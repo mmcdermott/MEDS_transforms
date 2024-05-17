@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "MEDS_polars_functions"
+version = "0.0.1"
+authors = [
+  { name="Matthew McDermott", email="mattmcdermott8@gmail.com" },
+]
+description = "MEDS ETL and transformation functions leveraging a sharding-based parallelism model & polars."
+readme = "README.md"
+requires-python = ">=3.12"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = ["polars", "nested_ragged_tensors", "loguru"]
+
+[project.optional-dependencies]
+dev = ["pre-commit"]
+tests = ["pytest", "pytest-cov"]
+
+[project.urls]
+Homepage = "https://github.com/mmcdermott/MEDS_polars_functions"
+Issues = "https://github.com/mmcdermott/MEDS_polars_functions/issues"
