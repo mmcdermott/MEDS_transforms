@@ -50,17 +50,22 @@ def shard_patients[
         >>> patients = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         >>> shard_patients(patients, n_patients_per_shard=3)
         {'train/0': [9, 4, 8], 'train/1': [2, 1, 10], 'train/2': [6, 5], 'tuning/0': [3], 'held_out/0': [7]}
-        >>> external_splits = {'taskA/held_out': [8, 9, 10]}
+        >>> external_splits = {'taskA/held_out': [8, 9, 10], 'taskB/held_out': [10, 8, 9]}
         >>> shard_patients(patients, 3, external_splits) # doctest: +NORMALIZE_WHITESPACE
         {'train/0': [5, 7, 4],
          'train/1': [1, 2],
          'tuning/0': [3],
          'held_out/0': [6],
-         'taskA/held_out/0': [8, 9, 10]}
+         'taskA/held_out/0': [8, 9, 10],
+         'taskB/held_out/0': [10, 8, 9]}
         >>> shard_patients(patients, n_patients_per_shard=3, split_fracs_dict={'train': 0.5})
         Traceback (most recent call last):
             ...
         ValueError: The sum of the split fractions must be equal to 1.
+        >>> shard_patients([1, 2], n_patients_per_shard=3)
+        Traceback (most recent call last):
+            ...
+        ValueError: Unable to adjust splits to ensure all splits have at least 1 patient.
     """
 
     if sum(split_fracs_dict.values()) != 1:
@@ -114,4 +119,18 @@ def shard_patients[
             for i, shard in enumerate(shards):
                 sharded_splits[f"{sp}/{i}"] = list(shard)
 
-    return {sp: [pt_id_type(pt) for pt in pts] for sp, pts in sharded_splits.items()}
+    final_shards = {sp: [pt_id_type(pt) for pt in pts] for sp, pts in sharded_splits.items()}
+
+    seen = {}
+
+    for k, pts in final_shards.items():
+        logger.info(f"Split {k} has {len(pts)} patients.")
+
+        for kk, v in seen.items():
+            shared = set(pts).intersection(v)
+            if shared:
+                logger.info(f"  - intersects {kk} on {len(shared)} patients.")
+
+        seen[k] = set(pts)
+
+    return final_shards

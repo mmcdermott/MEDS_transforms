@@ -1,0 +1,26 @@
+# Raw data
+raw_data_dir: ???
+MEDS_cohort_dir: ???
+
+# Splits
+external_splits_json_fp: ???
+split_fracs:
+  train: 0.8
+  tuning: 0.1
+  held_out: 0.1
+
+# Sharding
+row_chunksize: 200000000
+n_patients_per_shard: 50000
+
+# Misc
+do_overwrite: False
+
+# Hydra
+hydra:
+  job:
+    name: MEDS_ETL_step_${now:%Y-%m-%d_%H-%M-%S}
+  run:
+    dir: ${MEDS_cohort_dir}/.logs/etl/${hydra.job.name}
+  sweep:
+    dir: ${MEDS_cohort_dir}/.logs/etl/${hydra.job.name}
