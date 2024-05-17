@@ -35,7 +35,8 @@ Assumptions:
 
 1. Your data is organized in a set of parquet files on disk such that each row of each file corresponds to
    one or more measurements per patient and has all necessary information in that row to extract said
-   measurement, organized in a simple, columnar format.
+   measurement, organized in a simple, columnar format. Each of these parquet files stores the patient's ID in
+   a column called `patient_id` in the same type.
 2. You have a pre-defined or can externally define the requisite MEDS base `code_metadata` file that
    describes the codes in your data as necessary. This file is not used in the provided pre-processing
    pipeline in this package, but is necessary for other uses of the MEDS data.

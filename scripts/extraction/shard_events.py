@@ -21,7 +21,7 @@ def scan_with_row_idx(fp: Path) -> pl.LazyFrame:
 
 
 def filter_to_row_chunk(df: pl.LazyFrame, start: int, end: int) -> pl.LazyFrame:
-    return df.filter(pl.col(ROW_IDX_NAME).is_between(start, end, closed="left"))
+    return df.filter(pl.col(ROW_IDX_NAME).is_between(start, end, closed="left")).drop(ROW_IDX_NAME)
 
 
 def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
@@ -40,7 +40,6 @@ def main(cfg: DictConfig):
     hydra_loguru_init()
 
     raw_cohort_dir = Path(cfg.raw_cohort_dir)
-    Path(cfg.MEDS_cohort_dir)
     row_chunksize = cfg.row_chunksize
 
     input_files_to_subshard = list(raw_cohort_dir.glob("raw/*.parquet"))
