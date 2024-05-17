@@ -2,6 +2,9 @@
 raw_data_dir: ???
 MEDS_cohort_dir: ???
 
+# Event Conversion
+event_conversion_config_fp: ???
+
 # Splits
 external_splits_json_fp: null
 split_fracs:
