@@ -1,3 +1,5 @@
+"""Basic utilities for parallelizable map operations on sharded MEDS datasets with caching and locking."""
+
 import json
 import shutil
 from collections.abc import Callable

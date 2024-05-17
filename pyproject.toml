@@ -16,7 +16,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-dependencies = ["polars", "nested_ragged_tensors", "loguru"]
+dependencies = ["polars", "nested_ragged_tensors", "loguru", "hydra-core"]
 
 [project.optional-dependencies]
 dev = ["pre-commit"]
