@@ -75,4 +75,33 @@ The ETL scripts all use [Hydra](https://hydra.cc/) for configuration management,
 `configs/extraction.yaml` file for configuration. The user can override any of these settings in the normal
 way for Hydra configurations.
 
+#### Input Event Extraction
+
+Input events extraction configurations are defined through a simple configuration file language, stored in
+YAML form on disk, which specified for a collection of events how the individual rows from the various input
+dataframes should be parsed into different event formats. The YAML file stores a simple dictionary with the
+following structure:
+
+```yaml
+$INPUT_FILE_STEM:
+    $EVENT_NAME:
+        code: $CODE
+        timestamp: $TIMESTAMP
+        $MEDS_COLUMN_NAME: $RAW_COLUMN_NAME
+        ...
+    ...
+...
+```
+
+In this structure, `$INPUT_FILE_STEM` is the stem of the input file name, `$EVENT_NAME` is the name of a
+particular kind of event that can be extracted from the input file, `$CODE` is the code for the event, either
+as a constant string or (with the syntax `"col($COLUMN)"` the name of the column in the raw data to be read to
+get the code), and `$TIMESTAMP` is the timestamp for the event, either as `null` to indicate the event has a
+null timestamp (e.g., a static measurement) or with the `"col($COLUMN)"` syntax refenced above, and all
+subsequent key-value pairs are mappings from the MEDS column name to the raw column name in the input data.
+Here, these mappings can _only_ point to columns in the input data, not constant values, and the input data
+columns must be either string or categorical types (in which case they will be converted to categorical) or
+numeric types. You can see this extraction logic in the `scripts/extraction/convert_to_sharded_events.py`
+file, in the `extract_event` function.
+
 ### Pre-processing
