@@ -469,7 +469,6 @@ def filter_and_convert[
     PT_ID_T
 ](df: pl.LazyFrame, event_cfgs: dict[str, dict[str, str | None]], patients: list[PT_ID_T]) -> pl.LazyFrame:
     """Filters the DataFrame and converts it into events."""
-
     return convert_to_events(df.filter(pl.col("patient_id").isin(patients)), event_cfgs)
 
 
