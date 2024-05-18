@@ -303,7 +303,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
     return df.select(**event_exprs).unique(maintain_order=True)
 
 
-def convert_to_event(df: pl.LazyFrame, event_cfgs: dict[str, dict[str, str | None]]) -> pl.LazyFrame:
+def convert_to_events(df: pl.LazyFrame, event_cfgs: dict[str, dict[str, str | None]]) -> pl.LazyFrame:
     """Converts a DataFrame of raw data into a DataFrame of events.
 
     Args:
@@ -332,7 +332,125 @@ def convert_to_event(df: pl.LazyFrame, event_cfgs: dict[str, dict[str, str | Non
         ValueError: If no event configurations are provided or if an error occurs during event extraction.
 
     Examples:
-    """
+        >>> _ = pl.Config.set_tbl_rows(20)
+        >>> from datetime import datetime
+        >>> complex_raw_data = pl.DataFrame(
+        ...     {
+        ...         "patient_id": [1, 1, 2, 2, 2, 3],
+        ...         "admission_time": [
+        ...             "2021-01-01 00:00:00",
+        ...             "2021-01-02 00:00:00",
+        ...             "2021-01-03 00:00:00",
+        ...             "2021-01-04 00:00:00",
+        ...             "2021-01-05 00:00:00",
+        ...             "2021-01-06 00:00:00",
+        ...         ],
+        ...         "discharge_time": [
+        ...             datetime(2021, 1, 1, 11, 23, 45),
+        ...             datetime(2021, 1, 2, 12, 34, 56),
+        ...             datetime(2021, 1, 3, 13, 45, 56),
+        ...             datetime(2021, 1, 4, 14, 56, 45),
+        ...             datetime(2021, 1, 5, 15, 23, 45),
+        ...             datetime(2021, 1, 6, 16, 34, 56),
+        ...         ],
+        ...         "admission_type": ["A", "B", "C", "D", "E", "F"],
+        ...         "discharge_location": ["Home", "SNF", "Home", "SNF", "Home", "SNF"],
+        ...         "severity_score": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        ...         "death_time": [
+        ...             "2023/01/01",
+        ...             "2023/01/01",
+        ...             "2023/01/04",
+        ...             "2023/01/04",
+        ...             "2023/01/04",
+        ...             "2023/01/07"
+        ...         ],
+        ...         "eye_color": ["blue", "blue", "green", "green", "green", "brown"],
+        ...     },
+        ...     schema={
+        ...         "patient_id": pl.UInt8,
+        ...         "admission_time": pl.Utf8,
+        ...         "discharge_time": pl.Datetime,
+        ...         "admission_type": pl.Utf8,
+        ...         "discharge_location": pl.Categorical,
+        ...         "severity_score": pl.Float64,
+        ...         "death_time": pl.Utf8,
+        ...         "eye_color": pl.Categorical,
+        ...     },
+        ... )
+        >>> event_cfgs = {
+        ...     "admission": {
+        ...         "code": "ADMISSION",
+        ...         "timestamp": "col(admission_time)",
+        ...         "timestamp_format": "%Y-%m-%d %H:%M:%S",
+        ...         "admission_type": "admission_type",
+        ...         "severity_on_admission": "severity_score",
+        ...     },
+        ...     "discharge": {
+        ...         "code": "DISCHARGE",
+        ...         "timestamp": "col(discharge_time)",
+        ...         "discharge_location": "discharge_location",
+        ...     },
+        ...     "death": {
+        ...         "code": "DEATH",
+        ...         "timestamp": "col(death_time)",
+        ...         "timestamp_format": "%Y/%m/%d",
+        ...     },
+        ...     "eye_color": {
+        ...         "code": "EYE_COLOR",
+        ...         "timestamp": None,
+        ...         "eye_color": "eye_color",
+        ...     },
+        ... }
+        >>> # We'll print the raw data so you can see what it looks like
+        >>> complex_raw_data
+        shape: (6, 8)
+        ┌────────────┬─────────────────────┬─────────────────────┬────────────────┬────────────────────┬────────────────┬────────────┬───────────┐
+        │ patient_id ┆ admission_time      ┆ discharge_time      ┆ admission_type ┆ discharge_location ┆ severity_score ┆ death_time ┆ eye_color │
+        │ ---        ┆ ---                 ┆ ---                 ┆ ---            ┆ ---                ┆ ---            ┆ ---        ┆ ---       │
+        │ u8         ┆ str                 ┆ datetime[μs]        ┆ str            ┆ cat                ┆ f64            ┆ str        ┆ cat       │
+        ╞════════════╪═════════════════════╪═════════════════════╪════════════════╪════════════════════╪════════════════╪════════════╪═══════════╡
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ 2021-01-01 11:23:45 ┆ A              ┆ Home               ┆ 1.0            ┆ 2023/01/01 ┆ blue      │
+        │ 1          ┆ 2021-01-02 00:00:00 ┆ 2021-01-02 12:34:56 ┆ B              ┆ SNF                ┆ 2.0            ┆ 2023/01/01 ┆ blue      │
+        │ 2          ┆ 2021-01-03 00:00:00 ┆ 2021-01-03 13:45:56 ┆ C              ┆ Home               ┆ 3.0            ┆ 2023/01/04 ┆ green     │
+        │ 2          ┆ 2021-01-04 00:00:00 ┆ 2021-01-04 14:56:45 ┆ D              ┆ SNF                ┆ 4.0            ┆ 2023/01/04 ┆ green     │
+        │ 2          ┆ 2021-01-05 00:00:00 ┆ 2021-01-05 15:23:45 ┆ E              ┆ Home               ┆ 5.0            ┆ 2023/01/04 ┆ green     │
+        │ 3          ┆ 2021-01-06 00:00:00 ┆ 2021-01-06 16:34:56 ┆ F              ┆ SNF                ┆ 6.0            ┆ 2023/01/07 ┆ brown     │
+        └────────────┴─────────────────────┴─────────────────────┴────────────────┴────────────────────┴────────────────┴────────────┴───────────┘
+        >>> convert_to_events(complex_raw_data, event_cfgs)
+        shape: (18, 7)
+        ┌────────────┬───────────┬─────────────────────┬────────────────┬───────────────────────┬────────────────────┬───────────┐
+        │ patient_id ┆ code      ┆ timestamp           ┆ admission_type ┆ severity_on_admission ┆ discharge_location ┆ eye_color │
+        │ ---        ┆ ---       ┆ ---                 ┆ ---            ┆ ---                   ┆ ---                ┆ ---       │
+        │ u8         ┆ cat       ┆ datetime[μs]        ┆ cat            ┆ f64                   ┆ cat                ┆ cat       │
+        ╞════════════╪═══════════╪═════════════════════╪════════════════╪═══════════════════════╪════════════════════╪═══════════╡
+        │ 1          ┆ ADMISSION ┆ 2021-01-01 00:00:00 ┆ A              ┆ 1.0                   ┆ null               ┆ null      │
+        │ 1          ┆ ADMISSION ┆ 2021-01-02 00:00:00 ┆ B              ┆ 2.0                   ┆ null               ┆ null      │
+        │ 2          ┆ ADMISSION ┆ 2021-01-03 00:00:00 ┆ C              ┆ 3.0                   ┆ null               ┆ null      │
+        │ 2          ┆ ADMISSION ┆ 2021-01-04 00:00:00 ┆ D              ┆ 4.0                   ┆ null               ┆ null      │
+        │ 2          ┆ ADMISSION ┆ 2021-01-05 00:00:00 ┆ E              ┆ 5.0                   ┆ null               ┆ null      │
+        │ 3          ┆ ADMISSION ┆ 2021-01-06 00:00:00 ┆ F              ┆ 6.0                   ┆ null               ┆ null      │
+        │ 1          ┆ DISCHARGE ┆ 2021-01-01 11:23:45 ┆ null           ┆ null                  ┆ Home               ┆ null      │
+        │ 1          ┆ DISCHARGE ┆ 2021-01-02 12:34:56 ┆ null           ┆ null                  ┆ SNF                ┆ null      │
+        │ 2          ┆ DISCHARGE ┆ 2021-01-03 13:45:56 ┆ null           ┆ null                  ┆ Home               ┆ null      │
+        │ 2          ┆ DISCHARGE ┆ 2021-01-04 14:56:45 ┆ null           ┆ null                  ┆ SNF                ┆ null      │
+        │ 2          ┆ DISCHARGE ┆ 2021-01-05 15:23:45 ┆ null           ┆ null                  ┆ Home               ┆ null      │
+        │ 3          ┆ DISCHARGE ┆ 2021-01-06 16:34:56 ┆ null           ┆ null                  ┆ SNF                ┆ null      │
+        │ 1          ┆ DEATH     ┆ 2023-01-01 00:00:00 ┆ null           ┆ null                  ┆ null               ┆ null      │
+        │ 2          ┆ DEATH     ┆ 2023-01-04 00:00:00 ┆ null           ┆ null                  ┆ null               ┆ null      │
+        │ 3          ┆ DEATH     ┆ 2023-01-07 00:00:00 ┆ null           ┆ null                  ┆ null               ┆ null      │
+        │ 1          ┆ EYE_COLOR ┆ null                ┆ null           ┆ null                  ┆ null               ┆ blue      │
+        │ 2          ┆ EYE_COLOR ┆ null                ┆ null           ┆ null                  ┆ null               ┆ green     │
+        │ 3          ┆ EYE_COLOR ┆ null                ┆ null           ┆ null                  ┆ null               ┆ brown     │
+        └────────────┴───────────┴─────────────────────┴────────────────┴───────────────────────┴────────────────────┴───────────┘
+        >>> convert_to_events(complex_raw_data, {})
+        Traceback (most recent call last):
+            ...
+        ValueError: No event configurations provided.
+        >>> convert_to_events(complex_raw_data, {"admission": {}})
+        Traceback (most recent call last):
+            ...
+        ValueError: Error extracting event admission: ...
+    """  # noqa: E501
 
     if not event_cfgs:
         raise ValueError("No event configurations provided.")
@@ -352,7 +470,7 @@ def filter_and_convert[
 ](df: pl.LazyFrame, event_cfgs: dict[str, dict[str, str | None]], patients: list[PT_ID_T]) -> pl.LazyFrame:
     """Filters the DataFrame and converts it into events."""
 
-    return convert_to_event(df.filter(pl.col("patient_id").isin(patients)), event_cfgs)
+    return convert_to_events(df.filter(pl.col("patient_id").isin(patients)), event_cfgs)
 
 
 def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
