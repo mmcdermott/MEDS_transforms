@@ -199,6 +199,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         │ 2          ┆ DEATH ┆ 2023-01-04 00:00:00 │
         │ 3          ┆ DEATH ┆ 2023-01-07 00:00:00 │
         └────────────┴───────┴─────────────────────┘
+        >>> # Note that the eye color is a static event, so the timestamp is null
         >>> extract_event(complex_raw_data, valid_static_event_cfg)
         shape: (3, 4)
         ┌────────────┬───────────┬──────────────┬───────────┐
@@ -210,8 +211,45 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         │ 2          ┆ EYE_COLOR ┆ null         ┆ green     │
         │ 3          ┆ EYE_COLOR ┆ null         ┆ brown     │
         └────────────┴───────────┴──────────────┴───────────┘
+        >>> extract_event(complex_raw_data, {"timestamp": "col(admission_time)"})
+        Traceback (most recent call last):
+            ...
+        KeyError: "Event configuration dictionary must contain 'code' and 'timestamp' keys."
+        >>> extract_event(complex_raw_data, {"code": "test"})
+        Traceback (most recent call last):
+            ..".
+        KeyError: "Event configuration dictionary must contain 'code' and 'timestamp' keys."
+        >>> extract_event(complex_raw_data, {"code": 34, "timestamp": "col(admission_time)"})
+        Traceback (most recent call last):
+            ...
+        ValueError: Invalid code literal: 34
+        >>> extract_event(complex_raw_data, {"code": "test", "timestamp": "12-01-23"})
+        Traceback (most recent call last):
+            ...
+        ValueError: Invalid timestamp literal: 12-01-23
+        >>> extract_event(complex_raw_data, {"code": "test", "timestamp": None, "patient_id": 3})
+        Traceback (most recent call last):
+            ...
+        KeyError: "Event column name 'patient_id' cannot be overridden."
+        >>> extract_event(complex_raw_data, {"code": "test", "timestamp": None, "foobar": "fuzz"})
+        Traceback (most recent call last):
+            ...
+        KeyError: "Source column 'fuzz' for event column foobar not found in DataFrame schema."
+        >>> extract_event(complex_raw_data, {"code": "test", "timestamp": None, "foobar": 32})
+        Traceback (most recent call last):
+            ...
+        ValueError: For event column foobar, source column 32 must be a string column name. Got <class 'int'>.
+        >>> extract_event(complex_raw_data, {"code": "test", "timestamp": None, "foobar": "discharge_time"})
+        Traceback (most recent call last):
+            ...
+        ValueError: Source column 'discharge_time' for event column foobar is not numeric or categorical! Cannot be used as an event col.
     """  # noqa: E501
     event_exprs = {"patient_id": pl.col("patient_id")}
+
+    if "code" not in event_cfg or "timestamp" not in event_cfg:
+        raise KeyError("Event configuration dictionary must contain 'code' and 'timestamp' keys.")
+    if "patient_id" in event_cfg:
+        raise KeyError("Event column name 'patient_id' cannot be overridden.")
 
     code = event_cfg.pop("code")
     match code:
@@ -220,7 +258,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         case str():
             event_exprs["code"] = pl.lit(code).cast(pl.Categorical)
         case _:
-            raise ValueError(f"Invalid code: {code}")
+            raise ValueError(f"Invalid code literal: {code}")
 
     ts = event_cfg.pop("timestamp")
     ts_format = event_cfg.pop("timestamp_format", None)
@@ -233,13 +271,22 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         case None:
             event_exprs["timestamp"] = pl.lit(None, dtype=pl.Datetime)
         case _:
-            raise ValueError(f"Invalid timestamp: {ts}")
+            raise ValueError(f"Invalid timestamp literal: {ts}")
 
     for k, v in event_cfg.items():
-        if k in event_exprs:
-            raise KeyError(f"Event column name {k} conflicts with core column name.")
-        elif v not in df.schema:
-            raise KeyError(f"Event column name {k} not found in DataFrame schema.")
+        if not isinstance(v, str):
+            raise ValueError(
+                f"For event column {k}, source column {v} must be a string column name. Got {type(v)}."
+            )
+        elif v.startswith("col(") and v.endswith(")"):
+            logger.warning(
+                f"Source column '{v}' for event column {k} is always interpreted as a column name. "
+                f"Removing col() function call and setting source column to {v[4:-1]}."
+            )
+            v = v[4:-1]
+
+        if v not in df.schema:
+            raise KeyError(f"Source column '{v}' for event column {k} not found in DataFrame schema.")
 
         col = pl.col(v)
         if df.schema[v] == pl.Utf8:
@@ -247,14 +294,45 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         elif isinstance(df.schema[v], pl.Categorical):
             pass
         elif not df.schema[v].is_numeric():
-            raise ValueError(f"Column {k} is not numeric or categorical! Cannot be used as an event col.")
+            raise ValueError(
+                f"Source column '{v}' for event column {k} is not numeric or categorical! "
+                "Cannot be used as an event col."
+            )
 
         event_exprs[k] = col
     return df.select(**event_exprs).unique(maintain_order=True)
 
 
 def convert_to_event(df: pl.LazyFrame, event_cfgs: dict[str, dict[str, str | None]]) -> pl.LazyFrame:
-    """Converts a DataFrame of raw data into a DataFrame of events."""
+    """Converts a DataFrame of raw data into a DataFrame of events.
+
+    Args:
+        df: The raw data DataFrame. This must have a `"patient_id"` column containing the patient ID. The
+            other columns it must have are determined by the `event_cfgs` configuration dictionary.
+            For the precise mechanism of column determination, see the `extract_event` function.
+        event_cfgs: A dictionary containing the configurations for the events to extract. The keys of this
+            dictionary should be the names of the events to extract (these are only used for logging, and will
+            not automatically appear in any manner in the output data), and the values should be dictionaries
+            containing the configuration for each event. Each event configuration dictionary should have the
+            same structure as the `event_cfg` dictionary in the `extract_event` function. Please see that
+            function for further details on how these configuration dictionaries should be structured and are
+            used to extract events.
+
+    Returns:
+        A DataFrame containing the events extracted from the raw data. This DataFrame will contain all the
+        events extracted from the raw data, with the rows from each event DataFrame concatenated together.
+        After concatenation, this dataframe will not be deduplicated, so if the raw data results in duplicates
+        across events of different name, these will be preserved in the output DataFrame.
+        The output DataFrame will contain at least three columns: `"patient_id"`, `"code"`, and `"timestamp"`.
+        If any events have additional columns, these will be included in the output DataFrame as well. All
+        columns across all event configurations will be included in the output DataFrame, with `null` values
+        filled in for events that do not have a particular column.
+
+    Raises:
+        ValueError: If no event configurations are provided or if an error occurs during event extraction.
+
+    Examples:
+    """
 
     if not event_cfgs:
         raise ValueError("No event configurations provided.")
