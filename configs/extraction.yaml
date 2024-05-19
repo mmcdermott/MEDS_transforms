@@ -1,5 +1,5 @@
 # Raw data
-raw_data_dir: ???
+raw_cohort_dir: ???
 MEDS_cohort_dir: ???
 
 # Event Conversion
