@@ -39,7 +39,7 @@ def main(cfg: DictConfig):
 
     shards = MEDS_cohort_dir / "splits.json"
 
-    logger.info(f"Starting patient shard merging with config:\n{cfg.pretty()}")
+    logger.info(f"Starting patient shard merging with config:\n{cfg.to_yaml()}")
 
     patient_subsharded_dir = raw_cohort_dir / "patient_sub_sharded_events"
     if not patient_subsharded_dir.exists():

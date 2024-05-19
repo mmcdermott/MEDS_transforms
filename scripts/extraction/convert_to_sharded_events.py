@@ -32,11 +32,11 @@ def main(cfg: DictConfig):
     if not event_conversion_cfg_fp.exists():
         raise FileNotFoundError(f"Event conversion config file not found: {event_conversion_cfg_fp}")
 
-    logger.info(f"Starting event conversion with config:\n{cfg.pretty()}")
+    logger.info(f"Starting event conversion with config:\n{cfg.to_yaml()}")
 
     logger.info(f"Reading event conversion config from {event_conversion_cfg_fp}")
     event_conversion_cfg = OmegaConf.load(event_conversion_cfg_fp)
-    logger.info(f"Event conversion config:\n{event_conversion_cfg.pretty()}")
+    logger.info(f"Event conversion config:\n{event_conversion_cfg.to_yaml()}")
 
     default_patient_id_col = event_conversion_cfg.pop("patient_id_col", "patient_id")
 
