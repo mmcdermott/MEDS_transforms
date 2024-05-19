@@ -47,8 +47,8 @@ def main(cfg: DictConfig):
 
     logger.info(f"Starting event sub-sharding. Sub-sharding {len(input_files_to_subshard)} files.")
     logger.info(
-        f"Will read raw data from {raw_cohort_dir}/raw/$IN_FILE.parquet and write sub-sharded data to "
-        f"{raw_cohort_dir}/sub_sharded/$IN_FILE/$ROW_START-$ROW_END.parquet"
+        f"Will read raw data from {str(raw_cohort_dir.resolve())}/$IN_FILE.parquet and write sub-sharded "
+        f"data to {str(MEDS_cohort_dir.resolve())}/sub_sharded/$IN_FILE/$ROW_START-$ROW_END.parquet"
     )
 
     random.shuffle(input_files_to_subshard)
