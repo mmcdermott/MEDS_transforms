@@ -43,7 +43,9 @@ def main(cfg: DictConfig):
         logger.info(f"Reading patient IDs from {input_prefix} files: {input_fp}")
 
         dfs.append(
-            pl.scan_parquet(input_fp).select(pl.col(input_patient_id_column).alias("patient_id")).unique()
+            pl.scan_parquet(input_fp, glob=False)
+            .select(pl.col(input_patient_id_column).alias("patient_id"))
+            .unique()
         )
 
     logger.info(f"Joining all patient IDs from {len(dfs)} dataframes")

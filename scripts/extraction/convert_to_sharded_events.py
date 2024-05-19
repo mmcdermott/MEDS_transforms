@@ -13,11 +13,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from MEDS_polars_functions.event_conversion import convert_to_events
 from MEDS_polars_functions.mapper import wrap as rwlock_wrap
-from MEDS_polars_functions.utils import hydra_loguru_init
-
-
-def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
-    df.collect().write_parquet(out_fp, use_pyarrow=True)
+from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
 
 
 @hydra.main(version_base=None, config_path="../../configs", config_name="extraction")
@@ -84,7 +80,9 @@ def main(cfg: DictConfig):
                             f"Error converting {str(shard_fp.resolve())} for {sp}/{input_prefix}: {e}"
                         ) from e
 
-                rwlock_wrap(shard_fp, out_fp, read_fn, write_fn, compute_fn)
+                rwlock_wrap(
+                    shard_fp, out_fp, read_fn, write_lazyframe, compute_fn, do_overwrite=cfg.do_overwrite
+                )
 
     logger.info("Subsharded into converted events.")
 

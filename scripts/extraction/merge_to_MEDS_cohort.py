@@ -35,7 +35,6 @@ def main(cfg: DictConfig):
 
     hydra_loguru_init()
 
-    Path(cfg.raw_cohort_dir)
     MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
 
     shards = json.loads((MEDS_cohort_dir / "splits.json").read_text())
@@ -43,7 +42,7 @@ def main(cfg: DictConfig):
     logger.info("Starting patient shard merging.")
 
     patient_subsharded_dir = MEDS_cohort_dir / "patient_sub_sharded_events"
-    if not patient_subsharded_dir.exists():
+    if not patient_subsharded_dir.is_dir():
         raise FileNotFoundError(f"Patient sub-sharded directory not found: {patient_subsharded_dir}")
 
     patient_splits = list(shards.keys())
