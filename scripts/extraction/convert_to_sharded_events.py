@@ -41,6 +41,7 @@ def main(cfg: DictConfig):
     default_patient_id_col = event_conversion_cfg.pop("patient_id_col", "patient_id")
 
     patient_subsharded_dir = MEDS_cohort_dir / "patient_sub_sharded_events"
+    patient_subsharded_dir.mkdir(parents=True, exist_ok=True)
     OmegaConf.save(event_conversion_cfg, patient_subsharded_dir / "event_conversion_config.yaml")
 
     patient_splits = list(shards.items())
