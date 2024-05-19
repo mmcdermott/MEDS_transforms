@@ -47,7 +47,7 @@ def shard_patients[
         ValueError: If the sum of the split fractions in `split_fracs_dict` is not equal to 1.
 
     Examples:
-        >>> patients = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        >>> patients = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], dtype=int)
         >>> shard_patients(patients, n_patients_per_shard=3)
         {'train/0': [9, 4, 8], 'train/1': [2, 1, 10], 'train/2': [6, 5], 'tuning/0': [3], 'held_out/0': [7]}
         >>> external_splits = {'taskA/held_out': [8, 9, 10], 'taskB/held_out': [10, 8, 9]}
@@ -104,23 +104,21 @@ def shard_patients[
     patients = rng.permutation(patient_ids_to_split)
     patients_per_split = np.split(patients, split_lens.cumsum())
 
-    splits = {k: list(v) for k, v in zip(split_names, patients_per_split)}
+    splits = {k: v for k, v in zip(split_names, patients_per_split)}
     splits = {**splits, **external_splits}
 
     # Sharding
-    sharded_splits = {}
+    final_shards = {}
     for sp, pts in splits.items():
         if len(pts) <= n_patients_per_shard:
-            sharded_splits[f"{sp}/0"] = pts
+            final_shards[f"{sp}/0"] = pts.tolist()
         else:
             pts = rng.permutation(pts)
             n_pts = len(pts)
             n_shards = int(np.ceil(n_pts / n_patients_per_shard))
             shards = np.array_split(pts, n_shards)
             for i, shard in enumerate(shards):
-                sharded_splits[f"{sp}/{i}"] = list(shard)
-
-    final_shards = {sp: pts.tolist() for sp, pts in sharded_splits.items()}
+                final_shards[f"{sp}/{i}"] = shard.to_list()
 
     seen = {}
 
