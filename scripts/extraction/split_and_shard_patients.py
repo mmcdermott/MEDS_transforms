@@ -6,7 +6,7 @@ from pathlib import Path
 import hydra
 import polars as pl
 from loguru import logger
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from MEDS_polars_functions.sharding import shard_patients
 from MEDS_polars_functions.utils import hydra_loguru_init
@@ -20,18 +20,36 @@ def main(cfg: DictConfig):
 
     logger.info("Starting patient splitting and sharding")
 
-    raw_cohort_dir = Path(cfg.raw_cohort_dir)
     MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
-    subsharded_input_files = list(MEDS_cohort_dir.glob("sub_sharded/*/*.parquet"))
+    subsharded_dir = MEDS_cohort_dir / "sub_sharded"
 
-    if subsharded_input_files:
-        logger.info("Subsharded input files found. Using them.")
-        input_path = raw_cohort_dir / "sub_sharded" / "*" / "*.parquet"
-    elif list(raw_cohort_dir.glob("*.parquet")):
-        logger.info("No subsharded input files found. Using raw input files.")
-        input_path = raw_cohort_dir / "raw" / "*.parquet"
-    else:
-        raise FileNotFoundError("No input files found in either 'raw' or 'sub_sharded' directories.")
+    event_conversion_cfg_fp = Path(cfg.event_conversion_config_fp)
+    if not event_conversion_cfg_fp.exists():
+        raise FileNotFoundError(f"Event conversion config file not found: {event_conversion_cfg_fp}")
+
+    logger.info(
+        f"Reading event conversion config from {event_conversion_cfg_fp} (needed for patient ID columns)"
+    )
+    event_conversion_cfg = OmegaConf.load(event_conversion_cfg_fp)
+    logger.info(f"Event conversion config:\n{OmegaConf.to_yaml(event_conversion_cfg)}")
+
+    dfs = []
+
+    default_patient_id_col = event_conversion_cfg.pop("patient_id_col", "patient_id")
+    for input_prefix, event_cfgs in event_conversion_cfg.items():
+        input_patient_id_column = event_cfgs.get("patient_id_col", default_patient_id_col)
+
+        input_fp = subsharded_dir / input_prefix / "*.parquet"
+        logger.info(f"Reading patient IDs from {input_prefix} files: {input_fp}")
+
+        dfs.append(
+            pl.scan_parquet(input_fp).select(pl.col(input_patient_id_column).alias("patient_id")).unique()
+        )
+
+    logger.info(f"Joining all patient IDs from {len(dfs)} dataframes")
+    patient_ids = pl.concat(dfs).select(pl.col("patient_id").unique()).collect(streaming=True).to_list()
+
+    logger.info(f"Found {len(patient_ids)} unique patient IDs")
 
     if cfg.external_splits_json_fp:
         external_splits_json_fp = Path(cfg.external_splits_json_fp)
@@ -44,12 +62,8 @@ def main(cfg: DictConfig):
         size_strs = ", ".join(f"{k}: {len(v)}" for k, v in external_splits.items())
         logger.info(f"Loaded external splits of size: {size_strs}")
 
-    logger.info(f"Reading patient IDs from {input_path}")
-    patient_ids = (
-        pl.scan_parquet(input_path).select(pl.col("patient_id").unique()).collect(streaming=True).to_list()
-    )
+    logger.info("Sharding and splitting patients")
 
-    logger.info(f"Found {len(patient_ids)} unique patient IDs. Sharding and splitting")
     sharded_patients = shard_patients(
         patients=patient_ids,
         external_splits=external_splits,
