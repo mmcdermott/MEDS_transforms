@@ -28,7 +28,7 @@ def identity_fn(df: pl.LazyFrame) -> pl.LazyFrame:
     return df
 
 
-@hydra.main(version_base=None, config_path="configs", config_name="extraction")
+@hydra.main(version_base=None, config_path="../../configs", config_name="extraction")
 def main(cfg: DictConfig):
     """Merges the patient sub-sharded events into a single parquet file per patient shard."""
 

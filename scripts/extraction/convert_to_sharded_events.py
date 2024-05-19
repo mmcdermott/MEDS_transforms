@@ -17,7 +17,7 @@ def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
     df.collect().write_parquet(out_fp, use_pyarrow=True)
 
 
-@hydra.main(version_base=None, config_path="configs", config_name="extraction")
+@hydra.main(version_base=None, config_path="../../configs", config_name="extraction")
 def main(cfg: DictConfig):
     """Converts the sub-sharded or raw data into events which are sharded by patient X input shard."""
 

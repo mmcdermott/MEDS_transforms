@@ -12,7 +12,7 @@ from MEDS_polars_functions.sharding import shard_patients
 from MEDS_polars_functions.utils import hydra_loguru_init
 
 
-@hydra.main(version_base=None, config_path="configs", config_name="extraction")
+@hydra.main(version_base=None, config_path="../../configs", config_name="extraction")
 def main(cfg: DictConfig):
     """Extracts the set of unique patients from the raw data and splits/shards them and saves the result."""
 

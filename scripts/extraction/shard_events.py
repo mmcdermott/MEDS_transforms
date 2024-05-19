@@ -28,7 +28,7 @@ def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
     df.collect().write_parquet(out_fp, use_pyarrow=True)
 
 
-@hydra.main(version_base=None, config_path="configs", config_name="extraction")
+@hydra.main(version_base=None, config_path="../../configs", config_name="extraction")
 def main(cfg: DictConfig):
     """Runs the input data re-sharding process. Can be parallelized across output shards.
 
