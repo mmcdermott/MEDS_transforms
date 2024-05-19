@@ -250,6 +250,9 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
 
     codes = event_cfg.pop("code")
     if not isinstance(codes, list):
+        logger.debug(
+            f"Event code '{codes}' is a {type(codes)}, not a list. Automatically converting to a list."
+        )
         codes = [codes]
 
     code_exprs = []
