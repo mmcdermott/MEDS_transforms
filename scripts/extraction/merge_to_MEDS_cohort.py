@@ -12,6 +12,8 @@ from omegaconf import DictConfig
 from MEDS_polars_functions.mapper import wrap as rwlock_wrap
 from MEDS_polars_functions.utils import hydra_loguru_init
 
+pl.enable_string_cache()
+
 
 def read_fn(sp_dir: Path) -> pl.LazyFrame:
     dfs = []
