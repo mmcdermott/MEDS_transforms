@@ -39,14 +39,17 @@ def main(cfg: DictConfig):
     for input_prefix, event_cfgs in event_conversion_cfg.items():
         input_patient_id_column = event_cfgs.get("patient_id_col", default_patient_id_col)
 
-        input_fp = subsharded_dir / input_prefix / "*.parquet"
-        logger.info(f"Reading patient IDs from {input_prefix} files: {input_fp}")
+        input_fps = list((subsharded_dir / input_prefix).glob("*.parquet"))
 
-        dfs.append(
-            pl.scan_parquet(input_fp, glob=False)
-            .select(pl.col(input_patient_id_column).alias("patient_id"))
-            .unique()
-        )
+        input_fps_strs = "\n".join(f"  - {str(fp.resolve())}" for fp in input_fps)
+        logger.info(f"Reading patient IDs from {input_prefix} files:\n{input_fps_strs}")
+
+        for input_fp in input_fps:
+            dfs.append(
+                pl.scan_parquet(input_fp, glob=False)
+                .select(pl.col(input_patient_id_column).alias("patient_id"))
+                .unique()
+            )
 
     logger.info(f"Joining all patient IDs from {len(dfs)} dataframes")
     patient_ids = (
