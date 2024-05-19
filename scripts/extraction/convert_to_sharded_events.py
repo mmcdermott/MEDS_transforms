@@ -2,6 +2,7 @@
 
 import json
 import random
+from functools import partial
 from pathlib import Path
 
 import hydra
@@ -51,6 +52,9 @@ def main(cfg: DictConfig):
     event_configs = list(event_conversion_cfg.items())
     random.shuffle(event_configs)
 
+    # Here, we'll be reading files directly, so we'll turn off globbing
+    read_fn = partial(pl.scan_parquet, glob=False)
+
     for sp, patients in patient_splits:
         for input_prefix, event_cfgs in event_configs:
             input_patient_id_column = event_cfgs.get("patient_id_col", default_patient_id_col)
@@ -77,7 +81,7 @@ def main(cfg: DictConfig):
                             f"Error converting {str(shard_fp.resolve())} for {sp}/{input_prefix}: {e}"
                         ) from e
 
-                rwlock_wrap(shard_fp, out_fp, pl.scan_parquet, write_fn, compute_fn)
+                rwlock_wrap(shard_fp, out_fp, read_fn, write_fn, compute_fn)
 
     logger.info("Subsharded into converted events.")
 
