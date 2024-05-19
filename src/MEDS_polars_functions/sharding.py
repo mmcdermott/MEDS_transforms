@@ -9,12 +9,12 @@ from loguru import logger
 def shard_patients[
     SUBJ_ID_T
 ](
-    patients: Sequence[SUBJ_ID_T],
+    patients: np.ndarray,
     n_patients_per_shard: int = 50000,
     external_splits: dict[str, Sequence[SUBJ_ID_T]] | None = None,
     split_fracs_dict: dict[str, float] = {"train": 0.8, "tuning": 0.1, "held_out": 0.1},
     seed: int = 1,
-) -> dict[str, list[int]]:
+) -> dict[str, list[SUBJ_ID_T]]:
     """Shard a list of patients, nested within train/tuning/held-out splits.
 
     This function takes a list of patients and shards them into train/tuning/held-out splits, with the shards
@@ -74,11 +74,12 @@ def shard_patients[
     if external_splits is None:
         external_splits = {}
 
-    pt_id_type = type(patients[0])
+    patients = np.unique(patients)
 
     # Splitting
-
-    patient_ids_to_split = list(set(patients) - set().union(*external_splits.values()))
+    all_external_splits = set().union(*external_splits.values())
+    is_in_external_split = np.isin(patients, list(all_external_splits))
+    patient_ids_to_split = patients[~is_in_external_split]
 
     n_patients = len(patient_ids_to_split)
 
@@ -119,7 +120,7 @@ def shard_patients[
             for i, shard in enumerate(shards):
                 sharded_splits[f"{sp}/{i}"] = list(shard)
 
-    final_shards = {sp: [pt_id_type(pt) for pt in pts] for sp, pts in sharded_splits.items()}
+    final_shards = {sp: pts.tolist() for sp, pts in sharded_splits.items()}
 
     seen = {}
 
