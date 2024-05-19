@@ -4,6 +4,7 @@ from functools import reduce
 
 import polars as pl
 from loguru import logger
+from omegaconf.listconfig import ListConfig
 
 
 def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.LazyFrame:
@@ -249,7 +250,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         raise KeyError("Event column name 'patient_id' cannot be overridden.")
 
     codes = event_cfg.pop("code")
-    if not isinstance(codes, list):
+    if not isinstance(codes, (list, ListConfig)):
         logger.debug(
             f"Event code '{codes}' is a {type(codes)}, not a list. Automatically converting to a list."
         )
