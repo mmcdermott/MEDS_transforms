@@ -44,7 +44,7 @@ def main(cfg: DictConfig):
 
     input_files_to_subshard = list(raw_cohort_dir.glob("raw/*.parquet"))
 
-    logger.info(f"Starting extraction with config:\n{cfg.to_yaml()}")
+    logger.info("Starting event sub-sharding.")
     logger.info(
         f"Will read raw data from {raw_cohort_dir}/raw/$IN_FILE.parquet and write sub-sharded data to "
         f"{raw_cohort_dir}/sub_sharded/$IN_FILE/$ROW_START-$ROW_END.parquet"

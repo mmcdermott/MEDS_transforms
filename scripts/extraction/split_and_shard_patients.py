@@ -18,7 +18,7 @@ def main(cfg: DictConfig):
 
     hydra_loguru_init()
 
-    logger.info(f"Starting patient splitting and sharding with config:\n{cfg.to_yaml()}")
+    logger.info("Starting patient splitting and sharding")
 
     raw_cohort_dir = Path(cfg.raw_cohort_dir)
     MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
