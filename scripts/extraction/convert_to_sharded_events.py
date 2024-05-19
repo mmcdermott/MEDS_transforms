@@ -2,6 +2,7 @@
 
 import json
 import random
+from copy import deepcopy
 from functools import partial
 from pathlib import Path
 
@@ -77,7 +78,7 @@ def main(cfg: DictConfig):
                         )
 
                     try:
-                        return convert_to_events(df, event_cfgs=event_cfgs)
+                        return convert_to_events(df, event_cfgs=deepcopy(event_cfgs))
                     except Exception as e:
                         raise ValueError(
                             f"Error converting {str(shard_fp.resolve())} for {sp}/{input_prefix}: {e}"
