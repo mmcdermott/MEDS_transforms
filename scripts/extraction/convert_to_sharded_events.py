@@ -67,15 +67,17 @@ def main(cfg: DictConfig):
                 logger.info(f"Converting {shard_fp} to events and saving to {out_fp}")
 
                 def compute_fn(df: pl.LazyFrame) -> pl.LazyFrame:
+                    typed_patients = pl.Series(patients, dtype=df.schema[input_patient_id_column])
+
                     if input_patient_id_column != "patient_id":
                         df = (
                             df.with_columns(pl.col(input_patient_id_column).alias("patient_id"))
                             .drop(input_patient_id_column)
-                            .filter(pl.col("patient_id").is_in(patients))
+                            .filter(pl.col("patient_id").is_in(typed_patients))
                         )
 
                     try:
-                        convert_to_events(df, event_cfgs=event_cfgs, patients=patients)
+                        convert_to_events(df, event_cfgs=event_cfgs)
                     except Exception as e:
                         raise ValueError(
                             f"Error converting {str(shard_fp.resolve())} for {sp}/{input_prefix}: {e}"
