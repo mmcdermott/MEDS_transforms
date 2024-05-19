@@ -22,12 +22,12 @@ def main(cfg: DictConfig):
 
     raw_cohort_dir = Path(cfg.raw_cohort_dir)
     MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
-    subsharded_input_files = list(raw_cohort_dir.glob("sub_sharded/*/*.parquet"))
+    subsharded_input_files = list(MEDS_cohort_dir.glob("sub_sharded/*/*.parquet"))
 
     if subsharded_input_files:
         logger.info("Subsharded input files found. Using them.")
         input_path = raw_cohort_dir / "sub_sharded" / "*" / "*.parquet"
-    elif list(raw_cohort_dir.glob("raw/*.parquet")):
+    elif list(raw_cohort_dir.glob("*.parquet")):
         logger.info("No subsharded input files found. Using raw input files.")
         input_path = raw_cohort_dir / "raw" / "*.parquet"
     else:

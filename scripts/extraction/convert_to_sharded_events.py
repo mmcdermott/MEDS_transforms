@@ -23,7 +23,7 @@ def main(cfg: DictConfig):
 
     hydra_loguru_init()
 
-    raw_cohort_dir = Path(cfg.raw_cohort_dir)
+    Path(cfg.raw_cohort_dir)
     MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
 
     shards = MEDS_cohort_dir / "splits.json"
@@ -40,7 +40,7 @@ def main(cfg: DictConfig):
 
     default_patient_id_col = event_conversion_cfg.pop("patient_id_col", "patient_id")
 
-    patient_subsharded_dir = raw_cohort_dir / "patient_sub_sharded_events"
+    patient_subsharded_dir = MEDS_cohort_dir / "patient_sub_sharded_events"
     OmegaConf.save(event_conversion_cfg, patient_subsharded_dir / "event_conversion_config.yaml")
 
     patient_splits = list(shards.items())
@@ -53,7 +53,7 @@ def main(cfg: DictConfig):
         for input_prefix, event_cfgs in event_configs:
             input_patient_id_column = event_cfgs.get("patient_id_col", default_patient_id_col)
 
-            event_shards = list((raw_cohort_dir / "sub_sharded" / input_prefix).glob("*.parquet"))
+            event_shards = list((MEDS_cohort_dir / "sub_sharded" / input_prefix).glob("*.parquet"))
             random.shuffle(event_shards)
 
             for shard_fp in event_shards:

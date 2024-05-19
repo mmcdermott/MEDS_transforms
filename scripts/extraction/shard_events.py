@@ -40,11 +40,12 @@ def main(cfg: DictConfig):
     hydra_loguru_init()
 
     raw_cohort_dir = Path(cfg.raw_cohort_dir)
+    MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
     row_chunksize = cfg.row_chunksize
 
-    input_files_to_subshard = list(raw_cohort_dir.glob("raw/*.parquet"))
+    input_files_to_subshard = list(raw_cohort_dir.glob("*.parquet"))
 
-    logger.info("Starting event sub-sharding.")
+    logger.info(f"Starting event sub-sharding. Sub-sharding {len(input_files_to_subshard)} files.")
     logger.info(
         f"Will read raw data from {raw_cohort_dir}/raw/$IN_FILE.parquet and write sub-sharded data to "
         f"{raw_cohort_dir}/sub_sharded/$IN_FILE/$ROW_START-$ROW_END.parquet"
@@ -53,7 +54,7 @@ def main(cfg: DictConfig):
     random.shuffle(input_files_to_subshard)
 
     for input_file in input_files_to_subshard:
-        out_dir = raw_cohort_dir / "sub_sharded" / input_file.stem
+        out_dir = MEDS_cohort_dir / "sub_sharded" / input_file.stem
         out_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Processing {input_file} to {out_dir}.")
 
