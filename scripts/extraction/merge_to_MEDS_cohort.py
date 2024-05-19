@@ -51,7 +51,7 @@ def main(cfg: DictConfig):
 
     for sp in patient_splits:
         in_dir = patient_subsharded_dir / sp
-        out_fp = MEDS_cohort_dir / f"{sp}.parquet"
+        out_fp = MEDS_cohort_dir / "final_cohort" / f"{sp}.parquet"
 
         shard_fps = sorted(list(in_dir.glob("**/*.parquet")))
         shard_fp_strs = [f"  * {str(fp.resolve())}" for fp in shard_fps]
