@@ -63,6 +63,8 @@ def main(cfg: DictConfig):
 
         size_strs = ", ".join(f"{k}: {len(v)}" for k, v in external_splits.items())
         logger.info(f"Loaded external splits of size: {size_strs}")
+    else:
+        external_splits = None
 
     logger.info("Sharding and splitting patients")
 
