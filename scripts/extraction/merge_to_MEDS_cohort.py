@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import json
 import random
 from pathlib import Path
 
@@ -37,7 +38,7 @@ def main(cfg: DictConfig):
     Path(cfg.raw_cohort_dir)
     MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
 
-    shards = MEDS_cohort_dir / "splits.json"
+    shards = json.loads((MEDS_cohort_dir / "splits.json").read_text())
 
     logger.info("Starting patient shard merging.")
 
