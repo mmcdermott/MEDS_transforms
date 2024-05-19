@@ -16,7 +16,7 @@ from MEDS_polars_functions.utils import hydra_loguru_init
 def read_fn(sp_dir: Path) -> pl.LazyFrame:
     dfs = []
     for parquet_fp in sp_dir.glob("**/*.parquet"):
-        dfs.append(pl.scan_parquet(parquet_fp))
+        dfs.append(pl.scan_parquet(parquet_fp, glob=False))
 
     return pl.concat(dfs, how="diagonal").sort(by=["patient_id", "timestamp"])
 
