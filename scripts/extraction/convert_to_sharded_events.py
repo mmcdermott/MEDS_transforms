@@ -77,7 +77,7 @@ def main(cfg: DictConfig):
                         )
 
                     try:
-                        convert_to_events(df, event_cfgs=event_cfgs)
+                        return convert_to_events(df, event_cfgs=event_cfgs)
                     except Exception as e:
                         raise ValueError(
                             f"Error converting {str(shard_fp.resolve())} for {sp}/{input_prefix}: {e}"
