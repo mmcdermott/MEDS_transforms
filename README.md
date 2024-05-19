@@ -83,9 +83,16 @@ dataframes should be parsed into different event formats. The YAML file stores a
 following structure:
 
 ```yaml
+patient_id: $GLOBAL_PATIENT_ID_OVERWRITE # Optional, if you want to overwrite the patient ID column name for
+                                         # all inputs. If not specified, defaults to "patient_id".
 $INPUT_FILE_STEM:
+    patient_id: $INPUT_FILE_PATIENT_ID # Optional, if you want to overwrite the patient ID column name for
+                                       # this input. IF not specified, defaults to the global patient ID.
     $EVENT_NAME:
-        code: $CODE
+        code:
+          - $CODE_PART_1
+          - $CODE_PART_2
+          ... # These will be combined with "//" to form the final code.
         timestamp: $TIMESTAMP
         $MEDS_COLUMN_NAME: $RAW_COLUMN_NAME
         ...
