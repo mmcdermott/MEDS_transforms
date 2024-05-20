@@ -17,13 +17,13 @@ This package provides three things:
 1. A working, scalable, simple example of how to extract and pre-process MEDS data for downstream modeling.
 2. A flexible ETL for extracting MEDS data from a variety of source formats.
 3. A pre-processing pipeline that can be used for models that require:
-    - Filtering data to only include patients with a certain number of events
-    - Filtering events to only include those whose codes occur a certain number of times
-    - Removing numerical values that are more than a certain number of standard deviations from the mean on a
-      per-code basis.
-    - Normalizing numerical values on a per-code basis.
-    - Modeling data in a 3D format, with patients X unique timestamps X codes & numerical values per
-      timestamp.
+   - Filtering data to only include patients with a certain number of events
+   - Filtering events to only include those whose codes occur a certain number of times
+   - Removing numerical values that are more than a certain number of standard deviations from the mean on a
+     per-code basis.
+   - Normalizing numerical values on a per-code basis.
+   - Modeling data in a 3D format, with patients X unique timestamps X codes & numerical values per
+     timestamp.
 
 ## Installation
 
@@ -147,37 +147,46 @@ in various ways to prepare them for downstream modeling. Broadly speaking, the p
 broken down into the following steps:
 
 1. Filtering the dataset by criteria that do not require cross-patient analyses, e.g.,
+
    - Filtering patients by the number of events or unique timestamps they have.
    - Removing numerical values that fall outside of pre-specified, per-code ranges (e.g., for outlier
      removal).
+
 2. Adding any extra events to the records that are necessary for downstream modeling, e.g.,
+
    - Adding time-derived measurements, e.g.,
-      - The time since the last event of a certain type.
-      - The patient's age as of each unique timepoint.
-      - The time-of-day of each event.
-      - Adding a "dummy" event to the dataset for each patient that occurs at the end of the observation
-        period.
+     - The time since the last event of a certain type.
+     - The patient's age as of each unique timepoint.
+     - The time-of-day of each event.
+     - Adding a "dummy" event to the dataset for each patient that occurs at the end of the observation
+       period.
 
 3. Transforming the code space to appropriately include or exclude any additional measurement columns that
    should be included during code grouping and modeling operations. The goal of this step is to ensure that
    the only columns that need be processed going into the pre-processing, tokenization, and tensorization
    stage are expressible in the `code` and `numerical_values` columns of the dataset, which helps
    standardize further downstream use.
+
    - Standardizing the unit of measure of observed codes or adding the unit of measure to the code such that
      group-by operations over the code take the unit into account.
    - Adding categorical normal/abnormal flags to laboratory test result codes.
-5. Iteratively (a) grouping the dataset by `code` and collecting statistics on the numerical and categorical
+
+4. Iteratively (a) grouping the dataset by `code` and collecting statistics on the numerical and categorical
    values for each code then (b) filtering the dataset down to remove outliers or other undesired codes or
    values, e.g.,
+
    - Computing the mean and standard deviation of the numerical values for each code.
    - Computing the number of times each code occurs in the dataset.
    - Computing appropriate numerical bins for each code for value discretization.
-6. Normalizing the data to convert codes to indices and numerical values to the desired form (either
+
+5. Normalizing the data to convert codes to indices and numerical values to the desired form (either
    categorical indices or normalized numerical values).
-7. Tokenizing the data in time to create a pre-tensorized dataset with clear delineations between patients,
+
+6. Tokenizing the data in time to create a pre-tensorized dataset with clear delineations between patients,
    patient sequence elements, and measurements per sequence element (note that various of these delineations
    may be fully flat/trivial for unnested formats).
-8. Tensorizing the data to permit efficient retrieval from disk of patient data for deep-learning modeling
+
+7. Tensorizing the data to permit efficient retrieval from disk of patient data for deep-learning modeling
    via PyTorch.
 
 Much like how the entire MEDS ETL pipeline is controlled by a single configuration file, the pre-processing
