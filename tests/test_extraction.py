@@ -7,10 +7,13 @@ root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 import json
 import subprocess
 import tempfile
+from io import StringIO
 from pathlib import Path
 
 import polars as pl
 from polars.testing import assert_frame_equal
+
+# Test data (inputs)
 
 SUBJECTS_CSV = """
 MRN,dob,eye_color,height
@@ -57,6 +60,7 @@ subjects:
   dob:
     code: DOB
     timestamp: col(dob)
+    timestamp_format: "%m/%d/%Y"
 admit_vitals:
   admissions:
     code:
@@ -80,6 +84,69 @@ admit_vitals:
     numerical_value: temp
 """
 
+# Test data (expected outputs) -- ALL OF THIS MAY CHANGE IF THE SEED OR DATA CHANGES
+EXPECTED_SPLITS = {
+    "train/0": [239684, 1195293],
+    "train/1": [68729, 814703],
+    "tuning/0": [754281],
+    "held_out/0": [1500733],
+}
+
+MEDS_OUTPUT_TRAIN_0 = """
+patient_id,timestamp,code,numerical_value
+239684,,EYE_COLOR//BROWN,
+239684,,HEIGHT,175.271115221764
+239684,"12/28/1980, 00:00:00",DOB,
+239684,"05/11/2010, 17:41:51",ADMISSION//CARDIAC,
+239684,"05/11/2010, 17:41:51",HR,102.6
+239684,"05/11/2010, 17:41:51",TEMP,96.0
+239684,"05/11/2010, 17:48:48",HR,105.1
+239684,"05/11/2010, 17:48:48",TEMP,96.2
+239684,"05/11/2010, 18:25:35",HR,113.4
+239684,"05/11/2010, 18:25:35",TEMP,95.8
+239684,"05/11/2010, 18:57:18",HR,112.6
+239684,"05/11/2010, 18:57:18",TEMP,95.5
+239684,"05/11/2010, 19:27:19",DISCHARGE,
+1195293,,EYE_COLOR//BLUE,
+1195293,,HEIGHT,164.6868838269085
+1195293,"06/20/1978, 00:00:00",DOB,
+1195293,"06/20/2010, 19:23:52",ADMISSION//CARDIAC,
+1195293,"06/20/2010, 19:23:52",HR,109.0
+1195293,"06/20/2010, 19:23:52",TEMP,100.0
+1195293,"06/20/2010, 19:25:32",HR,114.1
+1195293,"06/20/2010, 19:25:32",TEMP,100.0
+1195293,"06/20/2010, 19:45:19",HR,119.8
+1195293,"06/20/2010, 19:45:19",TEMP,99.9
+1195293,"06/20/2010, 20:12:31",HR,112.5
+1195293,"06/20/2010, 20:12:31",TEMP,99.8
+1195293,"06/20/2010, 20:24:44",HR,107.7
+1195293,"06/20/2010, 20:24:44",TEMP,100.0
+1195293,"06/20/2010, 20:41:33",HR,107.5
+1195293,"06/20/2010, 20:41:33",TEMP,100.4
+1195293,"06/20/2010, 20:50:04",DISCHARGE,
+"""
+
+
+def get_expected_output(df: str) -> pl.DataFrame:
+    return (
+        pl.read_csv(source=StringIO(df))
+        .select(
+            "patient_id",
+            pl.col("timestamp").str.strptime(pl.Datetime, "%m/%d/%Y, %H:%M:%S").alias("timestamp"),
+            pl.col("code").cast(pl.Categorical),
+            "numerical_value",
+        )
+        .sort(by=["patient_id", "timestamp"])
+    )
+
+
+MEDS_OUTPUTS = {
+    "train/0": get_expected_output(MEDS_OUTPUT_TRAIN_0),
+    "train/1": None,
+    "tuning/0": None,
+    "held_out/0": None,
+}
+
 
 def run_command(script: Path, hydra_kwargs: dict[str, str], test_name: str):
     script = str(script.resolve())
@@ -89,12 +156,15 @@ def run_command(script: Path, hydra_kwargs: dict[str, str], test_name: str):
     stdout = command_out.stdout.decode()
     if command_out.returncode != 0:
         raise AssertionError(f"{test_name} failed!\nstderr:\n{stderr}\nstdout:\n{stdout}")
+    return stderr, stdout
 
 
-def assert_df_equal(df1: pl.DataFrame, df2: pl.DataFrame, msg: str = None):
+def assert_df_equal(df1: pl.DataFrame, df2: pl.DataFrame, msg: str = None, **kwargs):
     try:
-        assert_frame_equal(df1, df2)
+        assert_frame_equal(df1, df2, **kwargs)
     except AssertionError as e:
+        print(f"df1:\n{df1}")
+        print(f"df2:\n{df2}")
         raise AssertionError(msg) from e
 
 
@@ -143,8 +213,16 @@ def test_extraction():
 
         extraction_root = root / "scripts" / "extraction"
 
+        all_stderrs = []
+        all_stdouts = []
+
         # Step 1: Sub-shard the data
-        run_command(extraction_root / "shard_events.py", extraction_config_kwargs, "shard_events")
+        stderr, stdout = run_command(
+            extraction_root / "shard_events.py", extraction_config_kwargs, "shard_events"
+        )
+
+        all_stderrs.append(stderr)
+        all_stdouts.append(stdout)
 
         subsharded_dir = MEDS_cohort_dir / "sub_sharded"
 
@@ -176,11 +254,14 @@ def test_extraction():
         )
 
         # Step 2: Collect the patient splits
-        run_command(
+        stderr, stdout = run_command(
             extraction_root / "split_and_shard_patients.py",
             extraction_config_kwargs,
             "split_and_shard_patients",
         )
+
+        all_stderrs.append(stderr)
+        all_stdouts.append(stdout)
 
         splits_fp = MEDS_cohort_dir / "splits.json"
         assert splits_fp.is_file(), f"Expected splits @ {str(splits_fp.resolve())} to exist."
@@ -195,15 +276,57 @@ def test_extraction():
             f"Expected splits to have keys {expected_keys_str}.\n" f"Got keys: {got_keys_str}"
         )
 
-        # THIS MAY CHANGE IF THE SEED OR DATA CHANGES
-        expected_splits = {
-            "train/0": [239684, 1195293],
-            "train/1": [68729, 814703],
-            "tuning/0": [754281],
-            "held_out/0": [1500733],
-        }
-        assert splits == expected_splits, (
-            f"Expected splits to be {expected_splits}, got {splits}. NOTE THIS MAY CHANGE IF THE SEED OR "
+        assert splits == EXPECTED_SPLITS, (
+            f"Expected splits to be {EXPECTED_SPLITS}, got {splits}. NOTE THIS MAY CHANGE IF THE SEED OR "
             "DATA CHANGES -- FAILURE HERE MAY BE JUST DUE TO A NON-DETERMINISTIC SPLIT AND THE TEST NEEDING "
             "TO BE UPDATED."
         )
+
+        # Step 3: Extract the events and sub-shard by patient
+        stderr, stdout = run_command(
+            extraction_root / "convert_to_sharded_events.py",
+            extraction_config_kwargs,
+            "convert_events",
+        )
+        all_stderrs.append(stderr)
+        all_stdouts.append(stdout)
+
+        patient_subsharded_folder = MEDS_cohort_dir / "patient_sub_sharded_events"
+        assert patient_subsharded_folder.is_dir(), f"Expected {patient_subsharded_folder} to be a directory."
+
+        # We'll skip checking these outputs explicitly, as we can check them more directly after we merge them
+
+        # Step 4: Merge to the final output
+        stderr, stdout = run_command(
+            extraction_root / "merge_to_MEDS_cohort.py",
+            extraction_config_kwargs,
+            "merge_sharded_events",
+        )
+        all_stderrs.append(stderr)
+        all_stdouts.append(stdout)
+
+        full_stderr = "\n".join(all_stderrs)
+        full_stdout = "\n".join(all_stdouts)
+
+        # Check the final output
+        output_folder = MEDS_cohort_dir / "final_cohort"
+        try:
+            for split, expected_df in MEDS_OUTPUTS.items():
+                if expected_df is None:
+                    continue
+
+                fp = output_folder / f"{split}.parquet"
+                assert fp.is_file(), f"Expected {fp} to exist."
+
+                got_df = pl.read_parquet(fp, glob=False)
+                assert_df_equal(
+                    got_df,
+                    expected_df,
+                    f"Expected output for split {split} to be equal to the expected output.",
+                    check_column_order=False,
+                )
+        except AssertionError as e:
+            print(f"Failed on split {split}")
+            print(f"stderr:\n{full_stderr}")
+            print(f"stdout:\n{full_stdout}")
+            raise e
