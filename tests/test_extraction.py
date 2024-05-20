@@ -11,6 +11,7 @@ from io import StringIO
 from pathlib import Path
 
 import polars as pl
+from loguru import logger
 from polars.testing import assert_frame_equal
 
 # Test data (inputs)
@@ -398,3 +399,5 @@ def test_extraction():
             print(f"stderr:\n{full_stderr}")
             print(f"stdout:\n{full_stdout}")
             raise e
+
+    logger.warning("Only checked the train/0 split for now. TODO: add the rest of the splits.")
