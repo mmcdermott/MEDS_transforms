@@ -4,6 +4,7 @@ import rootutils
 
 root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
+import json
 import subprocess
 import tempfile
 from pathlib import Path
@@ -80,13 +81,21 @@ admit_vitals:
 """
 
 
-def test_command(script: str, hydra_kwargs: dict[str, str], test_name: str):
+def run_command(script: Path, hydra_kwargs: dict[str, str], test_name: str):
+    script = str(script.resolve())
     command_parts = ["python", script] + [f"{k}={v}" for k, v in hydra_kwargs.items()]
     command_out = subprocess.run(" ".join(command_parts), shell=True, capture_output=True)
     stderr = command_out.stderr.decode()
     stdout = command_out.stdout.decode()
     if command_out.returncode != 0:
         raise AssertionError(f"{test_name} failed!\nstderr:\n{stderr}\nstdout:\n{stdout}")
+
+
+def assert_df_equal(df1: pl.DataFrame, df2: pl.DataFrame, msg: str = None):
+    try:
+        assert_frame_equal(df1, df2)
+    except AssertionError as e:
+        raise AssertionError(msg) from e
 
 
 def test_extraction():
@@ -132,8 +141,10 @@ def test_extraction():
             "hydra.verbose": True,
         }
 
+        extraction_root = root / "scripts" / "extraction"
+
         # Step 1: Sub-shard the data
-        test_command("./scripts/extraction/shard_events.py", extraction_config_kwargs, "shard_events")
+        run_command(extraction_root / "shard_events.py", extraction_config_kwargs, "shard_events")
 
         subsharded_dir = MEDS_cohort_dir / "sub_sharded"
 
@@ -145,7 +156,11 @@ def test_extraction():
         subjects_out = subsharded_dir / "subjects" / "[0-7).parquet"
         assert subjects_out.is_file(), f"Expected {subjects_out} to exist."
 
-        assert_frame_equal(pl.read_parquet(subjects_out, glob=False), pl.read_csv(subjects_csv))
+        assert_df_equal(
+            pl.read_parquet(subjects_out, glob=False),
+            pl.read_csv(subjects_csv),
+            "Subjects should be equal after sub-sharding",
+        )
 
         #   2. admit_vitals.parquet
         df_chunks = []
@@ -154,6 +169,41 @@ def test_extraction():
             assert admit_vitals_chunk_fp.is_file(), f"Expected {admit_vitals_chunk_fp} to exist."
 
             df_chunks.append(pl.read_parquet(admit_vitals_chunk_fp, glob=False))
-        assert_frame_equal(pl.concat(df_chunks), pl.read_csv(admit_vitals_csv))
+        assert_df_equal(
+            pl.concat(df_chunks),
+            pl.read_csv(admit_vitals_csv),
+            "Admit vitals should be equal after sub-sharding",
+        )
 
-        raise NotImplementedError("Finish the test_extraction function.")
+        # Step 2: Collect the patient splits
+        run_command(
+            extraction_root / "split_and_shard_patients.py",
+            extraction_config_kwargs,
+            "split_and_shard_patients",
+        )
+
+        splits_fp = MEDS_cohort_dir / "splits.json"
+        assert splits_fp.is_file(), f"Expected splits @ {str(splits_fp.resolve())} to exist."
+
+        splits = json.loads(splits_fp.read_text())
+        expected_keys = ["train/0", "train/1", "tuning/0", "held_out/0"]
+
+        expected_keys_str = ", ".join(f"'{k}'" for k in expected_keys)
+        got_keys_str = ", ".join(f"'{k}'" for k in splits.keys())
+
+        assert set(splits.keys()) == set(expected_keys), (
+            f"Expected splits to have keys {expected_keys_str}.\n" f"Got keys: {got_keys_str}"
+        )
+
+        # THIS MAY CHANGE IF THE SEED OR DATA CHANGES
+        expected_splits = {
+            "train/0": [239684, 1195293],
+            "train/1": [68729, 814703],
+            "tuning/0": [754281],
+            "held_out/0": [1500733],
+        }
+        assert splits == expected_splits, (
+            f"Expected splits to be {expected_splits}, got {splits}. NOTE THIS MAY CHANGE IF THE SEED OR "
+            "DATA CHANGES -- FAILURE HERE MAY BE JUST DUE TO A NON-DETERMINISTIC SPLIT AND THE TEST NEEDING "
+            "TO BE UPDATED."
+        )
