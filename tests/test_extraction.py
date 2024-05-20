@@ -92,11 +92,32 @@ EXPECTED_SPLITS = {
     "held_out/0": [1500733],
 }
 
-MEDS_OUTPUT_TRAIN_0 = """
+
+def get_expected_output(df: str) -> pl.DataFrame:
+    return (
+        pl.read_csv(source=StringIO(df))
+        .select(
+            "patient_id",
+            pl.col("timestamp").str.strptime(pl.Datetime, "%m/%d/%Y, %H:%M:%S").alias("timestamp"),
+            pl.col("code").cast(pl.Categorical),
+            "numerical_value",
+        )
+        .sort(by=["patient_id", "timestamp"])
+    )
+
+
+MEDS_OUTPUT_TRAIN_0_SUBJECTS = """
 patient_id,timestamp,code,numerical_value
 239684,,EYE_COLOR//BROWN,
 239684,,HEIGHT,175.271115221764
 239684,"12/28/1980, 00:00:00",DOB,
+1195293,,EYE_COLOR//BLUE,
+1195293,,HEIGHT,164.6868838269085
+1195293,"06/20/1978, 00:00:00",DOB,
+"""
+
+MEDS_OUTPUT_TRAIN_0_ADMIT_VITALS = """
+patient_id,timestamp,code,numerical_value
 239684,"05/11/2010, 17:41:51",ADMISSION//CARDIAC,
 239684,"05/11/2010, 17:41:51",HR,102.6
 239684,"05/11/2010, 17:41:51",TEMP,96.0
@@ -107,9 +128,6 @@ patient_id,timestamp,code,numerical_value
 239684,"05/11/2010, 18:57:18",HR,112.6
 239684,"05/11/2010, 18:57:18",TEMP,95.5
 239684,"05/11/2010, 19:27:19",DISCHARGE,
-1195293,,EYE_COLOR//BLUE,
-1195293,,HEIGHT,164.6868838269085
-1195293,"06/20/1978, 00:00:00",DOB,
 1195293,"06/20/2010, 19:23:52",ADMISSION//CARDIAC,
 1195293,"06/20/2010, 19:23:52",HR,109.0
 1195293,"06/20/2010, 19:23:52",TEMP,100.0
@@ -126,22 +144,28 @@ patient_id,timestamp,code,numerical_value
 1195293,"06/20/2010, 20:50:04",DISCHARGE,
 """
 
-
-def get_expected_output(df: str) -> pl.DataFrame:
-    return (
-        pl.read_csv(source=StringIO(df))
-        .select(
-            "patient_id",
-            pl.col("timestamp").str.strptime(pl.Datetime, "%m/%d/%Y, %H:%M:%S").alias("timestamp"),
-            pl.col("code").cast(pl.Categorical),
-            "numerical_value",
-        )
-        .sort(by=["patient_id", "timestamp"])
-    )
+SUB_SHARDED_OUTPUTS = {
+    "train/0": {
+        "subjects": MEDS_OUTPUT_TRAIN_0_SUBJECTS,
+        "admit_vitals": MEDS_OUTPUT_TRAIN_0_ADMIT_VITALS,
+    },
+    "train/1": {
+        "subjects": None,
+        "admit_vitals": None,
+    },
+    "tuning/0": {
+        "subjects": None,
+        "admit_vitals": None,
+    },
+    "held_out/0": {
+        "subjects": None,
+        "admit_vitals": None,
+    },
+}
 
 
 MEDS_OUTPUTS = {
-    "train/0": get_expected_output(MEDS_OUTPUT_TRAIN_0),
+    "train/0": [MEDS_OUTPUT_TRAIN_0_SUBJECTS, MEDS_OUTPUT_TRAIN_0_ADMIT_VITALS],
     "train/1": None,
     "tuning/0": None,
     "held_out/0": None,
@@ -159,13 +183,16 @@ def run_command(script: Path, hydra_kwargs: dict[str, str], test_name: str):
     return stderr, stdout
 
 
-def assert_df_equal(df1: pl.DataFrame, df2: pl.DataFrame, msg: str = None, **kwargs):
+def assert_df_equal(want: pl.DataFrame, got: pl.DataFrame, msg: str = None, **kwargs):
     try:
-        assert_frame_equal(df1, df2, **kwargs)
+        assert_frame_equal(want, got, **kwargs)
     except AssertionError as e:
-        print(f"df1:\n{df1}")
-        print(f"df2:\n{df2}")
-        raise AssertionError(msg) from e
+        pl.Config.set_tbl_rows(-1)
+        print(f"DFs are not equal: {msg}\nwant:")
+        print(want)
+        print("got:")
+        print(got)
+        raise AssertionError(f"{msg}\n{e}") from e
 
 
 def test_extraction():
@@ -294,7 +321,34 @@ def test_extraction():
         patient_subsharded_folder = MEDS_cohort_dir / "patient_sub_sharded_events"
         assert patient_subsharded_folder.is_dir(), f"Expected {patient_subsharded_folder} to be a directory."
 
-        # We'll skip checking these outputs explicitly, as we can check them more directly after we merge them
+        for split, expected_outputs in SUB_SHARDED_OUTPUTS.items():
+            for prefix, expected_df_L in expected_outputs.items():
+                if expected_df_L is None:
+                    continue
+
+                if not isinstance(expected_df_L, list):
+                    expected_df_L = [expected_df_L]
+
+                expected_df = pl.concat([get_expected_output(df) for df in expected_df_L])
+
+                fps = list((patient_subsharded_folder / split / prefix).glob("*.parquet"))
+                assert len(fps) > 0
+
+                # We add a "unique" here as there may be some duplicates across the row-group sub-shards.
+                got_df = pl.concat([pl.read_parquet(fp, glob=False) for fp in fps]).unique()
+                try:
+                    assert_df_equal(
+                        expected_df,
+                        got_df,
+                        f"Expected output for split {split}/{prefix} to be equal to the expected output.",
+                        check_column_order=False,
+                        check_row_order=False,
+                    )
+                except AssertionError as e:
+                    print(f"Failed on split {split}/{prefix}")
+                    print(f"stderr:\n{stderr}")
+                    print(f"stdout:\n{stdout}")
+                    raise e
 
         # Step 4: Merge to the final output
         stderr, stdout = run_command(
@@ -311,20 +365,34 @@ def test_extraction():
         # Check the final output
         output_folder = MEDS_cohort_dir / "final_cohort"
         try:
-            for split, expected_df in MEDS_OUTPUTS.items():
-                if expected_df is None:
+            for split, expected_df_L in MEDS_OUTPUTS.items():
+                if expected_df_L is None:
                     continue
+
+                if not isinstance(expected_df_L, list):
+                    expected_df_L = [expected_df_L]
+
+                expected_df = pl.concat([get_expected_output(df) for df in expected_df_L])
 
                 fp = output_folder / f"{split}.parquet"
                 assert fp.is_file(), f"Expected {fp} to exist."
 
                 got_df = pl.read_parquet(fp, glob=False)
                 assert_df_equal(
-                    got_df,
                     expected_df,
+                    got_df,
                     f"Expected output for split {split} to be equal to the expected output.",
                     check_column_order=False,
+                    check_row_order=False,
                 )
+
+                assert got_df["patient_id"].is_sorted(), f"Patient IDs should be sorted for split {split}."
+                for subj in splits[split]:
+                    got_df_subj = got_df.filter(pl.col("patient_id") == subj)
+                    assert got_df_subj[
+                        "timestamp"
+                    ].is_sorted(), f"Timestamps should be sorted for patient {subj} in split {split}."
+
         except AssertionError as e:
             print(f"Failed on split {split}")
             print(f"stderr:\n{full_stderr}")

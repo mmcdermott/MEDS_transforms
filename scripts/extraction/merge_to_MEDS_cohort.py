@@ -25,7 +25,7 @@ def read_fn(sp_dir: Path) -> pl.LazyFrame:
     logger.info(f"Reading {len(files_to_read)} files:\n{file_strs}")
 
     dfs = [pl.scan_parquet(fp, glob=False) for fp in files_to_read]
-    return pl.concat(dfs, how="diagonal").sort(by=["patient_id", "timestamp"])
+    return pl.concat(dfs, how="diagonal").unique(maintain_order=False).sort(by=["patient_id", "timestamp"])
 
 
 def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
