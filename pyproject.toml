@@ -20,7 +20,7 @@ dependencies = ["polars", "pyarrow", "nested_ragged_tensors", "loguru", "hydra-c
 
 [project.optional-dependencies]
 dev = ["pre-commit"]
-tests = ["pytest", "pytest-cov"]
+tests = ["pytest", "pytest-cov", "rootutils"]
 
 [project.urls]
 Homepage = "https://github.com/mmcdermott/MEDS_polars_functions"

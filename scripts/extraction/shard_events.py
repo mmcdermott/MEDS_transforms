@@ -17,7 +17,17 @@ ROW_IDX_NAME = "__row_idx"
 
 
 def scan_with_row_idx(fp: Path) -> pl.LazyFrame:
-    return pl.scan_parquet(fp, row_index_name=ROW_IDX_NAME)
+    match fp.suffix.lower():
+        case ".csv":
+            logger.debug(f"Reading {fp} as CSV.")
+            reader = pl.scan_csv
+        case ".parquet":
+            logger.debug(f"Reading {fp} as Parquet.")
+            reader = pl.scan_parquet
+        case _:
+            raise ValueError(f"Unsupported file type: {fp.suffix}")
+
+    return reader(fp, row_index_name=ROW_IDX_NAME)
 
 
 def filter_to_row_chunk(df: pl.LazyFrame, start: int, end: int) -> pl.LazyFrame:
@@ -43,7 +53,14 @@ def main(cfg: DictConfig):
     MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
     row_chunksize = cfg.row_chunksize
 
-    input_files_to_subshard = list(raw_cohort_dir.glob("*.parquet"))
+    input_files_to_subshard = []
+    for fmt in ["parquet", "csv"]:
+        files_in_fmt = list(raw_cohort_dir.glob(f"*.{fmt}"))
+        for f in files_in_fmt:
+            if f.stem in [x.stem for x in input_files_to_subshard]:
+                logger.warning(f"Skipping {f} as it has already been added in a preferred format.")
+            else:
+                input_files_to_subshard.append(f)
 
     logger.info(f"Starting event sub-sharding. Sub-sharding {len(input_files_to_subshard)} files.")
     logger.info(
@@ -58,7 +75,7 @@ def main(cfg: DictConfig):
         out_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Processing {input_file} to {out_dir}.")
 
-        df = pl.scan_parquet(input_file)
+        df = scan_with_row_idx(input_file)
         row_count = df.select(pl.len()).collect().item()
 
         row_shards = list(range(0, row_count, row_chunksize))
