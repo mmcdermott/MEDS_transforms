@@ -16,10 +16,15 @@ pl.enable_string_cache()
 
 
 def read_fn(sp_dir: Path) -> pl.LazyFrame:
-    dfs = []
-    for parquet_fp in sp_dir.glob("**/*.parquet"):
-        dfs.append(pl.scan_parquet(parquet_fp, glob=False))
+    files_to_read = list(sp_dir.glob("**/*.parquet"))
 
+    if not files_to_read:
+        raise FileNotFoundError(f"No files found in {sp_dir}/**/*.parquet.")
+
+    file_strs = "\n".join(f"  - {str(fp.resolve())}" for fp in files_to_read)
+    logger.info(f"Reading {len(files_to_read)} files:\n{file_strs}")
+
+    dfs = [pl.scan_parquet(fp, glob=False) for fp in files_to_read]
     return pl.concat(dfs, how="diagonal").sort(by=["patient_id", "timestamp"])
 
 
@@ -57,7 +62,7 @@ def main(cfg: DictConfig):
         shard_fps = sorted(list(in_dir.glob("**/*.parquet")))
         shard_fp_strs = [f"  * {str(fp.resolve())}" for fp in shard_fps]
         logger.info(f"Merging {len(shard_fp_strs)} shards into {out_fp}:\n" + "\n".join(shard_fp_strs))
-        rwlock_wrap(in_dir, out_fp, read_fn, write_fn, identity_fn)
+        rwlock_wrap(in_dir, out_fp, read_fn, write_fn, identity_fn, do_return=False)
 
     logger.info("Output cohort written.")
 

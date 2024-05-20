@@ -20,6 +20,7 @@ def wrap[
     cache_intermediate: bool = True,
     clear_cache_on_completion: bool = True,
     do_overwrite: bool = False,
+    do_return: bool = False,
 ) -> tuple[bool, DF_T | None]:
     """Wrap a series of file-in file-out map transformations on a dataframe with caching and locking.
 
@@ -52,6 +53,7 @@ def wrap[
             written. This is `True` by default.
         do_overwrite: If True, the output file will be overwritten if it already exists. This is `False` by
             default.
+        do_return: If True, the final dataframe will be returned. This is `False` by default.
 
     Returns:
         The dataframe resulting from the transformations applied in sequence to the dataframe stored in
@@ -74,16 +76,8 @@ def wrap[
         ...     lambda df: df.with_columns(pl.col("c") * 2),
         ...     lambda df: df.filter(pl.col("c") > 4)
         ... ]
-        >>> wrap(in_fp, out_fp, read_fn, write_fn, *transform_fns)
-        shape: (2, 3)
-        ┌─────┬─────┬─────┐
-        │ a   ┆ b   ┆ c   │
-        │ --- ┆ --- ┆ --- │
-        │ i64 ┆ i64 ┆ i64 │
-        ╞═════╪═════╪═════╡
-        │ 1   ┆ 2   ┆ 6   │
-        │ 3   ┆ 5   ┆ 12  │
-        └─────┴─────┴─────┘
+        >>> result_computed = wrap(in_fp, out_fp, read_fn, write_fn, *transform_fns, do_return=False)
+        >>> assert result_computed
         >>> print(out_fp.read_text())
         a,b,c
         1,2,6
@@ -119,8 +113,12 @@ def wrap[
         >>> def lock_fp_checker_fn(df: pl.DataFrame) -> pl.DataFrame:
         ...     print(f"Lock fp exists? {lock_fp.is_file()}")
         ...     return df
-        >>> wrap(in_fp, out_fp, read_fn, write_fn, lock_fp_checker_fn)
+        >>> result_computed, out_df = wrap(
+        ...     in_fp, out_fp, read_fn, write_fn, lock_fp_checker_fn, do_return=True
+        ... )
         Lock fp exists? True
+        >>> assert result_computed
+        >>> out_df
         shape: (3, 3)
         ┌─────┬─────┬─────┐
         │ a   ┆ b   ┆ c   │
@@ -140,7 +138,10 @@ def wrap[
             out_fp.unlink()
         else:
             logger.info(f"{out_fp} exists; reading directly and returning.")
-            return True, read_fn(out_fp)
+            if do_return:
+                return True, read_fn(out_fp)
+            else:
+                return True
 
     cache_directory = out_fp.parent / f".{out_fp.stem}_cache"
     cache_directory.mkdir(exist_ok=True, parents=True)
@@ -154,7 +155,10 @@ def wrap[
         logger.info(
             f"{out_fp} is under construction as of {started_at} as {lock_fp} exists. " "Returning None."
         )
-        return False, None
+        if do_return:
+            return False, None
+        else:
+            return False
 
     lock_fp.write_text(json.dumps(runtime_info))
 
@@ -179,7 +183,7 @@ def wrap[
             else:
                 df = transform_fn(df)
 
-            if cache_intermediate and i < len(transform_fns):
+            if cache_intermediate and i < len(transform_fns) - 1:
                 logger.info(f"Writing intermediate output for step {i} to {cache_fp}")
                 write_fn(df, cache_fp)
             logger.info(f"Completed step {i} in {datetime.now() - st_time_step}")
@@ -193,7 +197,10 @@ def wrap[
         else:
             logger.info(f"Leaving cache directory {cache_directory}, but clearing lock at {lock_fp}")
             lock_fp.unlink()
-        return df
+        if do_return:
+            return True, df
+        else:
+            return True
     except Exception as e:
         logger.warning(f"Clearing lock due to Exception {e} at {lock_fp} after {datetime.now() - st_time}")
         lock_fp.unlink()
