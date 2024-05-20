@@ -29,7 +29,9 @@ This package provides three things:
 
 For now, clone this repository and run `pip install -e .` from the repository root.
 
-### ETL
+## MEDS ETL / Extraction Pipeline
+
+### Overview
 
 Assumptions:
 
@@ -64,16 +66,20 @@ degree of parallelism is desired per step.
 3. It converts the input, event level shards into the MEDS flat format and joins and shards these data into
    patient-level shards for MEDS use and stores them in a nested format in the output cohort directory,
    again in the flat format. This step can be broken down into two sub-steps:
-   \- First, each input shard is converted to the MEDS flat format and split into sub patient-level shards.
-   \- Second, the appropriate sub patient-level shards are joined and re-organized into the final
-   patient-level shards. This method ensures that we minimize the amount of read contention on the input
-   shards during the join process and can maximize parallel throughput, as (theoretically, with sufficient
-   workers) all input shards can be sub-sharded in parallel and then all output shards can be joined in
-   parallel.
+
+- First, each input shard is converted to the MEDS flat format and split into sub patient-level shards.
+- Second, the appropriate sub patient-level shards are joined and re-organized into the final
+  patient-level shards. This method ensures that we minimize the amount of read contention on the input
+  shards during the join process and can maximize parallel throughput, as (theoretically, with sufficient
+  workers) all input shards can be sub-sharded in parallel and then all output shards can be joined in
+  parallel.
 
 The ETL scripts all use [Hydra](https://hydra.cc/) for configuration management, leveraging the shared
 `configs/extraction.yaml` file for configuration. The user can override any of these settings in the normal
 way for Hydra configurations.
+
+If desired, appropriate scripts can be written and run at a per-patient shard level to convert between the
+flat format and any of the other valid nested MEDS format, but for now we leave that up to the user.
 
 #### Input Event Extraction
 
@@ -111,4 +117,77 @@ columns must be either string or categorical types (in which case they will be c
 numeric types. You can see this extraction logic in the `scripts/extraction/convert_to_sharded_events.py`
 file, in the `extract_event` function.
 
-### Pre-processing
+### Scripts and Examples
+
+See `tests/test_extraction.py` for an example of the end-to-end ETL pipeline being run on synthetic data. This
+script is a functional test that is also run with `pytest` to verify correctness of the algorithm.
+
+#### Core Scripts:
+
+1. `scripts/extraction/shard_events.py` shards the input data into smaller, event-level shards by splitting
+   raw files into chunks of a configurable number of rows. Files are split sequentially, with no regard for
+   data content or patient boundaries. The resulting files are stored in the `subsharded_events`
+   subdirectory of the output directory.
+2. `scripts/extraction/split_and_shard_patients.py` splits the patient population into ML splits and shards
+   these splits into patient-level shards. The result of this process is only a simple `JSON` file
+   containing the patient IDs belonging to individual splits and shards. This file is stored in the
+   `output_directory/splits.json` file.
+3. `scripts/extraction/convert_to_sharded_events.py` converts the input, event-level shards into the MEDS
+   event format and splits them into patient-level sub-shards. So, the resulting files are sharded into
+   patient-level, then event-level groups and are not merged into full patient-level shards or appropriately
+   sorted for downstream use.
+4. `scripts/extraction/merge_to_MEDS_cohort.py` merges the patient-level, event-level shards into full
+   patient-level shards and sorts them appropriately for downstream use. The resulting files are stored in
+   the `output_directory/final_cohort` directory.
+
+## MEDS Pre-processing Transformations
+
+Once the MEDS dataset is created, in needs to be effectively pre-processed for downstream use. This package
+contains a variety of pre-processing transformations and scripts that can be applied on diverse MEDS datasets
+in various ways to prepare them for downstream modeling. Broadly speaking, the pre-processing pipeline can be
+broken down into the following steps:
+
+1. Filtering the dataset by criteria that do not require cross-patient analyses, e.g.,
+   \- Filtering patients by the number of events or unique timestamps they have.
+   \- Removing numerical values that fall outside of pre-specified, per-code ranges (e.g., for outlier
+   removal).
+2. Adding any extra events to the records that are necessary for downstream modeling, e.g.,
+   \- Adding time-derived measurements, e.g.,
+   - The time since the last event of a certain type.
+   - The patient's age as of each unique timepoint.
+   - The time-of-day of each event.
+
+```
+- Adding a "dummy" event to the dataset for each patient that occurs at the end of the observation
+  period.
+```
+
+3. Transforming the code space to appropriately include or exclude any additional measurement columns that
+   should be included during code grouping and modeling operations. The goal of this step is to ensure that
+   the only columns that need be processed going into the pre-processing, tokenization, and tensorization
+   stage are expressible in the `code` and `numerical_values` columns of the dataset, which helps
+   standardize further downstream use.
+   \- Standardizing the unit of measure of observed codes or adding the unit of measure to the code such that
+   group-by operations over the code take the unit into account.
+   \- Adding categorical normal/abnormal flags to laboratory test result codes.
+4. Iteratively (a) grouping the dataset by `code` and collecting statistics on the numerical and categorical
+   values for each code then (b) filtering the dataset down to remove outliers or other undesired codes or
+   values, e.g.,
+   \- Computing the mean and standard deviation of the numerical values for each code.
+   \- Computing the number of times each code occurs in the dataset.
+   \- Computing appropriate numerical bins for each code for value discretization.
+5. Normalizing the data to convert codes to indices and numerical values to the desired form (either
+   categorical indices or normalized numerical values).
+6. Tokenizing the data in time to create a pre-tensorized dataset with clear delineations between patients,
+   patient sequence elements, and measurements per sequence element (note that various of these delineations
+   may be fully flat/trivial for unnested formats).
+7. Tensorizing the data to permit efficient retrieval from disk of patient data for deep-learning modeling
+   via PyTorch.
+
+Much like how the entire MEDS ETL pipeline is controlled by a single configuration file, the pre-processing
+pipeline is also controlled by a single configuration file, stored in `configs/preprocessing.yaml`. Scripts
+leverage this file once again through the [Hydra](https://hydra.cc/) configuration management system. Similar
+to the ETL, this pipeline is designed to enable seamless parallelism and efficient use of resources simply by
+running multiple copies of the same script on independent workers to process the data in parallel. "Reduction"
+steps again need to happen in a single-threaded manner, but these steps are generally very fast and should not
+be a bottleneck.
