@@ -1,0 +1,22 @@
+# Raw data
+MEDS_cohort_dir: ???
+output_data_dir: ???
+
+# Pre-processing parameters
+min_code_occurrences: 50
+outlier_stddev_cutoff: 4.5
+
+min_events_per_patient: null
+min_measurements_per_patient: null
+
+# Misc
+do_overwrite: False
+
+# Hydra
+hydra:
+  job:
+    name: MEDS_ETL_step_${now:%Y-%m-%d_%H-%M-%S}
+  run:
+    dir: ${MEDS_cohort_dir}/.logs/etl/${hydra.job.name}
+  sweep:
+    dir: ${MEDS_cohort_dir}/.logs/etl/${hydra.job.name}
