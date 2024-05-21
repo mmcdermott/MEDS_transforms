@@ -196,3 +196,10 @@ to the ETL, this pipeline is designed to enable seamless parallelism and efficie
 running multiple copies of the same script on independent workers to process the data in parallel. "Reduction"
 steps again need to happen in a single-threaded manner, but these steps are generally very fast and should not
 be a bottleneck.
+
+## TODOs:
+
+1. We need to have a vehicle to cleanly separate dataset-specific variables from the general configuration
+   files. Similar to task configuration files, but for models.
+2. Figure out how to ensure that each pre-processing step reads from the right prior files. Likely need some
+   kind of a "prior stage name" config variable.

@@ -9,6 +9,15 @@ outlier_stddev_cutoff: 4.5
 min_events_per_patient: null
 min_measurements_per_patient: null
 
+# Time-derived measurements
+time_derived_measurements:
+  age:
+    dob_code: "DOB"
+    age_code: "AGE"
+    age_unit: "years"
+  time_of_day:
+    bin_endpoints: [6, 12, 18, 24]
+
 # Misc
 do_overwrite: False
 
