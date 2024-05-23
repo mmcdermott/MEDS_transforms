@@ -10,7 +10,7 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig
 
-from MEDS_polars_functions.filter_patients import (
+from MEDS_polars_functions.filter_patients_by_length import (
     filter_patients_by_num_events,
     filter_patients_by_num_measurements,
 )

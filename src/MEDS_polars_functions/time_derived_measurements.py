@@ -51,7 +51,7 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         ...         ],
         ...         "code": ["static", "DOB", "lab//A", "lab//B", "DOB", "lab//A", "lab//B"],
         ...     },
-        ...     schema={"patient_id": pl.UInt32, "timestamp": pl.Date32, "code": pl.Categorical},
+        ...     schema={"patient_id": pl.UInt32, "timestamp": pl.Datetime, "code": pl.Categorical},
         ... )
         >>> age_cfg = DictConfig({"DOB_code": "DOB", "age_code": "AGE", "age_unit": "years"})
         >>> age_fn = age_fntr(age_cfg)
