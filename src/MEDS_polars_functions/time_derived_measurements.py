@@ -169,14 +169,15 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         age_expr = (pl.col("timestamp") - dob_expr).dt.total_microseconds() / microseconds_in_unit
 
         return (
-            df.select(
+            df.drop_nulls(subset=["timestamp"])
+            .unique(subset=["patient_id", "timestamp"], maintain_order=True)
+            .select(
                 "patient_id",
                 "timestamp",
                 pl.lit(cfg.age_code, dtype=df.schema["code"]).alias("code"),
                 age_expr.alias("numerical_value"),
             )
             .drop_nulls(subset=["numerical_value"])
-            .unique(subset=["patient_id", "timestamp"], maintain_order=True)
         )
 
     return fn
@@ -206,7 +207,7 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         ...             datetime(1988, 1, 2, 6, 0),
         ...             datetime(2023, 1, 3, 12, 0),
         ...             datetime(2022, 1, 1, 18, 0),
-        ...             datetime(2022, 1, 2, 0, 0),
+        ...             datetime(2022, 1, 1, 18, 0),
         ...         ],
         ...         "code": ["static", "DOB", "lab//A", "lab//B", "DOB", "lab//A", "lab//B", "dx//1"],
         ...     },
@@ -226,10 +227,53 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         │ 2          ┆ 1988-01-02 06:00:00 ┆ DOB    │
         │ 2          ┆ 2023-01-03 12:00:00 ┆ lab//A │
         │ 3          ┆ 2022-01-01 18:00:00 ┆ lab//B │
-        │ 3          ┆ 2022-01-02 00:00:00 ┆ dx//1  │
+        │ 3          ┆ 2022-01-01 18:00:00 ┆ dx//1  │
         └────────────┴─────────────────────┴────────┘
         >>> time_of_day_cfg = DictConfig({"time_of_day_code": "time_of_day", "endpoints": [6, 12, 18]})
         >>> time_of_day_fn = time_of_day_fntr(time_of_day_cfg)
         >>> time_of_day_fn(df)
+        shape: (6, 3)
+        ┌────────────┬─────────────────────┬──────────────────────┐
+        │ patient_id ┆ timestamp           ┆ code                 │
+        │ ---        ┆ ---                 ┆ ---                  │
+        │ u32        ┆ datetime[μs]        ┆ cat                  │
+        ╞════════════╪═════════════════════╪══════════════════════╡
+        │ 1          ┆ 1990-01-01 01:00:00 ┆ time_of_day//[00,06) │
+        │ 1          ┆ 2021-01-01 12:00:00 ┆ time_of_day//[12,18) │
+        │ 1          ┆ 2021-01-02 23:59:00 ┆ time_of_day//[18,24) │
+        │ 2          ┆ 1988-01-02 06:00:00 ┆ time_of_day//[06,12) │
+        │ 2          ┆ 2023-01-03 12:00:00 ┆ time_of_day//[12,18) │
+        │ 3          ┆ 2022-01-01 18:00:00 ┆ time_of_day//[18,24) │
+        └────────────┴─────────────────────┴──────────────────────┘
     """
-    raise NotImplementedError("TODO")
+    if not cfg.endpoints:
+        raise ValueError("The 'endpoints' key must contain at least one endpoint for time of day categories.")
+    if not all(0 <= endpoint <= 24 for endpoint in cfg.endpoints):
+        raise ValueError(f"All endpoints must be between 0 and 24 inclusive. Got: {cfg.endpoints}")
+    if not all(isinstance(endpoint, int) for endpoint in cfg.endpoints):
+        raise ValueError(f"All endpoints must be integer, whole-hour boundaries, but got: {cfg.endpoints}")
+    if len(cfg.endpoints) != len(set(cfg.endpoints)) or cfg.endpoints != sorted(cfg.endpoints):
+        raise ValueError(f"All endpoints must be unique and in sorted order. Got: {cfg.endpoints}")
+
+    def fn(df: pl.LazyFrame) -> pl.LazyFrame:
+        hour = pl.col("timestamp").dt.hour()
+
+        def tod_code(start: int, end: int) -> str:
+            return pl.lit(f"{cfg.time_of_day_code}//[{start:02},{end:02})", dtype=df.schema["code"])
+
+        start, end = 0, cfg.endpoints[0]
+        time_of_day = pl.when(hour < end).then(tod_code(start, end))
+
+        for i in range(1, len(cfg.endpoints)):
+            start, end = cfg.endpoints[i - 1], cfg.endpoints[i]
+
+            time_of_day = time_of_day.when((hour >= start) & (hour < end)).then(tod_code(start, end))
+
+        time_of_day = time_of_day.when(hour >= end).then(tod_code(end, 24))
+        return (
+            df.drop_nulls(subset=["timestamp"])
+            .unique(subset=["patient_id", "timestamp"], maintain_order=True)
+            .select("patient_id", "timestamp", time_of_day.alias("code"))
+        )
+
+    return fn
