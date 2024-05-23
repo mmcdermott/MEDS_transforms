@@ -14,6 +14,8 @@ import polars as pl
 from loguru import logger
 from polars.testing import assert_frame_equal
 
+pl.enable_string_cache()
+
 # Test data (inputs)
 
 SUBJECTS_CSV = """

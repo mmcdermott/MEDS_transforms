@@ -101,6 +101,9 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         A function that returns the to-be-added "age" events with the patient's age for all input events with
         unique, non-null timestamps in the data, for all patients who have an observed date of birth.
 
+    Raises:
+        ValueError: If the input unit is not recognized.
+
     Examples:
         >>> from datetime import datetime
         >>> df = pl.DataFrame(
@@ -150,6 +153,12 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         │ 2          ┆ 1988-01-02 00:00:00 ┆ AGE  ┆ 0.0             │
         │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE  ┆ 35.00417        │
         └────────────┴─────────────────────┴──────┴─────────────────┘
+        >>> age_cfg = DictConfig({"DOB_code": "DOB", "age_code": "AGE", "age_unit": "scores"})
+        >>> age_fn = age_fntr(age_cfg)
+        Traceback (most recent call last):
+            ...
+        ValueError: Unknown time unit 'scores'. Valid units include:
+        ...
     """
 
     canonical_unit, seconds_in_unit = normalize_time_unit(cfg.age_unit)
