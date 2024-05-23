@@ -20,7 +20,7 @@ from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
 
 @hydra.main(version_base=None, config_path="configs", config_name="preprocess")
 def main(cfg: DictConfig):
-    """TODO."""
+    """Adds time-derived measurements to a MEDS cohort as separate observations at each unique timestamp."""
 
     hydra_loguru_init()
 
