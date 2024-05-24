@@ -86,14 +86,16 @@ def retrieve_columns(
         file_columns = [ROW_IDX_NAME, event_conversion_cfg.patient_id_col]
 
         # Loop through each configuration item for the current file.
-        for code_cfg in file_meds_cfg.values():
+        for event_cfg in file_meds_cfg.values():
             # If the config has a 'code' key and it contains column fields, parse and add them.
-            if "code" in code_cfg:
-                file_columns += [parse_col_field(field) for field in code_cfg["code"] if is_col_field(field)]
-
-            # If there is a timestamp field in the 'col()' format, parse and add it.
-            if "timestamp" in code_cfg and is_col_field(code_cfg["timestamp"]):
-                file_columns.append(parse_col_field(code_cfg["timestamp"]))
+            for key in ["code", "timestamp", "numerical_value"]:
+                if key in event_cfg:
+                    fields = event_cfg[key]
+                    # make sure fields is a list
+                    if isinstance(fields, str) or fields is None:
+                        fields = [fields]
+                    # append fields that are in the `col(<COLUMN_NAME>)`` format
+                    file_columns += [parse_col_field(field) for field in fields if is_col_field(field)]
 
         # Store unique column names for each file to prevent duplicates.
         file_to_columns[f] = list(set(file_columns))

@@ -272,27 +272,23 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
     ts_format = event_cfg.pop("timestamp_format", None)
     match ts:
         case str() if ts.startswith("col(") and ts.endswith(")"):
+            ts_name = ts[4:-1]
             if isinstance(ts_format, str):
-                event_exprs["timestamp"] = pl.col(ts[4:-1]).str.strptime(pl.Datetime, ts_format)
-            elif isinstance(ts_format, ListConfig):
+                logger.debug(f"string! {ts}")
+                event_exprs["timestamp"] = pl.col(ts_name).str.strptime(pl.Datetime, ts_format)
+            elif isinstance(ts_format, ListConfig) or isinstance(ts_format, list):
                 assert len(ts_format) > 0, "Timestamp format list is empty"
-                for fmt in ts_format:
-                    temp_column = df.select(pl.col("date").str.strptime(pl.Datetime, fmt, strict=False))
-                    if "timestamp" not in event_exprs:
-                        event_exprs["timestamp"] = temp_column
-                    else:
-                        concat = pl.concat(
-                            [event_exprs["timestamp"], temp_column.rename({"date": "temp_date"})],
-                            how="horizontal",
-                        )
-                        merge_column = concat.select(pl.col("date").fill_null(pl.col("temp_date")))
-                        event_exprs["timestamp"] = merge_column
-                event_exprs["timestamp"].select(
-                    pl.col("date")
-                ).collect().null_count().item() == 0, "Timestamp column has null values"
+                timestamp_expr = pl.col(ts_name).str.strptime(pl.Datetime, ts_format[0], strict=False)
+                for fmt in ts_format[1:]:
+                    ts_name = ts_name
+                    next_expr = pl.col(ts_name).str.strptime(pl.Datetime, fmt, strict=False)
+                    timestamp_expr = (
+                        pl.when(timestamp_expr.is_null()).then(next_expr).otherwise(timestamp_expr)
+                    )
+                event_exprs["timestamp"] = timestamp_expr
             else:
                 assert ts_format is None
-                event_exprs["timestamp"] = pl.col(ts[4:-1]).cast(pl.Datetime)
+                event_exprs["timestamp"] = pl.col(ts_name).cast(pl.Datetime)
         case None:
             event_exprs["timestamp"] = pl.lit(None, dtype=pl.Datetime)
         case _:

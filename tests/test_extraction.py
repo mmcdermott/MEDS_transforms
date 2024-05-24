@@ -237,6 +237,7 @@ def test_extraction():
             "split_fracs.tuning": 1 / 6,
             "split_fracs.held_out": 1 / 6,
             "row_chunksize": 10,
+            "subselect_columns": False,
             "n_patients_per_shard": 2,
             "hydra.verbose": True,
         }
