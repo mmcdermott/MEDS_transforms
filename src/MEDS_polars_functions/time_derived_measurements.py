@@ -5,6 +5,8 @@ from collections.abc import Callable
 import polars as pl
 from omegaconf import DictConfig
 
+pl.enable_string_cache()
+
 
 def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[[pl.DataFrame], pl.DataFrame]:
     """Creates a "meta" functor that computes the input functor on a MEDS shard then combines both dataframes.
@@ -16,9 +18,86 @@ def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[
         A function that computes the new events and combines them with the original DataFrame, returning a
         result in proper MEDS sorted order.
 
-    Examples: TODO
+    Examples:
+        >>> from datetime import datetime
+        >>> df = pl.DataFrame(
+        ...     {
+        ...         "patient_id": [1, 1, 1, 1, 2, 2, 3, 3],
+        ...         "timestamp": [
+        ...             None,
+        ...             datetime(1990, 1, 1),
+        ...             datetime(2021, 1, 1),
+        ...             datetime(2021, 1, 1),
+        ...             datetime(1988, 1, 2),
+        ...             datetime(2023, 1, 3),
+        ...             datetime(2022, 1, 1),
+        ...             datetime(2022, 1, 1),
+        ...         ],
+        ...         "code": ["static", "DOB", "lab//A", "lab//B", "DOB", "lab//A", "lab//B", "dx//1"],
+        ...     },
+        ...     schema={"patient_id": pl.UInt32, "timestamp": pl.Datetime, "code": pl.Categorical},
+        ... )
+        >>> df
+        shape: (8, 3)
+        ┌────────────┬─────────────────────┬────────┐
+        │ patient_id ┆ timestamp           ┆ code   │
+        │ ---        ┆ ---                 ┆ ---    │
+        │ u32        ┆ datetime[μs]        ┆ cat    │
+        ╞════════════╪═════════════════════╪════════╡
+        │ 1          ┆ null                ┆ static │
+        │ 1          ┆ 1990-01-01 00:00:00 ┆ DOB    │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//A │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//B │
+        │ 2          ┆ 1988-01-02 00:00:00 ┆ DOB    │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ lab//A │
+        │ 3          ┆ 2022-01-01 00:00:00 ┆ lab//B │
+        │ 3          ┆ 2022-01-01 00:00:00 ┆ dx//1  │
+        └────────────┴─────────────────────┴────────┘
+        >>> # As an example, we'll use the age functor defined elsewhere in this module.
+        >>> age_cfg = DictConfig({"DOB_code": "DOB", "age_code": "AGE", "age_unit": "years"})
+        >>> age_fn = age_fntr(age_cfg)
+        >>> age_fn(df)
+        shape: (2, 4)
+        ┌────────────┬─────────────────────┬──────┬─────────────────┐
+        │ patient_id ┆ timestamp           ┆ code ┆ numerical_value │
+        │ ---        ┆ ---                 ┆ ---  ┆ ---             │
+        │ u32        ┆ datetime[μs]        ┆ cat  ┆ f64             │
+        ╞════════════╪═════════════════════╪══════╪═════════════════╡
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ AGE  ┆ 31.001347       │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE  ┆ 35.00417        │
+        └────────────┴─────────────────────┴──────┴─────────────────┘
+        >>> # Now, we'll use the add_new_events functor to add these age events to the original DataFrame.
+        >>> add_age_fn = add_new_events_fntr(age_fn)
+        >>> add_age_fn(df)
+        shape: (10, 4)
+        ┌────────────┬─────────────────────┬────────┬─────────────────┐
+        │ patient_id ┆ timestamp           ┆ code   ┆ numerical_value │
+        │ ---        ┆ ---                 ┆ ---    ┆ ---             │
+        │ u32        ┆ datetime[μs]        ┆ cat    ┆ f64             │
+        ╞════════════╪═════════════════════╪════════╪═════════════════╡
+        │ 1          ┆ null                ┆ static ┆ null            │
+        │ 1          ┆ 1990-01-01 00:00:00 ┆ DOB    ┆ null            │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ AGE    ┆ 31.001347       │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//A ┆ null            │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//B ┆ null            │
+        │ 2          ┆ 1988-01-02 00:00:00 ┆ DOB    ┆ null            │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE    ┆ 35.00417        │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ lab//A ┆ null            │
+        │ 3          ┆ 2022-01-01 00:00:00 ┆ lab//B ┆ null            │
+        │ 3          ┆ 2022-01-01 00:00:00 ┆ dx//1  ┆ null            │
+        └────────────┴─────────────────────┴────────┴─────────────────┘
     """
-    raise NotImplementedError("TODO")
+
+    def out_fn(df: pl.DataFrame) -> pl.DataFrame:
+        new_events = fn(df)
+        df = df.with_row_index("__idx")
+        new_events = new_events.with_columns(pl.lit(0, dtype=df.schema["__idx"]).alias("__idx"))
+        return (
+            pl.concat([df, new_events], how="diagonal")
+            .sort(by=["patient_id", "timestamp", "__idx"])
+            .drop("__idx")
+        )
+    return out_fn
 
 
 TIME_DURATION_UNITS = {
@@ -99,7 +178,8 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
 
     Returns:
         A function that returns the to-be-added "age" events with the patient's age for all input events with
-        unique, non-null timestamps in the data, for all patients who have an observed date of birth.
+        unique, non-null timestamps in the data, for all patients who have an observed date of birth. It does
+        not add an event for timestamps that are equal to the date of birth.
 
     Raises:
         ValueError: If the input unit is not recognized.
@@ -108,23 +188,24 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         >>> from datetime import datetime
         >>> df = pl.DataFrame(
         ...     {
-        ...         "patient_id": [1, 1, 1, 1, 2, 2, 3, 3],
+        ...         "patient_id": [1, 1, 1, 1, 1, 2, 2, 3, 3],
         ...         "timestamp": [
         ...             None,
         ...             datetime(1990, 1, 1),
         ...             datetime(2021, 1, 1),
         ...             datetime(2021, 1, 1),
+        ...             datetime(2021, 1, 2),
         ...             datetime(1988, 1, 2),
         ...             datetime(2023, 1, 3),
         ...             datetime(2022, 1, 1),
         ...             datetime(2022, 1, 1),
         ...         ],
-        ...         "code": ["static", "DOB", "lab//A", "lab//B", "DOB", "lab//A", "lab//B", "dx//1"],
+        ...         "code": ["static", "DOB", "lab//A", "lab//B", "rx", "DOB", "lab//A", "lab//B", "dx//1"],
         ...     },
         ...     schema={"patient_id": pl.UInt32, "timestamp": pl.Datetime, "code": pl.Categorical},
         ... )
         >>> df
-        shape: (8, 3)
+        shape: (9, 3)
         ┌────────────┬─────────────────────┬────────┐
         │ patient_id ┆ timestamp           ┆ code   │
         │ ---        ┆ ---                 ┆ ---    │
@@ -134,6 +215,7 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         │ 1          ┆ 1990-01-01 00:00:00 ┆ DOB    │
         │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//A │
         │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//B │
+        │ 1          ┆ 2021-01-02 00:00:00 ┆ rx     │
         │ 2          ┆ 1988-01-02 00:00:00 ┆ DOB    │
         │ 2          ┆ 2023-01-03 00:00:00 ┆ lab//A │
         │ 3          ┆ 2022-01-01 00:00:00 ┆ lab//B │
@@ -142,15 +224,14 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         >>> age_cfg = DictConfig({"DOB_code": "DOB", "age_code": "AGE", "age_unit": "years"})
         >>> age_fn = age_fntr(age_cfg)
         >>> age_fn(df)
-        shape: (4, 4)
+        shape: (3, 4)
         ┌────────────┬─────────────────────┬──────┬─────────────────┐
         │ patient_id ┆ timestamp           ┆ code ┆ numerical_value │
         │ ---        ┆ ---                 ┆ ---  ┆ ---             │
         │ u32        ┆ datetime[μs]        ┆ cat  ┆ f64             │
         ╞════════════╪═════════════════════╪══════╪═════════════════╡
-        │ 1          ┆ 1990-01-01 00:00:00 ┆ AGE  ┆ 0.0             │
         │ 1          ┆ 2021-01-01 00:00:00 ┆ AGE  ┆ 31.001347       │
-        │ 2          ┆ 1988-01-02 00:00:00 ┆ AGE  ┆ 0.0             │
+        │ 1          ┆ 2021-01-02 00:00:00 ┆ AGE  ┆ 31.004084       │
         │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE  ┆ 35.00417        │
         └────────────┴─────────────────────┴──────┴─────────────────┘
         >>> age_cfg = DictConfig({"DOB_code": "DOB", "age_code": "AGE", "age_unit": "scores"})
@@ -178,6 +259,7 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
                 age_expr.alias("numerical_value"),
             )
             .drop_nulls(subset=["numerical_value"])
+            .filter(pl.col("numerical_value") > 0)
         )
 
     return fn

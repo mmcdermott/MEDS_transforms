@@ -59,7 +59,9 @@ def main(cfg: DictConfig):
         in_fp = input_dir / f"{sp}.parquet"
         out_fp = with_time_derived_dir / f"{sp}.parquet"
 
-        logger.info(f"Filtering {str(in_fp.resolve())} into {str(out_fp.resolve())}")
+        logger.info(
+            f"Adding time derived measurements to {str(in_fp.resolve())} into {str(out_fp.resolve())}"
+        )
 
         rwlock_wrap(
             in_fp,
