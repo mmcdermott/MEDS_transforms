@@ -1,5 +1,6 @@
 """Utilities for converting input data structures into MEDS events."""
 
+from collections.abc import Sequence
 from functools import reduce
 
 import polars as pl
@@ -271,9 +272,26 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
     ts_format = event_cfg.pop("timestamp_format", None)
     match ts:
         case str() if ts.startswith("col(") and ts.endswith(")"):
-            if ts_format:
+            if isinstance(ts_format, str):
                 event_exprs["timestamp"] = pl.col(ts[4:-1]).str.strptime(pl.Datetime, ts_format)
+            elif isinstance(ts_format, ListConfig):
+                assert len(ts_format) > 0, "Timestamp format list is empty"
+                for fmt in ts_format:
+                    temp_column = df.select(pl.col("date").str.strptime(pl.Datetime, fmt, strict=False))
+                    if "timestamp" not in event_exprs:
+                        event_exprs["timestamp"] = temp_column
+                    else:
+                        concat = pl.concat(
+                            [event_exprs["timestamp"], temp_column.rename({"date": "temp_date"})],
+                            how="horizontal",
+                        )
+                        merge_column = concat.select(pl.col("date").fill_null(pl.col("temp_date")))
+                        event_exprs["timestamp"] = merge_column
+                event_exprs["timestamp"].select(
+                    pl.col("date")
+                ).collect().null_count().item() == 0, "Timestamp column has null values"
             else:
+                assert ts_format is None
                 event_exprs["timestamp"] = pl.col(ts[4:-1]).cast(pl.Datetime)
         case None:
             event_exprs["timestamp"] = pl.lit(None, dtype=pl.Datetime)
@@ -310,7 +328,9 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
     return df.select(**event_exprs).unique(maintain_order=True)
 
 
-def convert_to_events(df: pl.LazyFrame, event_cfgs: dict[str, dict[str, str | None]]) -> pl.LazyFrame:
+def convert_to_events(
+    df: pl.LazyFrame, event_cfgs: dict[str, dict[str, str | None | Sequence[str]]]
+) -> pl.LazyFrame:
     """Converts a DataFrame of raw data into a DataFrame of events.
 
     Args:

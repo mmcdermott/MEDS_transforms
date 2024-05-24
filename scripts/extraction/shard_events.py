@@ -24,7 +24,7 @@ def scan_with_row_idx(columns: Sequence[str], cfg: DictConfig, fp: Path) -> pl.L
         case ".csv":
             logger.debug(f"Reading {fp} as CSV.")
             return pl.scan_csv(
-                fp, row_index_name=ROW_IDX_NAME, infer_schema_length=cfg.get("infer_schema_length")
+                fp, row_index_name=ROW_IDX_NAME, infer_schema_length=cfg["infer_schema_length"]
             ).select(pl.col(columns))
         case ".parquet":
             logger.debug(f"Reading {fp} as Parquet.")
@@ -33,9 +33,11 @@ def scan_with_row_idx(columns: Sequence[str], cfg: DictConfig, fp: Path) -> pl.L
             raise ValueError(f"Unsupported file type: {fp.suffix}")
 
 
-def is_col_field(field: str) -> bool:
+def is_col_field(field: str | None) -> bool:
     # Check if the string field starts with "col(" and ends with ")"
     # indicating a specialized column format in configuration.
+    if field is None:
+        return False
     return field.startswith("col(") and field.endswith(")")
 
 
