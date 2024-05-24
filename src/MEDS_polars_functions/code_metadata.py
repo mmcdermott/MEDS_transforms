@@ -69,6 +69,25 @@ class METADATA_FN(StrEnum):
 
 
 class MapReducePair(NamedTuple):
+    """A named tuple pair of a mapper and reducer function for type safety and clarity.
+
+    The mapper (element 0) should be a polars expression that aggregates the data for a single metadata
+    aggregation function. It must be suitable for use in a groupby operation on a polars LazyFrame. The
+    reducer (element 1) should be a function that takes either a single polars expression, a sequence of
+    polars expressions, or a polars Selector and reduces them into a single polars expression, which is
+    returned. Built in functions such as `pl.sum_horizontal` and `pl.max_horizontal` are examples of functions
+    that can be used as reducers. Custom defined functions can also be used.
+
+    There is no validation of these criteria in the constructor, so it is up to the user to ensure that the
+    functions provided are suitable for their intended use.
+
+    Args:
+        mapper: A polars expression that aggregates the data for a single metadata aggregation function. It
+            must be suitable for use in a groupby operation on a polars LazyFrame.
+        reducer: A function that takes either a single polars expression, a sequence of polars expressions, or
+            a polars Selector and reduces them into a single polars expression, which is returned.
+    """
+
     mapper: pl.Expr
     reducer: Callable[[pl.Expr | Sequence[pl.Expr] | cs._selector_proxy_], pl.Expr]
 
