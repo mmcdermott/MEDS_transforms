@@ -1,0 +1,384 @@
+patient_id_col: "empi"
+
+demographic:
+  sex:
+    code:
+      - SEX
+      - col(sex)
+    timestamp: null
+  race:
+    code:
+      - RACE
+      - col(race)
+    timestamp: null
+  country:
+    code:
+      - COUNTRY
+      - col(country)
+    timestamp: null
+  zip_code:
+    code:
+      - ZIP_CODE
+      - col(zip_code)
+    timestamp: null
+  birth:
+    code: BIRTH
+    timestamp: col(date_of_birth)
+    timestamp_format: "%Y-%m-%d"
+  death:
+    code: DEATH
+    timestamp: col(date_of_death)
+    timestamp_format: "%Y-%m-%d"
+
+diagnosis:
+  diagnosis:
+    code:
+      - DIAGNOSIS
+      - col(diagnosis_name)
+    timestamp: col(date)
+    timestamp_format: "%Y-%m-%d"
+
+encounters_modified:
+  admit_date:
+    code: ADMIT_DATE
+    timestamp: col(admit_date)
+    timestamp_format: "%Y-%m-%d"
+  discharge_date:
+    code: DISCHARGE_DATE
+    timestamp: col(discharge_date)
+    timestamp_format: "%Y-%m-%d"
+
+physical:
+  physical:
+    code:
+      - PHYSICAL
+      - col(physical_name)
+    timestamp: col(date)
+    timestamp_format: "%Y-%m-%d"
+    numerical_value: col(result)
+
+ecg:
+  ecg:
+    code: ECG
+    timestamp: col(date)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+
+echo:
+  echo_type:
+    code:
+      - ECHO_TYPE
+      - col(echo_type)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  lv_wall_thickness:
+    code:
+      - LV_WALL_THICKNESS
+      - col(lv_wall_thickness)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  lv_hypertrophy:
+    code:
+      - LV_HYPERTROPHY
+      - col(lv_hypertrophy)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  lv_ef:
+    code:
+      - LV_EF
+      - col(lv_ef)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  lv_ef_method:
+    code:
+      - LV_EF_METHOD
+      - col(lv_ef_method)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  rv_size:
+    code:
+      - RV_SIZE
+      - col(rv_size)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  tv_regurg:
+    code:
+      - TV_REGURG
+      - col(tv_regurg)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  tv_regurg_severity:
+    code:
+      - TV_REGURG_SEVERITY
+      - col(tv_regurg_severity)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  av_abnormal:
+    code:
+      - AV_ABNORMAL
+      - col(av_abnormal)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  av_stenosis:
+    code:
+      - AV_STENOSIS
+      - col(av_stenosis)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  av_calcified:
+    code:
+      - AV_CALCIFIED
+      - col(av_calcified)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  mv_regurg:
+    code:
+      - MV_REGURG
+      - col(mv_regurg)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  mv_regurg_severity:
+    code:
+      - MV_REGURG_SEVERITY
+      - col(mv_regurg_severity)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  pv_stenosis_severity:
+    code:
+      - PV_STENOSIS_SEVERITY
+      - col(pv_stenosis_severity)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  pv_regurg:
+    code:
+      - PV_REGURG
+      - col(pv_regurg)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  pv_regurg_severity:
+    code:
+      - PV_REGURG_SEVERITY
+      - col(pv_regurg_severity)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  echo_quality:
+    code:
+      - ECHO_QUALITY
+      - col(echo_quality)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  la_size:
+    code:
+      - LA_SIZE
+      - col(la_size)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  ra_size:
+    code:
+      - RA_SIZE
+      - col(ra_size)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  pericardium_normal:
+    code:
+      - PERICARDIUM_NORMAL
+      - col(pericardium_normal)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  pericardial_effusion:
+    code:
+      - PERICARDIAL_EFFUSION
+      - col(pericardial_effusion)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  pleural_effusion:
+    code:
+      - PLEURAL_EFFUSION
+      - col(pleural_effusion)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  av_morphology:
+    code:
+      - AV_MORPHOLOGY
+      - col(av_morphology)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  indication_category:
+    code:
+      - INDICATION_CATEGORY
+      - col(indication_category)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  indication_subcategory:
+    code:
+      - INDICATION_SUBCATEGORY
+      - col(indication_subcategory)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  echo_comprehensive:
+    code:
+      - ECHO_COMPREHENSIVE
+      - col(echo_comprehensive)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  lv_ef_value:
+    code:
+      - LV_EF_VALUE
+      - col(lv_ef_value)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+    numerical_value: col(lv_ef_value)
+  tv_rv_systolic_pressure:
+    code:
+      - TV_RV_SYSTOLIC_PRESSURE
+      - col(tv_rv_systolic_pressure)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+    numerical_value: col(tv_rv_systolic_pressure)
+  tv_ra_estimated_pressure:
+    code:
+      - TV_RA_ESTIMATED_PRESSURE
+      - col(tv_ra_estimated_pressure)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+    numerical_value: col(tv_ra_estimated_pressure)
+  body_surface_area:
+    code:
+      - BODY_SURFACE_AREA
+      - col(body_surface_area)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+    numerical_value: col(body_surface_area)
+  height_cm:
+    code:
+      - HEIGHT_CM
+      - col(height_cm)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+    numerical_value: col(height_cm)
+  weight_kg:
+    code:
+      - WEIGHT_KG
+      - col(weight_kg)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+    numerical_value: col(weight_kg)
+  heart_rate:
+    code:
+      - HEART_RATE
+      - col(heart_rate)
+    timestamp: col(date)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+    numerical_value: col(heart_rate)
+
+pressure:
+  mean_ra_pressure:
+    code: MEAN_RA_PRESSURE
+    timestamp: col(date)
+    timestamp_format: "%Y-%m-%d"
+    numerical_value: col(mean_ra_pressure)
+  mean_pa_pressure:
+    code: MEAN_PA_PRESSURE
+    timestamp: col(date)
+    timestamp_format: "%Y-%m-%d"
+    numerical_value: col(mean_pa_pressure)
+  mean_wedge_pressure:
+    code: MEAN_WEDGE_PRESSURE
+    timestamp: col(date)
+    timestamp_format: "%Y-%m-%d"
+    numerical_value: col(mean_wedge_pressure)
+  rvedp:
+    code: RVEDP
+    timestamp: col(date)
+    timestamp_format: "%Y-%m-%d"
+    numerical_value: col(rvedp)
+
+lab:
+  lab:
+    code:
+      - LAB
+      - col(name)
+    timestamp: col(date)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    numerical_value: col(name)
+
+medication_after_1960:
+  medication:
+    code:
+      - MEDICATION
+      - col(medication_name)
+    timestamp: col(date)
+    timestamp_format: "%m/%d/%Y"
+
+procedure:
+  procedure:
+    code:
+      - PROCEDURE
+      - col(procedure_name)
+    timestamp: col(date)
+    timestamp_format: "%Y-%m-%d"
