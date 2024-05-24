@@ -1,6 +1,11 @@
 # Raw data
 MEDS_cohort_dir: ???
 output_data_dir: ???
+log_dir: "${output_data_dir}/.logs"
+
+# Worker / Stage information
+stage: ???
+worker: 1
 
 # Filtering parameters
 min_code_occurrences: null
@@ -46,8 +51,8 @@ do_overwrite: False
 # Hydra
 hydra:
   job:
-    name: MEDS_ETL_step_${now:%Y-%m-%d_%H-%M-%S}
+    name: "MEDS_Preprocessor/stage_${stage}/worker_${worker}/${now:%Y-%m-%d_%H-%M-%S}"
   run:
-    dir: ${MEDS_cohort_dir}/.logs/etl/${hydra.job.name}
+    dir: "${log_dir}/${hydra.job.name}"
   sweep:
-    dir: ${MEDS_cohort_dir}/.logs/etl/${hydra.job.name}
+    dir: "${log_dir}/${hydra.job.name}"
