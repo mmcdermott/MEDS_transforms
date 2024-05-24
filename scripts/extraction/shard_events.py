@@ -14,7 +14,7 @@ from omegaconf import DictConfig, OmegaConf
 from tqdm.auto import tqdm
 
 from MEDS_polars_functions.mapper import wrap as rwlock_wrap
-from MEDS_polars_functions.utils import hydra_loguru_init
+from MEDS_polars_functions.utils import hydra_loguru_init, is_col_field
 
 ROW_IDX_NAME = "__row_idx"
 
@@ -32,14 +32,6 @@ def scan_with_row_idx(columns: Sequence[str], cfg: DictConfig, fp: Path) -> pl.L
     if cfg.subselect_columns:
         df = df.select(pl.col(columns))
     return df
-
-
-def is_col_field(field: str | None) -> bool:
-    # Check if the string field starts with "col(" and ends with ")"
-    # indicating a specialized column format in configuration.
-    if field is None:
-        return False
-    return field.startswith("col(") and field.endswith(")")
 
 
 def parse_col_field(field: str) -> str:

@@ -19,3 +19,11 @@ def hydra_loguru_init() -> None:
 
 def write_lazyframe(df: pl.LazyFrame, out_fp: Path) -> None:
     df.collect().write_parquet(out_fp, use_pyarrow=True)
+
+
+def is_col_field(field: str | None) -> bool:
+    # Check if the string field starts with "col(" and ends with ")"
+    # indicating a specialized column format in configuration.
+    if field is None:
+        return False
+    return field.startswith("col(") and field.endswith(")")
