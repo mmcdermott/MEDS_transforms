@@ -97,6 +97,7 @@ def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[
             .sort(by=["patient_id", "timestamp", "__idx"])
             .drop("__idx")
         )
+
     return out_fn
 
 
