@@ -23,14 +23,15 @@ def scan_with_row_idx(columns: Sequence[str], cfg: DictConfig, fp: Path) -> pl.L
     match fp.suffix.lower():
         case ".csv":
             logger.debug(f"Reading {fp} as CSV.")
-            return pl.scan_csv(
-                fp, row_index_name=ROW_IDX_NAME, infer_schema_length=cfg["infer_schema_length"]
-            ).select(pl.col(columns))
+            df = pl.scan_csv(fp, row_index_name=ROW_IDX_NAME, infer_schema_length=cfg["infer_schema_length"])
         case ".parquet":
             logger.debug(f"Reading {fp} as Parquet.")
-            return pl.scan_parquet(fp, row_index_name=ROW_IDX_NAME).select(pl.col(columns))
+            df = pl.scan_parquet(fp, row_index_name=ROW_IDX_NAME)
         case _:
             raise ValueError(f"Unsupported file type: {fp.suffix}")
+    if cfg.subselect_columns:
+        df = df.select(pl.col(columns))
+    return df
 
 
 def is_col_field(field: str | None) -> bool:

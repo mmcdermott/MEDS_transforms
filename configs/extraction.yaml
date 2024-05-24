@@ -19,6 +19,7 @@ infer_schema_length: 10000
 
 # Misc
 do_overwrite: False
+subselect_columns: True
 seed: 1
 
 # Hydra
