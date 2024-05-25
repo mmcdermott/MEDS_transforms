@@ -55,6 +55,9 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
             columns referenced by the event configuration dictionary are not found in the raw data.
 
     Examples:
+        >>> _ = pl.Config.set_tbl_width_chars(600)
+        >>> _ = pl.Config.set_tbl_rows(20)
+        >>> _ = pl.Config.set_tbl_cols(20)
         >>> raw_data = pl.DataFrame({
         ...     "patient_id": [1, 1, 2, 2],
         ...     "code": ["A", "B", "C", "D"],
@@ -147,8 +150,6 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         ...     "timestamp": None,
         ... }
         >>> # We'll print the raw data so you can see what it looks like
-        >>> _ = pl.Config.set_tbl_rows(20)
-        >>> _ = pl.Config.set_tbl_cols(20)
         >>> complex_raw_data
         shape: (6, 9)
         ┌────────────┬─────────────────────┬─────────────────────┬────────────────┬────────────────────┬──────────────────┬────────────────┬────────────┬───────────┐
@@ -357,7 +358,9 @@ def convert_to_events(
         ValueError: If no event configurations are provided or if an error occurs during event extraction.
 
     Examples:
+        >>> _ = pl.Config.set_tbl_width_chars(600)
         >>> _ = pl.Config.set_tbl_rows(20)
+        >>> _ = pl.Config.set_tbl_cols(20)
         >>> from datetime import datetime
         >>> complex_raw_data = pl.DataFrame(
         ...     {

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import gzip
 import random
 from collections.abc import Sequence
 from datetime import datetime
@@ -19,6 +20,13 @@ ROW_IDX_NAME = "__row_idx"
 
 def scan_with_row_idx(columns: Sequence[str], cfg: DictConfig, fp: Path) -> pl.LazyFrame:
     match fp.suffix.lower():
+        case ".csv.gz":
+            logger.debug(f"Reading {fp} as compressed CSV.")
+            logger.warning("Reading compressed CSV files may be slow and limit parallelizability.")
+
+            def reader(fp: Path, **kwargs) -> pl.LazyFrame:
+                return pl.read_csv(gzip.open(fp, mode="rb"), **kwargs).lazy()
+
         case ".csv":
             logger.debug(f"Reading {fp} as CSV.")
             df = pl.scan_csv(fp, row_index_name=ROW_IDX_NAME, infer_schema_length=cfg["infer_schema_length"])
@@ -101,6 +109,30 @@ def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
     df.collect().write_parquet(out_fp, use_pyarrow=True)
 
 
+def get_shard_prefix(base_path: Path, fp: Path) -> str:
+    """Extracts the shard prefix from a file path by removing the raw_cohort_dir.
+
+    Args:
+        base_path: The base path to remove.
+        fp: The file path to extract the shard prefix from.
+
+    Returns:
+        The shard prefix (the file path relative to the base path with the suffix removed).
+
+    Examples:
+        >>> get_shard_prefix(Path("/a/b/c"), Path("/a/b/c/d.parquet"))
+        'd'
+        >>> get_shard_prefix(Path("/a/b/c"), Path("/a/b/c/d/e.csv.gz"))
+        'd/e'
+    """
+
+    relative_path = fp.relative_to(base_path)
+    relative_parent = relative_path.parent
+    file_name = relative_path.name.split(".")[0]
+
+    return str(relative_parent / file_name)
+
+
 @hydra.main(version_base=None, config_path="../../configs", config_name="extraction")
 def main(cfg: DictConfig):
     """Runs the input data re-sharding process. Can be parallelized across output shards.
@@ -115,14 +147,16 @@ def main(cfg: DictConfig):
     MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
     row_chunksize = cfg.row_chunksize
 
+    seen_files = set()
     input_files_to_subshard = []
-    for fmt in ["parquet", "csv"]:
-        files_in_fmt = list(raw_cohort_dir.glob(f"*.{fmt}"))
+    for fmt in ["parquet", "csv", "csv.gz"]:
+        files_in_fmt = list(raw_cohort_dir.glob(f"**/*.{fmt}"))
         for f in files_in_fmt:
-            if f.stem in [x.stem for x in input_files_to_subshard]:
+            if get_shard_prefix(raw_cohort_dir, f) in seen_files:
                 logger.warning(f"Skipping {f} as it has already been added in a preferred format.")
             else:
                 input_files_to_subshard.append(f)
+                seen_files.add(get_shard_prefix(raw_cohort_dir, f))
 
     # Select subset of files that we wish to pull events from
     event_conversion_cfg_fp = Path(cfg.event_conversion_config_fp)
@@ -144,7 +178,7 @@ def main(cfg: DictConfig):
     start = datetime.now()
     for input_file in input_files_to_subshard:
         columns = table_to_columns[input_file]
-        out_dir = MEDS_cohort_dir / "sub_sharded" / input_file.stem
+        out_dir = MEDS_cohort_dir / "sub_sharded" / get_shard_prefix(raw_cohort_dir, input_file)
         out_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Processing {input_file} to {out_dir}.")
 

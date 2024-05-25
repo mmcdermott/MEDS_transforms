@@ -161,7 +161,15 @@ broken down into the following steps:
      - Adding a "dummy" event to the dataset for each patient that occurs at the end of the observation
        period.
 
-3. Transforming the code space to appropriately include or exclude any additional measurement columns that
+3. Iteratively (a) grouping the dataset by `code` and associated code modifier columns and collecting
+   statistics on the numerical and categorical values for each code then (b) filtering the dataset down to
+   remove outliers or other undesired codes or values, e.g.,
+
+   - Computing the mean and standard deviation of the numerical values for each code.
+   - Computing the number of times each code occurs in the dataset.
+   - Computing appropriate numerical bins for each code for value discretization.
+
+4. Transforming the code space to appropriately include or exclude any additional measurement columns that
    should be included during code grouping and modeling operations. The goal of this step is to ensure that
    the only columns that need be processed going into the pre-processing, tokenization, and tensorization
    stage are expressible in the `code` and `numerical_values` columns of the dataset, which helps
@@ -170,14 +178,6 @@ broken down into the following steps:
    - Standardizing the unit of measure of observed codes or adding the unit of measure to the code such that
      group-by operations over the code take the unit into account.
    - Adding categorical normal/abnormal flags to laboratory test result codes.
-
-4. Iteratively (a) grouping the dataset by `code` and collecting statistics on the numerical and categorical
-   values for each code then (b) filtering the dataset down to remove outliers or other undesired codes or
-   values, e.g.,
-
-   - Computing the mean and standard deviation of the numerical values for each code.
-   - Computing the number of times each code occurs in the dataset.
-   - Computing appropriate numerical bins for each code for value discretization.
 
 5. Normalizing the data to convert codes to indices and numerical values to the desired form (either
    categorical indices or normalized numerical values).

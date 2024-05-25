@@ -20,7 +20,7 @@ from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
 
 @hydra.main(version_base=None, config_path="configs", config_name="preprocess")
 def main(cfg: DictConfig):
-    """TODO."""
+    """Adds time-derived measurements to a MEDS cohort as separate observations at each unique timestamp."""
 
     hydra_loguru_init()
 
@@ -59,7 +59,9 @@ def main(cfg: DictConfig):
         in_fp = input_dir / f"{sp}.parquet"
         out_fp = with_time_derived_dir / f"{sp}.parquet"
 
-        logger.info(f"Filtering {str(in_fp.resolve())} into {str(out_fp.resolve())}")
+        logger.info(
+            f"Adding time derived measurements to {str(in_fp.resolve())} into {str(out_fp.resolve())}"
+        )
 
         rwlock_wrap(
             in_fp,
