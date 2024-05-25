@@ -84,7 +84,7 @@ def main(cfg: DictConfig):
     hydra_loguru_init()
 
     raw_cohort_dir = Path(cfg.raw_cohort_dir)
-    MEDS_input_dir = Path(cfg.MEDS_cohort_dir)
+    MEDS_input_dir = Path(cfg.output_dir)
 
     all_fps = list(raw_cohort_dir.glob("**/*.csv.gz"))
 

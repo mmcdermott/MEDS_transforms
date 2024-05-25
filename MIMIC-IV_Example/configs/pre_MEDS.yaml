@@ -1,11 +1,11 @@
 raw_cohort_dir: ???
-MEDS_input_dir: ???
+output_dir: ???
 
 # Hydra
 hydra:
   job:
     name: pre_MEDS_${now:%Y-%m-%d_%H-%M-%S}
   run:
-    dir: ${MEDS_input_dir}/.logs/${hydra.job.name}
+    dir: ${output_dir}/.logs/${hydra.job.name}
   sweep:
-    dir: ${MEDS_input_dir}/.logs/${hydra.job.name}
+    dir: ${output_dir}/.logs/${hydra.job.name}
