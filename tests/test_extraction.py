@@ -182,7 +182,7 @@ def run_command(script: Path, hydra_kwargs: dict[str, str], test_name: str):
     stderr = command_out.stderr.decode()
     stdout = command_out.stdout.decode()
     if command_out.returncode != 0:
-        raise AssertionError(f"{test_name} failed!\nstderr:\n{stderr}\nstdout:\n{stdout}")
+        raise AssertionError(f"{test_name} failed!\nstdout:\n{stdout}\nstderr:\n{stderr}")
     return stderr, stdout
 
 
@@ -212,20 +212,27 @@ def test_extraction():
         event_cfgs_yaml = raw_cohort_dir / "event_cfgs.yaml"
 
         # Write the CSV files
-        subjects_csv.write_text(SUBJECTS_CSV)
-        admit_vitals_csv.write_text(ADMIT_VITALS_CSV)
+        subjects_csv.write_text(SUBJECTS_CSV.strip())
+        admit_vitals_csv.write_text(ADMIT_VITALS_CSV.strip())
 
         # Mix things up -- have one CSV be also in parquet format.
         admit_vitals_parquet = raw_cohort_dir / "admit_vitals.parquet"
         df = pl.read_csv(admit_vitals_csv)
 
         old_shape = df.shape
-        df.write_parquet(admit_vitals_parquet, use_pyarrow=True)
-        df = pl.read_parquet(admit_vitals_parquet)
-        new_shape = df.shape
+        assert old_shape[0] > 0, "Should have some rows"
 
-        assert old_shape == new_shape, "Shapes should be the same after writing and reading parquet."
-        assert new_shape[0] > 0, "Should have some rows in the parquet file."
+        df.write_parquet(admit_vitals_parquet, use_pyarrow=True)
+
+        df = pl.scan_parquet(admit_vitals_parquet)
+        df = df.select(list(df.columns))
+        assert (
+            df.select(pl.len()).collect().item() == old_shape[0]
+        ), "Should have the same number of rows after select."
+        assert old_shape == df.collect().shape, "Shapes should be the same after selecting all columns."
+
+        df = pl.scan_parquet(admit_vitals_parquet)
+        assert old_shape == df.collect().shape, "Shapes should be the same after scanning the parquet file."
 
         # Write the event config YAML
         event_cfgs_yaml.write_text(EVENT_CFGS_YAML)

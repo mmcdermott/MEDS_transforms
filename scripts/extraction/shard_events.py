@@ -16,7 +16,7 @@ from omegaconf import DictConfig, OmegaConf
 from MEDS_polars_functions.mapper import wrap as rwlock_wrap
 from MEDS_polars_functions.utils import hydra_loguru_init, is_col_field, parse_col_field
 
-ROW_IDX_NAME = "__row_idx"
+ROW_IDX_NAME = "//row_idx//"
 META_KEYS = {"timestamp_format"}
 
 
@@ -50,12 +50,10 @@ def scan_with_row_idx(fp: Path, columns: Sequence[str], **scan_kwargs) -> pl.Laz
         case _:
             raise ValueError(f"Unsupported file type: {fp.suffix}")
 
-    logger.info(f"Read {df.select(pl.len()).collect().item()} rows")
     if columns:
-        columns = [ROW_IDX_NAME] + columns
+        columns = [ROW_IDX_NAME, *columns]
         logger.debug(f"Selecting columns: {columns}")
         df = df.select(columns)
-        logger.info(f" Post columns, Read {df.select(pl.len()).collect().item()} rows")
 
     logger.debug(f"Returning df with columns: {', '.join(df.columns)}")
     return df
@@ -254,7 +252,18 @@ def main(cfg: DictConfig):
 
         logger.info(f"Performing preliminary read of {str(input_file.resolve())} to determine row count.")
         df = scan_with_row_idx(input_file, columns=columns, infer_schema_length=cfg["infer_schema_length"])
-        row_count = df.select(pl.len()).collect().item()
+
+        max_row_idx = df.select(pl.col(ROW_IDX_NAME).count()).collect().item()
+        if max_row_idx is None or max_row_idx <= 2:
+            logger.warning(
+                f"File {str(input_file.resolve())} Gives max row index of {max_row_idx}. Trying to debug"
+            )
+            logger.warning(f"Columns: {', '.join(df.columns)}")
+            logger.warning(f"First 10 rows:\n{df.head(10).collect()}")
+            logger.warning(f"Last 10 rows:\n{df.tail(10).collect()}")
+            raise ValueError(f"File {str(input_file.resolve())} Gives max row index of `None`.")
+
+        row_count = max_row_idx + 1
         if row_count == 0:
             raise ValueError(
                 f"File {str(input_file.resolve())} has no rows! If this is not an error, exclude it from "
