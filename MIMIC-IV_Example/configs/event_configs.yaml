@@ -27,12 +27,13 @@ hosp/admissions:
     timestamp: col(dischtime)
     timestamp_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
-  death:
-    code: DEATH
-    timestamp: col(deathtime)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
-    death_location: death_location
-    death_type: death_type
+  # We omit the death event here as it is joined to the data in the patients table in the pre-MEDS step.
+  #death:
+  #  code: DEATH
+  #  timestamp: col(deathtime)
+  #  timestamp_format: "%Y-%m-%d %H:%M:%S"
+  #  death_location: death_location
+  #  death_type: death_type
 
 hosp/diagnoses_icd:
   diagnosis:
@@ -103,11 +104,14 @@ hosp/patients:
       - col(gender)
   dob:
     code: DOB
-    timestamp: ???
+    timestamp: col(year_of_birth)
+    timestamp_format: "%Y"
   death:
     code: DEATH
     timestamp: col(dod)
-    timestamp_format: "%Y-%m-%d"
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
 
 hosp/pharmacy:
   medication_start:
