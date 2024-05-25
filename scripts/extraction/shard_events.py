@@ -246,6 +246,12 @@ def main(cfg: DictConfig):
 
         df = scan_with_row_idx(input_file, columns=columns, infer_schema_length=cfg["infer_schema_length"])
         row_count = df.select(pl.len()).collect().item()
+        if row_count == 0:
+            raise ValueError(
+                f"File {str(input_file.resolve())} has no rows! If this is not an error, exclude it from "
+                f"the event conversion configuration in {str(event_conversion_cfg_fp.resolve())}."
+            )
+
         logger.info(f"Read {row_count} rows from {str(input_file.resolve())}.")
 
         row_shards = list(range(0, row_count, row_chunksize))

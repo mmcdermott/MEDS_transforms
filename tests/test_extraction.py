@@ -218,8 +218,14 @@ def test_extraction():
         # Mix things up -- have one CSV be also in parquet format.
         admit_vitals_parquet = raw_cohort_dir / "admit_vitals.parquet"
         df = pl.read_csv(admit_vitals_csv)
-        print(f"Moving {admit_vitals_csv} (shape {df.shape}) to {admit_vitals_parquet}")
+
+        old_shape = df.shape
         df.write_parquet(admit_vitals_parquet, use_pyarrow=True)
+        df = pl.read_parquet(admit_vitals_parquet)
+        new_shape = df.shape
+
+        assert old_shape == new_shape, "Shapes should be the same after writing and reading parquet."
+        assert new_shape[0] > 0, "Should have some rows in the parquet file."
 
         # Write the event config YAML
         event_cfgs_yaml.write_text(EVENT_CFGS_YAML)
