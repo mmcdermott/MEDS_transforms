@@ -42,7 +42,7 @@ hosp/diagnoses_icd:
       - col(icd_version)
       - col(icd_code)
     hadm_id: hadm_id
-    timestamp: hosp/admissions.discharge @ hadm_id
+    timestamp: hadm_discharge_time
 
 hosp/drgcodes:
   drg:
@@ -52,7 +52,7 @@ hosp/drgcodes:
       - col(drg_code)
       - col(description)
     hadm_id: hadm_id
-    timestamp: hosp/admissions.discharge @ hadm_id
+    timestamp: hadm_discharge_time
     drg_severity: drg_severity
     drg_mortality: drg_mortality
 
@@ -149,14 +149,53 @@ hosp/transfers:
     timestamp_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
 
+icu/icustays:
+  icu_admission:
+    code:
+      - ICU_ADMISSION
+      - col(first_careunit)
+    timestamp: col(intime)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    hadm_id: hadm_id
+    icustay_id: stay_id
+  icu_discharge:
+    code:
+      - ICU_DISCHARGE
+      - col(last_careunit)
+    timestamp: col(outtime)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    hadm_id: hadm_id
+    icustay_id: stay_id
+
 icu/chartevents:
   event:
     code:
+      - LAB
       - col(itemid)
       - col(valueuom)
     timestamp: col(charttime)
     timestamp_format: "%Y-%m-%d %H:%M:%S"
     numerical_value: valuenum
     text_value: value
+    hadm_id: hadm_id
+    icustay_id: stay_id
+
+icu/procedureevents:
+  start:
+    code:
+      - PROCEDURE
+      - START
+      - col(itemid)
+    timestamp: col(starttime)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    hadm_id: hadm_id
+    icustay_id: stay_id
+  end:
+    code:
+      - PROCEDURE
+      - END
+      - col(itemid)
+    timestamp: col(endtime)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
     icustay_id: stay_id

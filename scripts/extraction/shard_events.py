@@ -12,7 +12,11 @@ from loguru import logger
 from omegaconf import DictConfig
 
 from MEDS_polars_functions.mapper import wrap as rwlock_wrap
-from MEDS_polars_functions.utils import hydra_loguru_init
+from MEDS_polars_functions.utils import (
+    get_shard_prefix,
+    hydra_loguru_init,
+    write_lazyframe,
+)
 
 ROW_IDX_NAME = "__row_idx"
 
@@ -40,34 +44,6 @@ def scan_with_row_idx(fp: Path) -> pl.LazyFrame:
 
 def filter_to_row_chunk(df: pl.LazyFrame, start: int, end: int) -> pl.LazyFrame:
     return df.filter(pl.col(ROW_IDX_NAME).is_between(start, end, closed="left")).drop(ROW_IDX_NAME)
-
-
-def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
-    df.collect().write_parquet(out_fp, use_pyarrow=True)
-
-
-def get_shard_prefix(base_path: Path, fp: Path) -> str:
-    """Extracts the shard prefix from a file path by removing the raw_cohort_dir.
-
-    Args:
-        base_path: The base path to remove.
-        fp: The file path to extract the shard prefix from.
-
-    Returns:
-        The shard prefix (the file path relative to the base path with the suffix removed).
-
-    Examples:
-        >>> get_shard_prefix(Path("/a/b/c"), Path("/a/b/c/d.parquet"))
-        'd'
-        >>> get_shard_prefix(Path("/a/b/c"), Path("/a/b/c/d/e.csv.gz"))
-        'd/e'
-    """
-
-    relative_path = fp.relative_to(base_path)
-    relative_parent = relative_path.parent
-    file_name = relative_path.name.split(".")[0]
-
-    return str(relative_parent / file_name)
 
 
 @hydra.main(version_base=None, config_path="../../configs", config_name="extraction")
@@ -124,7 +100,12 @@ def main(cfg: DictConfig):
             compute_fn = partial(filter_to_row_chunk, start=st, end=end)
             logger.info(f"Writing {input_file} row-chunk [{st}-{end}) to {out_fp}.")
             rwlock_wrap(
-                input_file, out_fp, scan_with_row_idx, write_fn, compute_fn, do_overwrite=cfg.do_overwrite
+                input_file,
+                out_fp,
+                scan_with_row_idx,
+                write_lazyframe,
+                compute_fn,
+                do_overwrite=cfg.do_overwrite,
             )
 
 

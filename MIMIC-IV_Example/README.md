@@ -11,6 +11,8 @@ Currently, some tables are ignored, including:
 1. `hosp/emar_detail`
 2. `hosp/microbiologyevents`
 3. `hosp/services`
+4. `icu/datetimeevents`
+5. `icu/ingredientevents`
 
 Lots of questions remain about how to appropriately handle timestamps of the data -- e.g., things like HCPCS
 events are stored at the level of the _date_, not the _datetime_. How should those be slotted into the
