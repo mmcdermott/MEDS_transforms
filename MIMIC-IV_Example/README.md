@@ -1,8 +1,22 @@
 # MIMIC-IV Example
 
-This is an example of how to extract a MEDS dataset from MIMIC-IV.
+This is an example of how to extract a MEDS dataset from MIMIC-IV. All scripts in this README are assumed to
+be run **not** from this directory but from the root directory of this entire repository (e.g., one directory
+up from this one).
 
-**Status**: This is a work in progress. The code is not yet functional.
+**Status**: This is a work in progress. The code is not yet functional. Remaining work includes:
+\[ \] Implementing the pre-MEDS processing step.
+
+```
+[x] Implement the joining of discharge times.
+[ ] Implement the conversion of the DOB to a more usable format.
+[ ] Implement the joining of death times.
+```
+
+\[ \] Testing the pre-MEDS processing step on live MIMIC-IV.
+\[ \] Testing the `configs/event_configs.yaml` configuration on MIMIC-IV
+\[ \] Testing the steps of the MEDS extraction ETL on MIMIC-IV (this should be expected to work, but needs
+live testing).
 
 ## Limitations / TO-DOs:
 
@@ -42,38 +56,66 @@ This is a step in a few parts:
      `anchor_offset` fields.
    - Merge the patient's `dod` with the `deathtime` from the `admissions` table.
 
-If you wanted, some other processing could also be done here, such as:
+After these steps, modified files or symlinks to the original files will be written in a new directory which
+will be used as the input to the actual MEDS extraction ETL. We'll use `$MIMICIV_PREMEDS_DIR` to denote this
+directory.
 
-1. Converting the patient's dynamically recorded race into a static, most commonly recorded race field.
+To run this step, you can use the following script (assumed to be run **not** from this directory but from the
+root directory of this repository):
+
+```bash
+./MIMIC_IV/pre_MEDS.py raw_cohort_dir=$MIMICIV_RAW_DIR output_dir=$MIMICIV_PREMEDS_DIR
+```
 
 ## Step 3: Run the MEDS extraction ETL
 
+We will assume you want to output the final MEDS dataset into a directory we'll denote as `$MIMICIV_MEDS_DIR`.
+Note this is a different directory than the pre-MEDS directory (though, of course, they can both be
+subdirectories of the same root directory).
+
 This is a step in 4 parts:
 
-1. Sub-shard the raw files.
+1. Sub-shard the raw files. Run this command as many times simultaneously as you would like to have workers
+   performing this sub-sharding step.
+
+```bash
+./scripts/extraction/shard_events.py \
+    raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
+    output_dir=$MIMICIV_MEDS_DIR \
+    event_conversion_config_fp=./MIMIC_IV/configs/event_configs.yaml
+```
+
 2. Extract and form the patient splits and sub-shards.
+
+```bash
+./scripts/extraction/split_and_shard_patients.py \
+    raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
+    output_dir=$MIMICIV_MEDS_DIR \
+    event_conversion_config_fp=./MIMIC_IV/configs/event_configs.yaml
+```
+
 3. Extract patient sub-shards and convert to MEDS events.
+
+```bash
+./scripts/extraction/convert_to_sharded_events.py \
+    raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
+    output_dir=$MIMICIV_MEDS_DIR \
+    event_conversion_config_fp=./MIMIC_IV/configs/event_configs.yaml
+```
+
 4. Merge the MEDS events into a single file per patient sub-shard.
 
-### Step 3.1: Sub-shard the raw files
-
-Run as many copies of the following shell script as you would like to have workers in parallel performing this
-sub-sharding step.
-
 ```bash
+./scripts/extraction/merge_to_MEDS_cohort.py \
+    raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
+    output_dir=$MIMICIV_MEDS_DIR \
+    event_conversion_config_fp=./MIMIC_IV/configs/event_configs.yaml
 ```
 
-### Step 3.2: Extract and form the patient splits and sub-shards.
+## Future Work
 
-```bash
-```
+### Pre-MEDS Processing
 
-### Step 3.3: Extract patient sub-shards and convert to MEDS events.
+If you wanted, some other processing could also be done here, such as:
 
-```bash
-```
-
-### Step 3.4: Merge the MEDS events into a single file per patient sub-shard.
-
-```bash
-```
+1. Converting the patient's dynamically recorded race into a static, most commonly recorded race field.
