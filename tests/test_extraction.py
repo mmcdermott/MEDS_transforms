@@ -257,13 +257,13 @@ def test_extraction():
 
         subsharded_dir = MEDS_cohort_dir / "sub_sharded"
 
-        out_files = list(subsharded_dir.glob("*/*.parquet"))
+        out_files = list(subsharded_dir.glob("**/*.parquet"))
         assert len(out_files) == 3, f"Expected 3 output files, got {len(out_files)}."
 
         # Checking specific out files:
         #   1. subjects.parquet
         subjects_out = subsharded_dir / "subjects" / "[0-7).parquet"
-        assert subjects_out.is_file(), f"Expected {subjects_out} to exist."
+        assert subjects_out.is_file(), f"Expected {subjects_out} to exist. Files include {out_files}."
 
         assert_df_equal(
             pl.read_parquet(subjects_out, glob=False),

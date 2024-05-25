@@ -150,7 +150,7 @@ def main(cfg: DictConfig):
     seen_files = set()
     input_files_to_subshard = []
     for fmt in ["parquet", "csv", "csv.gz"]:
-        files_in_fmt = list(raw_cohort_dir.glob(f"**/*.{fmt}"))
+        files_in_fmt = set(list(raw_cohort_dir.glob(f"*.{fmt}")) + list(raw_cohort_dir.glob(f"**/*.{fmt}")))
         for f in files_in_fmt:
             if get_shard_prefix(raw_cohort_dir, f) in seen_files:
                 logger.warning(f"Skipping {f} as it has already been added in a preferred format.")
@@ -182,7 +182,7 @@ def main(cfg: DictConfig):
         out_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Processing {input_file} to {out_dir}.")
 
-        df = scan_with_row_idx(input_file, columns, infer_schema_length=cfg["infer_schema_length"])
+        df = scan_with_row_idx(input_file, columns=columns, infer_schema_length=cfg["infer_schema_length"])
         row_count = df.select(pl.len()).collect().item()
 
         row_shards = list(range(0, row_count, row_chunksize))
@@ -200,7 +200,7 @@ def main(cfg: DictConfig):
             rwlock_wrap(
                 input_file,
                 out_fp,
-                partial(scan_with_row_idx, columns, cfg),
+                partial(scan_with_row_idx, columns=columns, infer_schema_length=cfg["infer_schema_length"]),
                 write_fn,
                 compute_fn,
                 do_overwrite=cfg.do_overwrite,
