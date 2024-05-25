@@ -44,7 +44,13 @@ def scan_with_row_idx(fp: Path, columns: Sequence[str], **scan_kwargs) -> pl.Laz
         case _:
             raise ValueError(f"Unsupported file type: {fp.suffix}")
 
-    return df.select(ROW_IDX_NAME, *columns) if columns else df
+    if columns:
+        columns = [ROW_IDX_NAME] + columns
+        logger.debug(f"Selecting columns: {columns}")
+        df = df.select(columns)
+
+    logger.debug(f"Returning df with columns: {', '.join(df.columns)}")
+    return df
 
 
 def retrieve_columns(event_conversion_cfg: DictConfig) -> dict[str, list[str]]:
@@ -79,7 +85,7 @@ def retrieve_columns(event_conversion_cfg: DictConfig) -> dict[str, list[str]]:
         ...             "code": "HEIGHT", "timestamp": None, "numerical_value": "height"
         ...         }
         ...     },
-        ...    "icu/chartevents": {
+        ...     "icu/chartevents": {
         ...         "patient_id_col": "patient_id_icu",
         ...         "heart_rate": {
         ...             "code": "HEART_RATE", "timestamp": "charttime", "numerical_value": "HR"
@@ -91,12 +97,25 @@ def retrieve_columns(event_conversion_cfg: DictConfig) -> dict[str, list[str]]:
         ...             "text_value": "value",
         ...             "mod": "mod_lab",
         ...         }
+        ...     },
+        ...     "icu/meds": {
+        ...         "med": {"code": "col(medication)", "timestamp": "medtime"}
         ...     }
         ... })
         >>> retrieve_columns(cfg) # doctest: +NORMALIZE_WHITESPACE
         {'hosp/patients': ['eye_color', 'height', 'mod_col', 'patient_id_global'],
          'icu/chartevents': ['HR', 'charttime', 'itemid', 'mod_lab', 'patient_id_icu', 'value', 'valuenum',
-                             'valueuom']}
+                             'valueuom'],
+         'icu/meds': ['medication', 'medtime', 'patient_id_global']}
+        >>> cfg = DictConfig({
+        ...     "subjects": {
+        ...         "patient_id_col": "MRN",
+        ...         "eye_color": {"code": ["col(eye_color)"], "timestamp": None},
+        ...     },
+        ...     "labs": {"lab": {"code": "col(labtest)", "timestamp": "charttime"}},
+        ... })
+        >>> retrieve_columns(cfg)
+        {'subjects': ['MRN', 'eye_color'], 'labs': ['charttime', 'labtest', 'patient_id']}
     """
 
     event_conversion_cfg = copy.deepcopy(event_conversion_cfg)
@@ -197,6 +216,7 @@ def main(cfg: DictConfig):
         for f in files_in_fmt:
             if get_shard_prefix(raw_cohort_dir, f) in seen_files:
                 logger.warning(f"Skipping {f} as it has already been added in a preferred format.")
+                continue
             elif get_shard_prefix(raw_cohort_dir, f) not in prefix_to_columns:
                 logger.warning(f"Skipping {f} as it is not specified in the event conversion configuration.")
                 continue
@@ -206,7 +226,11 @@ def main(cfg: DictConfig):
 
     random.shuffle(input_files_to_subshard)
 
-    logger.info(f"Starting event sub-sharding. Sub-sharding {len(input_files_to_subshard)} files.")
+    subsharding_files_strs = "\n".join([f"  * {str(fp.resolve())}" for fp in input_files_to_subshard])
+    logger.info(
+        f"Starting event sub-sharding. Sub-sharding {len(input_files_to_subshard)} files:\n"
+        f"{subsharding_files_strs}"
+    )
     logger.info(
         f"Will read raw data from {str(raw_cohort_dir.resolve())}/$IN_FILE.parquet and write sub-sharded "
         f"data to {str(MEDS_cohort_dir.resolve())}/sub_sharded/$IN_FILE/$ROW_START-$ROW_END.parquet"
@@ -222,6 +246,7 @@ def main(cfg: DictConfig):
 
         df = scan_with_row_idx(input_file, columns=columns, infer_schema_length=cfg["infer_schema_length"])
         row_count = df.select(pl.len()).collect().item()
+        logger.info(f"Read {row_count} rows from {str(input_file.resolve())}.")
 
         row_shards = list(range(0, row_count, row_chunksize))
         random.shuffle(row_shards)

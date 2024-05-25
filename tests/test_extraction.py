@@ -217,7 +217,9 @@ def test_extraction():
 
         # Mix things up -- have one CSV be also in parquet format.
         admit_vitals_parquet = raw_cohort_dir / "admit_vitals.parquet"
-        pl.read_csv(admit_vitals_csv).write_parquet(admit_vitals_parquet, use_pyarrow=True)
+        df = pl.read_csv(admit_vitals_csv)
+        print(f"Moving {admit_vitals_csv} (shape {df.shape}) to {admit_vitals_parquet}")
+        df.write_parquet(admit_vitals_parquet, use_pyarrow=True)
 
         # Write the event config YAML
         event_cfgs_yaml.write_text(EVENT_CFGS_YAML)
@@ -256,21 +258,27 @@ def test_extraction():
 
         subsharded_dir = MEDS_cohort_dir / "sub_sharded"
 
-        out_files = list(subsharded_dir.glob("**/*.parquet"))
-        assert len(out_files) == 3, f"Expected 3 output files, got {len(out_files)}."
+        try:
+            out_files = list(subsharded_dir.glob("**/*.parquet"))
+            assert len(out_files) == 3, f"Expected 3 output files, got {len(out_files)}."
 
-        # Checking specific out files:
-        #   1. subjects.parquet
-        subjects_out = subsharded_dir / "subjects" / "[0-6).parquet"
-        assert subjects_out.is_file(), f"Expected {subjects_out} to exist. Files include {out_files}."
+            # Checking specific out files:
+            #   1. subjects.parquet
+            subjects_out = subsharded_dir / "subjects" / "[0-6).parquet"
+            assert subjects_out.is_file(), f"Expected {subjects_out} to exist. Files include {out_files}."
 
-        assert_df_equal(
-            pl.read_csv(subjects_csv).drop("height"),
-            pl.read_parquet(subjects_out, glob=False),
-            "Subjects should be equal after sub-sharding",
-            check_column_order=False,
-            check_row_order=False,
-        )
+            assert_df_equal(
+                pl.read_csv(subjects_csv).drop("height"),
+                pl.read_parquet(subjects_out, glob=False),
+                "Subjects should be equal after sub-sharding",
+                check_column_order=False,
+                check_row_order=False,
+            )
+        except AssertionError as e:
+            full_stderr = "\n".join(all_stderrs)
+            print("Sub-sharding failed")
+            print(f"stderr:\n{full_stderr}")
+            raise e
 
         #   2. admit_vitals.parquet
         df_chunks = []
