@@ -55,7 +55,7 @@ def fix_static_data(raw_static_df: pl.LazyFrame, death_times_df: pl.LazyFrame) -
         The fixed static data.
     """
 
-    death_times_df = death_times_df.groupby("subject_id").agg(pl.col("deathtime").min())
+    death_times_df = death_times_df.group_by("subject_id").agg(pl.col("deathtime").min())
 
     return raw_static_df.join(death_times_df, on="subject_id", how="left").select(
         "subject_id",
@@ -104,6 +104,7 @@ def main(cfg: DictConfig):
             out_fp.symlink_to(in_fp)
             continue
         else:
+            out_fp = MEDS_input_dir / f"{pfx}.parquet"
             fn, need_df = FUNCTIONS[pfx]
             if not need_df:
                 st = datetime.now()
@@ -135,7 +136,7 @@ def main(cfg: DictConfig):
 
         for fp in fps:
             pfx = get_shard_prefix(raw_cohort_dir, fp)
-            out_fp = MEDS_input_dir / fp.relative_to(raw_cohort_dir)
+            out_fp = MEDS_input_dir / f"{pfx}.parquet"
 
             logger.info(f"  Processing dependent df @ {pfx}...")
             fn, _ = FUNCTIONS[pfx]
