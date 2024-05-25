@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import random
-import time
 from collections.abc import Sequence
 from datetime import datetime
 from functools import partial
@@ -11,7 +10,6 @@ import hydra
 import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
-from tqdm.auto import tqdm
 
 from MEDS_polars_functions.mapper import wrap as rwlock_wrap
 from MEDS_polars_functions.utils import hydra_loguru_init, is_col_field
@@ -30,7 +28,7 @@ def scan_with_row_idx(columns: Sequence[str], cfg: DictConfig, fp: Path) -> pl.L
         case _:
             raise ValueError(f"Unsupported file type: {fp.suffix}")
     if cfg.subselect_columns:
-        df = df.select(pl.col(columns))
+        df = df.select(*columns)
     return df
 
 
@@ -143,8 +141,8 @@ def main(cfg: DictConfig):
 
     random.shuffle(input_files_to_subshard)
 
-    start = time.time()
-    for input_file in tqdm(input_files_to_subshard, position=0, desc="Iterating through files", leave=True):
+    start = datetime.now()
+    for input_file in input_files_to_subshard:
         columns = table_to_columns[input_file]
         out_dir = MEDS_cohort_dir / "sub_sharded" / input_file.stem
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -157,8 +155,7 @@ def main(cfg: DictConfig):
         random.shuffle(row_shards)
         logger.info(f"Splitting {input_file} into {len(row_shards)} row-chunks of size {row_chunksize}.")
 
-        datetime.now()
-        for i, st in enumerate(tqdm(row_shards, position=1, desc=f"Sub-sharding file {f.stem}")):
+        for i, st in enumerate(row_shards):
             end = min(st + row_chunksize, row_count)
             out_fp = out_dir / f"[{st}-{end}).parquet"
 
@@ -174,8 +171,8 @@ def main(cfg: DictConfig):
                 compute_fn,
                 do_overwrite=cfg.do_overwrite,
             )
-    end = time.time()
-    logger.info(f"Sub-sharding completed in {end - start:.2f} seconds.")
+    end = datetime.now()
+    logger.info(f"Sub-sharding completed in {datetime.now() - start}")
 
 
 if __name__ == "__main__":

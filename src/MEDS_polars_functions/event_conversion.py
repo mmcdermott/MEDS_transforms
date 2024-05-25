@@ -8,6 +8,10 @@ from loguru import logger
 from omegaconf.listconfig import ListConfig
 
 
+def in_format(fmt: str, ts_name: str) -> pl.Expr:
+    return pl.col(ts_name).str.strptime(pl.Datetime, fmt, strict=False)
+
+
 def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.LazyFrame:
     """Extracts a single event dataframe from the raw data.
 
@@ -270,22 +274,14 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
 
     ts = event_cfg.pop("timestamp")
     ts_format = event_cfg.pop("timestamp_format", None)
+    if isinstance(ts_format, str):
+        ts_format = [ts_format]
     match ts:
         case str() if ts.startswith("col(") and ts.endswith(")"):
             ts_name = ts[4:-1]
-            if isinstance(ts_format, str):
-                logger.debug(f"string! {ts}")
-                event_exprs["timestamp"] = pl.col(ts_name).str.strptime(pl.Datetime, ts_format)
-            elif isinstance(ts_format, ListConfig) or isinstance(ts_format, list):
+            if isinstance(ts_format, (ListConfig, list)):
                 assert len(ts_format) > 0, "Timestamp format list is empty"
-                timestamp_expr = pl.col(ts_name).str.strptime(pl.Datetime, ts_format[0], strict=False)
-                for fmt in ts_format[1:]:
-                    ts_name = ts_name
-                    next_expr = pl.col(ts_name).str.strptime(pl.Datetime, fmt, strict=False)
-                    timestamp_expr = (
-                        pl.when(timestamp_expr.is_null()).then(next_expr).otherwise(timestamp_expr)
-                    )
-                event_exprs["timestamp"] = timestamp_expr
+                event_exprs["timestamp"] = pl.coalesce(*(in_format(fmt, ts_name) for fmt in ts_format))
             else:
                 assert ts_format is None
                 event_exprs["timestamp"] = pl.col(ts_name).cast(pl.Datetime)
@@ -321,7 +317,13 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
             )
 
         event_exprs[k] = col
-    return df.select(**event_exprs).unique(maintain_order=True)
+    df = df.select(**event_exprs).unique(maintain_order=True)
+
+    # if numerical_value column is not numeric, convert it to float
+    if "numerical_value" in df.columns and not df.schema["numerical_value"].is_numeric():
+        logger.warning(f"Converting numerical_value to float for codes {codes}")
+        df = df.with_columns(pl.col("numerical_value").cast(pl.Float64, strict=False))
+    return df
 
 
 def convert_to_events(
@@ -485,4 +487,5 @@ def convert_to_events(
         except Exception as e:
             raise ValueError(f"Error extracting event {event_name}: {e}") from e
 
-    return pl.concat(event_dfs, how="diagonal")
+    df = pl.concat(event_dfs, how="diagonal")
+    return df

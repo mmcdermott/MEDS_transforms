@@ -16,18 +16,6 @@ from MEDS_polars_functions.mapper import wrap as rwlock_wrap
 from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
 
 
-def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
-    """Convert numerical_value column to Float64 write to parquet file.
-
-    When converting the numerical_value column, we set rows that are not numeric to null.
-    """
-    # if numerical_value column is not numeric, convert it to float
-    if "numerical_value" in df.columns and not df.schema["numerical_value"].is_numeric():
-        logger.warning(f"Converting numerical_value to float in {out_fp}")
-        df = df.with_columns(pl.col("numerical_value").cast(pl.Float64, strict=False))
-    write_lazyframe(df, out_fp)
-
-
 @hydra.main(version_base=None, config_path="../../configs", config_name="extraction")
 def main(cfg: DictConfig):
     """Converts the sub-sharded or raw data into events which are sharded by patient X input shard."""
@@ -92,7 +80,9 @@ def main(cfg: DictConfig):
                             f"Error converting {str(shard_fp.resolve())} for {sp}/{input_prefix}: {e}"
                         ) from e
 
-                rwlock_wrap(shard_fp, out_fp, read_fn, write_fn, compute_fn, do_overwrite=cfg.do_overwrite)
+                rwlock_wrap(
+                    shard_fp, out_fp, read_fn, write_lazyframe, compute_fn, do_overwrite=cfg.do_overwrite
+                )
 
     logger.info("Subsharded into converted events.")
 
