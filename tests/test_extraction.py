@@ -29,7 +29,7 @@ MRN,dob,eye_color,height
 """
 
 ADMIT_VITALS_CSV = """
-MRN,admit_date,disch_date,department,vitals_date,HR,temp
+patient_id,admit_date,disch_date,department,vitals_date,HR,temp
 239684,"05/11/2010, 17:41:51","05/11/2010, 19:27:19",CARDIAC,"05/11/2010, 18:57:18",112.6,95.5
 754281,"01/03/2010, 06:27:59","01/03/2010, 08:22:13",PULMONARY,"01/03/2010, 06:27:59",142.0,99.8
 814703,"02/05/2010, 05:55:39","02/05/2010, 07:02:30",ORTHOPEDIC,"02/05/2010, 05:55:39",170.2,100.1
@@ -49,8 +49,8 @@ MRN,admit_date,disch_date,department,vitals_date,HR,temp
 """
 
 EVENT_CFGS_YAML = """
-patient_id_col: MRN
 subjects:
+  patient_id_col: MRN
   eye_color:
     code:
       - EYE_COLOR
@@ -237,7 +237,6 @@ def test_extraction():
             "split_fracs.tuning": 1 / 6,
             "split_fracs.held_out": 1 / 6,
             "row_chunksize": 10,
-            "subselect_columns": False,
             "n_patients_per_shard": 2,
             "hydra.verbose": True,
         }
@@ -262,13 +261,15 @@ def test_extraction():
 
         # Checking specific out files:
         #   1. subjects.parquet
-        subjects_out = subsharded_dir / "subjects" / "[0-7).parquet"
+        subjects_out = subsharded_dir / "subjects" / "[0-6).parquet"
         assert subjects_out.is_file(), f"Expected {subjects_out} to exist. Files include {out_files}."
 
         assert_df_equal(
+            pl.read_csv(subjects_csv).drop("height"),
             pl.read_parquet(subjects_out, glob=False),
-            pl.read_csv(subjects_csv),
             "Subjects should be equal after sub-sharding",
+            check_column_order=False,
+            check_row_order=False,
         )
 
         #   2. admit_vitals.parquet
@@ -278,10 +279,13 @@ def test_extraction():
             assert admit_vitals_chunk_fp.is_file(), f"Expected {admit_vitals_chunk_fp} to exist."
 
             df_chunks.append(pl.read_parquet(admit_vitals_chunk_fp, glob=False))
+
         assert_df_equal(
-            pl.concat(df_chunks),
             pl.read_csv(admit_vitals_csv),
+            pl.concat(df_chunks),
             "Admit vitals should be equal after sub-sharding",
+            check_column_order=False,
+            check_row_order=False,
         )
 
         # Step 2: Collect the patient splits

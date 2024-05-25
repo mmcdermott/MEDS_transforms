@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import copy
 import gzip
 import random
 from collections.abc import Sequence
@@ -16,6 +17,7 @@ from MEDS_polars_functions.mapper import wrap as rwlock_wrap
 from MEDS_polars_functions.utils import hydra_loguru_init, is_col_field, parse_col_field
 
 ROW_IDX_NAME = "__row_idx"
+META_KEYS = {"timestamp_format"}
 
 
 def scan_with_row_idx(fp: Path, columns: Sequence[str], **scan_kwargs) -> pl.LazyFrame:
@@ -42,12 +44,10 @@ def scan_with_row_idx(fp: Path, columns: Sequence[str], **scan_kwargs) -> pl.Laz
         case _:
             raise ValueError(f"Unsupported file type: {fp.suffix}")
 
-    return df.select(columns) if columns else df
+    return df.select(ROW_IDX_NAME, *columns) if columns else df
 
 
-def retrieve_columns(
-    files: Sequence[Path], cfg: DictConfig, event_conversion_cfg: DictConfig
-) -> dict[Path, list[str]]:
+def retrieve_columns(event_conversion_cfg: DictConfig) -> dict[str, list[str]]:
     """Extracts and organizes column names from configuration for a list of files.
 
     This function processes each file specified in the 'files' list, reading the
@@ -58,10 +58,6 @@ def retrieve_columns(
     for medical events and timestamps formatted in a special 'col(column_name)' syntax.
 
     Args:
-        files (Sequence[Path]): A sequence of Path objects representing the
-            file paths to process.
-        cfg (DictConfig): A dictionary configuration that might be used for
-            further expansion (not used in the current implementation).
         event_conversion_cfg (DictConfig): A dictionary configuration where
             each key is a filename stem and each value is a dictionary containing
             configuration details for different codes or events, specifying
@@ -71,34 +67,73 @@ def retrieve_columns(
         dict[Path, list[str]]: A dictionary mapping each file path to a list
         of unique column names necessary for processing the file.
         The list of columns includes generic columns and those specified in the 'event_conversion_cfg'.
+
+    Examples:
+        >>> cfg = DictConfig({
+        ...     "patient_id_col": "patient_id_global",
+        ...     "hosp/patients": {
+        ...         "eye_color": {
+        ...             "code": ["EYE_COLOR", "col(eye_color)"], "timestamp": None, "mod": "mod_col"
+        ...         },
+        ...         "height": {
+        ...             "code": "HEIGHT", "timestamp": None, "numerical_value": "height"
+        ...         }
+        ...     },
+        ...    "icu/chartevents": {
+        ...         "patient_id_col": "patient_id_icu",
+        ...         "heart_rate": {
+        ...             "code": "HEART_RATE", "timestamp": "charttime", "numerical_value": "HR"
+        ...         },
+        ...         "lab": {
+        ...             "code": ["col(itemid)", "col(valueuom)"],
+        ...             "timestamp": "charttime",
+        ...             "numerical_value": "valuenum",
+        ...             "text_value": "value",
+        ...             "mod": "mod_lab",
+        ...         }
+        ...     }
+        ... })
+        >>> retrieve_columns(cfg) # doctest: +NORMALIZE_WHITESPACE
+        {'hosp/patients': ['eye_color', 'height', 'mod_col', 'patient_id_global'],
+         'icu/chartevents': ['HR', 'charttime', 'itemid', 'mod_lab', 'patient_id_icu', 'value', 'valuenum',
+                             'valueuom']}
     """
 
+    event_conversion_cfg = copy.deepcopy(event_conversion_cfg)
+
     # Initialize a dictionary to store file paths as keys and lists of column names as values.
-    file_to_columns = {}
+    prefix_to_columns = {}
 
-    for f in files:
-        # Access the event conversion config specific to the stem (filename without extension) of the file.
-        file_meds_cfg = event_conversion_cfg[f.stem]
+    default_patient_id_col = event_conversion_cfg.pop("patient_id_col", "patient_id")
+    for input_prefix, event_cfgs in event_conversion_cfg.items():
+        input_patient_id_column = event_cfgs.pop("patient_id_col", default_patient_id_col)
 
-        # Start with a list containing default columns such as row index and patient ID column.
-        file_columns = [ROW_IDX_NAME, event_conversion_cfg.patient_id_col]
+        prefix_to_columns[input_prefix] = {input_patient_id_column}
 
-        # Loop through each configuration item for the current file.
-        for event_cfg in file_meds_cfg.values():
+        for event_cfg in event_cfgs.values():
             # If the config has a 'code' key and it contains column fields, parse and add them.
-            for key in ["code", "timestamp", "numerical_value"]:
-                if key in event_cfg:
-                    fields = event_cfg[key]
-                    # make sure fields is a list
-                    if isinstance(fields, str) or fields is None:
-                        fields = [fields]
-                    # append fields that are in the `col(<COLUMN_NAME>)`` format
-                    file_columns += [parse_col_field(field) for field in fields if is_col_field(field)]
+            for key, value in event_cfg.items():
+                if key in META_KEYS:
+                    continue
 
-        # Store unique column names for each file to prevent duplicates.
-        file_to_columns[f] = list(set(file_columns))
+                if value is None:
+                    # None can be used to indicate a null timestamp, which has no associated column.
+                    continue
 
-    return file_to_columns
+                if isinstance(value, str):
+                    value = [value]
+
+                for field in value:
+                    if is_col_field(field):
+                        prefix_to_columns[input_prefix].add(parse_col_field(field))
+                    elif key == "code":
+                        # strings in the "code" fields are literals, not columns
+                        continue
+                    else:
+                        prefix_to_columns[input_prefix].add(field)
+
+    # Return things in sorted order for determinism.
+    return {k: list(sorted(v)) for k, v in prefix_to_columns.items()}
 
 
 def filter_to_row_chunk(df: pl.LazyFrame, start: int, end: int) -> pl.LazyFrame:
@@ -147,6 +182,14 @@ def main(cfg: DictConfig):
     MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
     row_chunksize = cfg.row_chunksize
 
+    event_conversion_cfg_fp = Path(cfg.event_conversion_config_fp)
+    if not event_conversion_cfg_fp.exists():
+        raise FileNotFoundError(f"Event conversion config file not found: {event_conversion_cfg_fp}")
+    logger.info(f"Reading event conversion config from {event_conversion_cfg_fp} to identify needed columns.")
+    event_conversion_cfg = OmegaConf.load(event_conversion_cfg_fp)
+
+    prefix_to_columns = retrieve_columns(event_conversion_cfg)
+
     seen_files = set()
     input_files_to_subshard = []
     for fmt in ["parquet", "csv", "csv.gz"]:
@@ -154,18 +197,14 @@ def main(cfg: DictConfig):
         for f in files_in_fmt:
             if get_shard_prefix(raw_cohort_dir, f) in seen_files:
                 logger.warning(f"Skipping {f} as it has already been added in a preferred format.")
+            elif get_shard_prefix(raw_cohort_dir, f) not in prefix_to_columns:
+                logger.warning(f"Skipping {f} as it is not specified in the event conversion configuration.")
+                continue
             else:
                 input_files_to_subshard.append(f)
                 seen_files.add(get_shard_prefix(raw_cohort_dir, f))
 
-    # Select subset of files that we wish to pull events from
-    event_conversion_cfg_fp = Path(cfg.event_conversion_config_fp)
-    if not event_conversion_cfg_fp.exists():
-        raise FileNotFoundError(f"Event conversion config file not found: {event_conversion_cfg_fp}")
-    logger.info(f"Reading event conversion config from {event_conversion_cfg_fp}")
-    event_conversion_cfg = OmegaConf.load(event_conversion_cfg_fp)
-    input_files_to_subshard = [f for f in input_files_to_subshard if f.stem in event_conversion_cfg.keys()]
-    table_to_columns = retrieve_columns(input_files_to_subshard, cfg, event_conversion_cfg)
+    random.shuffle(input_files_to_subshard)
 
     logger.info(f"Starting event sub-sharding. Sub-sharding {len(input_files_to_subshard)} files.")
     logger.info(
@@ -173,11 +212,10 @@ def main(cfg: DictConfig):
         f"data to {str(MEDS_cohort_dir.resolve())}/sub_sharded/$IN_FILE/$ROW_START-$ROW_END.parquet"
     )
 
-    random.shuffle(input_files_to_subshard)
-
     start = datetime.now()
     for input_file in input_files_to_subshard:
-        columns = table_to_columns[input_file]
+        columns = prefix_to_columns[get_shard_prefix(raw_cohort_dir, input_file)]
+
         out_dir = MEDS_cohort_dir / "sub_sharded" / get_shard_prefix(raw_cohort_dir, input_file)
         out_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Processing {input_file} to {out_dir}.")

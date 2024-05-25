@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
+import copy
 import json
 import random
-from copy import deepcopy
 from functools import partial
 from pathlib import Path
 
@@ -67,14 +67,13 @@ def main(cfg: DictConfig):
                     typed_patients = pl.Series(patients, dtype=df.schema[input_patient_id_column])
 
                     if input_patient_id_column != "patient_id":
-                        df = (
-                            df.with_columns(pl.col(input_patient_id_column).alias("patient_id"))
-                            .drop(input_patient_id_column)
-                            .filter(pl.col("patient_id").is_in(typed_patients))
-                        )
+                        df = df.rename({input_patient_id_column: "patient_id"})
 
                     try:
-                        return convert_to_events(df, event_cfgs=deepcopy(event_cfgs))
+                        return convert_to_events(
+                            df.filter(pl.col("patient_id").is_in(typed_patients)),
+                            event_cfgs=copy.deepcopy(event_cfgs),
+                        )
                     except Exception as e:
                         raise ValueError(
                             f"Error converting {str(shard_fp.resolve())} for {sp}/{input_prefix}: {e}"
