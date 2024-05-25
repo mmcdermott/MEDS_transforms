@@ -5,14 +5,15 @@ be run **not** from this directory but from the root directory of this entire re
 up from this one).
 
 **Status**: This is a work in progress. The code is not yet functional. Remaining work includes:
-  - [ ] Implementing the pre-MEDS processing step.
-     - [x] Implement the joining of discharge times.
-     - [ ] Implement the conversion of the DOB to a more usable format.
-     - [ ] Implement the joining of death times.
-  - [ ] Testing the pre-MEDS processing step on live MIMIC-IV.
-  - [ ] Testing the `configs/event_configs.yaml` configuration on MIMIC-IV
-  - [ ] Testing the steps of the MEDS extraction ETL on MIMIC-IV (this should be expected to work, but needs
-live testing).
+
+- [ ] Implementing the pre-MEDS processing step.
+  - [x] Implement the joining of discharge times.
+  - [ ] Implement the conversion of the DOB to a more usable format.
+  - [ ] Implement the joining of death times.
+- [ ] Testing the pre-MEDS processing step on live MIMIC-IV.
+- [ ] Testing the `configs/event_configs.yaml` configuration on MIMIC-IV
+- [ ] Testing the steps of the MEDS extraction ETL on MIMIC-IV (this should be expected to work, but needs
+  live testing).
 
 ## Limitations / TO-DOs:
 
