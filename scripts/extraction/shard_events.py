@@ -20,34 +20,42 @@ ROW_IDX_NAME = "__row_idx"
 META_KEYS = {"timestamp_format"}
 
 
+def kwargs_strs(kwargs: dict) -> str:
+    return "\n".join([f"  * {k}={v}" for k, v in kwargs.items()])
+
+
 def scan_with_row_idx(fp: Path, columns: Sequence[str], **scan_kwargs) -> pl.LazyFrame:
     kwargs = {"row_index_name": ROW_IDX_NAME, **scan_kwargs}
     match fp.suffix.lower():
         case ".csv.gz":
-            logger.debug(f"Reading {str(fp.resolve())} as compressed CSV.")
-            logger.warning("Reading compressed CSV files may be slow and limit parallelizability.")
-
             if columns:
                 kwargs["columns"] = columns
 
+            logger.debug(
+                f"Reading {str(fp.resolve())} as compressed CSV with kwargs:\n{kwargs_strs(kwargs)}."
+            )
+            logger.warning("Reading compressed CSV files may be slow and limit parallelizability.")
             with gzip.open(fp, mode="rb") as f:
                 return pl.read_csv(f, **kwargs).lazy()
         case ".csv":
-            logger.debug(f"Reading {str(fp.resolve())} as CSV.")
+            logger.debug(f"Reading {str(fp.resolve())} as CSV with kwargs:\n{kwargs_strs(kwargs)}.")
             df = pl.scan_csv(fp, **kwargs)
         case ".parquet":
-            logger.debug(f"Reading {str(fp.resolve())} as Parquet.")
             if "infer_schema_length" in kwargs:
                 infer_schema_length = kwargs.pop("infer_schema_length")
                 logger.info(f"Ignoring infer_schema_length={infer_schema_length} for Parquet files.")
+
+            logger.debug(f"Reading {str(fp.resolve())} as Parquet with kwargs:\n{kwargs_strs(kwargs)}.")
             df = pl.scan_parquet(fp, **kwargs)
         case _:
             raise ValueError(f"Unsupported file type: {fp.suffix}")
 
+    logger.info(f"Read {df.select(pl.len()).collect().item()} rows")
     if columns:
         columns = [ROW_IDX_NAME] + columns
         logger.debug(f"Selecting columns: {columns}")
         df = df.select(columns)
+        logger.info(f" Post columns, Read {df.select(pl.len()).collect().item()} rows")
 
     logger.debug(f"Returning df with columns: {', '.join(df.columns)}")
     return df
@@ -244,6 +252,7 @@ def main(cfg: DictConfig):
         out_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Processing {input_file} to {out_dir}.")
 
+        logger.info(f"Performing preliminary read of {str(input_file.resolve())} to determine row count.")
         df = scan_with_row_idx(input_file, columns=columns, infer_schema_length=cfg["infer_schema_length"])
         row_count = df.select(pl.len()).collect().item()
         if row_count == 0:
