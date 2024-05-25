@@ -7,6 +7,8 @@ import polars as pl
 from loguru import logger
 from omegaconf.listconfig import ListConfig
 
+from .utils import is_col_field, parse_col_field
+
 
 def in_format(fmt: str, ts_name: str) -> pl.Expr:
     return pl.col(ts_name).str.strptime(pl.Datetime, fmt, strict=False)
@@ -265,8 +267,8 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
     code_exprs = []
     for code in codes:
         match code:
-            case str() if code.startswith("col(") and code.endswith(")") and code[4:-1] in df.schema:
-                code_exprs.append(pl.col(code[4:-1]).cast(pl.Utf8))
+            case str() if is_col_field(code) and parse_col_field(code) in df.schema:
+                code_exprs.append(pl.col(parse_col_field(code)).cast(pl.Utf8))
             case str():
                 code_exprs.append(pl.lit(code, dtype=pl.Utf8))
             case _:
@@ -278,8 +280,8 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
     if isinstance(ts_format, str):
         ts_format = [ts_format]
     match ts:
-        case str() if ts.startswith("col(") and ts.endswith(")"):
-            ts_name = ts[4:-1]
+        case str() if is_col_field(ts):
+            ts_name = parse_col_field(ts)
             if isinstance(ts_format, (ListConfig, list)):
                 assert len(ts_format) > 0, "Timestamp format list is empty"
                 event_exprs["timestamp"] = pl.coalesce(*(in_format(fmt, ts_name) for fmt in ts_format))
@@ -296,12 +298,12 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
             raise ValueError(
                 f"For event column {k}, source column {v} must be a string column name. Got {type(v)}."
             )
-        elif v.startswith("col(") and v.endswith(")"):
+        elif is_col_field(v):
             logger.warning(
                 f"Source column '{v}' for event column {k} is always interpreted as a column name. "
-                f"Removing col() function call and setting source column to {v[4:-1]}."
+                f"Removing col() function call and setting source column to {parse_col_field(v)}."
             )
-            v = v[4:-1]
+            v = parse_col_field(v)
 
         if v not in df.schema:
             raise KeyError(f"Source column '{v}' for event column {k} not found in DataFrame schema.")
