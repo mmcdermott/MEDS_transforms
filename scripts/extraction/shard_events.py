@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import gzip
+import inspect
 import random
 from collections.abc import Sequence
 from datetime import datetime
@@ -17,27 +18,59 @@ from MEDS_polars_functions.utils import hydra_loguru_init, is_col_field
 
 ROW_IDX_NAME = "__row_idx"
 
+from collections.abc import Callable
 
-def scan_with_row_idx(columns: Sequence[str], cfg: DictConfig, fp: Path) -> pl.LazyFrame:
+
+def check_kwargs(func: Callable, kwargs: dict) -> dict:
+    """Checks if the kwargs are valid for a function and logs then removes invalid kwargs.
+
+    Args:
+        func: The function to check the kwargs against.
+        kwargs: The kwargs to check.
+
+    Returns:
+        A dictionary containing only the kwargs that are valid for the function.
+    """
+    valid_keywords = inspect.signature(func).parameters.keys()
+
+    valid_kwargs = {k: v for k, v in kwargs.items() if k in valid_keywords}
+    invalid_kwargs = {k: v for k, v in kwargs.items() if k not in valid_keywords}
+
+    if invalid_kwargs:
+        kwarg_strs = "\n".join(f"  * {k}: {v}" for k, v in invalid_kwargs.items())
+        logger.warning(
+            f"Removing unused kwargs for {func.__name__}:\n{kwarg_strs}\n"
+            f"Valid kwargs are: {', '.join(valid_keywords)}\n"
+            "This behavior may be expected depending on the use case."
+        )
+    return valid_kwargs
+
+
+def scan_with_row_idx(fp: Path, columns: Sequence[str], **scan_kwargs) -> pl.LazyFrame:
+    kwargs = {"row_index_name": ROW_IDX_NAME, **scan_kwargs}
     match fp.suffix.lower():
         case ".csv.gz":
-            logger.debug(f"Reading {fp} as compressed CSV.")
+            logger.debug(f"Reading {str(fp.resolve())} as compressed CSV.")
             logger.warning("Reading compressed CSV files may be slow and limit parallelizability.")
 
-            def reader(fp: Path, **kwargs) -> pl.LazyFrame:
-                return pl.read_csv(gzip.open(fp, mode="rb"), **kwargs).lazy()
+            if columns:
+                kwargs["columns"] = columns
 
+            kwargs = check_kwargs(pl.read_csv, kwargs)
+            with gzip.open(fp, mode="rb") as f:
+                return pl.read_csv(f, **kwargs).lazy()
         case ".csv":
-            logger.debug(f"Reading {fp} as CSV.")
-            df = pl.scan_csv(fp, row_index_name=ROW_IDX_NAME, infer_schema_length=cfg["infer_schema_length"])
+            logger.debug(f"Reading {str(fp.resolve())} as CSV.")
+            kwargs = check_kwargs(pl.scan_csv, kwargs)
+            df = pl.scan_csv(fp, **kwargs)
         case ".parquet":
-            logger.debug(f"Reading {fp} as Parquet.")
-            df = pl.scan_parquet(fp, row_index_name=ROW_IDX_NAME)
+            logger.debug(f"Reading {str(fp.resolve())} as Parquet.")
+            kwargs = check_kwargs(pl.scan_parquet, kwargs)
+            df = pl.scan_parquet(fp, **kwargs)
         case _:
             raise ValueError(f"Unsupported file type: {fp.suffix}")
-    if cfg.subselect_columns:
-        df = df.select(*columns)
-    return df
+
+    return df.select(columns) if columns else df
 
 
 def parse_col_field(field: str) -> str:
@@ -182,7 +215,7 @@ def main(cfg: DictConfig):
         out_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Processing {input_file} to {out_dir}.")
 
-        df = scan_with_row_idx(columns, cfg, input_file)
+        df = scan_with_row_idx(input_file, columns, infer_schema_length=cfg["infer_schema_length"])
         row_count = df.select(pl.len()).collect().item()
 
         row_shards = list(range(0, row_count, row_chunksize))
