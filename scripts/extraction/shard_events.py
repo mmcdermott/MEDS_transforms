@@ -22,13 +22,13 @@ ROW_IDX_NAME = "__row_idx"
 
 
 def scan_with_row_idx(fp: Path) -> pl.LazyFrame:
-    match fp.suffix.lower():
+    match "".join(fp.suffixes):
         case ".csv.gz":
             logger.debug(f"Reading {fp} as compressed CSV.")
             logger.warning("Reading compressed CSV files may be slow and limit parallelizability.")
 
             def reader(fp: Path, **kwargs) -> pl.LazyFrame:
-                return pl.read_csv(gzip.open(fp, mode="rb"), **kwargs).lazy()
+                return pl.read_csv(gzip.open(fp, mode="rb"), infer_schema_length=1_000_000, **kwargs).lazy()
 
         case ".csv":
             logger.debug(f"Reading {fp} as CSV.")
