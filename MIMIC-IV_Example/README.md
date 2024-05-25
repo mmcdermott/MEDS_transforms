@@ -11,28 +11,25 @@ up from this one).
   - [x] Implement the conversion of the DOB to a more usable format.
   - [x] Implement the joining of death times.
 - [ ] Testing the pre-MEDS processing step on live MIMIC-IV.
+  - [x] Test that it runs at all.
+  - [ ] Test that the output is as expected.
+- [ ] Check the installation instructions on a fresh client.
 - [ ] Testing the `configs/event_configs.yaml` configuration on MIMIC-IV
 - [ ] Testing the steps of the MEDS extraction ETL on MIMIC-IV (this should be expected to work, but needs
   live testing).
 
-## Limitations / TO-DOs:
+## Step 0: Installation
 
-Currently, some tables are ignored, including:
+Download this repository and install the requirements:
 
-1. `hosp/emar_detail`
-2. `hosp/microbiologyevents`
-3. `hosp/services`
-4. `icu/datetimeevents`
-5. `icu/ingredientevents`
-
-Lots of questions remain about how to appropriately handle timestamps of the data -- e.g., things like HCPCS
-events are stored at the level of the _date_, not the _datetime_. How should those be slotted into the
-timeline which is otherwise stored at the _datetime_ resolution?
-
-Other questions:
-
-1. How to handle merging the deathtimes between the hosp table and the patients table?
-2. How to handle the dob nonsense MIMIC has?
+```bash
+git clone git@github.com:mmcdermott/MEDS_polars_functions.git
+cd MEDS_polars_functions
+git checkout MIMIC_IV
+conda create -n MEDS python=3.12
+conda activate MEDS
+pip install .[mimic]
+```
 
 ## Step 1: Download MIMIC-IV
 
@@ -108,6 +105,25 @@ This is a step in 4 parts:
     output_dir=$MIMICIV_MEDS_DIR \
     event_conversion_config_fp=./MIMIC_IV/configs/event_configs.yaml
 ```
+
+## Limitations / TO-DOs:
+
+Currently, some tables are ignored, including:
+
+1. `hosp/emar_detail`
+2. `hosp/microbiologyevents`
+3. `hosp/services`
+4. `icu/datetimeevents`
+5. `icu/ingredientevents`
+
+Lots of questions remain about how to appropriately handle timestamps of the data -- e.g., things like HCPCS
+events are stored at the level of the _date_, not the _datetime_. How should those be slotted into the
+timeline which is otherwise stored at the _datetime_ resolution?
+
+Other questions:
+
+1. How to handle merging the deathtimes between the hosp table and the patients table?
+2. How to handle the dob nonsense MIMIC has?
 
 ## Future Work
 
