@@ -43,7 +43,8 @@ hosp/diagnoses_icd:
       - col(icd_version)
       - col(icd_code)
     hadm_id: hadm_id
-    timestamp: hadm_discharge_time
+    timestamp: col(hadm_discharge_time)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
 
 hosp/drgcodes:
   drg:
@@ -53,7 +54,8 @@ hosp/drgcodes:
       - col(drg_code)
       - col(description)
     hadm_id: hadm_id
-    timestamp: hadm_discharge_time
+    timestamp: col(hadm_discharge_time)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
     drg_severity: drg_severity
     drg_mortality: drg_mortality
 
@@ -96,12 +98,14 @@ hosp/omr:
     code: col(result_name)
     text_value: col(result_value)
     timestamp: col(chartdate)
+    timestamp_format: "%Y-%m-%d"
 
 hosp/patients:
   gender:
     code:
       - GENDER
       - col(gender)
+    timestamp: null
   dob:
     code: DOB
     timestamp: col(year_of_birth)
@@ -124,13 +128,19 @@ hosp/pharmacy:
     frequency: frequency
     doses_per_24_hrs: doses_per_24_hrs
     poe_id: poe_id
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
   medication_stop:
     code:
       - MEDICATION
       - STOP
       - col(medication)
-    timestamp: col(endtime)
+    timestamp: col(stoptime)
     poe_id: poe_id
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
 
 hosp/procedures_icd:
   procedure:

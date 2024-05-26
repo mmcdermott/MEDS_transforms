@@ -40,7 +40,7 @@ def add_discharge_time_by_hadm_id(
 ) -> pl.LazyFrame:
     """Joins the two dataframes by ``"hadm_id"`` and adds the discharge time to the original dataframe."""
 
-    discharge_time_df.select("hadm_id", pl.col("dischtime").alias(out_column_name))
+    discharge_time_df = discharge_time_df.select("hadm_id", pl.col("dischtime").alias(out_column_name))
     return df.join(discharge_time_df, on="hadm_id", how="left")
 
 

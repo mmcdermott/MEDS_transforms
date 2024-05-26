@@ -14,9 +14,13 @@ up from this one).
   - [x] Test that it runs at all.
   - [ ] Test that the output is as expected.
 - [ ] Check the installation instructions on a fresh client.
-- [ ] Testing the `configs/event_configs.yaml` configuration on MIMIC-IV
+- [x] Testing the `configs/event_configs.yaml` configuration on MIMIC-IV
 - [ ] Testing the steps of the MEDS extraction ETL on MIMIC-IV (this should be expected to work, but needs
   live testing).
+  - [x] Sub-sharding
+  - [x] Patient split gathering
+  - [x] Event extraction
+  - [ ] Merging
 
 ## Step 0: Installation
 
@@ -58,8 +62,10 @@ To run this step, you can use the following script (assumed to be run **not** fr
 root directory of this repository):
 
 ```bash
-./MIMIC_IV/pre_MEDS.py raw_cohort_dir=$MIMICIV_RAW_DIR output_dir=$MIMICIV_PREMEDS_DIR
+./MIMIC-IV_Example/pre_MEDS.py raw_cohort_dir=$MIMICIV_RAW_DIR output_dir=$MIMICIV_PREMEDS_DIR
 ```
+
+In practice, on a machine with 150 GB of RAM and 10 cores, this step takes less than 5 minutes in total.
 
 ## Step 3: Run the MEDS extraction ETL
 
@@ -76,8 +82,10 @@ This is a step in 4 parts:
 ./scripts/extraction/shard_events.py \
     raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
     MEDS_cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC_IV/configs/event_configs.yaml
+    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
+
+In practice, on a machine with 150 GB of RAM and 10 cores, this step takes approximately 20 minutes in total.
 
 2. Extract and form the patient splits and sub-shards.
 
@@ -85,8 +93,10 @@ This is a step in 4 parts:
 ./scripts/extraction/split_and_shard_patients.py \
     raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
     MEDS_cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC_IV/configs/event_configs.yaml
+    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
+
+In practice, on a machine with 150 GB of RAM and 10 cores, this step takes less than 5 minutes in total.
 
 3. Extract patient sub-shards and convert to MEDS events.
 
@@ -94,8 +104,14 @@ This is a step in 4 parts:
 ./scripts/extraction/convert_to_sharded_events.py \
     raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
     MEDS_cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC_IV/configs/event_configs.yaml
+    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
+
+In practice, serially, this also takes around 20 minutes or more. However, it can be trivially parallelized to
+cut the time down by a factor of the number of workers processing the data by simply running the command
+multiple times (though this will, of course, consume more resources). If your filesystem is distributed, these
+commands can also be launched as separate slurm jobs, for example. For MIMIC-IV, this level of parallelization
+and performance is not necessary; however, for larger datasets, it can be.
 
 4. Merge the MEDS events into a single file per patient sub-shard.
 
@@ -103,7 +119,7 @@ This is a step in 4 parts:
 ./scripts/extraction/merge_to_MEDS_cohort.py \
     raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
     MEDS_cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC_IV/configs/event_configs.yaml
+    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
 
 ## Limitations / TO-DOs:
