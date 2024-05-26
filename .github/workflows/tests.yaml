@@ -26,9 +26,7 @@ jobs:
 
       - name: Install packages
         run: |
-          pip install -e .
-          pip install pytest
-          pip install pytest-cov[toml]
+          pip install -e .[tests]
 
       #----------------------------------------------
       #              run test suite
