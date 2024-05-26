@@ -1,0 +1,215 @@
+patient_id_col: subject_id
+hosp/admissions:
+  ed_registration:
+    code: ED_REGISTRATION
+    timestamp: col(edregtime)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+  ed_out:
+    code: ED_OUT
+    timestamp: col(edouttime)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+  admission:
+    code:
+      - HOSPITAL_ADMISSION
+      - col(admission_type)
+      - col(admission_location)
+    timestamp: col(admittime)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    insurance: insurance
+    language: language
+    marital_status: marital_status
+    race: race
+    hadm_id: hadm_id
+  discharge:
+    code:
+      - HOSPITAL_DISCHARGE
+      - col(discharge_location)
+    timestamp: col(dischtime)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    hadm_id: hadm_id
+  # We omit the death event here as it is joined to the data in the patients table in the pre-MEDS step.
+  #death:
+  #  code: DEATH
+  #  timestamp: col(deathtime)
+  #  timestamp_format: "%Y-%m-%d %H:%M:%S"
+  #  death_location: death_location
+  #  death_type: death_type
+
+hosp/diagnoses_icd:
+  diagnosis:
+    code:
+      - DIAGNOSIS
+      - ICD
+      - col(icd_version)
+      - col(icd_code)
+    hadm_id: hadm_id
+    timestamp: col(hadm_discharge_time)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+
+hosp/drgcodes:
+  drg:
+    code:
+      - DRG
+      - col(drg_type)
+      - col(drg_code)
+      - col(description)
+    hadm_id: hadm_id
+    timestamp: col(hadm_discharge_time)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    drg_severity: drg_severity
+    drg_mortality: drg_mortality
+
+hosp/emar:
+  medication:
+    code:
+      - MEDICATION
+      - col(medication)
+      - col(event_txt)
+    timestamp: col(charttime)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    hadm_id: hadm_id
+    emar_id: emar_id
+    emar_seq: emar_seq
+
+hosp/hcpcsevents:
+  hcpcs:
+    code:
+      - HCPCS
+      - col(short_description)
+    hadm_id: hadm_id
+    timestamp: col(chartdate)
+    timestamp_format: "%Y-%m-%d"
+
+hosp/labevents:
+  lab:
+    code:
+      - LAB
+      - col(itemid)
+      - col(valueuom)
+    hadm_id: hadm_id
+    timestamp: col(charttime)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    numerical_value: valuenum
+    text_value: value
+    priority: priority
+
+hosp/omr:
+  omr:
+    code: col(result_name)
+    text_value: col(result_value)
+    timestamp: col(chartdate)
+    timestamp_format: "%Y-%m-%d"
+
+hosp/patients:
+  gender:
+    code:
+      - GENDER
+      - col(gender)
+    timestamp: null
+  dob:
+    code: DOB
+    timestamp: col(year_of_birth)
+    timestamp_format: "%Y"
+  death:
+    code: DEATH
+    timestamp: col(dod)
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+
+hosp/pharmacy:
+  medication_start:
+    code:
+      - MEDICATION
+      - START
+      - col(medication)
+    timestamp: col(starttime)
+    route: route
+    frequency: frequency
+    doses_per_24_hrs: doses_per_24_hrs
+    poe_id: poe_id
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+  medication_stop:
+    code:
+      - MEDICATION
+      - STOP
+      - col(medication)
+    timestamp: col(stoptime)
+    poe_id: poe_id
+    timestamp_format:
+      - "%Y-%m-%d %H:%M:%S"
+      - "%Y-%m-%d"
+
+hosp/procedures_icd:
+  procedure:
+    code:
+      - PROCEDURE
+      - ICD
+      - col(icd_version)
+      - col(icd_code)
+    hadm_id: hadm_id
+    timestamp: col(chartdate)
+    timestamp_format: "%Y-%m-%d"
+
+hosp/transfers:
+  transfer:
+    code:
+      - TRANSFER_TO
+      - col(eventtype)
+      - col(careunit)
+    timestamp: col(intime)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    hadm_id: hadm_id
+
+icu/icustays:
+  icu_admission:
+    code:
+      - ICU_ADMISSION
+      - col(first_careunit)
+    timestamp: col(intime)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    hadm_id: hadm_id
+    icustay_id: stay_id
+  icu_discharge:
+    code:
+      - ICU_DISCHARGE
+      - col(last_careunit)
+    timestamp: col(outtime)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    hadm_id: hadm_id
+    icustay_id: stay_id
+
+icu/chartevents:
+  event:
+    code:
+      - LAB
+      - col(itemid)
+      - col(valueuom)
+    timestamp: col(charttime)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    numerical_value: valuenum
+    text_value: value
+    hadm_id: hadm_id
+    icustay_id: stay_id
+
+icu/procedureevents:
+  start:
+    code:
+      - PROCEDURE
+      - START
+      - col(itemid)
+    timestamp: col(starttime)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    hadm_id: hadm_id
+    icustay_id: stay_id
+  end:
+    code:
+      - PROCEDURE
+      - END
+      - col(itemid)
+    timestamp: col(endtime)
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    hadm_id: hadm_id
+    icustay_id: stay_id

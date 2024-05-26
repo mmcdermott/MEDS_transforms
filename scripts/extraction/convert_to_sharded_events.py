@@ -71,6 +71,7 @@ def main(cfg: DictConfig):
                         df = df.rename({input_patient_id_column: "patient_id"})
 
                     try:
+                        logger.info(f"Extracting events for {input_prefix}/{shard_fp.name}")
                         return convert_to_events(
                             df.filter(pl.col("patient_id").is_in(typed_patients)),
                             event_cfgs=copy.deepcopy(event_cfgs),

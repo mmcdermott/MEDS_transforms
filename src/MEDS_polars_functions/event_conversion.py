@@ -276,8 +276,11 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
     for code in codes:
         match code:
             case str() if is_col_field(code) and parse_col_field(code) in df.schema:
-                code_exprs.append(pl.col(parse_col_field(code)).cast(pl.Utf8))
+                code_col = parse_col_field(code)
+                logger.info(f"Extracting code column {code_col}")
+                code_exprs.append(pl.col(code_col).cast(pl.Utf8))
             case str():
+                logger.info(f"Adding code literate {code}")
                 code_exprs.append(pl.lit(code, dtype=pl.Utf8))
             case _:
                 raise ValueError(f"Invalid code literal: {code}")
@@ -287,16 +290,20 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
     ts_format = event_cfg.pop("timestamp_format", None)
     if isinstance(ts_format, str):
         ts_format = [ts_format]
+
     match ts:
         case str() if is_col_field(ts):
             ts_name = parse_col_field(ts)
             if isinstance(ts_format, (ListConfig, list)):
+                logger.info(f"Adding timestamp column {ts_name} in possible formats {', '.join(ts_format)}")
                 assert len(ts_format) > 0, "Timestamp format list is empty"
                 event_exprs["timestamp"] = pl.coalesce(*(in_format(fmt, ts_name) for fmt in ts_format))
             else:
+                logger.info(f"{ts_name} should already be in Date/time format")
                 assert ts_format is None
                 event_exprs["timestamp"] = pl.col(ts_name).cast(pl.Datetime)
         case None:
+            logger.info("Adding null literate for timestamp")
             event_exprs["timestamp"] = pl.lit(None, dtype=pl.Datetime)
         case _:
             raise ValueError(f"Invalid timestamp literal: {ts}")
@@ -496,6 +503,7 @@ def convert_to_events(
     event_dfs = []
     for event_name, event_cfg in event_cfgs.items():
         try:
+            logger.info(f"Building computational graph for extracting {event_name}")
             event_dfs.append(extract_event(df, event_cfg))
         except Exception as e:
             raise ValueError(f"Error extracting event {event_name}: {e}") from e
