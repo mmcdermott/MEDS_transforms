@@ -75,7 +75,7 @@ This is a step in 4 parts:
 ```bash
 ./scripts/extraction/shard_events.py \
     raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
-    output_dir=$MIMICIV_MEDS_DIR \
+    MEDS_cohort_dir=$MIMICIV_MEDS_DIR \
     event_conversion_config_fp=./MIMIC_IV/configs/event_configs.yaml
 ```
 
@@ -84,7 +84,7 @@ This is a step in 4 parts:
 ```bash
 ./scripts/extraction/split_and_shard_patients.py \
     raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
-    output_dir=$MIMICIV_MEDS_DIR \
+    MEDS_cohort_dir=$MIMICIV_MEDS_DIR \
     event_conversion_config_fp=./MIMIC_IV/configs/event_configs.yaml
 ```
 
@@ -93,7 +93,7 @@ This is a step in 4 parts:
 ```bash
 ./scripts/extraction/convert_to_sharded_events.py \
     raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
-    output_dir=$MIMICIV_MEDS_DIR \
+    MEDS_cohort_dir=$MIMICIV_MEDS_DIR \
     event_conversion_config_fp=./MIMIC_IV/configs/event_configs.yaml
 ```
 
@@ -102,7 +102,7 @@ This is a step in 4 parts:
 ```bash
 ./scripts/extraction/merge_to_MEDS_cohort.py \
     raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
-    output_dir=$MIMICIV_MEDS_DIR \
+    MEDS_cohort_dir=$MIMICIV_MEDS_DIR \
     event_conversion_config_fp=./MIMIC_IV/configs/event_configs.yaml
 ```
 

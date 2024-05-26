@@ -39,7 +39,7 @@ def scan_with_row_idx(fp: Path, columns: Sequence[str], **scan_kwargs) -> pl.Laz
     """
 
     kwargs = {**scan_kwargs}
-    match fp.suffix.lower():
+    match "".join(fp.suffixes).lower():
         case ".csv.gz":
             if columns:
                 kwargs["columns"] = columns

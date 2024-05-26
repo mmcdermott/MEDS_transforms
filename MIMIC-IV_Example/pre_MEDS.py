@@ -101,7 +101,8 @@ def main(cfg: DictConfig):
                 f"No function needed for {pfx}: "
                 f"Symlinking {str(in_fp.resolve())} to {str(out_fp.resolve())}"
             )
-            out_fp.symlink_to(in_fp)
+            relative_in_fp = in_fp.relative_to(out_fp.parent, walk_up=True)
+            out_fp.symlink_to(relative_in_fp)
             continue
         else:
             out_fp = MEDS_input_dir / f"{pfx}.parquet"
