@@ -50,7 +50,12 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         all columns. If the raw data has no duplicates when considering the event column space, the output
         dataframe will have the same number of rows as the raw data and be in the same order. The output
         dataframe will contain at least three columns: `"patient_id"`, `"code"`, and `"timestamp"`. If the
-        event has additional columns, they will be included in the output dataframe as well.
+        event has additional columns, they will be included in the output dataframe as well. **_Events that
+        would be extracted with a null code or a timestamp that should be specified via a column with or
+        without a formatting option but in practice is null will be dropped._** Note that this dropping logic
+        for code list fields applies to columns in list order -- not to all columns. So, if you have a code
+        that starts with a string literal or with a column that is not null, it will always appear, even if a
+        subsequent list element is null, just with the missing code columns filled with "UNK".
 
     Raises:
         KeyError: If the event configuration dictionary is missing the `"code"` or `"timestamp"` keys or if
@@ -85,6 +90,29 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         │ 2          ┆ FOO//C//3 ┆ 2021-01-03 00:00:00 ┆ 3               │
         │ 2          ┆ FOO//D//4 ┆ 2021-01-04 00:00:00 ┆ 4               │
         └────────────┴───────────┴─────────────────────┴─────────────────┘
+        >>> data_with_nulls = pl.DataFrame({
+        ...     "patient_id": [1, 1, 2, 2],
+        ...     "code": ["A", None, "C", "D"],
+        ...     "code_modifier": ["1", "2", "3", None],
+        ...     "timestamp": [None, "2021-01-02", "2021-01-03", "2021-01-04"],
+        ...     "numerical_value": [1, 2, 3, 4],
+        ... })
+        >>> event_cfg = {
+        ...     "code": ["col(code)", "col(code_modifier)"],
+        ...     "timestamp": "col(timestamp)",
+        ...     "timestamp_format": "%Y-%m-%d",
+        ...     "numerical_value": "numerical_value",
+        ... }
+        >>> extract_event(data_with_nulls, event_cfg)
+        shape: (2, 4)
+        ┌────────────┬────────┬─────────────────────┬─────────────────┐
+        │ patient_id ┆ code   ┆ timestamp           ┆ numerical_value │
+        │ ---        ┆ ---    ┆ ---                 ┆ ---             │
+        │ i64        ┆ cat    ┆ datetime[μs]        ┆ i64             │
+        ╞════════════╪════════╪═════════════════════╪═════════════════╡
+        │ 2          ┆ C//3   ┆ 2021-01-03 00:00:00 ┆ 3               │
+        │ 2          ┆ D//UNK ┆ 2021-01-04 00:00:00 ┆ 4               │
+        └────────────┴────────┴─────────────────────┴─────────────────┘
         >>> from datetime import datetime
         >>> complex_raw_data = pl.DataFrame(
         ...     {
@@ -273,12 +301,15 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         codes = [codes]
 
     code_exprs = []
-    for code in codes:
+    code_null_filter_expr = None
+    for i, code in enumerate(codes):
         match code:
             case str() if is_col_field(code) and parse_col_field(code) in df.schema:
                 code_col = parse_col_field(code)
                 logger.info(f"Extracting code column {code_col}")
-                code_exprs.append(pl.col(code_col).cast(pl.Utf8))
+                code_exprs.append(pl.col(code_col).cast(pl.Utf8).fill_null("UNK"))
+                if i == 0:
+                    code_null_filter_expr = pl.col(code_col).is_not_null()
             case str():
                 logger.info(f"Adding code literate {code}")
                 code_exprs.append(pl.lit(code, dtype=pl.Utf8))
@@ -291,6 +322,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
     if isinstance(ts_format, str):
         ts_format = [ts_format]
 
+    ts_filter_expr = None
     match ts:
         case str() if is_col_field(ts):
             ts_name = parse_col_field(ts)
@@ -302,6 +334,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
                 logger.info(f"{ts_name} should already be in Date/time format")
                 assert ts_format is None
                 event_exprs["timestamp"] = pl.col(ts_name).cast(pl.Datetime)
+            ts_filter_expr = event_exprs["timestamp"].is_not_null()
         case None:
             logger.info("Adding null literate for timestamp")
             event_exprs["timestamp"] = pl.lit(None, dtype=pl.Datetime)
@@ -335,12 +368,21 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
             )
 
         event_exprs[k] = col
+
+    if code_null_filter_expr is not None:
+        logger.info(f"Filtering out rows with null codes via {code_null_filter_expr}")
+        df = df.filter(code_null_filter_expr)
+    if ts_filter_expr is not None:
+        logger.info(f"Filtering out rows with null timestamps via {ts_filter_expr}")
+        df = df.filter(ts_filter_expr)
+
     df = df.select(**event_exprs).unique(maintain_order=True)
 
     # if numerical_value column is not numeric, convert it to float
     if "numerical_value" in df.columns and not df.schema["numerical_value"].is_numeric():
         logger.warning(f"Converting numerical_value to float for codes {codes}")
         df = df.with_columns(pl.col("numerical_value").cast(pl.Float64, strict=False))
+
     return df
 
 
