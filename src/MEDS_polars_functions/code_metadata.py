@@ -72,7 +72,7 @@ class MapReducePair(NamedTuple):
     """A named tuple pair of a mapper and reducer function for type safety and clarity.
 
     The mapper (element 0) should be a polars expression that aggregates the data for a single metadata
-    aggregation function. It must be suitable for use in a groupby operation on a polars LazyFrame. The
+    aggregation function. It must be suitable for use in a group_by operation on a polars LazyFrame. The
     reducer (element 1) should be a function that takes either a single polars expression, a sequence of
     polars expressions, or a polars Selector and reduces them into a single polars expression, which is
     returned. Built in functions such as `pl.sum_horizontal` and `pl.max_horizontal` are examples of functions
@@ -83,7 +83,7 @@ class MapReducePair(NamedTuple):
 
     Args:
         mapper: A polars expression that aggregates the data for a single metadata aggregation function. It
-            must be suitable for use in a groupby operation on a polars LazyFrame.
+            must be suitable for use in a group_by operation on a polars LazyFrame.
         reducer: A function that takes either a single polars expression, a sequence of polars expressions, or
             a polars Selector and reduces them into a single polars expression, which is returned.
     """
@@ -260,7 +260,7 @@ def mapper_fntr(cfg: DictConfig, stage_name: str) -> Callable[[pl.DataFrame], pl
     agg_operations = {agg: CODE_METADATA_AGGREGATIONS[agg].mapper for agg in aggregations}
 
     def mapper(df: pl.LazyFrame) -> pl.LazyFrame:
-        return df.groupby(code_key_columns).agg(**agg_operations).sort(code_key_columns)
+        return df.group_by(code_key_columns).agg(**agg_operations).sort(code_key_columns)
 
     return mapper
 

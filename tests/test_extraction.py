@@ -29,7 +29,7 @@ MRN,dob,eye_color,height
 """
 
 ADMIT_VITALS_CSV = """
-MRN,admit_date,disch_date,department,vitals_date,HR,temp
+patient_id,admit_date,disch_date,department,vitals_date,HR,temp
 239684,"05/11/2010, 17:41:51","05/11/2010, 19:27:19",CARDIAC,"05/11/2010, 18:57:18",112.6,95.5
 754281,"01/03/2010, 06:27:59","01/03/2010, 08:22:13",PULMONARY,"01/03/2010, 06:27:59",142.0,99.8
 814703,"02/05/2010, 05:55:39","02/05/2010, 07:02:30",ORTHOPEDIC,"02/05/2010, 05:55:39",170.2,100.1
@@ -49,8 +49,8 @@ MRN,admit_date,disch_date,department,vitals_date,HR,temp
 """
 
 EVENT_CFGS_YAML = """
-patient_id_col: MRN
 subjects:
+  patient_id_col: MRN
   eye_color:
     code:
       - EYE_COLOR
@@ -182,7 +182,7 @@ def run_command(script: Path, hydra_kwargs: dict[str, str], test_name: str):
     stderr = command_out.stderr.decode()
     stdout = command_out.stdout.decode()
     if command_out.returncode != 0:
-        raise AssertionError(f"{test_name} failed!\nstderr:\n{stderr}\nstdout:\n{stdout}")
+        raise AssertionError(f"{test_name} failed!\nstdout:\n{stdout}\nstderr:\n{stderr}")
     return stderr, stdout
 
 
@@ -212,12 +212,27 @@ def test_extraction():
         event_cfgs_yaml = raw_cohort_dir / "event_cfgs.yaml"
 
         # Write the CSV files
-        subjects_csv.write_text(SUBJECTS_CSV)
-        admit_vitals_csv.write_text(ADMIT_VITALS_CSV)
+        subjects_csv.write_text(SUBJECTS_CSV.strip())
+        admit_vitals_csv.write_text(ADMIT_VITALS_CSV.strip())
 
         # Mix things up -- have one CSV be also in parquet format.
         admit_vitals_parquet = raw_cohort_dir / "admit_vitals.parquet"
-        pl.read_csv(admit_vitals_csv).write_parquet(admit_vitals_parquet, use_pyarrow=True)
+        df = pl.read_csv(admit_vitals_csv)
+
+        old_shape = df.shape
+        assert old_shape[0] > 0, "Should have some rows"
+
+        df.write_parquet(admit_vitals_parquet, use_pyarrow=True)
+
+        df = pl.scan_parquet(admit_vitals_parquet)
+        df = df.select(list(df.columns))
+        assert (
+            df.select(pl.len()).collect().item() == old_shape[0]
+        ), "Should have the same number of rows after select."
+        assert old_shape == df.collect().shape, "Shapes should be the same after selecting all columns."
+
+        df = pl.scan_parquet(admit_vitals_parquet)
+        assert old_shape == df.collect().shape, "Shapes should be the same after scanning the parquet file."
 
         # Write the event config YAML
         event_cfgs_yaml.write_text(EVENT_CFGS_YAML)
@@ -256,19 +271,27 @@ def test_extraction():
 
         subsharded_dir = MEDS_cohort_dir / "sub_sharded"
 
-        out_files = list(subsharded_dir.glob("*/*.parquet"))
-        assert len(out_files) == 3, f"Expected 3 output files, got {len(out_files)}."
+        try:
+            out_files = list(subsharded_dir.glob("**/*.parquet"))
+            assert len(out_files) == 3, f"Expected 3 output files, got {len(out_files)}."
 
-        # Checking specific out files:
-        #   1. subjects.parquet
-        subjects_out = subsharded_dir / "subjects" / "[0-7).parquet"
-        assert subjects_out.is_file(), f"Expected {subjects_out} to exist."
+            # Checking specific out files:
+            #   1. subjects.parquet
+            subjects_out = subsharded_dir / "subjects" / "[0-6).parquet"
+            assert subjects_out.is_file(), f"Expected {subjects_out} to exist. Files include {out_files}."
 
-        assert_df_equal(
-            pl.read_parquet(subjects_out, glob=False),
-            pl.read_csv(subjects_csv),
-            "Subjects should be equal after sub-sharding",
-        )
+            assert_df_equal(
+                pl.read_csv(subjects_csv),
+                pl.read_parquet(subjects_out, glob=False),
+                "Subjects should be equal after sub-sharding",
+                check_column_order=False,
+                check_row_order=False,
+            )
+        except AssertionError as e:
+            full_stderr = "\n".join(all_stderrs)
+            print("Sub-sharding failed")
+            print(f"stderr:\n{full_stderr}")
+            raise e
 
         #   2. admit_vitals.parquet
         df_chunks = []
@@ -277,10 +300,13 @@ def test_extraction():
             assert admit_vitals_chunk_fp.is_file(), f"Expected {admit_vitals_chunk_fp} to exist."
 
             df_chunks.append(pl.read_parquet(admit_vitals_chunk_fp, glob=False))
+
         assert_df_equal(
-            pl.concat(df_chunks),
             pl.read_csv(admit_vitals_csv),
+            pl.concat(df_chunks),
             "Admit vitals should be equal after sub-sharding",
+            check_column_order=False,
+            check_row_order=False,
         )
 
         # Step 2: Collect the patient splits

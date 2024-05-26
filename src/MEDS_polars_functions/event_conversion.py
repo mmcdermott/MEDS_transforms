@@ -1,10 +1,17 @@
 """Utilities for converting input data structures into MEDS events."""
 
+from collections.abc import Sequence
 from functools import reduce
 
 import polars as pl
 from loguru import logger
 from omegaconf.listconfig import ListConfig
+
+from .utils import is_col_field, parse_col_field
+
+
+def in_format(fmt: str, ts_name: str) -> pl.Expr:
+    return pl.col(ts_name).str.strptime(pl.Datetime, fmt, strict=False)
 
 
 def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.LazyFrame:
@@ -213,11 +220,11 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         >>> extract_event(complex_raw_data, {"timestamp": "col(admission_time)"})
         Traceback (most recent call last):
             ...
-        KeyError: "Event configuration dictionary must contain 'code' and 'timestamp' keys."
-        >>> extract_event(complex_raw_data, {"code": "test"})
+        KeyError: "Event configuration dictionary must contain 'code' key. Got: [timestamp]."
+        >>> extract_event(complex_raw_data, {"code": "test", "value": "severity_score"})
         Traceback (most recent call last):
             ..".
-        KeyError: "Event configuration dictionary must contain 'code' and 'timestamp' keys."
+        KeyError: "Event configuration dictionary must contain 'timestamp' key. Got: [code, value]."
         >>> extract_event(complex_raw_data, {"code": 34, "timestamp": "col(admission_time)"})
         Traceback (most recent call last):
             ...
@@ -245,8 +252,16 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
     """  # noqa: E501
     event_exprs = {"patient_id": pl.col("patient_id")}
 
-    if "code" not in event_cfg or "timestamp" not in event_cfg:
-        raise KeyError("Event configuration dictionary must contain 'code' and 'timestamp' keys.")
+    if "code" not in event_cfg:
+        raise KeyError(
+            "Event configuration dictionary must contain 'code' key. "
+            f"Got: [{', '.join(event_cfg.keys())}]."
+        )
+    if "timestamp" not in event_cfg:
+        raise KeyError(
+            "Event configuration dictionary must contain 'timestamp' key. "
+            f"Got: [{', '.join(event_cfg.keys())}]."
+        )
     if "patient_id" in event_cfg:
         raise KeyError("Event column name 'patient_id' cannot be overridden.")
 
@@ -260,8 +275,8 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
     code_exprs = []
     for code in codes:
         match code:
-            case str() if code.startswith("col(") and code.endswith(")") and code[4:-1] in df.schema:
-                code_exprs.append(pl.col(code[4:-1]).cast(pl.Utf8))
+            case str() if is_col_field(code) and parse_col_field(code) in df.schema:
+                code_exprs.append(pl.col(parse_col_field(code)).cast(pl.Utf8))
             case str():
                 code_exprs.append(pl.lit(code, dtype=pl.Utf8))
             case _:
@@ -270,12 +285,17 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
 
     ts = event_cfg.pop("timestamp")
     ts_format = event_cfg.pop("timestamp_format", None)
+    if isinstance(ts_format, str):
+        ts_format = [ts_format]
     match ts:
-        case str() if ts.startswith("col(") and ts.endswith(")"):
-            if ts_format:
-                event_exprs["timestamp"] = pl.col(ts[4:-1]).str.strptime(pl.Datetime, ts_format)
+        case str() if is_col_field(ts):
+            ts_name = parse_col_field(ts)
+            if isinstance(ts_format, (ListConfig, list)):
+                assert len(ts_format) > 0, "Timestamp format list is empty"
+                event_exprs["timestamp"] = pl.coalesce(*(in_format(fmt, ts_name) for fmt in ts_format))
             else:
-                event_exprs["timestamp"] = pl.col(ts[4:-1]).cast(pl.Datetime)
+                assert ts_format is None
+                event_exprs["timestamp"] = pl.col(ts_name).cast(pl.Datetime)
         case None:
             event_exprs["timestamp"] = pl.lit(None, dtype=pl.Datetime)
         case _:
@@ -286,12 +306,12 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
             raise ValueError(
                 f"For event column {k}, source column {v} must be a string column name. Got {type(v)}."
             )
-        elif v.startswith("col(") and v.endswith(")"):
+        elif is_col_field(v):
             logger.warning(
                 f"Source column '{v}' for event column {k} is always interpreted as a column name. "
-                f"Removing col() function call and setting source column to {v[4:-1]}."
+                f"Removing col() function call and setting source column to {parse_col_field(v)}."
             )
-            v = v[4:-1]
+            v = parse_col_field(v)
 
         if v not in df.schema:
             raise KeyError(f"Source column '{v}' for event column {k} not found in DataFrame schema.")
@@ -308,10 +328,18 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
             )
 
         event_exprs[k] = col
-    return df.select(**event_exprs).unique(maintain_order=True)
+    df = df.select(**event_exprs).unique(maintain_order=True)
+
+    # if numerical_value column is not numeric, convert it to float
+    if "numerical_value" in df.columns and not df.schema["numerical_value"].is_numeric():
+        logger.warning(f"Converting numerical_value to float for codes {codes}")
+        df = df.with_columns(pl.col("numerical_value").cast(pl.Float64, strict=False))
+    return df
 
 
-def convert_to_events(df: pl.LazyFrame, event_cfgs: dict[str, dict[str, str | None]]) -> pl.LazyFrame:
+def convert_to_events(
+    df: pl.LazyFrame, event_cfgs: dict[str, dict[str, str | None | Sequence[str]]]
+) -> pl.LazyFrame:
     """Converts a DataFrame of raw data into a DataFrame of events.
 
     Args:
@@ -472,4 +500,5 @@ def convert_to_events(df: pl.LazyFrame, event_cfgs: dict[str, dict[str, str | No
         except Exception as e:
             raise ValueError(f"Error extracting event {event_name}: {e}") from e
 
-    return pl.concat(event_dfs, how="diagonal")
+    df = pl.concat(event_dfs, how="diagonal")
+    return df
