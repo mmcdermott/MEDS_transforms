@@ -15,13 +15,16 @@ up from this one).
   - [ ] Test that the output is as expected.
 - [ ] Check the installation instructions on a fresh client.
 - [x] Testing the `configs/event_configs.yaml` configuration on MIMIC-IV
-- [ ] Testing the MEDS extraction ETL runs on MIMIC-IV (this should be expected to work, but needs
+- [x] Testing the MEDS extraction ETL runs on MIMIC-IV (this should be expected to work, but needs
   live testing).
   - [x] Sub-sharding
   - [x] Patient split gathering
   - [x] Event extraction
   - [x] Merging
 - [ ] Validating the output MEDS cohort
+  - [x] Basic validation (even though file sizes are weird, the number of rows looks consistent).
+  - [ ] Debug and remove rows with null codes! (there are a lot of them)
+  - [ ] Detailed validation
 
 ## Step 0: Installation
 
