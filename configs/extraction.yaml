@@ -15,6 +15,7 @@ split_fracs:
 # Sharding
 row_chunksize: 200000000
 n_patients_per_shard: 50000
+infer_schema_length: 10000
 
 # Misc
 do_overwrite: False
