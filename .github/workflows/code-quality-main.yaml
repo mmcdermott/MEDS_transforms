@@ -15,8 +15,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Set up Python
+      - name: Set up Python 3.12
         uses: actions/setup-python@v3
+        with:
+          python-version: "3.12"
 
       - name: Run pre-commits
         uses: pre-commit/action@v3.0.1
