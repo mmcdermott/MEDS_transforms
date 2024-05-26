@@ -76,7 +76,7 @@ This is a step in 4 parts:
 ./scripts/extraction/shard_events.py \
 	raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
 	MEDS_cohort_dir=$MIMICIV_MEDS_DIR \
-	event_conversion_config_fp=./MIMIC_IV/configs/event_configs.yaml
+	event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
 
 2. Extract and form the patient splits and sub-shards.
@@ -85,7 +85,7 @@ This is a step in 4 parts:
 ./scripts/extraction/split_and_shard_patients.py \
 	raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
 	MEDS_cohort_dir=$MIMICIV_MEDS_DIR \
-	event_conversion_config_fp=./MIMIC_IV/configs/event_configs.yaml
+	event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
 
 3. Extract patient sub-shards and convert to MEDS events.
@@ -94,7 +94,7 @@ This is a step in 4 parts:
 ./scripts/extraction/convert_to_sharded_events.py \
 	raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
 	MEDS_cohort_dir=$MIMICIV_MEDS_DIR \
-	event_conversion_config_fp=./MIMIC_IV/configs/event_configs.yaml
+	event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
 
 4. Merge the MEDS events into a single file per patient sub-shard.
@@ -103,7 +103,7 @@ This is a step in 4 parts:
 ./scripts/extraction/merge_to_MEDS_cohort.py \
 	raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
 	MEDS_cohort_dir=$MIMICIV_MEDS_DIR \
-	event_conversion_config_fp=./MIMIC_IV/configs/event_configs.yaml
+	event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
 
 ## Limitations / TO-DOs:
