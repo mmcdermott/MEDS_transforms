@@ -54,7 +54,8 @@ def main(cfg: DictConfig):
 
     for sp, patients in patient_splits:
         for input_prefix, event_cfgs in event_configs:
-            input_patient_id_column = event_cfgs.get("patient_id_col", default_patient_id_col)
+            event_cfgs = copy.deepcopy(event_cfgs)
+            input_patient_id_column = event_cfgs.pop("patient_id_col", default_patient_id_col)
 
             event_shards = list((MEDS_cohort_dir / "sub_sharded" / input_prefix).glob("*.parquet"))
             random.shuffle(event_shards)

@@ -281,7 +281,7 @@ def test_extraction():
             assert subjects_out.is_file(), f"Expected {subjects_out} to exist. Files include {out_files}."
 
             assert_df_equal(
-                pl.read_csv(subjects_csv).drop("height"),
+                pl.read_csv(subjects_csv),
                 pl.read_parquet(subjects_out, glob=False),
                 "Subjects should be equal after sub-sharding",
                 check_column_order=False,

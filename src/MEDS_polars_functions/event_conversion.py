@@ -220,11 +220,11 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         >>> extract_event(complex_raw_data, {"timestamp": "col(admission_time)"})
         Traceback (most recent call last):
             ...
-        KeyError: "Event configuration dictionary must contain 'code' and 'timestamp' keys."
-        >>> extract_event(complex_raw_data, {"code": "test"})
+        KeyError: "Event configuration dictionary must contain 'code' key. Got: [timestamp]."
+        >>> extract_event(complex_raw_data, {"code": "test", "value": "severity_score"})
         Traceback (most recent call last):
             ..".
-        KeyError: "Event configuration dictionary must contain 'code' and 'timestamp' keys."
+        KeyError: "Event configuration dictionary must contain 'timestamp' key. Got: [code, value]."
         >>> extract_event(complex_raw_data, {"code": 34, "timestamp": "col(admission_time)"})
         Traceback (most recent call last):
             ...
@@ -252,8 +252,16 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
     """  # noqa: E501
     event_exprs = {"patient_id": pl.col("patient_id")}
 
-    if "code" not in event_cfg or "timestamp" not in event_cfg:
-        raise KeyError("Event configuration dictionary must contain 'code' and 'timestamp' keys.")
+    if "code" not in event_cfg:
+        raise KeyError(
+            "Event configuration dictionary must contain 'code' key. "
+            f"Got: [{', '.join(event_cfg.keys())}]."
+        )
+    if "timestamp" not in event_cfg:
+        raise KeyError(
+            "Event configuration dictionary must contain 'timestamp' key. "
+            f"Got: [{', '.join(event_cfg.keys())}]."
+        )
     if "patient_id" in event_cfg:
         raise KeyError("Event column name 'patient_id' cannot be overridden.")
 
