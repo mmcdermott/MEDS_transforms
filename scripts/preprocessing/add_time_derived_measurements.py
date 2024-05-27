@@ -24,12 +24,17 @@ def main(cfg: DictConfig):
 
     hydra_loguru_init()
 
-    MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
-    output_dir = Path(cfg.output_data_dir)
+    logger.info(
+        f"Running with config:\n{OmegaConf.to_yaml(cfg)}\n"
+        f"Stage: {cfg.stage}\n\n"
+        f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
+    )
 
-    shards = json.loads((MEDS_cohort_dir / "splits.json").read_text())
+    output_dir = Path(cfg.stage_dfg.output_dir)
 
-    final_cohort_dir = MEDS_cohort_dir / "final_cohort"
+    shards = json.loads((Path(cfg.stage_cfg.metadata_input_dir) / "splits.json").read_text())
+
+    final_cohort_dir = cfg.stage_cfg.data_input_dir / "final_cohort"
     filtered_patients_dir = output_dir / "patients_above_length_threshold"
     with_time_derived_dir = output_dir / "with_time_derived_measurements"
 

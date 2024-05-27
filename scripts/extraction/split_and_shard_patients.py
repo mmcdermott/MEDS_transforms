@@ -18,10 +18,16 @@ def main(cfg: DictConfig):
 
     hydra_loguru_init()
 
+    logger.info(
+        f"Running with config:\n{OmegaConf.to_yaml(cfg)}\n"
+        f"Stage: {cfg.stage}\n\n"
+        f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
+    )
+
     logger.info("Starting patient splitting and sharding")
 
-    MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
-    subsharded_dir = MEDS_cohort_dir / "sub_sharded"
+    MEDS_cohort_dir = Path(cfg.stage_cfg.output_dir)
+    subsharded_dir = Path(cfg.stage_cfg.data_input_dir)
 
     event_conversion_cfg_fp = Path(cfg.event_conversion_config_fp)
     if not event_conversion_cfg_fp.exists():
@@ -61,8 +67,8 @@ def main(cfg: DictConfig):
 
     logger.info(f"Found {len(patient_ids)} unique patient IDs of type {patient_ids.dtype}")
 
-    if cfg.external_splits_json_fp:
-        external_splits_json_fp = Path(cfg.external_splits_json_fp)
+    if cfg.stage_cfg.external_splits_json_fp:
+        external_splits_json_fp = Path(cfg.stage_cfg.external_splits_json_fp)
         if not external_splits_json_fp.exists():
             raise FileNotFoundError(f"External splits JSON file not found at {external_splits_json_fp}")
 
@@ -79,8 +85,8 @@ def main(cfg: DictConfig):
     sharded_patients = shard_patients(
         patients=patient_ids,
         external_splits=external_splits,
-        split_fracs_dict=cfg.split_fracs,
-        n_patients_per_shard=cfg.n_patients_per_shard,
+        split_fracs_dict=cfg.stage_cfg.split_fracs,
+        n_patients_per_shard=cfg.stage_cfg.n_patients_per_shard,
         seed=cfg.seed,
     )
 

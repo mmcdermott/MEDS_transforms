@@ -7,7 +7,7 @@ from pathlib import Path
 import hydra
 import polars as pl
 from loguru import logger
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from MEDS_polars_functions.mapper import wrap as rwlock_wrap
 from MEDS_polars_functions.utils import hydra_loguru_init
@@ -42,13 +42,17 @@ def main(cfg: DictConfig):
 
     hydra_loguru_init()
 
-    MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
+    logger.info(
+        f"Running with config:\n{OmegaConf.to_yaml(cfg)}\n"
+        f"Stage: {cfg.stage}\n\n"
+        f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
+    )
 
-    shards = json.loads((MEDS_cohort_dir / "splits.json").read_text())
+    shards = json.loads((Path(cfg.stage_cfg.metadata_input_dir) / "splits.json").read_text())
 
     logger.info("Starting patient shard merging.")
 
-    patient_subsharded_dir = MEDS_cohort_dir / "patient_sub_sharded_events"
+    patient_subsharded_dir = Path(cfg.stage_cfg.data_input_dir)
     if not patient_subsharded_dir.is_dir():
         raise FileNotFoundError(f"Patient sub-sharded directory not found: {patient_subsharded_dir}")
 
@@ -57,7 +61,7 @@ def main(cfg: DictConfig):
 
     for sp in patient_splits:
         in_dir = patient_subsharded_dir / sp
-        out_fp = MEDS_cohort_dir / "final_cohort" / f"{sp}.parquet"
+        out_fp = Path(cfg.stage_cfg.output_dir) / f"{sp}.parquet"
 
         shard_fps = sorted(list(in_dir.glob("**/*.parquet")))
         shard_fp_strs = [f"  * {str(fp.resolve())}" for fp in shard_fps]

@@ -8,7 +8,7 @@ from pathlib import Path
 import hydra
 import polars as pl
 from loguru import logger
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from MEDS_polars_functions.filter_patients_by_length import (
     filter_patients_by_num_events,
@@ -23,6 +23,12 @@ def main(cfg: DictConfig):
     """TODO."""
 
     hydra_loguru_init()
+
+    logger.info(
+        f"Running with config:\n{OmegaConf.to_yaml(cfg)}\n"
+        f"Stage: {cfg.stage}\n\n"
+        f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
+    )
 
     MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
     output_dir = Path(cfg.output_data_dir)

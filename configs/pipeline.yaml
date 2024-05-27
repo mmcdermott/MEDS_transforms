@@ -7,7 +7,8 @@ log_dir: "${cohort_dir}/.logs/${stage}/worker_${worker}/${now:%Y-%m-%d_%H-%M-%S}
 # General pipeline variables
 do_overwrite: False
 seed: 1
-stages: ??? # The list of stages to this overall pipeline
+stages: ??? # The list of stages to this overall pipeline (in order)
+stage_configs: ??? # The configurations for each stage, keyed by stage name
 
 # Mapreduce information
 worker: 1
@@ -15,7 +16,7 @@ polling_time: 300 # wait time in seconds before beginning reduction steps
 
 # Filling in the current stage
 stage: ${current_script_name:}
-stage_cfg: ${oc.create:${populate_stage:${stage}, ${input_dir}, ${cohort_dir}, ${stages}}}
+stage_cfg: ${oc.create:${populate_stage:${stage}, ${input_dir}, ${cohort_dir}, ${stages}, ${stage_configs}}}
 
 # Hydra
 hydra:

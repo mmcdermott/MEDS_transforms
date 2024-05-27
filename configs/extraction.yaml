@@ -5,15 +5,23 @@ defaults:
 event_conversion_config_fp: ???
 
 stages:
-  - name: shard_events
+  - shard_events
+  - split_and_shard_patients
+  - convert_to_sharded_events
+  - merge_to_MEDS_cohort
+
+stage_configs:
+  shard_events:
     row_chunksize: 200000000
     infer_schema_length: 10000
-  - name: split_and_shard_patients
+  split_and_shard_patients:
+    is_metadata: True
+    output_dir: ${cohort_dir}
     n_patients_per_shard: 50000
     external_splits_json_fp: null
     split_fracs:
       train: 0.8
       tuning: 0.1
       held_out: 0.1
-  - name: convert_to_sharded_events
-  - name: merge_to_MEDS_cohort
+  merge_to_MEDS_cohort:
+    output_dir: ${cohort_dir}/final_cohort

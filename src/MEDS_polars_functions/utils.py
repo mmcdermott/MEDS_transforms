@@ -6,7 +6,7 @@ from pathlib import Path
 
 import hydra
 import polars as pl
-from loguru import logger as log
+from loguru import logger
 from omegaconf import OmegaConf
 
 
@@ -23,8 +23,9 @@ def populate_stage(
     stage_name: str,
     input_dir: str,
     cohort_dir: str,
-    stages: list[dict],
-    pre_parsed_stages: list[dict] | None = None,
+    stages: list[str],
+    stage_configs: dict[str, dict],
+    pre_parsed_stages: dict[str, dict] | None = None,
 ) -> dict:
     """Populates a stage in the stages configuration with inferred stage parameters.
 
@@ -42,9 +43,11 @@ def populate_stage(
         stage_name: The name of the stage to populate.
         input_dir: The global input directory.
         cohort_dir: The cohort directory into which this overall pipeline is writing data.
-        stages: The stages configuration dictionaries (unresolved).
-        pre_parsed_stages: The stages configuration dictionaries (resolved). If specified, the function will
-            not re-resolve the stages in this list.
+        stages: The names of the stages processed by this pipeline in order.
+        stage_configs: The raw, unresolved stage configuration dictionaries for any stages with specific
+            arguments, keyed by stage name.
+        pre_parsed_stages: The stages configuration dictionaries (resolved), keyed by stage name. If
+            specified, the function will not re-resolve the stages in this list.
 
     Returns:
         dict: The populated stage configuration.
@@ -53,70 +56,78 @@ def populate_stage(
         ValueError: If the stage is not present in the stages configuration.
 
     Examples:
+        >>> from omegaconf import DictConfig
         >>> root_config = DictConfig({
         ...     "input_dir": "/a/b",
         ...     "cohort_dir": "/c/d",
-        ...     "stages": [
-        ...         {"name": "stage1"},
-        ...         {"name": "stage2", "is_metadata": True},
-        ...         {"name": "stage3", "is_metadata": None},
-        ...         {"name": "stage4", "data_input_dir": "/e/f", "output_dir": "/g/h"},
-        ...         {"name": "stage5", "aggregations": ["foo"]},
-        ...         {"name": "stage6"},
-        ...     ],
+        ...     "stages": ["stage1", "stage2", "stage3", "stage4", "stage5", "stage6"],
+        ...     "stage_configs": {
+        ...         "stage2": {"is_metadata": True},
+        ...         "stage3": {"is_metadata": None},
+        ...         "stage4": {"data_input_dir": "/e/f", "output_dir": "/g/h"},
+        ...         "stage5": {"aggregations": ["foo"]},
+        ...     },
         ... })
-        >>> args = (root_config["input_dir"], root_config["cohort_dir"], root_config["stages"])
+        >>> args = [root_config[k] for k in ["input_dir", "cohort_dir", "stages", "stage_configs"]]
         >>> populate_stage("stage1", *args) # doctest: +NORMALIZE_WHITESPACE
-        {'name': 'stage1', 'is_metadata': False, 'data_input_dir': '/a/b', 'metadata_input_dir': '/a/b',
+        {'is_metadata': False, 'data_input_dir': '/a/b', 'metadata_input_dir': '/a/b',
          'output_dir': '/c/d/stage1'}
         >>> populate_stage("stage2", *args) # doctest: +NORMALIZE_WHITESPACE
-        {'name': 'stage2', 'is_metadata': True, 'data_input_dir': '/c/d/stage1', 'metadata_input_dir': '/a/b',
+        {'is_metadata': True, 'data_input_dir': '/c/d/stage1', 'metadata_input_dir': '/a/b',
          'output_dir': '/c/d/stage2'}
         >>> populate_stage("stage3", *args) # doctest: +NORMALIZE_WHITESPACE
-        {'name': 'stage3', 'is_metadata': False, 'data_input_dir': '/c/d/stage1',
+        {'is_metadata': False, 'data_input_dir': '/c/d/stage1',
          'metadata_input_dir': '/c/d/stage2', 'output_dir': '/c/d/stage3'}
         >>> populate_stage("stage4", *args) # doctest: +NORMALIZE_WHITESPACE
-        {'name': 'stage4', 'data_input_dir': '/e/f', 'output_dir': '/g/h', 'is_metadata': False,
+        {'data_input_dir': '/e/f', 'output_dir': '/g/h', 'is_metadata': False,
          'metadata_input_dir': '/c/d/stage2'}
         >>> populate_stage("stage5", *args) # doctest: +NORMALIZE_WHITESPACE
-        {'name': 'stage5', 'aggregations': ['foo'], 'is_metadata': True, 'data_input_dir': '/g/h',
+        {'aggregations': ['foo'], 'is_metadata': True, 'data_input_dir': '/g/h',
          'metadata_input_dir': '/c/d/stage2', 'output_dir': '/c/d/stage5'}
         >>> populate_stage("stage6", *args) # doctest: +NORMALIZE_WHITESPACE
-        {'name': 'stage6', 'is_metadata': False, 'data_input_dir': '/g/h',
+        {'is_metadata': False, 'data_input_dir': '/g/h',
          'metadata_input_dir': '/c/d/stage5', 'output_dir': '/c/d/stage6'}
         >>> populate_stage("stage7", *args) # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
-        ValueError: 'stage7' is not a valid stage name. Options are:
-            ['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'stage6']
+        ValueError: 'stage7' is not a valid stage name. Options are: stage1, stage2, stage3, stage4, stage5,
+            stage6
     """
 
-    if stage_name not in {s["name"] for s in stages}:
-        raise ValueError(
-            f"'{stage_name}' is not a valid stage name. Options are: {list(s['name'] for s in stages)}"
-        )
+    for s in stage_configs.keys():
+        if s not in stages:
+            raise ValueError(
+                f"stage config key '{s}' is not a valid stage name. Options are: {list(stages.keys())}"
+            )
 
-    pre_pop_stages_by_name = {s["name"]: s for s in pre_parsed_stages} if pre_parsed_stages else {}
-    pre_parsed_stages = pre_parsed_stages or []
+    if stage_name not in stages:
+        raise ValueError(f"'{stage_name}' is not a valid stage name. Options are: {', '.join(stages)}")
 
-    prior_stages = []
+    if pre_parsed_stages is None:
+        pre_parsed_stages = {}
+
     stage = None
     prior_data_stage = None
     prior_metadata_stage = None
     for s in stages:
-        if s["name"] == stage_name:
-            stage = s
+        if s == stage_name:
+            stage = stage_configs.get(s, {})
             break
-        elif s["name"] in pre_pop_stages_by_name:
-            s_resolved = pre_pop_stages_by_name[s["name"]]
+        elif s in pre_parsed_stages:
+            s_resolved = pre_parsed_stages[s]
         else:
-            s_resolved = populate_stage(s["name"], input_dir, cohort_dir, stages, prior_stages)
+            s_resolved = populate_stage(s, input_dir, cohort_dir, stages, stage_configs, pre_parsed_stages)
 
+        pre_parsed_stages[s] = s_resolved
         if s_resolved["is_metadata"]:
             prior_metadata_stage = s_resolved
         else:
             prior_data_stage = s_resolved
-        prior_stages.append(s_resolved)
+
+    logger.debug(
+        f"Parsing stage {stage_name}:\nResolved prior data stage: {prior_data_stage}\n"
+        f"Resolved prior metadata stage: {prior_metadata_stage}"
+    )
 
     inferred_keys = {
         "is_metadata": "aggregations" in stage,
@@ -145,7 +156,7 @@ def hydra_loguru_init() -> None:
     Must be called from a hydra main!
     """
     hydra_path = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
-    log.add(os.path.join(hydra_path, "main.log"))
+    logger.add(os.path.join(hydra_path, "main.log"))
 
 
 def write_lazyframe(df: pl.LazyFrame, out_fp: Path) -> None:

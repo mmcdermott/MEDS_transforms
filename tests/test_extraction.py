@@ -245,14 +245,14 @@ def test_extraction():
         #   4. Merge to the final output.
 
         extraction_config_kwargs = {
-            "raw_cohort_dir": str(raw_cohort_dir.resolve()),
-            "MEDS_cohort_dir": str(MEDS_cohort_dir.resolve()),
+            "input_dir": str(raw_cohort_dir.resolve()),
+            "cohort_dir": str(MEDS_cohort_dir.resolve()),
             "event_conversion_config_fp": str(event_cfgs_yaml.resolve()),
-            "split_fracs.train": 4 / 6,
-            "split_fracs.tuning": 1 / 6,
-            "split_fracs.held_out": 1 / 6,
-            "row_chunksize": 10,
-            "n_patients_per_shard": 2,
+            "stage_configs.split_and_shard_patients.split_fracs.train": 4 / 6,
+            "stage_configs.split_and_shard_patients.split_fracs.tuning": 1 / 6,
+            "stage_configs.split_and_shard_patients.split_fracs.held_out": 1 / 6,
+            "stage_configs.shard_events.row_chunksize": 10,
+            "stage_configs.split_and_shard_patients.n_patients_per_shard": 2,
             "hydra.verbose": True,
         }
 
@@ -269,7 +269,7 @@ def test_extraction():
         all_stderrs.append(stderr)
         all_stdouts.append(stdout)
 
-        subsharded_dir = MEDS_cohort_dir / "sub_sharded"
+        subsharded_dir = MEDS_cohort_dir / "shard_events"
 
         try:
             out_files = list(subsharded_dir.glob("**/*.parquet"))
@@ -319,24 +319,30 @@ def test_extraction():
         all_stderrs.append(stderr)
         all_stdouts.append(stdout)
 
-        splits_fp = MEDS_cohort_dir / "splits.json"
-        assert splits_fp.is_file(), f"Expected splits @ {str(splits_fp.resolve())} to exist."
+        try:
+            splits_fp = MEDS_cohort_dir / "splits.json"
+            assert splits_fp.is_file(), f"Expected splits @ {str(splits_fp.resolve())} to exist."
 
-        splits = json.loads(splits_fp.read_text())
-        expected_keys = ["train/0", "train/1", "tuning/0", "held_out/0"]
+            splits = json.loads(splits_fp.read_text())
+            expected_keys = ["train/0", "train/1", "tuning/0", "held_out/0"]
 
-        expected_keys_str = ", ".join(f"'{k}'" for k in expected_keys)
-        got_keys_str = ", ".join(f"'{k}'" for k in splits.keys())
+            expected_keys_str = ", ".join(f"'{k}'" for k in expected_keys)
+            got_keys_str = ", ".join(f"'{k}'" for k in splits.keys())
 
-        assert set(splits.keys()) == set(expected_keys), (
-            f"Expected splits to have keys {expected_keys_str}.\n" f"Got keys: {got_keys_str}"
-        )
+            assert set(splits.keys()) == set(expected_keys), (
+                f"Expected splits to have keys {expected_keys_str}.\n" f"Got keys: {got_keys_str}"
+            )
 
-        assert splits == EXPECTED_SPLITS, (
-            f"Expected splits to be {EXPECTED_SPLITS}, got {splits}. NOTE THIS MAY CHANGE IF THE SEED OR "
-            "DATA CHANGES -- FAILURE HERE MAY BE JUST DUE TO A NON-DETERMINISTIC SPLIT AND THE TEST NEEDING "
-            "TO BE UPDATED."
-        )
+            assert splits == EXPECTED_SPLITS, (
+                f"Expected splits to be {EXPECTED_SPLITS}, got {splits}. NOTE THIS MAY CHANGE IF THE SEED OR "
+                "DATA CHANGES -- FAILURE HERE MAY BE JUST DUE TO A NON-DETERMINISTIC SPLIT AND THE TEST "
+                "NEEDING TO BE UPDATED."
+            )
+        except AssertionError as e:
+            print("Failed to split patients")
+            print(f"stderr:\n{stderr}")
+            print(f"stdout:\n{stdout}")
+            raise e
 
         # Step 3: Extract the events and sub-shard by patient
         stderr, stdout = run_command(
@@ -347,7 +353,7 @@ def test_extraction():
         all_stderrs.append(stderr)
         all_stdouts.append(stdout)
 
-        patient_subsharded_folder = MEDS_cohort_dir / "patient_sub_sharded_events"
+        patient_subsharded_folder = MEDS_cohort_dir / "convert_to_sharded_events"
         assert patient_subsharded_folder.is_dir(), f"Expected {patient_subsharded_folder} to be a directory."
 
         for split, expected_outputs in SUB_SHARDED_OUTPUTS.items():

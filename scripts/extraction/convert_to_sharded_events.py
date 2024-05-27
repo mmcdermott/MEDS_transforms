@@ -28,10 +28,7 @@ def main(cfg: DictConfig):
         f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
     )
 
-    Path(cfg.raw_cohort_dir)
-    MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
-
-    shards = json.loads((MEDS_cohort_dir / "splits.json").read_text())
+    shards = json.loads((Path(cfg.stage_cfg.metadata_input_dir) / "splits.json").read_text())
 
     event_conversion_cfg_fp = Path(cfg.event_conversion_config_fp)
     if not event_conversion_cfg_fp.exists():
@@ -45,7 +42,7 @@ def main(cfg: DictConfig):
 
     default_patient_id_col = event_conversion_cfg.pop("patient_id_col", "patient_id")
 
-    patient_subsharded_dir = MEDS_cohort_dir / "patient_sub_sharded_events"
+    patient_subsharded_dir = Path(cfg.stage_cfg.output_dir)
     patient_subsharded_dir.mkdir(parents=True, exist_ok=True)
     OmegaConf.save(event_conversion_cfg, patient_subsharded_dir / "event_conversion_config.yaml")
 
@@ -63,7 +60,7 @@ def main(cfg: DictConfig):
             event_cfgs = copy.deepcopy(event_cfgs)
             input_patient_id_column = event_cfgs.pop("patient_id_col", default_patient_id_col)
 
-            event_shards = list((MEDS_cohort_dir / "sub_sharded" / input_prefix).glob("*.parquet"))
+            event_shards = list((Path(cfg.stage_cfg.data_input_dir) / input_prefix).glob("*.parquet"))
             random.shuffle(event_shards)
 
             for shard_fp in event_shards:
