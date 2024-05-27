@@ -6,6 +6,7 @@ log_dir: "${output_data_dir}/.logs"
 # Worker / Stage information
 stage: ???
 worker: 1
+polling_time: 300 # wait time in seconds before beginning reduction steps
 
 # Filtering parameters
 min_code_occurrences: null

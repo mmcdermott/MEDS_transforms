@@ -1,7 +1,4 @@
-"""Utilities for grouping and/or reducing MEDS cohort files by code to collect metadata properties.
-
-TODO: more details
-"""
+"""Utilities for grouping and/or reducing MEDS cohort files by code to collect metadata properties."""
 
 from collections.abc import Callable, Sequence
 from enum import StrEnum
