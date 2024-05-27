@@ -1,46 +1,143 @@
 """Core utilities for MEDS pipelines built with these tools."""
 
 import os
+import sys
 from pathlib import Path
 
-from omegaconf import OmegaConf
 import hydra
 import polars as pl
 from loguru import logger as log
+from omegaconf import OmegaConf
 
-def get_stage_input_dir(
-    raw_input_dir: str, cohort_dir: str, stages: list[str], stage: str
-) -> str:
-    """Resolves the input directory for a stage in a MEDS pipeline.
 
-    Args:
-        raw_input_dir: The raw input directory (used as the input when the stage is the 1st stage).
-        cohort_dir: The cohort (output) directory; used as the source for the default stage output.
-        stages: The stages in the pipeline.
-        stage: The current stage.
+def current_script_name() -> str:
+    """Returns the name of the script that called this function.
 
     Returns:
-        The input directory for the current stage.
+        str: The name of the script that called this function.
+    """
+    return Path(sys.argv[0]).stem
+
+
+def populate_stage(
+    stage_name: str,
+    input_dir: str,
+    cohort_dir: str,
+    stages: list[dict],
+    pre_parsed_stages: list[dict] | None = None,
+) -> dict:
+    """Populates a stage in the stages configuration with inferred stage parameters.
+
+    Infers and adds (unless already present, in which case the provided value is used) the following
+    parameters to the stage configuration:
+      - `is_metadata`: Whether the stage is a metadata stage, which is determined to be `False` if the stage
+        does not have an `aggregations` parameter.
+      - `data_input_dir`: The input directory for the stage (either the global input directory or the previous
+        data stage's output directory).
+      - `metadata_input_dir`: The input directory for the stage (either the global input directory or the
+        previous metadata stage's output directory).
+      - `output_dir`: The output directory for the stage (the cohort directory with the stage name appended).
+
+    Args:
+        stage_name: The name of the stage to populate.
+        input_dir: The global input directory.
+        cohort_dir: The cohort directory into which this overall pipeline is writing data.
+        stages: The stages configuration dictionaries (unresolved).
+        pre_parsed_stages: The stages configuration dictionaries (resolved). If specified, the function will
+            not re-resolve the stages in this list.
+
+    Returns:
+        dict: The populated stage configuration.
+
+    Raises:
+        ValueError: If the stage is not present in the stages configuration.
 
     Examples:
-        >>> get_stage_input_dir("/a/b", "/c/d", ["stage1", "stage2"], "stage1")
-        '/a/b'
-        >>> get_stage_input_dir("/a/b", "/c/d", ["stage1", "stage2"], "stage2")
-        '/c/d/stage1'
+        >>> root_config = DictConfig({
+        ...     "input_dir": "/a/b",
+        ...     "cohort_dir": "/c/d",
+        ...     "stages": [
+        ...         {"name": "stage1"},
+        ...         {"name": "stage2", "is_metadata": True},
+        ...         {"name": "stage3", "is_metadata": None},
+        ...         {"name": "stage4", "data_input_dir": "/e/f", "output_dir": "/g/h"},
+        ...         {"name": "stage5", "aggregations": ["foo"]},
+        ...         {"name": "stage6"},
+        ...     ],
+        ... })
+        >>> args = (root_config["input_dir"], root_config["cohort_dir"], root_config["stages"])
+        >>> populate_stage("stage1", *args) # doctest: +NORMALIZE_WHITESPACE
+        {'name': 'stage1', 'is_metadata': False, 'data_input_dir': '/a/b', 'metadata_input_dir': '/a/b',
+         'output_dir': '/c/d/stage1'}
+        >>> populate_stage("stage2", *args) # doctest: +NORMALIZE_WHITESPACE
+        {'name': 'stage2', 'is_metadata': True, 'data_input_dir': '/c/d/stage1', 'metadata_input_dir': '/a/b',
+         'output_dir': '/c/d/stage2'}
+        >>> populate_stage("stage3", *args) # doctest: +NORMALIZE_WHITESPACE
+        {'name': 'stage3', 'is_metadata': False, 'data_input_dir': '/c/d/stage1',
+         'metadata_input_dir': '/c/d/stage2', 'output_dir': '/c/d/stage3'}
+        >>> populate_stage("stage4", *args) # doctest: +NORMALIZE_WHITESPACE
+        {'name': 'stage4', 'data_input_dir': '/e/f', 'output_dir': '/g/h', 'is_metadata': False,
+         'metadata_input_dir': '/c/d/stage2'}
+        >>> populate_stage("stage5", *args) # doctest: +NORMALIZE_WHITESPACE
+        {'name': 'stage5', 'aggregations': ['foo'], 'is_metadata': True, 'data_input_dir': '/g/h',
+         'metadata_input_dir': '/c/d/stage2', 'output_dir': '/c/d/stage5'}
+        >>> populate_stage("stage6", *args) # doctest: +NORMALIZE_WHITESPACE
+        {'name': 'stage6', 'is_metadata': False, 'data_input_dir': '/g/h',
+         'metadata_input_dir': '/c/d/stage5', 'output_dir': '/c/d/stage6'}
+        >>> populate_stage("stage7", *args) # doctest: +NORMALIZE_WHITESPACE
+        Traceback (most recent call last):
+            ...
+        ValueError: 'stage7' is not a valid stage name. Options are:
+            ['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'stage6']
     """
-    if stage == stages[0]:
-        return raw_input_dir
-    elif stage not in stages:
-        raise ValueError(
-            f"Can't impute input directory for {stage} as it is not in the stages list! "
-            f"Stages: {stages}. "
-            "If this is intentional, please provide the input directory explicitly or remove the "
-            "attempted interpolation from your config by overwriting the `stage_input_dir` parameter."
-        )
-    return os.path.join(cohort_dir, stages[stages.index(stage) - 1])
 
-# We actually call this here that way it is registered in every script when the module is imported.
-OmegaConf.register_new_resolver("stage_input_idr", get_stage_input_dir, replace=True)
+    if stage_name not in {s["name"] for s in stages}:
+        raise ValueError(
+            f"'{stage_name}' is not a valid stage name. Options are: {list(s['name'] for s in stages)}"
+        )
+
+    pre_pop_stages_by_name = {s["name"]: s for s in pre_parsed_stages} if pre_parsed_stages else {}
+    pre_parsed_stages = pre_parsed_stages or []
+
+    prior_stages = []
+    stage = None
+    prior_data_stage = None
+    prior_metadata_stage = None
+    for s in stages:
+        if s["name"] == stage_name:
+            stage = s
+            break
+        elif s["name"] in pre_pop_stages_by_name:
+            s_resolved = pre_pop_stages_by_name[s["name"]]
+        else:
+            s_resolved = populate_stage(s["name"], input_dir, cohort_dir, stages, prior_stages)
+
+        if s_resolved["is_metadata"]:
+            prior_metadata_stage = s_resolved
+        else:
+            prior_data_stage = s_resolved
+        prior_stages.append(s_resolved)
+
+    inferred_keys = {
+        "is_metadata": "aggregations" in stage,
+        "data_input_dir": input_dir if prior_data_stage is None else prior_data_stage["output_dir"],
+        "metadata_input_dir": (
+            input_dir if prior_metadata_stage is None else prior_metadata_stage["output_dir"]
+        ),
+        "output_dir": os.path.join(cohort_dir, stage_name),
+    }
+
+    out = {**stage}
+    for key, val in inferred_keys.items():
+        if key not in out or out[key] is None:
+            out[key] = val
+
+    return out
+
+
+OmegaConf.register_new_resolver("current_script_name", current_script_name, replace=False)
+OmegaConf.register_new_resolver("populate_stage", populate_stage, replace=False)
+
 
 def hydra_loguru_init() -> None:
     """Adds loguru output to the logs that hydra scrapes.

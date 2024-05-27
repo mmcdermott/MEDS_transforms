@@ -22,6 +22,12 @@ def main(cfg: DictConfig):
 
     hydra_loguru_init()
 
+    logger.info(
+        f"Running with config:\n{OmegaConf.to_yaml(cfg)}\n"
+        f"Stage: {cfg.stage}\n\n"
+        f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
+    )
+
     Path(cfg.raw_cohort_dir)
     MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
 

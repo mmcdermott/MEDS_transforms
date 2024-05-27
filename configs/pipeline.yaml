@@ -15,7 +15,7 @@ polling_time: 300 # wait time in seconds before beginning reduction steps
 
 # Filling in the current stage
 stage: ${current_script_name:}
-stage_cfg: ${oc.create:${populate_stage:${stage}}}
+stage_cfg: ${oc.create:${populate_stage:${stage}, ${input_dir}, ${cohort_dir}, ${stages}}}
 
 # Hydra
 hydra:
