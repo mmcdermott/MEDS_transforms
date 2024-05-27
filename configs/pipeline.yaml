@@ -1,0 +1,27 @@
+
+# Global IO
+input_dir: ???
+cohort_dir: ???
+
+log_dir: "${cohort_dir}/.logs/${stage}/worker_${worker}/${now:%Y-%m-%d_%H-%M-%S}"
+
+# General pipeline variables
+do_overwrite: False
+seed: 1
+stages: ??? # The list of stages to this overall pipeline
+
+# Worker / Stage information
+stage: ???
+worker: 1
+polling_time: 300 # wait time in seconds before beginning reduction steps
+
+# Stage-specific IO
+stage_output_dir: "${cohort_dir}/${stage}"
+stage_input_dir: "${stage_input_dir:${input_dir},${cohort_dir},${stages},${stage}}"
+
+# Hydra
+hydra:
+  run:
+    dir: "${log_dir}/${hydra.job.name}"
+  sweep:
+    dir: "${log_dir}/${hydra.job.name}"

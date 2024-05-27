@@ -1,12 +1,36 @@
-# Raw data
-MEDS_cohort_dir: ???
-output_data_dir: ???
-log_dir: "${output_data_dir}/.logs"
+defaults:
+  - pipeline
 
-# Worker / Stage information
-stage: ???
-worker: 1
-polling_time: 300 # wait time in seconds before beginning reduction steps
+# Pipeline Structure
+stages:
+  - filter_patients_by_length
+  - add_time_derived_measurements
+  - preliminary_counts
+  - filter_codes
+  - fit_outlier_detection
+  - filter_outliers
+  - fit_normalization
+  - normalization
+  - tokenization
+  - tensorization
+
+stages:
+  filter_patients_by_length:
+    input_dir: ???
+    output_dir: ???
+    min_events_per_patient: null
+    min_measurements_per_patient: null
+
+  add_time_derived_measurements
+  preliminary_counts
+  filter_codes
+  fit_outlier_detection
+  filter_outliers
+  fit_normalization
+  normalization
+  tokenization
+  tensorization
+
 
 # Filtering parameters
 min_code_occurrences: null
@@ -32,11 +56,11 @@ code_processing_stages:
   preliminary_counts:
     - "code/n_occurrences"
     - "code/n_patients"
-  outlier_detection:
+  fit_outlier_detection:
     - "values/n_occurrences"
     - "values/sum"
     - "values/sum_sqd"
-  normalization:
+  fit_normalization:
     - "code/n_occurrences"
     - "code/n_patients"
     - "values/n_occurrences"
@@ -45,15 +69,3 @@ code_processing_stages:
 
 # Outlier detection
 outlier_stddev_cutoff: 4.5
-
-# Misc
-do_overwrite: False
-
-# Hydra
-hydra:
-  job:
-    name: "MEDS_Preprocessor/stage_${stage}/worker_${worker}/${now:%Y-%m-%d_%H-%M-%S}"
-  run:
-    dir: "${log_dir}/${hydra.job.name}"
-  sweep:
-    dir: "${log_dir}/${hydra.job.name}"

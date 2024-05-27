@@ -3,10 +3,44 @@
 import os
 from pathlib import Path
 
+from omegaconf import OmegaConf
 import hydra
 import polars as pl
 from loguru import logger as log
 
+def get_stage_input_dir(
+    raw_input_dir: str, cohort_dir: str, stages: list[str], stage: str
+) -> str:
+    """Resolves the input directory for a stage in a MEDS pipeline.
+
+    Args:
+        raw_input_dir: The raw input directory (used as the input when the stage is the 1st stage).
+        cohort_dir: The cohort (output) directory; used as the source for the default stage output.
+        stages: The stages in the pipeline.
+        stage: The current stage.
+
+    Returns:
+        The input directory for the current stage.
+
+    Examples:
+        >>> get_stage_input_dir("/a/b", "/c/d", ["stage1", "stage2"], "stage1")
+        '/a/b'
+        >>> get_stage_input_dir("/a/b", "/c/d", ["stage1", "stage2"], "stage2")
+        '/c/d/stage1'
+    """
+    if stage == stages[0]:
+        return raw_input_dir
+    elif stage not in stages:
+        raise ValueError(
+            f"Can't impute input directory for {stage} as it is not in the stages list! "
+            f"Stages: {stages}. "
+            "If this is intentional, please provide the input directory explicitly or remove the "
+            "attempted interpolation from your config by overwriting the `stage_input_dir` parameter."
+        )
+    return os.path.join(cohort_dir, stages[stages.index(stage) - 1])
+
+# We actually call this here that way it is registered in every script when the module is imported.
+OmegaConf.register_new_resolver("stage_input_idr", get_stage_input_dir, replace=True)
 
 def hydra_loguru_init() -> None:
     """Adds loguru output to the logs that hydra scrapes.

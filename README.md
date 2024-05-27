@@ -15,6 +15,11 @@ more information.
 This package provides three things:
 
 1. A working, scalable, simple example of how to extract and pre-process MEDS data for downstream modeling.
+   These examples are provided in the form of:
+   - A set of integration tests that are run over synthetic data to verify correctness of the ETL pipeline.
+     See `tests/test_extraction.py` for the ETL tests with the in-built synthetic source data.
+   - A working MIMIC-IV MEDS ETL pipeline that can be run over MIMIC-IV v2.2 in approximately 1 hour in serial
+     mode (and much faster if parallelized). See `MIMIC-IV_Example` for more details.
 2. A flexible ETL for extracting MEDS data from a variety of source formats.
 3. A pre-processing pipeline that can be used for models that require:
    - Filtering data to only include patients with a certain number of events
@@ -27,7 +32,8 @@ This package provides three things:
 
 ## Installation
 
-For now, clone this repository and run `pip install -e .` from the repository root.
+For now, clone this repository and run `pip install -e .` from the repository root. To use the MIMIC-IV
+example, install the optional MIMIC dependencies as well with `pip install -e .[mimic]`.
 
 ## MEDS ETL / Extraction Pipeline
 
@@ -196,6 +202,16 @@ to the ETL, this pipeline is designed to enable seamless parallelism and efficie
 running multiple copies of the same script on independent workers to process the data in parallel. "Reduction"
 steps again need to happen in a single-threaded manner, but these steps are generally very fast and should not
 be a bottleneck.
+
+## Running the Pipeline in Parallel via Hydra Multirun
+We support two (optional) hydra multirun job launchers for parallelizing ETL and pre-processing pipeline
+steps: [`joblib`](https://hydra.cc/docs/plugins/joblib_launcher/) (for local parallelism) and
+[`submitit`](https://hydra.cc/docs/plugins/submitit_launcher/) to launch things with slurm for cluster
+parallelism.
+
+To use either of these, you need to install additional optional dependencies:
+  1. `pip install -e .[local_parallelism]` for joblib local parallelism support, or
+  2. `pip install -e .[slurm_parallelism]` for submitit cluster parallelism support.
 
 ## TODOs:
 

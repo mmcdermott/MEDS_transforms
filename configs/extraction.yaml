@@ -1,6 +1,12 @@
-# Raw data
-raw_cohort_dir: ???
-MEDS_cohort_dir: ???
+defaults:
+  - pipeline
+
+# Pipeline Structure
+stages:
+  - shard_by_event
+  - generate_patient_shards
+  - convert_to_MEDS_and_subshard
+  - merge_subshards
 
 # Event Conversion
 event_conversion_config_fp: ???
@@ -16,16 +22,3 @@ split_fracs:
 row_chunksize: 200000000
 n_patients_per_shard: 50000
 infer_schema_length: 10000
-
-# Misc
-do_overwrite: False
-seed: 1
-
-# Hydra
-hydra:
-  job:
-    name: MEDS_ETL_step_${now:%Y-%m-%d_%H-%M-%S}
-  run:
-    dir: ${MEDS_cohort_dir}/.logs/etl/${hydra.job.name}
-  sweep:
-    dir: ${MEDS_cohort_dir}/.logs/etl/${hydra.job.name}

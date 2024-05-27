@@ -22,6 +22,8 @@ dependencies = ["polars", "pyarrow", "nested_ragged_tensors", "loguru", "hydra-c
 mimic = ["rootutils"]
 dev = ["pre-commit"]
 tests = ["pytest", "pytest-cov[toml]", "rootutils"]
+local_parallelism = ["hydra-joblib-launcher"]
+slurm_parallelism = ["hydra-submitit-launcher"]
 
 [project.urls]
 Homepage = "https://github.com/mmcdermott/MEDS_polars_functions"
