@@ -1,24 +1,19 @@
 defaults:
   - pipeline
 
-# Pipeline Structure
-stages:
-  - shard_by_event
-  - generate_patient_shards
-  - convert_to_MEDS_and_subshard
-  - merge_subshards
-
-# Event Conversion
+# The event conversion configuration file is used throughout the pipeline to define the events to extract.
 event_conversion_config_fp: ???
 
-# Splits
-external_splits_json_fp: null
-split_fracs:
-  train: 0.8
-  tuning: 0.1
-  held_out: 0.1
-
-# Sharding
-row_chunksize: 200000000
-n_patients_per_shard: 50000
-infer_schema_length: 10000
+stages:
+  - name: shard_events
+    row_chunksize: 200000000
+    infer_schema_length: 10000
+  - name: split_and_shard_patients
+    n_patients_per_shard: 50000
+    external_splits_json_fp: null
+    split_fracs:
+      train: 0.8
+      tuning: 0.1
+      held_out: 0.1
+  - name: convert_to_sharded_events
+  - name: merge_to_MEDS_cohort

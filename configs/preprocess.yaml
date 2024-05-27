@@ -8,29 +8,35 @@ code_modifier_columns: ???
 
 # Pipeline Structure
 stages:
-  - name: filter_patients_by_length:
+  - name: filter_patients
     min_events_per_patient: null
     min_measurements_per_patient: null
-  - name: add_time_derived_measurements:
+
+  - name: add_time_derived_measurements
     age:
       dob_code: ???
       age_code: "AGE"
       age_unit: "years"
     time_of_day:
       bin_endpoints: [6, 12, 18, 24]
+
   - name: preliminary_counts
     obs_aggregations:
       - "code/n_occurrences"
       - "code/n_patients"
+
   - name: filter_codes
     min_code_occurrences: null
+
   - name: fit_outlier_detection
     aggregations:
       - "values/n_occurrences"
       - "values/sum"
       - "values/sum_sqd"
+
   - name: filter_outliers
     stddev_cutoff: 4.5
+
   - name: fit_normalization
     aggregations:
       - "code/n_occurrences"
@@ -38,9 +44,7 @@ stages:
       - "values/n_occurrences"
       - "values/sum"
       - "values/sum_sqd"
+
   - name: normalization
   - name: tokenization
   - name: tensorization
-
-stage: ???
-stage_cfg: ${populate_stage:${stage}}

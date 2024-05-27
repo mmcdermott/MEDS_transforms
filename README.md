@@ -203,15 +203,38 @@ running multiple copies of the same script on independent workers to process the
 steps again need to happen in a single-threaded manner, but these steps are generally very fast and should not
 be a bottleneck.
 
-## Running the Pipeline in Parallel via Hydra Multirun
+## Overview of configuration manipulation
+
+### Pipeline configuration: Stages and OmegaConf Resolvers
+
+The pipeline configuration file for both the provided extraction and pre-processing pipelines are structured
+to permit both ease of understanding, flexibility for user-derived modifications, and ease of use in the
+simple, file-in/file-out scripts that this repository promotes. How this works is that each pipeline
+(extraction and pre-processing) defines one global configuration file which is used as the Hydra specification
+for all scripts in that pipeline. This file leverages some generic pipeline configuration options, specified
+in `pipeline.yaml` and imported via the Hydra `defaults:` list, but also defines a list of stages with
+stage-specific configurations.
+
+The user can specify the stage in question on the command line either manually (e.g., `stage=stage_name`) or
+allow the stage name to be inferred automatically from the script name. Each script receives both the global
+configuration file but also a sub-configuration (within the `stage_cfg` node in the received global
+configuration) which is pre-populated with the stage-specific configuration for the stage in question and
+automatically inferred input and output file paths (if not overwritten in the config file) based on the stage
+name and its position in the overall pipeline. This makes it easy to leverage transformations and scripts
+defined here in new configuration pipelines, simply by placing them as a stage in a broader pipeline in a
+different configuration or order relative to other stages.
+
+### Running the Pipeline in Parallel via Hydra Multirun
+
 We support two (optional) hydra multirun job launchers for parallelizing ETL and pre-processing pipeline
 steps: [`joblib`](https://hydra.cc/docs/plugins/joblib_launcher/) (for local parallelism) and
 [`submitit`](https://hydra.cc/docs/plugins/submitit_launcher/) to launch things with slurm for cluster
 parallelism.
 
 To use either of these, you need to install additional optional dependencies:
-  1. `pip install -e .[local_parallelism]` for joblib local parallelism support, or
-  2. `pip install -e .[slurm_parallelism]` for submitit cluster parallelism support.
+
+1. `pip install -e .[local_parallelism]` for joblib local parallelism support, or
+2. `pip install -e .[slurm_parallelism]` for submitit cluster parallelism support.
 
 ## TODOs:
 
