@@ -1,71 +1,46 @@
 defaults:
   - pipeline
 
-# Pipeline Structure
-stages:
-  - filter_patients_by_length
-  - add_time_derived_measurements
-  - preliminary_counts
-  - filter_codes
-  - fit_outlier_detection
-  - filter_outliers
-  - fit_normalization
-  - normalization
-  - tokenization
-  - tensorization
-
-stages:
-  filter_patients_by_length:
-    input_dir: ???
-    output_dir: ???
-    min_events_per_patient: null
-    min_measurements_per_patient: null
-
-  add_time_derived_measurements
-  preliminary_counts
-  filter_codes
-  fit_outlier_detection
-  filter_outliers
-  fit_normalization
-  normalization
-  tokenization
-  tensorization
-
-
-# Filtering parameters
-min_code_occurrences: null
-min_events_per_patient: null
-min_measurements_per_patient: null
-
-# Time-derived measurements
-time_derived_measurements:
-  age:
-    dob_code: ???
-    age_code: "AGE"
-    age_unit: "years"
-  time_of_day:
-    bin_endpoints: [6, 12, 18, 24]
-
-# Code modifiers will be used as adjoining parts of the `code` columns during group-bys and eventual
+# Global pipeline parameters:
+# 1. Code modifiers will be used as adjoining parts of the `code` columns during group-bys and eventual
 # tokenization.
 code_modifier_columns: ???
 
-# Code metadata extraction. These may contain duplicates because the data may be filtered between different
-# stages, depending on the pipeline in question.
-code_processing_stages:
-  preliminary_counts:
-    - "code/n_occurrences"
-    - "code/n_patients"
-  fit_outlier_detection:
-    - "values/n_occurrences"
-    - "values/sum"
-    - "values/sum_sqd"
-  fit_normalization:
-    - "code/n_occurrences"
-    - "code/n_patients"
-    - "values/n_occurrences"
-    - "values/sum"
-    - "values/sum_sqd"
+# Pipeline Structure
+stages:
+  - name: filter_patients_by_length:
+    min_events_per_patient: null
+    min_measurements_per_patient: null
+  - name: add_time_derived_measurements:
+    age:
+      dob_code: ???
+      age_code: "AGE"
+      age_unit: "years"
+    time_of_day:
+      bin_endpoints: [6, 12, 18, 24]
+  - name: preliminary_counts
+    obs_aggregations:
+      - "code/n_occurrences"
+      - "code/n_patients"
+  - name: filter_codes
+    min_code_occurrences: null
+  - name: fit_outlier_detection
+    aggregations:
+      - "values/n_occurrences"
+      - "values/sum"
+      - "values/sum_sqd"
+  - name: filter_outliers
+    stddev_cutoff: 4.5
+  - name: fit_normalization
+    aggregations:
+      - "code/n_occurrences"
+      - "code/n_patients"
+      - "values/n_occurrences"
+      - "values/sum"
+      - "values/sum_sqd"
+  - name: normalization
+  - name: tokenization
+  - name: tensorization
 
-# Outlier detection
-outlier_stddev_cutoff: 4.5
+stage: ???
+stage_cfg: ${populate_stage:${stage}}
