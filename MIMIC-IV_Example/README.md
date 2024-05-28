@@ -84,8 +84,8 @@ This is a step in 4 parts:
 
 ```bash
 ./scripts/extraction/shard_events.py \
-    raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
-    MEDS_cohort_dir=$MIMICIV_MEDS_DIR \
+    input_dir=$MIMICIV_PREMEDS_DIR \
+    cohort_dir=$MIMICIV_MEDS_DIR \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
 
@@ -95,8 +95,8 @@ In practice, on a machine with 150 GB of RAM and 10 cores, this step takes appro
 
 ```bash
 ./scripts/extraction/split_and_shard_patients.py \
-    raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
-    MEDS_cohort_dir=$MIMICIV_MEDS_DIR \
+    input_dir=$MIMICIV_PREMEDS_DIR \
+    cohort_dir=$MIMICIV_MEDS_DIR \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
 
@@ -106,8 +106,8 @@ In practice, on a machine with 150 GB of RAM and 10 cores, this step takes less 
 
 ```bash
 ./scripts/extraction/convert_to_sharded_events.py \
-    raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
-    MEDS_cohort_dir=$MIMICIV_MEDS_DIR \
+    input_dir=$MIMICIV_PREMEDS_DIR \
+    cohort_dir=$MIMICIV_MEDS_DIR \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
 
@@ -121,8 +121,8 @@ and performance is not necessary; however, for larger datasets, it can be.
 
 ```bash
 ./scripts/extraction/merge_to_MEDS_cohort.py \
-    raw_cohort_dir=$MIMICIV_PREMEDS_DIR \
-    MEDS_cohort_dir=$MIMICIV_MEDS_DIR \
+    input_dir=$MIMICIV_PREMEDS_DIR \
+    cohort_dir=$MIMICIV_MEDS_DIR \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
 
