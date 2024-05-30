@@ -94,6 +94,11 @@ def main(cfg: DictConfig):
         pfx = get_shard_prefix(raw_cohort_dir, in_fp)
 
         out_fp = MEDS_input_dir / in_fp.relative_to(raw_cohort_dir)
+
+        if out_fp.is_file():
+            print(f"Done with {pfx}. Continuing")
+            continue
+
         out_fp.parent.mkdir(parents=True, exist_ok=True)
 
         if pfx not in FUNCTIONS:
@@ -106,6 +111,10 @@ def main(cfg: DictConfig):
             continue
         else:
             out_fp = MEDS_input_dir / f"{pfx}.parquet"
+            if out_fp.is_file():
+                print(f"Done with {pfx}. Continuing")
+                continue
+
             fn, need_df = FUNCTIONS[pfx]
             if not need_df:
                 st = datetime.now()

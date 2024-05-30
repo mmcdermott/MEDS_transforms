@@ -222,6 +222,11 @@ def main(cfg: DictConfig):
                 input_files_to_subshard.append(f)
                 seen_files.add(get_shard_prefix(raw_cohort_dir, f))
 
+    if not input_files_to_subshard:
+        raise FileNotFoundError(
+            f"Can't find any files in {str(raw_cohort_dir.resolve())} to sub-shard!"
+        )
+
     random.shuffle(input_files_to_subshard)
 
     subsharding_files_strs = "\n".join([f"  * {str(fp.resolve())}" for fp in input_files_to_subshard])
