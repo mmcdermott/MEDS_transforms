@@ -32,10 +32,92 @@ This package provides three things:
 
 ## Installation
 
-For now, clone this repository and run `pip install -e .` from the repository root. To use the MIMIC-IV
-example, install the optional MIMIC dependencies as well with `pip install -e .[mimic]`.
+- For a base installation, clone this repository and run `pip install .` from the repository root.
+- For running the MIMIC-IV example, install the optional MIMIC dependencies as well with `pip install .[mimic]`.
+- To support same-machine, process-based parallelism, install the optional joblib dependencies with `pip install .[local_parallelism]`.
+- To support cluster-based parallelism, install the optional submitit dependencies with `pip install .[slurm_parallelism]`.
+- For working on development, install the optional development dependencies with `pip install .[dev,tests]`.
+- Optional dependencies can be mutually installed by combining the optional dependency names with commas in
+  the square brackets, e.g., `pip install .[mimic,local_parallelism]`.
 
-## MEDS ETL / Extraction Pipeline
+## Usage -- High Level
+
+The MEDS ETL and pre-processing pipelines are designed to be run in a modular, stage-based manner, with each
+stage of the pipeline being run as a separate script. For a single pipeline, all scripts will take the same
+arguments by leveraging the same Hydra configuration file, and to run multiple workers on a single stage in
+parallel, the user can launch the same script multiple times _without changing the arguments or configuration
+file_, and the scripts will automatically handle the parallelism and avoid duplicative work. This permits
+tremendous flexibility in how these pipelines can be run.
+
+- The user can run the entire pipeline in serial, through a single shell script simply by calling each
+  stage's script in sequence.
+- The user can leverage arbitrary scheduling systems (e.g., Slurm, LSF, Kubernetes, etc.) to run each stage
+  in parallel on a cluster, by constructing the appropriate worker scripts to run each stage's script and
+  simply launching as many worker jobs as is desired (note this will typically required a distributed file
+  system to work correctly, as these scripts use manually created file locks to avoid duplicative work).
+- The user can run each stage in parallel on a single machine by launching multiple copies of the same
+  script in different terminal sessions. This can result in a significant speedup depending on the machine
+  configuration as it ensures that parallelism can be used with minimal file read contention.
+
+Two of these methods of parallelism, in particular local-machine parallelism and slurm-based cluster
+parallelism, are supported explicitly by this package through the use of the `joblib` and `submitit` Hydra
+plugins and Hydra's multirun capabilities, which will be discussed in more detail below.
+
+By following this design convention, each individual stage of the pipeline can be kept extremely simple (often
+each stage corresponds simply to a single short "dataframe" function), can be rigorously tested, can be cached
+after completion to permit easy re-suming or re-running of the pipeline, and permits extremely flexible and
+efficient (through parallelization) use of the pipeline in a variety of environments, all without imposing
+significant complexity, overhead, or computational dependencies on the user.
+
+Below we walk through usage of this mechanism for both the ETL and the model-specific pre-processing
+pipelines in more detail.
+
+### Scripts for the ETL Pipeline
+
+The ETL pipeline (which is more complete, and likely to be viable for a wider range of input datasets out of
+the box) relies on the following configuration files and scripts:
+
+Configuration: `configs/extraction.yaml`
+
+```yaml
+# The event conversion configuration file is used throughout the pipeline to define the events to extract.
+event_conversion_config_fp: ???
+
+stages:
+  - shard_events
+  - split_and_shard_patients
+  - convert_to_sharded_events
+  - merge_to_MEDS_cohort
+
+stage_configs:
+  shard_events:
+    row_chunksize: 200000000
+    infer_schema_length: 10000
+  split_and_shard_patients:
+    is_metadata: true
+    output_dir: ${cohort_dir}
+    n_patients_per_shard: 50000
+    external_splits_json_fp:
+    split_fracs:
+      train: 0.8
+      tuning: 0.1
+      held_out: 0.1
+  merge_to_MEDS_cohort:
+    output_dir: ${cohort_dir}/final_cohort
+```
+
+Scripts:
+
+1. `shard_events.py`: Shards the input data into smaller, event-level shards.
+2. `split_and_shard_patients.py`: Splits the patient population into ML splits and shards these splits into
+   patient-level shards.
+3. `convert_to_sharded_events.py`: Converts the input, event-level shards into the MEDS event format and
+   sub-shards them into patient-level sub-shards.
+4. `merge_to_MEDS_cohort.py`: Merges the patient-level, event-level shards into full patient-level shards.
+
+See the `MIMIC-IV_Example` directory for a full, worked example of the ETL on MIMIC-IV v2.2.
+
+## MEDS ETL / Extraction Pipeline Details
 
 ### Overview
 
