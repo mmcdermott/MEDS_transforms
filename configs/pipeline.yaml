@@ -2,7 +2,7 @@
 input_dir: ???
 cohort_dir: ???
 
-log_dir: "${cohort_dir}/.logs/${stage}/worker_${worker}/${now:%Y-%m-%d_%H-%M-%S}"
+log_dir: "${cohort_dir}/.logs"
 
 # General pipeline variables
 do_overwrite: False
@@ -21,7 +21,7 @@ stage_cfg: ${oc.create:${populate_stage:${stage}, ${input_dir}, ${cohort_dir}, $
 # Hydra
 hydra:
   job:
-    name: "${stage}"
+    name: "${stage}/${worker}/${now:%Y-%m-%d_%H-%M-%S}"
   run:
     dir: "${log_dir}/${hydra.job.name}"
   sweep:
