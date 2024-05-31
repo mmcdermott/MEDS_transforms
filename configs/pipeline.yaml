@@ -21,8 +21,8 @@ stage_cfg: ${oc.create:${populate_stage:${stage}, ${input_dir}, ${cohort_dir}, $
 # Hydra
 hydra:
   job:
-    name: "${stage}/${worker}/${now:%Y-%m-%d_%H-%M-%S}"
+    name: "${stage}_${worker}_${now:%Y-%m-%d_%H-%M-%S}"
   run:
-    dir: "${log_dir}/${hydra.job.name}"
+    dir: "${log_dir}"
   sweep:
-    dir: "${log_dir}/${hydra.job.name}"
+    dir: "${log_dir}"
