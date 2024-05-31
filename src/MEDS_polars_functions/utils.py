@@ -9,6 +9,8 @@ import polars as pl
 from loguru import logger
 from omegaconf import OmegaConf
 
+pl.enable_string_cache()
+
 
 def current_script_name() -> str:
     """Returns the name of the script that called this function.
@@ -123,11 +125,6 @@ def populate_stage(
             prior_metadata_stage = s_resolved
         else:
             prior_data_stage = s_resolved
-
-    logger.debug(
-        f"Parsing stage {stage_name}:\nResolved prior data stage: {prior_data_stage}\n"
-        f"Resolved prior metadata stage: {prior_metadata_stage}"
-    )
 
     inferred_keys = {
         "is_metadata": "aggregations" in stage,
