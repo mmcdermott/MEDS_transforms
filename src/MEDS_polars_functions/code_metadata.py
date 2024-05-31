@@ -242,10 +242,10 @@ def mapper_fntr(cfg: DictConfig, stage_name: str) -> Callable[[pl.DataFrame], pl
         KeyError: 'Stage name stage5 not found in code_processing_stages in configuration file.'
     """
 
-    if stage_name not in cfg.code_processing_stages:
+    if stage_name not in cfg.stages:
         raise KeyError(f"Stage name {stage_name} not found in code_processing_stages in configuration file.")
 
-    aggregations = cfg.code_processing_stages[stage_name]
+    aggregations = cfg.stages[stage_name].aggregations
     for agg in aggregations:
         if agg not in METADATA_FN:
             raise KeyError(

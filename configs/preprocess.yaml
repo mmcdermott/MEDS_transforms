@@ -6,13 +6,25 @@ defaults:
 # tokenization.
 code_modifier_columns: ???
 
-# Pipeline Structure
 stages:
-  - name: filter_patients
+  - filter_patients
+  - add_time_derived_measurements
+  - preliminary_counts
+  - filter_codes
+  - fit_outlier_detection
+  - filter_outliers
+  - fit_normalization
+  - normalize
+  - tokenize
+  - tensorize
+
+# Pipeline Structure
+stage_configs:
+  filter_patients:
     min_events_per_patient: null
     min_measurements_per_patient: null
 
-  - name: add_time_derived_measurements
+  add_time_derived_measurements:
     age:
       dob_code: ???
       age_code: "AGE"
@@ -20,31 +32,27 @@ stages:
     time_of_day:
       bin_endpoints: [6, 12, 18, 24]
 
-  - name: preliminary_counts
-    obs_aggregations:
+  preliminary_counts:
+    aggregations:
       - "code/n_occurrences"
       - "code/n_patients"
 
-  - name: filter_codes
+  filter_codes:
     min_code_occurrences: null
 
-  - name: fit_outlier_detection
+  fit_outlier_detection:
     aggregations:
       - "values/n_occurrences"
       - "values/sum"
       - "values/sum_sqd"
 
-  - name: filter_outliers
+  filter_outliers:
     stddev_cutoff: 4.5
 
-  - name: fit_normalization
+  fit_normalization:
     aggregations:
       - "code/n_occurrences"
       - "code/n_patients"
       - "values/n_occurrences"
       - "values/sum"
       - "values/sum_sqd"
-
-  - name: normalization
-  - name: tokenization
-  - name: tensorization

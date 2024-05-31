@@ -28,25 +28,12 @@ def main(cfg: DictConfig):
         f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
     )
 
-    MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
-    output_dir = Path(cfg.output_data_dir)
+    input_dir = Path(cfg.stage_cfg.data_input_dir)
+    output_dir = Path(cfg.stage_cfg.output_dir)
 
-    shards = json.loads((MEDS_cohort_dir / "splits.json").read_text())
+    logger.info(f"Reading data from input directory {str(input_dir.resolve())}")
 
-    final_cohort_dir = MEDS_cohort_dir / "final_cohort"
-    filtered_patients_dir = output_dir / "patients_above_length_threshold"
-    with_time_derived_dir = output_dir / "with_time_derived_measurements"
-    code_metadata_dir = output_dir / f"code_metadata/{cfg.stage}"
-
-    if with_time_derived_dir.is_dir():
-        logger.info("Reading data from directory with time-derived: {str(with_time_derived_dir.resolve())}")
-        input_dir = with_time_derived_dir
-    if filtered_patients_dir.is_dir():
-        logger.info(f"Reading data from filtered cohort directory {str(filtered_patients_dir.resolve())}")
-        input_dir = filtered_patients_dir
-    else:
-        logger.info(f"Reading data from raw cohort directory {str(final_cohort_dir.resolve())}")
-        input_dir = final_cohort_dir
+    shards = json.loads((Path(cfg.input_dir) / "splits.json").read_text())
 
     patient_splits = list(shards.keys())
     random.shuffle(patient_splits)
@@ -59,7 +46,7 @@ def main(cfg: DictConfig):
     all_out_fps = []
     for sp in patient_splits:
         in_fp = input_dir / f"{sp}.parquet"
-        out_fp = code_metadata_dir / f"{sp}.parquet"
+        out_fp = output_dir / f"{sp}.parquet"
         all_out_fps.append(out_fp)
 
         logger.info(
@@ -91,7 +78,7 @@ def main(cfg: DictConfig):
     reducer_fn = reducer_fntr(cfg, cfg.stage)
 
     reduced = reducer_fn(pl.scan_parquet(fp, glob=False) for fp in all_out_fps)
-    write_lazyframe(reduced, code_metadata_dir / "code_metadata.parquet")
+    write_lazyframe(reduced, output_dir / "code_metadata.parquet")
     logger.info(f"Finished reduction in {datetime.now() - start}")
 
 
