@@ -270,8 +270,9 @@ def main(cfg: DictConfig):
 
     hydra_loguru_init()
 
-    logger.info("Loading table preprocessors from configs/table_preprocessors.yaml...")
-    preprocessors = OmegaConf.load("configs/table_preprocessors.yaml")
+    table_preprocessors_config_fp = Path("./eICU_Example/configs/table_preprocessors.yaml")
+    logger.info(f"Loading table preprocessors from {str(table_preprocessors_config_fp.resolve())}...")
+    preprocessors = OmegaConf.load(table_preprocessors_config_fp)
     functions = {}
     for table_name, preprocessor_cfg in preprocessors.items():
         logger.info(f"  Adding preprocessor for {table_name}:\n{OmegaConf.to_yaml(preprocessor_cfg)}")
