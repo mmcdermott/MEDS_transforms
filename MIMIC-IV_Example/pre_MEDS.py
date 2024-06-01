@@ -59,7 +59,7 @@ def fix_static_data(raw_static_df: pl.LazyFrame, death_times_df: pl.LazyFrame) -
 
     return raw_static_df.join(death_times_df, on="subject_id", how="left").select(
         "subject_id",
-        pl.coalesce(pl.col("dod"), pl.col("deathtime")).alias("dod"),
+        pl.coalesce(pl.col("deathtime"), pl.col("dod")).alias("dod"),
         (pl.col("anchor_year") - pl.col("anchor_age")).cast(str).alias("year_of_birth"),
         "gender",
     )
