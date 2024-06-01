@@ -37,12 +37,10 @@ carePlanInfectiousDisease:
   offset_col: "cplInfectDiseaseOffset"
   pseudotime_col: "carePlanInfectDiseaseEnteredTimestamp"
   output_data_cols:
-    [
-      "infectDiseaseSite",
-      "infectDiseaseAssessment",
-      "responseToTherapy",
-      "treatment",
-    ]
+    - "infectDiseaseSite"
+    - "infectDiseaseAssessment"
+    - "responseToTherapy"
+    - "treatment"
 
 diagonosis:
   offset_col: "diagnosisOffset"
