@@ -1,5 +1,6 @@
 """Core utilities for MEDS pipelines built with these tools."""
 
+import inspect
 import os
 import sys
 from pathlib import Path
@@ -10,6 +11,20 @@ from loguru import logger
 from omegaconf import OmegaConf
 
 pl.enable_string_cache()
+
+
+def get_script_docstring() -> str:
+    """Returns the docstring of the main function of the script that was called.
+
+    Returns:
+        str: TODO
+    """
+
+    main_module = sys.modules["__main__"]
+    func = getattr(main_module, "main", None)
+    if func and callable(func):
+        return inspect.getdoc(func) or ""
+    return ""
 
 
 def current_script_name() -> str:
@@ -143,6 +158,7 @@ def populate_stage(
     return out
 
 
+OmegaConf.register_new_resolver("get_script_docstring", get_script_docstring, replace=False)
 OmegaConf.register_new_resolver("current_script_name", current_script_name, replace=False)
 OmegaConf.register_new_resolver("populate_stage", populate_stage, replace=False)
 
