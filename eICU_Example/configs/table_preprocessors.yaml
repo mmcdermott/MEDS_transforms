@@ -1,0 +1,94 @@
+
+admissiondx:
+  offset_col: "admitDxEnteredOffset"
+  pseudotime_col: "admitDxEnteredTimestamp"
+  output_data_cols: ["admitDxName", "admitDxID"]
+  warning_items: ["How should we use `admitDxTest`?", "How should we use `admitDxPath`?"]
+
+allergy:
+  offset_col: "allergyEnteredOffset"
+  pseudotime_col: "allergyEnteredTimestamp"
+  output_data_cols: ["allergyType", "allergyName"]
+  warning_items:
+    - "How should we use `allergyNoteType`?"
+    - "How should we use `specialtyType`?"
+    - "How should we use `userType`?"
+    - |- Is `drugName` the name of the drug to which the patient is allergic or the drug given to the patient
+      (docs say \'name of the selected admission drug\')?
+
+carePlanGeneral:
+  offset_col: "cplItemOffset"
+  pseudotime_col: "carePlanGeneralItemEnteredTimestamp"
+  output_data_cols: ["cplGroup", "cplItemValue"]
+
+carePlanEOL:
+  offset_col: "cplEolDiscussionOffset"
+  pseudotime_col: "carePlanEolDiscussionOccurredTimestamp"
+  warning_items:
+    - "Is the DiscussionOffset time actually reliable? Should we fall back on the SaveOffset time?"
+
+carePlanGoal:
+  offset_col: "cplGoalOffset"
+  pseudotime_col: "carePlanGoalEnteredTimestamp"
+  output_data_cols: ["cplGoalCategory", "cplGoalValue", "cplGoalStatus"]
+
+carePlanInfectiousDisease:
+  offset_col: "cplInfectDiseaseOffset"
+  pseudotime_col: "carePlanInfectDiseaseEnteredTimestamp"
+  output_data_cols: ["infectDiseaseSite", "infectDiseaseAssessment", "responseToTherapy", "treatment"]
+
+diagonosis:
+  offset_col: "diagnosisOffset"
+  pseudotime_col: "diagnosisEnteredTimestamp"
+  output_data_cols: ["ICD9Code", "diagnosisPriority", "diagnosisString"]
+  warning_items:
+    - "Though we use it, the `diagnosisString` field documentation is unclear -- by what is it separated?"
+
+infusionDrug:
+  offset_col: "infusionOffset"
+  pseudotime_col: "infusionEnteredTimestamp"
+  output_data_cols:
+    - "infusionDrugID"
+    - "drugName"
+    - "drugRate"
+    - "infusionRate"
+    - "drugAmount"
+    - "volumeOfFluid"
+    - "patientWeight"
+
+lab:
+  offset_col: "labResultOffset"
+  pseudotime_col: "labResultDrawnTimestamp"
+  output_data_cols:
+    - "labName"
+    - "labResult"
+    - "labResultText"
+    - "labMeasureNameSystem"
+    - "labMeasureNameInterface"
+    - "labTypeID"
+  warning_items:
+    - "Is this the time the lab was drawn? Entered? The time the result came in?"
+    - "We **IGNORE** the `labResultRevisedOffset` column -- this may be a mistake!"
+
+medication:
+  offset_col:
+    - "drugOrderOffset"
+    - "drugStartOffset"
+    - "drugStopOffset"
+  pseudotime_col:
+    - "drugOrderTimestamp"
+    - "drugStartTimestamp"
+    - "drugStopTimestamp"
+  output_data_cols:
+    - "medicationID"
+    - "drugIVAdmixture"
+    - "drugName"
+    - "drugHiclSeqno"
+    - "dosage"
+    - "routeAdmin"
+    - "frequency"
+    - "loadingDose"
+    - "PRN"
+    - "GTC"
+  warning_items:
+    - "We **IGNORE** the `drugOrderCancelled` column -- this may be a mistake!"
