@@ -191,7 +191,7 @@ respiratoryCare:
     - "airwaysize"
     - "airwayposition"
     - "cuffpressure"
-    - "apneaparams"
+    - "apneaparms"
     - "lowexhmvlimit"
     - "hiexhmvlimit"
     - "lowexhtvlimit"

@@ -44,7 +44,7 @@ def load_raw_eicu_file(fp: Path, **kwargs) -> pl.LazyFrame:
     """
 
     with gzip.open(fp, mode="rb") as f:
-        return pl.read_csv(f, infer_schema_length=100000, **kwargs).lazy()
+        return pl.read_csv(f, infer_schema_length=100000000, **kwargs).lazy()
 
 
 def check_timestamps_agree(df: pl.LazyFrame, pseudotime_col: pl.Expr, given_24htime_col: str):

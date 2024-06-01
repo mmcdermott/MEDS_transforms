@@ -17,23 +17,23 @@ patient:
   hosp_admission:
     code:
       - "HOSPITAL_ADMISSION"
-      - col("hospitalAdmitSource")
-      - col("hospitalRegion")
-      - col("hospitalTeachingStatus")
-      - col("hospitalNumBedsCategory")
+      - col(hospitaladmitsource)
+      - col(hospitalregion)
+      - col(hospitalteachingstatus)
+      - col(hospitalnumbedscategory)
     timestamp: "hospitalAdmitTimestamp"
     hospital_id: "hospitalID"
   hosp_discharge:
     code:
       - "HOSPITAL_DISCHARGE"
-      - col("hospitalDischargeStatus")
-      - col("hospitalDischargeLocation")
+      - col(hospitaldischargestatus)
+      - col(hospitaldischargelocation)
     timestamp: "hospitalDischargeTimestamp"
   unit_admission:
     code:
       - "UNIT_ADMISSION"
-      - col("unitAdmitSource")
-      - col("unitStayType")
+      - col(unitadmitsource)
+      - col(unitstaytype)
     timestamp: "unitAdmitTimestamp"
     ward_id: "wardID"
     unit_stay_id: "patientUnitStayID"
@@ -50,8 +50,8 @@ patient:
   unit_discharge:
     code:
       - "UNIT_DISCHARGE"
-      - col("unitDischargeStatus")
-      - col("unitDischargeLocation")
+      - col(unitdischargestatus)
+      - col(unitdischargelocation)
     timestamp: "unitDischargeTimestamp"
   unit_discharge_weight:
     code:
@@ -63,7 +63,7 @@ admissiondx:
   admission_diagnosis:
     code:
       - "ADMISSION_DX"
-      - col("admitDxName")
+      - col(admitdxname)
     timestamp: "admitDxEnteredTimestamp"
     admission_dx_id: "admitDxID"
     unit_stay_id: "patientUnitStayID"
@@ -72,16 +72,16 @@ allergy:
   allergy:
     code:
       - "ALLERGY"
-      - col("allergyType")
-      - col("allergyName")
+      - col(allergytype)
+      - col(allergyname)
     timestamp: "allergyEnteredTimestamp"
 
 carePlanGeneral:
   cplItem:
     code:
       - "CAREPLAN_GENERAL"
-      - col("cplGroup")
-      - col("cplItemValue")
+      - col(cplgroup)
+      - col(cplitemvalue)
     timestamp: "carePlanGeneralItemEnteredTimestamp"
 
 carePlanEOL:
@@ -94,27 +94,27 @@ carePlanGoal:
   cplGoal:
     code:
       - "CAREPLAN_GOAL"
-      - col("cplGoalCategory")
-      - col("cplGoalValue")
-      - col("cplGoalStatus")
+      - col(cplgoalcategory)
+      - col(cplgoalvalue)
+      - col(cplgoalstatus)
     timestamp: "carePlanGoalEnteredTimestamp"
 
 carePlanInfectiousDisease:
   cplInfectDisease:
     code:
       - "CAREPLAN_INFECTIOUS_DISEASE"
-      - col("infectDiseaseSite")
-      - col("infectDiseaseAssessment")
-      - col("treatment")
-      - col("responseToTherapy")
+      - col(infectdiseasesite)
+      - col(infectdiseaseassessment)
+      - col(treatment)
+      - col(responsetotherapy)
     timestamp: "carePlanInfectDiseaseEnteredTimestamp"
 
 diagnosis:
   diagnosis:
     code:
       - "ICD9CM"
-      - col("ICD9Code")
-      - col("diagnosisPriority")
+      - col(icd9code)
+      - col(diagnosispriority)
     timestamp: "diagnosisEnteredTimestamp"
     diagnosis_string: "diagnosisString"
 
@@ -122,8 +122,8 @@ infusionDrug:
   infusion:
     code:
       - "INFUSION"
-      - col("infusionDrugID")
-      - col("drugName")
+      - col(infusiondrugid)
+      - col(drugname)
     timestamp: "infusionEnteredTimestamp"
     drug_rate: "drugRate"
     infusion_rate: "infusionRate"
@@ -139,9 +139,9 @@ lab:
   lab:
     code:
       - "LAB"
-      - col("labMeasureNameSystem")
-      - col("labMeasureNameInterface")
-      - col("labName")
+      - col(labmeasurenamesystem)
+      - col(labmeasurenameinterface)
+      - col(labname)
     timestamp: "labResultDrawnTimestamp"
     numerical_value: "labResult"
     text_value: "labResultText"
@@ -294,32 +294,32 @@ respiratoryCare:
     timestamp: "respCareStatusEnteredTimestamp"
     resp_care_id: "respCareID"
 
-    airwayType: "airwayType"
-    airwaySize: "airwaySize"
-    airwayPosition: "airwayPosition"
-    cuffPressure: "cuffPressure"
-    apneaParams: "apneaParams"
-    lowExhMVLimit: "lowExhMVLimit"
-    hiExhMVLimit: "hiExhMVLimit"
-    lowExhTVLimit: "lowExhTVLimit"
-    hiPeakPresLimit: "hiPeakPresLimit"
-    lowPeakPresLimit: "lowPeakPresLimit"
-    hiRespRateLimit: "hiRespRateLimit"
-    lowRespRateLimit: "lowRespRateLimit"
-    sighPresLimit: "sighPresLimit"
-    lowIronOxLimit: "lowIronOxLimit"
-    highIronOxLimit: "highIronOxLimit"
-    meanAirwayPresLimit: "meanAirwayPresLimit"
-    PEEPLimit: "PEEPLimit"
-    CPAPLimit: "CPAPLimit"
-    setApneaInterval: "setApneaInterval"
-    setApneaTV: "setApneaTV"
-    setApneaIPPEEPHigh: "setApneaIPPEEPHigh"
-    setApneaRR: "setApneaRR"
-    setApneaPeakFlow: "setApneaPeakFlow"
-    setApneaInspTime: "setApneaInspTime"
-    setApneaIE: "setApneaIE"
-    setApneaFIO2: "setApneaFIO2"
+    airwaytype: "airwaytype"
+    airwaysize: "airwaysize"
+    airwayposition: "airwayposition"
+    cuffpressure: "cuffpressure"
+    apneaparms: "apneaparms"
+    lowexhmvlimit: "lowexhmvlimit"
+    hiexhmvlimit: "hiexhmvlimit"
+    lowexhtvlimit: "lowexhtvlimit"
+    hipeakpreslimit: "hipeakpreslimit"
+    lowpeakpreslimit: "lowpeakpreslimit"
+    hirespratelimit: "hirespratelimit"
+    lowrespratelimit: "lowrespratelimit"
+    sighpreslimit: "sighpreslimit"
+    lowironoxlimit: "lowironoxlimit"
+    highironoxlimit: "highironoxlimit"
+    meanairwaypreslimit: "meanairwaypreslimit"
+    peeplimit: "peeplimit"
+    cpaplimit: "cpaplimit"
+    setapneainterval: "setapneainterval"
+    setapneatv: "setapneatv"
+    setapneaippeephigh: "setapneaippeephigh"
+    setapnearr: "setapnearr"
+    setapneapeakflow: "setapneapeakflow"
+    setapneainsptime: "setapneainsptime"
+    setapneaie: "setapneaie"
+    setapneafio2: "setapneafio2"
 
   vent_start:
     code:
@@ -365,7 +365,7 @@ treatment:
     code:
       - "TREATMENT"
       - "ENTERED"
-      - col("treatmentString")
+      - col(treatmentstring)
     timestamp: "treatmentEnteredTimestamp"
     treatment_id: "treatmentID"
 
