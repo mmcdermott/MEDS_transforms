@@ -58,9 +58,7 @@ def check_timestamps_agree(df: pl.LazyFrame, pseudotime_col: pl.Expr, given_24ht
     expected_time = pl.col(given_24htime_col).str.strptime(pl.Time, "%H:%M:%S")
 
     # The use of `.dt.combine` here re-sets the "time-of-day" of the pseudotime_col column
-    time_deltas_min = (
-        pseudotime_col - pseudotime_col.dt.combine(expected_time)
-    ).dt.total_minutes()
+    time_deltas_min = (pseudotime_col - pseudotime_col.dt.combine(expected_time)).dt.total_minutes()
 
     # Check that the time deltas are all within 1 minute
     logger.info(
@@ -86,14 +84,12 @@ def process_patient(df: pl.LazyFrame, hospital_df: pl.LazyFrame) -> pl.LazyFrame
     `configs/event_configs.yaml` file.
     """
 
-    hospital_discharge_pseudotime = (
-        pl.datetime(year=pl.col("hospitaldischargeyear"), **END_OF_YEAR).dt.combine(
-            pl.col("hospitaldischargetime24").str.strptime(pl.Time, "%H:%M:%S")
-        )
-    )
+    hospital_discharge_pseudotime = pl.datetime(
+        year=pl.col("hospitaldischargeyear"), **END_OF_YEAR
+    ).dt.combine(pl.col("hospitaldischargetime24").str.strptime(pl.Time, "%H:%M:%S"))
 
-    unit_admit_pseudotime = (
-        hospital_discharge_pseudotime - pl.duration(minutes=pl.col("hospitaldischargeoffset"))
+    unit_admit_pseudotime = hospital_discharge_pseudotime - pl.duration(
+        minutes=pl.col("hospitaldischargeoffset")
     )
 
     unit_discharge_pseudotime = unit_admit_pseudotime + pl.duration(minutes=pl.col("unitdischargeoffset"))
@@ -101,9 +97,7 @@ def process_patient(df: pl.LazyFrame, hospital_df: pl.LazyFrame) -> pl.LazyFrame
     hospital_admit_pseudotime = unit_admit_pseudotime + pl.duration(minutes=pl.col("hospitaladmitoffset"))
 
     age_in_years = (
-        pl.when(pl.col("age") == "> 89")
-        .then(90)
-        .otherwise(pl.col("age").cast(pl.UInt16, strict=False))
+        pl.when(pl.col("age") == "> 89").then(90).otherwise(pl.col("age").cast(pl.UInt16, strict=False))
     )
     age_in_days = age_in_years * 365.25
     # We assume that the patient was born at the midpoint of the year as we don't know the actual birthdate
