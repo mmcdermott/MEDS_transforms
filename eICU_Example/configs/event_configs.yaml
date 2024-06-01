@@ -75,3 +75,543 @@ allergy:
       - col("allergyType")
       - col("allergyName")
     timestamp: "allergyEnteredTimestamp"
+
+carePlanGeneral:
+  cplItem:
+    code:
+      - "CAREPLAN_GENERAL"
+      - col("cplGroup")
+      - col("cplItemValue")
+    timestamp: "carePlanGeneralItemEnteredTimestamp"
+
+carePlanEOL:
+  cplEolDiscussion:
+    code:
+      - "CAREPLAN_EOL"
+    timestamp: "carePlanEolDiscussionOccurredTimestamp"
+
+carePlanGoal:
+  cplGoal:
+    code:
+      - "CAREPLAN_GOAL"
+      - col("cplGoalCategory")
+      - col("cplGoalValue")
+      - col("cplGoalStatus")
+    timestamp: "carePlanGoalEnteredTimestamp"
+
+carePlanInfectiousDisease:
+  cplInfectDisease:
+    code:
+      - "CAREPLAN_INFECTIOUS_DISEASE"
+      - col("infectDiseaseSite")
+      - col("infectDiseaseAssessment")
+      - col("treatment")
+      - col("responseToTherapy")
+    timestamp: "carePlanInfectDiseaseEnteredTimestamp"
+
+diagnosis:
+  diagnosis:
+    code:
+      - "ICD9CM"
+      - col("ICD9Code")
+      - col("diagnosisPriority")
+    timestamp: "diagnosisEnteredTimestamp"
+    diagnosis_string: "diagnosisString"
+
+infusionDrug:
+  infusion:
+    code:
+      - "INFUSION"
+      - col("infusionDrugID")
+      - col("drugName")
+    timestamp: "infusionEnteredTimestamp"
+    drug_rate: "drugRate"
+    infusion_rate: "infusionRate"
+    drug_amount: "drugAmount"
+    volume_of_fluid: "volumeOfFluid"
+  patient_weight:
+    code:
+      - "INFUSION_PATIENT_WEIGHT"
+    timestamp: "infusionEnteredTimestamp"
+    numerical_value: "patientWeight"
+
+lab:
+  lab:
+    code:
+      - "LAB"
+      - col("labMeasureNameSystem")
+      - col("labMeasureNameInterface")
+      - col("labName")
+    timestamp: "labResultDrawnTimestamp"
+    numerical_value: "labResult"
+    text_value: "labResultText"
+    lab_type_id: "labTypeID"
+
+medication:
+  drug_ordered:
+    code:
+      - "MEDICATION"
+      - "ORDERED"
+      - col(drugName)
+    timestamp: "drugOrderTimestamp"
+    medication_id: "medicationID"
+    drug_iv_admixture: "drugIVAdmixture"
+    dosage: "dosage"
+    route_admin: "routeAdmin"
+    frequency: "frequency"
+    loading_dose: "loadingDose"
+    prn: "PRN"
+    gtc: "GTC"
+  drug_started:
+    code:
+      - "MEDICATION"
+      - "STARTED"
+      - col(drugName)
+    timestamp: "drugStartedTimestamp"
+    medication_id: "medicationID"
+  drug_stopped:
+    code:
+      - "MEDICATION"
+      - "STOPPED"
+      - col(drugName)
+    timestamp: "drugStoppedTimestamp"
+    medication_id: "medicationID"
+
+nurseAssessment:
+  nurse_assessment_performed:
+    code:
+      - "NURSE_ASSESSMENT"
+      - "PERFORMED"
+      - NOT YET DONE
+    timestamp: "nurseAssessPerformedTimestamp"
+    nurse_assessment_id: "nurseAssessID"
+    cell_label: "cellLabel"
+    cell_attribute: "cellAttribute"
+    cell_attribute_value: "cellAttributeValue"
+
+  nurse_assessment_entered:
+    code:
+      - "NURSE_ASSESSMENT"
+      - "ENTERED"
+      - NOT YET DONE
+    timestamp: "nurseAssessEnteredTimestamp"
+    nurse_assessment_id: "nurseAssessID"
+    cell_label: "cellLabel"
+    cell_attribute: "cellAttribute"
+    cell_attribute_value: "cellAttributeValue"
+
+nurseCare:
+  nurse_care_performed:
+    code:
+      - "NURSE_CARE"
+      - "PERFORMED"
+      - NOT YET DONE
+    timestamp: "nurseCarePerformedTimestamp"
+    nurse_care_id: "nurseCareID"
+    cell_label: "cellLabel"
+    cell_attribute: "cellAttribute"
+    cell_attribute_value: "cellAttributeValue"
+
+  nurse_care_entered:
+    code:
+      - "NURSE_CARE"
+      - "ENTERED"
+      - NOT YET DONE
+    timestamp: "nurseCareEnteredTimestamp"
+    nurse_care_id: "nurseCareID"
+    cell_label: "cellLabel"
+    cell_attribute: "cellAttribute"
+    cell_attribute_value: "cellAttributeValue"
+
+nurseCharting:
+  nurse_charting_performed:
+    code:
+      - "NURSE_CHARTING"
+      - "PERFORMED"
+      - NOT YET DONE
+    timestamp: "nursingChartPerformedTimestamp"
+    nurse_charting_id: "nursingChartID"
+    cell_type_cat: "nursingChartCellTypeCat"
+    cell_type_val_name: "nursingChartCellTypeValName"
+    cell_type_val_label: "nursingChartCellTypeValLabel"
+    cell_value: "nursingChartValue"
+
+  nurse_charting_entered:
+    code:
+      - "NURSE_CHARTING"
+      - "ENTERED"
+      - NOT YET DONE
+    timestamp: "nursingChartEnteredTimestamp"
+    nurse_charting_id: "nursingChartID"
+    cell_type_cat: "nursingChartCellTypeCat"
+    cell_type_val_name: "nursingChartCellTypeValName"
+    cell_type_val_label: "nursingChartCellTypeValLabel"
+    cell_value: "nursingChartValue"
+
+pastHistory:
+  past_history_taken:
+    code:
+      - "PAST_HISTORY"
+      - "TAKEN"
+      - NOT YET DONE
+    timestamp: "pastHistoryTakenTimestamp"
+    past_history_id: "pastHistoryID"
+    note_type: "pastHistoryNoteType"
+    path: "pastHistoryPath"
+    value: "pastHistoryValue"
+    value_text: "pastHistoryValueText"
+
+  past_history_entered:
+    code:
+      - "PAST_HISTORY"
+      - "ENTERED"
+      - NOT YET DONE
+    timestamp: "pastHistoryEnteredTimestamp"
+    past_history_id: "pastHistoryID"
+    note_type: "pastHistoryNoteType"
+    path: "pastHistoryPath"
+    value: "pastHistoryValue"
+    value_text: "pastHistoryValueText"
+
+
+physicalExam:
+  physical_exam_entered:
+    code:
+      - "PHYSICAL_EXAM"
+      - "ENTERED"
+      - NOT YET DONE
+    timestamp: "physicalExamEnteredTimestamp"
+    physical_exam_id: "physicalExamID"
+    text: "physicalExamText"
+    path: "physicalExamPath"
+    value: "physicalExamValue"
+
+
+respiratoryCare:
+  resp_care_status:
+    code:
+      - "RESP_CARE"
+      - "STATUS"
+      - NOT YET DONE
+    timestamp: "respCareStatusEnteredTimestamp"
+    resp_care_id: "respCareID"
+
+    airwayType:         "airwayType"
+    airwaySize:         "airwaySize"
+    airwayPosition:     "airwayPosition"
+    cuffPressure:       "cuffPressure"
+    apneaParams:        "apneaParams"
+    lowExhMVLimit:      "lowExhMVLimit"
+    hiExhMVLimit:       "hiExhMVLimit"
+    lowExhTVLimit:      "lowExhTVLimit"
+    hiPeakPresLimit:    "hiPeakPresLimit"
+    lowPeakPresLimit:   "lowPeakPresLimit"
+    hiRespRateLimit:    "hiRespRateLimit"
+    lowRespRateLimit:   "lowRespRateLimit"
+    sighPresLimit:      "sighPresLimit"
+    lowIronOxLimit:     "lowIronOxLimit"
+    highIronOxLimit:    "highIronOxLimit"
+    meanAirwayPresLimit: "meanAirwayPresLimit"
+    PEEPLimit:          "PEEPLimit"
+    CPAPLimit:          "CPAPLimit"
+    setApneaInterval:   "setApneaInterval"
+    setApneaTV:         "setApneaTV"
+    setApneaIPPEEPHigh: "setApneaIPPEEPHigh"
+    setApneaRR:         "setApneaRR"
+    setApneaPeakFlow:   "setApneaPeakFlow"
+    setApneaInspTime:   "setApneaInspTime"
+    setApneaIE:         "setApneaIE"
+    setApneaFIO2:       "setApneaFIO2"
+
+  vent_start:
+    code:
+      - "VENT"
+      - "START"
+      - NOT YET DONE
+    timestamp: "ventStartTimestamp"
+    resp_care_id: "respCareID"
+
+  vent_end:
+    code:
+      - "VENT"
+      - "END"
+      - NOT YET DONE
+    timestamp: "ventEndTimestamp"
+    resp_care_id: "respCareID"
+
+
+respiratoryCharting:
+  resp_charting_performed:
+    code:
+      - "RESP_CHARTING"
+      - "PERFORMED"
+      - NOT YET DONE
+    timestamp: "respChartPerformedTimestamp"
+    resp_chart_id: "respChartID"
+    type_cat: "respChartTypeCat"
+    value_label: "respChartValueLabel"
+    value: "respChartValue"
+
+  resp_charting_entered:
+    code:
+      - "RESP_CHARTING"
+      - "ENTERED"
+      - NOT YET DONE
+    timestamp: "respChartEnteredTimestamp"
+    resp_chart_id: "respChartID"
+    type_cat: "respChartTypeCat"
+    value_label: "respChartValueLabel"
+    value: "respChartValue"
+
+treatment:
+  treatment:
+    code:
+      - "TREATMENT"
+      - "ENTERED"
+      - col("treatmentString")
+    timestamp: "treatmentEnteredTimestamp"
+    treatment_id: "treatmentID"
+
+vitalAperiodic:
+  non_invasive_systolic:
+    code:
+      - "VITALS"
+      - "APERIODIC"
+      - "BP"
+      - "NONINVASIVE_SYSTOLIC"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalAperiodicID"
+    numeric_value: "nonInvasiveSystolic"
+  non_invasive_diastolic:
+    code:
+      - "VITALS"
+      - "APERIODIC"
+      - "BP"
+      - "NONINVASIVE_DIASTOLIC"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalAperiodicID"
+    numeric_value: "nonInvasiveDiastolic"
+
+  non_invasive_mean:
+    code:
+      - "VITALS"
+      - "APERIODIC"
+      - "BP"
+      - "NONINVASIVE_MEAN"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalAperiodicID"
+    numeric_value: "nonInvasiveMean"
+
+  paop:
+    code:
+      - "VITALS"
+      - "APERIODIC"
+      - "PAOP"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalAperiodicID"
+    numeric_value: "paop"
+
+  cardiac_output:
+    code:
+      - "VITALS"
+      - "APERIODIC"
+      - "CARDIAC_OUTPUT"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalAperiodicID"
+    numeric_value: "cardiacOutput"
+
+  cardiac_input:
+    code:
+      - "VITALS"
+      - "APERIODIC"
+      - "CARDIAC_INPUT"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalAperiodicID"
+    numeric_value: "cardiacInput"
+
+  svr:
+    code:
+      - "VITALS"
+      - "APERIODIC"
+      - "SVR"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalAperiodicID"
+    numeric_value: "svr"
+
+  svri:
+    code:
+      - "VITALS"
+      - "APERIODIC"
+      - "SVRI"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalAperiodicID"
+    numeric_value: "svri"
+
+  pvr:
+    code:
+      - "VITALS"
+      - "APERIODIC"
+      - "PVR"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalAperiodicID"
+    numeric_value: "pvr"
+
+  pvri:
+    code:
+      - "VITALS"
+      - "APERIODIC"
+      - "PVRI"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalAperiodicID"
+    numeric_value: "pvri"
+
+vitalPeriodic:
+  temperature:
+    code:
+      - "VITALS"
+      - "PERIODIC"
+      - "TEMPERATURE"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalPeriodicID"
+    numeric_value: "temperature"
+
+  saO2:
+    code:
+      - "VITALS"
+      - "PERIODIC"
+      - "SAO2"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalPeriodicID"
+    numeric_value: "saO2"
+
+  heartRate:
+    code:
+      - "VITALS"
+      - "PERIODIC"
+      - "HEARTRATE"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalPeriodicID"
+    numeric_value: "heartRate"
+
+  respiration:
+    code:
+      - "VITALS"
+      - "PERIODIC"
+      - "RESPIRATION"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalPeriodicID"
+    numeric_value: "respiration"
+
+  cvp:
+    code:
+      - "VITALS"
+      - "PERIODIC"
+      - "CVP"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalPeriodicID"
+    numeric_value: "cvp"
+
+  etCo2:
+    code:
+      - "VITALS"
+      - "PERIODIC"
+      - "ETCO2"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalPeriodicID"
+    numeric_value: "etCo2"
+
+  systemic_systolic:
+    code:
+      - "VITALS"
+      - "PERIODIC"
+      - "BP"
+      - "SYSTEMIC_SYSTOLIC"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalPeriodicID"
+    numeric_value: "systemicSystolic"
+
+  systemic_diastolic:
+    code:
+      - "VITALS"
+      - "PERIODIC"
+      - "BP"
+      - "SYSTEMIC_DIASTOLIC"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalPeriodicID"
+    numeric_value: "systemicDiastolic"
+
+  systemic_mean:
+    code:
+      - "VITALS"
+      - "PERIODIC"
+      - "BP"
+      - "SYSTEMIC_MEAN"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalPeriodicID"
+    numeric_value: "systemicMean"
+
+  pa_systolic:
+    code:
+      - "VITALS"
+      - "PERIODIC"
+      - "BP"
+      - "PULM_ART_SYSTOLIC"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalPeriodicID"
+    numeric_value: "paSystolic"
+
+  pa_diastolic:
+    code:
+      - "VITALS"
+      - "PERIODIC"
+      - "BP"
+      - "PULM_ART_DIASTOLIC"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalPeriodicID"
+    numeric_value: "paDiastolic"
+
+  pa_mean:
+    code:
+      - "VITALS"
+      - "PERIODIC"
+      - "BP"
+      - "PULM_ART_MEAN"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalPeriodicID"
+    numeric_value: "paMean"
+
+  st1:
+    code:
+      - "VITALS"
+      - "PERIODIC"
+      - "ST1"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalPeriodicID"
+    numeric_value: "st1"
+
+  st2:
+    code:
+      - "VITALS"
+      - "PERIODIC"
+      - "ST2"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalPeriodicID"
+    numeric_value: "st2"
+
+  st3:
+    code:
+      - "VITALS"
+      - "PERIODIC"
+      - "ST3"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalPeriodicID"
+    numeric_value: "st3"
+
+  ICP:
+    code:
+      - "VITALS"
+      - "PERIODIC"
+      - "ICP"
+    timestamp: "observationEnteredTimestamp"
+    vital_id: "vitalPeriodicID"
+    numeric_value: "ICP"

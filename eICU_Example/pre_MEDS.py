@@ -157,8 +157,8 @@ def process_patient(df: pl.LazyFrame, hospital_df: pl.LazyFrame) -> pl.LazyFrame
 
 def join_and_get_pseudotime_fntr(
     table_name: str,
-    offset_col: str,
-    pseudotime_col: str,
+    offset_col: str | list[str],
+    pseudotime_col: str | list[str],
     output_data_cols: list[str] | None = None,
     warning_items: list[str] | None = None,
 ) -> Callable[[pl.LazyFrame, pl.LazyFrame], pl.LazyFrame]:
@@ -172,6 +172,18 @@ def join_and_get_pseudotime_fntr(
     if output_data_cols is None:
         output_data_cols = []
 
+    if isinstance(offset_col, str):
+        offset_col = [offset_col]
+    if isinstance(pseudotime_col, str):
+        pseudotime_col = [pseudotime_col]
+
+    if len(offset_col) != len(pseudotime_col):
+        raise ValueError(
+            "There must be the same number of `offset_col`s and `pseudotime_col`s specified. Got "
+            f"{len(offset_col)} and {len(pseudotime_col)}, respectively."
+        )
+
+
     def fn(df: pl.LazyFrame, patient_df: pl.LazyFrame) -> pl.LazyFrame:
         f"""Takes the {table_name} table and converts it to a form that includes pseudo-timestamps.
 
@@ -179,7 +191,11 @@ def join_and_get_pseudotime_fntr(
         `configs/event_configs.yaml` file.
         """
 
-        pseudotime = pl.col("unitAdmitTimestamp") + pl.duration(minutes=pl.col(offset_col))
+
+        pseudotimes = [
+            (pl.col("unitAdmitTimestamp") + pl.duration(minutes=pl.col(offset))).alias(pseudotime)
+            for pseudotime, offset in zip(pseudotime_col, offset_col)
+        ]
 
         if warning_items:
             warning_lines = [
@@ -191,7 +207,7 @@ def join_and_get_pseudotime_fntr(
         return df.join(patient_df, on=UNIT_STAY_ID, how="inner").select(
             HEALTH_SYSTEM_STAY_ID,
             UNIT_STAY_ID,
-            pseudotime.alias(pseudotime_col),
+            *pseudotimes,
             *output_data_cols,
         )
 
@@ -265,6 +281,12 @@ def main(cfg: DictConfig):
       8. `microLab`: We don't use this because the culture taken time != culture result time, so seeing this
          data would give a model an advantage over any possible real-world implementation. Plus, the docs say
          it is not well populated.
+      9. `note`: This table is largely duplicated with structured data due to the fact that primarily
+         narrative notes were removed due to PHI constraints (see the docs).
+
+    There are other notes for this pipeline:
+      1. Many fields here are, I believe, **lists**, not simple categoricals, and should be split and
+         processed accordingly. This is not yet done.
 
     Args (all as part of the config file):
         raw_cohort_dir: The directory containing the raw eICU files.
