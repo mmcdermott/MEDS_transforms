@@ -92,14 +92,3 @@ medication:
     - "GTC"
   warning_items:
     - "We **IGNORE** the `drugOrderCancelled` column -- this may be a mistake!"
-
-# We don't use this because the culture taken time != culture result time, so seeing this data would give a
-# model an advantage over any possible real-world implementation. But, I'm including its data here as it would
-# be easy to fit into this paradigm.
-#microLab:
-#  offset_col: "cultureTakenOffset"
-#  pseudotime_col: "cultureTakenTimestamp"
-#  output_data_cols:
-#    - "cultureSite"
-#    - "organism"
-#    - "antibiotic"

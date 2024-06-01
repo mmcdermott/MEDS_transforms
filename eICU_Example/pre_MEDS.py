@@ -262,6 +262,9 @@ def main(cfg: DictConfig):
       6. `customLab`: The documentation for this table is very sparse, so we skip it.
       7. `intakeOutput`: There are a number of significant warnings about duplicates, cumulative values, and
          more in the documentation for this table, so for now we skip it.
+      8. `microLab`: We don't use this because the culture taken time != culture result time, so seeing this
+         data would give a model an advantage over any possible real-world implementation. Plus, the docs say
+         it is not well populated.
 
     Args (all as part of the config file):
         raw_cohort_dir: The directory containing the raw eICU files.
