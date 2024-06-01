@@ -9,10 +9,9 @@ import rootutils
 root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
 import gzip
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import NamedTuple
 
 import hydra
 import polars as pl
@@ -183,14 +182,12 @@ def join_and_get_pseudotime_fntr(
             f"{len(offset_col)} and {len(pseudotime_col)}, respectively."
         )
 
-
     def fn(df: pl.LazyFrame, patient_df: pl.LazyFrame) -> pl.LazyFrame:
         f"""Takes the {table_name} table and converts it to a form that includes pseudo-timestamps.
 
         The output of this process is ultimately converted to events via the `{table_name}` key in the
         `configs/event_configs.yaml` file.
         """
-
 
         pseudotimes = [
             (pl.col("unitAdmitTimestamp") + pl.duration(minutes=pl.col(offset))).alias(pseudotime)
@@ -214,29 +211,7 @@ def join_and_get_pseudotime_fntr(
     return fn
 
 
-class PreProcessor(NamedTuple):
-    """A preprocessor function and its dependencies.
-
-    Args:
-      function: TODO
-      dependencies: A two-element tuple containing the prefix of the dependent dataframe and a list of
-        columns needed from that dataframe.
-    """
-
-    function: Callable[[Sequence[pl.LazyFrame]], pl.LazyFrame]
-    dependencies: tuple[str, list[str]]
-
-
 NEEDED_PATIENT_COLS = [UNIT_STAY_ID, HEALTH_SYSTEM_STAY_ID, "unitAdmitTimestamp"]
-PATIENT_DEPENDENCY = ("patient", NEEDED_PATIENT_COLS)
-
-# Generic "copy from patients" functions are stored in `configs/table_preprocessors.yaml` and loaded in
-# `main`.
-SPECIALTY_FUNCTIONS: dict[str, PreProcessor] = {
-    "patient": PreProcessor(
-        process_patient, ("hospital", ["hospitalid", "numbedscategory", "teachingstatus", "region"])
-    ),
-}
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="pre_MEDS")
@@ -293,32 +268,59 @@ def main(cfg: DictConfig):
         output_dir: The directory to write the processed files to.
     """
 
-    raise NotImplementedError("This script is not yet implemented for eICU.")
-
     hydra_loguru_init()
-
-    functions = {**SPECIALTY_FUNCTIONS}
 
     logger.info("Loading table preprocessors from configs/table_preprocessors.yaml...")
     preprocessors = OmegaConf.load("configs/table_preprocessors.yaml")
+    functions = {}
     for table_name, preprocessor_cfg in preprocessors.items():
         logger.info(f"  Adding preprocessor for {table_name}:\n{OmegaConf.to_yaml(preprocessor_cfg)}")
-        functions[table_name] = PreProcessor(
-            join_and_get_pseudotime_fntr(table_name=table_name, **preprocessor_cfg),
-            PATIENT_DEPENDENCY,
-        )
+        functions[table_name] = join_and_get_pseudotime_fntr(table_name=table_name, **preprocessor_cfg)
 
     raw_cohort_dir = Path(cfg.raw_cohort_dir)
     MEDS_input_dir = Path(cfg.output_dir)
 
-    all_fps = list(raw_cohort_dir.glob("**/*.csv.gz"))
+    logger.info("Processing patient table first...")
 
-    dfs_to_load = {}
+    hospital_fp = raw_cohort_dir / "hospital.csv.gz"
+    patient_fp = raw_cohort_dir / "patient.csv.gz"
+    logger.info(f"Loading {str(hospital_fp.resolve())}...")
+    hospital_df = load_raw_eicu_file(
+        hospital_fp, columns=["hospitalid", "numbedscategory", "teachingstatus", "region"]
+    )
+    logger.info(f"Loading {str(patient_fp.resolve())}...")
+    raw_patient_df = load_raw_eicu_file(patient_fp)
+
+    logger.info("Processing patient table...")
+    patient_df = process_patient(raw_patient_df, hospital_df)
+    write_lazyframe(patient_df, MEDS_input_dir / "patient.parquet")
+
+    all_fps = [
+        fp for fp in raw_cohort_dir.glob("*/.csv.gz") if fp.name not in {"hospital.csv.gz", "patient.csv.gz"}
+    ]
+
+    unused_tables = {
+        "admissiondrug",
+        "apacheApsVar",
+        "apachePatientResult",
+        "apachePredVar",
+        "carePlanCareProvider",
+        "customLab",
+        "intakeOutput",
+        "microLab",
+        "note",
+    }
 
     for in_fp in all_fps:
         pfx = get_shard_prefix(raw_cohort_dir, in_fp)
+        if pfx in unused_tables:
+            logger.warning(f"Skipping {pfx} as it is not supported in this pipeline.")
+            continue
+        elif pfx not in functions:
+            logger.warning(f"No function needed for {pfx}. For eICU, THIS IS UNEXPECTED")
+            continue
 
-        out_fp = MEDS_input_dir / in_fp.relative_to(raw_cohort_dir)
+        out_fp = MEDS_input_dir / f"{pfx}.parquet"
 
         if out_fp.is_file():
             print(f"Done with {pfx}. Continuing")
@@ -326,63 +328,15 @@ def main(cfg: DictConfig):
 
         out_fp.parent.mkdir(parents=True, exist_ok=True)
 
-        if pfx not in functions:
-            logger.info(
-                f"No function needed for {pfx}: "
-                f"Symlinking {str(in_fp.resolve())} to {str(out_fp.resolve())}"
-            )
-            relative_in_fp = in_fp.relative_to(out_fp.parent, walk_up=True)
-            out_fp.symlink_to(relative_in_fp)
-            continue
-        else:
-            out_fp = MEDS_input_dir / f"{pfx}.parquet"
-            if out_fp.is_file():
-                print(f"Done with {pfx}. Continuing")
-                continue
-
-            fn, need_df = functions[pfx]
-            if not need_df:
-                st = datetime.now()
-                logger.info(f"Processing {pfx}...")
-                df = load_raw_eicu_file(in_fp)
-                logger.info(f"  Loaded raw {in_fp} in {datetime.now() - st}")
-                processed_df = fn(df)
-                write_lazyframe(processed_df, out_fp)
-                logger.info(f"  Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - st}")
-            else:
-                needed_pfx, needed_cols = need_df
-                if needed_pfx not in dfs_to_load:
-                    dfs_to_load[needed_pfx] = {"fps": set(), "cols": set()}
-
-                dfs_to_load[needed_pfx]["fps"].add(in_fp)
-                dfs_to_load[needed_pfx]["cols"].update(needed_cols)
-
-    for df_to_load_pfx, fps_and_cols in dfs_to_load.items():
-        fps = fps_and_cols["fps"]
-        cols = list(fps_and_cols["cols"])
-
-        df_to_load_fp = raw_cohort_dir / f"{df_to_load_pfx}.csv.gz"
+        fn = functions[pfx]
 
         st = datetime.now()
-
-        logger.info(f"Loading {str(df_to_load_fp.resolve())} for manipulating other dataframes...")
-        df = load_raw_eicu_file(df_to_load_fp, columns=cols)
-        logger.info(f"  Loaded in {datetime.now() - st}")
-
-        for fp in fps:
-            pfx = get_shard_prefix(raw_cohort_dir, fp)
-            out_fp = MEDS_input_dir / f"{pfx}.parquet"
-
-            logger.info(f"  Processing dependent df @ {pfx}...")
-            fn, _ = functions[pfx]
-
-            fp_st = datetime.now()
-            logger.info(f"    Loading {str(fp.resolve())}...")
-            fp_df = load_raw_eicu_file(fp)
-            logger.info(f"    Loaded in {datetime.now() - fp_st}")
-            processed_df = fn(fp_df, df)
-            write_lazyframe(processed_df, out_fp)
-            logger.info(f"    Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - fp_st}")
+        logger.info(f"Processing {pfx}...")
+        df = load_raw_eicu_file(in_fp)
+        logger.info(f"  * Loaded raw {in_fp} in {datetime.now() - st}")
+        processed_df = fn(df, patient_df)
+        write_lazyframe(processed_df, out_fp)
+        logger.info(f"  * Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - st}")
 
     logger.info(f"Done! All dataframes processed and written to {str(MEDS_input_dir.resolve())}")
 
