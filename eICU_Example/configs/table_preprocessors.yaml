@@ -42,7 +42,7 @@ carePlanInfectiousDisease:
     - "responsetotherapy"
     - "treatment"
 
-diagonosis:
+diagnosis:
   offset_col: "diagnosisoffset"
   pseudotime_col: "diagnosisEnteredTimestamp"
   output_data_cols: ["icd9code", "diagnosispriority", "diagnosisstring"]
