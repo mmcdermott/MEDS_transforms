@@ -24,8 +24,8 @@ from MEDS_polars_functions.utils import (
     write_lazyframe,
 )
 
-HEALTH_SYSTEM_STAY_ID = "patientHealthSystemStayID"
-UNIT_STAY_ID = "patientUnitStayID"
+HEALTH_SYSTEM_STAY_ID = "patienthealthsystemstayid"
+UNIT_STAY_ID = "patientunitstayid"
 PATIENT_ID = "uniquepid"
 
 # The end of year date, used for year-only timestamps in eICU. The time is set to midnight as we'll add a
@@ -48,9 +48,19 @@ def load_raw_eicu_file(fp: Path, **kwargs) -> pl.LazyFrame:
 
 
 def check_timestamps_agree(df: pl.LazyFrame, pseudotime_col: pl.Expr, given_24htime_col: str):
+    """Checks that the time-of-day portions agree between the pseudotime and given columns.
+
+    Raises a `ValueError` if the times don't match within a minute.
+
+    Args:
+        TODO
+    """
     expected_time = pl.col(given_24htime_col).str.strptime(pl.Time, "%H:%M:%S")
 
-    time_deltas_min = (pseudotime_col.dt.time() - expected_time).dt.total_minutes()
+    # The use of `.dt.combine` here re-sets the "time-of-day" of the pseudotime_col column
+    time_deltas_min = (
+        pseudotime_col - pseudotime_col.dt.combine(expected_time)
+    ).dt.total_minutes()
 
     # Check that the time deltas are all within 1 minute
     logger.info(
@@ -76,19 +86,25 @@ def process_patient(df: pl.LazyFrame, hospital_df: pl.LazyFrame) -> pl.LazyFrame
     `configs/event_configs.yaml` file.
     """
 
-    hospital_discharge_pseudotime = pl.datetime(year=pl.col("hospitalDischargeYear"), **END_OF_YEAR) + pl.col(
-        "hospitalDischargeTime24"
-    ).str.strptime(pl.Time, "%H:%M:%S")
-
-    unit_admit_pseudotime = hospital_discharge_pseudotime - pl.duration(
-        minutes=pl.col("hospitalDischargeOffset")
+    hospital_discharge_pseudotime = (
+        pl.datetime(year=pl.col("hospitaldischargeyear"), **END_OF_YEAR).dt.combine(
+            pl.col("hospitaldischargetime24").str.strptime(pl.Time, "%H:%M:%S")
+        )
     )
 
-    unit_discharge_pseudotime = unit_admit_pseudotime + pl.duration(minutes=pl.col("unitDischargeOffset"))
+    unit_admit_pseudotime = (
+        hospital_discharge_pseudotime - pl.duration(minutes=pl.col("hospitaldischargeoffset"))
+    )
 
-    hospital_admit_pseudotime = unit_admit_pseudotime + pl.duration(minutes=pl.col("hospitalAdmitOffset"))
+    unit_discharge_pseudotime = unit_admit_pseudotime + pl.duration(minutes=pl.col("unitdischargeoffset"))
 
-    age_in_years = pl.when(pl.col("age") == "> 89").then(90).otherwise(pl.col("age").cast(pl.UInt16))
+    hospital_admit_pseudotime = unit_admit_pseudotime + pl.duration(minutes=pl.col("hospitaladmitoffset"))
+
+    age_in_years = (
+        pl.when(pl.col("age") == "> 89")
+        .then(90)
+        .otherwise(pl.col("age").cast(pl.UInt16, strict=False))
+    )
     age_in_days = age_in_years * 365.25
     # We assume that the patient was born at the midpoint of the year as we don't know the actual birthdate
     pseudo_date_of_birth = unit_admit_pseudotime - pl.duration(days=(age_in_days - 365.25 / 2))
@@ -99,10 +115,10 @@ def process_patient(df: pl.LazyFrame, hospital_df: pl.LazyFrame) -> pl.LazyFrame
         "Checking that the 24h times are consistent. If this is extremely slow, consider refactoring to have "
         "only one `.collect()` call."
     )
-    check_timestamps_agree(df, hospital_discharge_pseudotime, "hospitalDischargeTime24")
-    check_timestamps_agree(df, hospital_admit_pseudotime, "hospitalAdmitTime24")
-    check_timestamps_agree(df, unit_admit_pseudotime, "unitAdmitTime24")
-    check_timestamps_agree(df, unit_discharge_pseudotime, "unitDischargeTime24")
+    check_timestamps_agree(df, hospital_discharge_pseudotime, "hospitaldischargetime24")
+    check_timestamps_agree(df, hospital_admit_pseudotime, "hospitaladmittime24")
+    check_timestamps_agree(df, unit_admit_pseudotime, "unitadmittime24")
+    check_timestamps_agree(df, unit_discharge_pseudotime, "unitdischargetime24")
     logger.info(f"Validated 24h times in {datetime.now() - start}")
 
     logger.warning("NOT validating the `unitVisitNumber` column as that isn't implemented yet.")
@@ -116,41 +132,42 @@ def process_patient(df: pl.LazyFrame, hospital_df: pl.LazyFrame) -> pl.LazyFrame
         "  - `age` is interpreted as the age at the time of the unit stay, not the hospital stay. "
         "Is this right?\n"
         "  - `What is the actual mean age for those > 89? Here we assume 90.\n"
+        "  - Note that all the column names appear to be all in lowercase for the csv versions, vs. the docs"
     )
 
-    return df.join(hospital_df, left_on="hospitalID", right_on="hospitalid", how="left").select(
+    return df.join(hospital_df, left_on="hospitalid", right_on="hospitalid", how="left").select(
         # 1. Static variables
         PATIENT_ID,
         "gender",
-        pseudo_date_of_birth.alias("dateOfBirth"),
+        pseudo_date_of_birth.alias("dateofbirth"),
         "ethnicity",
         # 2. Health system stay parameters
         HEALTH_SYSTEM_STAY_ID,
-        "hospitalID",
-        pl.col("numbedscategory").alias("hospitalNumBedsCategory"),
-        pl.col("teachingstatus").alias("hospitalTeachingStatus"),
-        pl.col("region").alias("hospitalRegion"),
+        "hospitalid",
+        pl.col("numbedscategory").alias("hospitalnumbedscategory"),
+        pl.col("teachingstatus").alias("hospitalteachingstatus"),
+        pl.col("region").alias("hospitalregion"),
         # 2.1 Admission parameters
-        hospital_admit_pseudotime.alias("hospitalAdmitTimestamp"),
-        "hospitalAdmitSource",
+        hospital_admit_pseudotime.alias("hospitaladmittimestamp"),
+        "hospitaladmitsource",
         # 2.2 Discharge parameters
-        hospital_discharge_pseudotime.alias("hospitalDischargeTimestamp"),
-        "hospitalDischargeLocation",
-        "hospitalDischargeStatus",
+        hospital_discharge_pseudotime.alias("hospitaldischargetimestamp"),
+        "hospitaldischargelocation",
+        "hospitaldischargestatus",
         # 3. Unit stay parameters
         UNIT_STAY_ID,
-        "wardID",
+        "wardid",
         # 3.1 Admission parameters
-        unit_admit_pseudotime.alias("unitAdmitTimestamp"),
-        "unitAdmitSource",
-        "unitStayType",
-        pl.col("admissionHeight").alias("unitAdmissionHeight"),
-        pl.col("admissionWeight").alias("unitAdmissionWeight"),
+        unit_admit_pseudotime.alias("unitadmittimestamp"),
+        "unitadmitsource",
+        "unitstaytype",
+        pl.col("admissionheight").alias("unitadmissionheight"),
+        pl.col("admissionweight").alias("unitadmissionweight"),
         # 3.2 Discharge parameters
-        unit_discharge_pseudotime.alias("unitDischargeTimestamp"),
-        "unitDischargeLocation",
-        "unitDischargeStatus",
-        pl.col("dischargeWeight").alias("unitDischargeWeight"),
+        unit_discharge_pseudotime.alias("unitdischargetimestamp"),
+        "unitdischargelocation",
+        "unitdischargestatus",
+        pl.col("dischargeweight").alias("unitdischargeweight"),
     )
 
 
@@ -190,7 +207,7 @@ def join_and_get_pseudotime_fntr(
         """
 
         pseudotimes = [
-            (pl.col("unitAdmitTimestamp") + pl.duration(minutes=pl.col(offset))).alias(pseudotime)
+            (pl.col("unitadmittimestamp") + pl.duration(minutes=pl.col(offset))).alias(pseudotime)
             for pseudotime, offset in zip(pseudotime_col, offset_col)
         ]
 
@@ -211,7 +228,7 @@ def join_and_get_pseudotime_fntr(
     return fn
 
 
-NEEDED_PATIENT_COLS = [UNIT_STAY_ID, HEALTH_SYSTEM_STAY_ID, "unitAdmitTimestamp"]
+NEEDED_PATIENT_COLS = [UNIT_STAY_ID, HEALTH_SYSTEM_STAY_ID, "unitadmittimestamp"]
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="pre_MEDS")
@@ -281,23 +298,29 @@ def main(cfg: DictConfig):
     raw_cohort_dir = Path(cfg.raw_cohort_dir)
     MEDS_input_dir = Path(cfg.output_dir)
 
-    logger.info("Processing patient table first...")
+    patient_out_fp = MEDS_input_dir / "patient.parquet"
 
-    hospital_fp = raw_cohort_dir / "hospital.csv.gz"
-    patient_fp = raw_cohort_dir / "patient.csv.gz"
-    logger.info(f"Loading {str(hospital_fp.resolve())}...")
-    hospital_df = load_raw_eicu_file(
-        hospital_fp, columns=["hospitalid", "numbedscategory", "teachingstatus", "region"]
-    )
-    logger.info(f"Loading {str(patient_fp.resolve())}...")
-    raw_patient_df = load_raw_eicu_file(patient_fp)
+    if patient_out_fp.is_file():
+        logger.info(f"Reloading processed patient df from {str(patient_out_fp.resolve())}")
+        patient_df = pl.read_parquet(patient_out_fp, columns=NEEDED_PATIENT_COLS, use_pyarrow=True).lazy()
+    else:
+        logger.info("Processing patient table first...")
 
-    logger.info("Processing patient table...")
-    patient_df = process_patient(raw_patient_df, hospital_df)
-    write_lazyframe(patient_df, MEDS_input_dir / "patient.parquet")
+        hospital_fp = raw_cohort_dir / "hospital.csv.gz"
+        patient_fp = raw_cohort_dir / "patient.csv.gz"
+        logger.info(f"Loading {str(hospital_fp.resolve())}...")
+        hospital_df = load_raw_eicu_file(
+            hospital_fp, columns=["hospitalid", "numbedscategory", "teachingstatus", "region"]
+        )
+        logger.info(f"Loading {str(patient_fp.resolve())}...")
+        raw_patient_df = load_raw_eicu_file(patient_fp)
+
+        logger.info("Processing patient table...")
+        patient_df = process_patient(raw_patient_df, hospital_df)
+        write_lazyframe(patient_df, MEDS_input_dir / "patient.parquet")
 
     all_fps = [
-        fp for fp in raw_cohort_dir.glob("*/.csv.gz") if fp.name not in {"hospital.csv.gz", "patient.csv.gz"}
+        fp for fp in raw_cohort_dir.glob("*.csv.gz") if fp.name not in {"hospital.csv.gz", "patient.csv.gz"}
     ]
 
     unused_tables = {
