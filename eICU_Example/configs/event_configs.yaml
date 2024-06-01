@@ -273,7 +273,6 @@ pastHistory:
     value: "pastHistoryValue"
     value_text: "pastHistoryValueText"
 
-
 physicalExam:
   physical_exam_entered:
     code:
@@ -286,7 +285,6 @@ physicalExam:
     path: "physicalExamPath"
     value: "physicalExamValue"
 
-
 respiratoryCare:
   resp_care_status:
     code:
@@ -296,32 +294,32 @@ respiratoryCare:
     timestamp: "respCareStatusEnteredTimestamp"
     resp_care_id: "respCareID"
 
-    airwayType:         "airwayType"
-    airwaySize:         "airwaySize"
-    airwayPosition:     "airwayPosition"
-    cuffPressure:       "cuffPressure"
-    apneaParams:        "apneaParams"
-    lowExhMVLimit:      "lowExhMVLimit"
-    hiExhMVLimit:       "hiExhMVLimit"
-    lowExhTVLimit:      "lowExhTVLimit"
-    hiPeakPresLimit:    "hiPeakPresLimit"
-    lowPeakPresLimit:   "lowPeakPresLimit"
-    hiRespRateLimit:    "hiRespRateLimit"
-    lowRespRateLimit:   "lowRespRateLimit"
-    sighPresLimit:      "sighPresLimit"
-    lowIronOxLimit:     "lowIronOxLimit"
-    highIronOxLimit:    "highIronOxLimit"
+    airwayType: "airwayType"
+    airwaySize: "airwaySize"
+    airwayPosition: "airwayPosition"
+    cuffPressure: "cuffPressure"
+    apneaParams: "apneaParams"
+    lowExhMVLimit: "lowExhMVLimit"
+    hiExhMVLimit: "hiExhMVLimit"
+    lowExhTVLimit: "lowExhTVLimit"
+    hiPeakPresLimit: "hiPeakPresLimit"
+    lowPeakPresLimit: "lowPeakPresLimit"
+    hiRespRateLimit: "hiRespRateLimit"
+    lowRespRateLimit: "lowRespRateLimit"
+    sighPresLimit: "sighPresLimit"
+    lowIronOxLimit: "lowIronOxLimit"
+    highIronOxLimit: "highIronOxLimit"
     meanAirwayPresLimit: "meanAirwayPresLimit"
-    PEEPLimit:          "PEEPLimit"
-    CPAPLimit:          "CPAPLimit"
-    setApneaInterval:   "setApneaInterval"
-    setApneaTV:         "setApneaTV"
+    PEEPLimit: "PEEPLimit"
+    CPAPLimit: "CPAPLimit"
+    setApneaInterval: "setApneaInterval"
+    setApneaTV: "setApneaTV"
     setApneaIPPEEPHigh: "setApneaIPPEEPHigh"
-    setApneaRR:         "setApneaRR"
-    setApneaPeakFlow:   "setApneaPeakFlow"
-    setApneaInspTime:   "setApneaInspTime"
-    setApneaIE:         "setApneaIE"
-    setApneaFIO2:       "setApneaFIO2"
+    setApneaRR: "setApneaRR"
+    setApneaPeakFlow: "setApneaPeakFlow"
+    setApneaInspTime: "setApneaInspTime"
+    setApneaIE: "setApneaIE"
+    setApneaFIO2: "setApneaFIO2"
 
   vent_start:
     code:
@@ -338,7 +336,6 @@ respiratoryCare:
       - NOT YET DONE
     timestamp: "ventEndTimestamp"
     resp_care_id: "respCareID"
-
 
 respiratoryCharting:
   resp_charting_performed:

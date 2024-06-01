@@ -2,7 +2,8 @@ admissiondx:
   offset_col: "admitDxEnteredOffset"
   pseudotime_col: "admitDxEnteredTimestamp"
   output_data_cols: ["admitDxName", "admitDxID"]
-  warning_items: ["How should we use `admitDxTest`?", "How should we use `admitDxPath`?"]
+  warning_items:
+    ["How should we use `admitDxTest`?", "How should we use `admitDxPath`?"]
 
 allergy:
   offset_col: "allergyEnteredOffset"
@@ -12,8 +13,9 @@ allergy:
     - "How should we use `allergyNoteType`?"
     - "How should we use `specialtyType`?"
     - "How should we use `userType`?"
-    - |- Is `drugName` the name of the drug to which the patient is allergic or the drug given to the patient
-      (docs say \'name of the selected admission drug\')?
+    - >-
+      Is `drugName` the name of the drug to which the patient is allergic or the drug given to the patient
+      (docs say 'name of the selected admission drug')?
 
 carePlanGeneral:
   offset_col: "cplItemOffset"
@@ -34,7 +36,13 @@ carePlanGoal:
 carePlanInfectiousDisease:
   offset_col: "cplInfectDiseaseOffset"
   pseudotime_col: "carePlanInfectDiseaseEnteredTimestamp"
-  output_data_cols: ["infectDiseaseSite", "infectDiseaseAssessment", "responseToTherapy", "treatment"]
+  output_data_cols:
+    [
+      "infectDiseaseSite",
+      "infectDiseaseAssessment",
+      "responseToTherapy",
+      "treatment",
+    ]
 
 diagonosis:
   offset_col: "diagnosisOffset"
@@ -93,7 +101,7 @@ medication:
     - "We **IGNORE** the `drugOrderCancelled` column -- this may be a mistake!"
 
 nurseAssessment:
-  offset_col: 
+  offset_col:
     - "nurseAssessOffset"
     - "nurseAssessEntryOffset"
   pseudotime_col:
@@ -175,7 +183,7 @@ respiratoryCare:
     - "respCareStatusOffset"
     - "ventStartOffset"
     - "ventEndOffset"
-  pseudotime_col: 
+  pseudotime_col:
     - "respCareStatusEnteredTimestamp"
     - "ventStartTimestamp"
     - "ventEndTimestamp"

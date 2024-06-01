@@ -69,6 +69,7 @@ root directory of this repository):
 In practice, on a machine with 150 GB of RAM and 10 cores, this step takes less than 5 minutes in total.
 
 ## Step 3: Run the MEDS extraction ETL
+
 ### Running locally, serially
 
 We will assume you want to output the final MEDS dataset into a directory we'll denote as `$EICU_MEDS_DIR`.
@@ -125,11 +126,12 @@ and performance is not necessary; however, for larger datasets, it can be.
 ```
 
 ### Running Locally, in Parallel.
+
 This step is the exact same commands as above, but leverages Hydra's multirun capabilities with the `joblib`
-launcher. Install this package with the optional `local_parallelism` option (e.g., `pip install -e
-.[local_parallelism]` and run `./eICU_Example/joint_script.sh`. See that script for expected args.
+launcher. Install this package with the optional `local_parallelism` option (e.g., `pip install -e .[local_parallelism]` and run `./eICU_Example/joint_script.sh`. See that script for expected args.
 
 ### Running Each Step over Slurm
+
 To use slurm, run each command with the number of workers desired using Hydra's multirun capabilities with the
 `submitit_slurm` launcher. Install this package with the optional `slurm_parallelism` option. See below for
 modified commands. Note these can't be chained in a single script as the jobs will not wait for all slurm jobs
@@ -195,8 +197,7 @@ Currently, some tables are ignored, including:
 
 1. `admissiondrug`: The [documentation](https://eicu-crd.mit.edu/eicutables/admissiondrug/) notes that this is
    extremely infrequently used, so we skip it.
-2. 
-
+2.
 
 Lots of questions remain about how to appropriately handle timestamps of the data -- e.g., things like HCPCS
 events are stored at the level of the _date_, not the _datetime_. How should those be slotted into the
