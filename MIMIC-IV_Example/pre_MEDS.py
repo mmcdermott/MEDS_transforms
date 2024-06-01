@@ -106,7 +106,8 @@ def main(cfg: DictConfig):
                 f"No function needed for {pfx}: "
                 f"Symlinking {str(in_fp.resolve())} to {str(out_fp.resolve())}"
             )
-            relative_in_fp = in_fp.relative_to(out_fp.parent, walk_up=True)
+            # create a relative symlink
+            relative_in_fp = in_fp.resolve().relative_to(out_fp.resolve().parent, walk_up=True)
             out_fp.symlink_to(relative_in_fp)
             continue
         else:
