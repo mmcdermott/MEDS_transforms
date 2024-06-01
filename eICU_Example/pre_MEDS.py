@@ -17,7 +17,7 @@ from typing import NamedTuple
 import hydra
 import polars as pl
 from loguru import logger
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from MEDS_polars_functions.utils import (
     get_shard_prefix,
@@ -155,57 +155,47 @@ def process_patient(df: pl.LazyFrame, hospital_df: pl.LazyFrame) -> pl.LazyFrame
     )
 
 
-def process_admissiondx(df: pl.LazyFrame, patient_df: pl.LazyFrame) -> pl.LazyFrame:
-    """Takes the admissiondx table and converts it to a form that includes timestamps.
+def join_and_get_pseudotime_fntr(
+    table_name: str,
+    offset_col: str,
+    pseudotime_col: str,
+    output_data_cols: list[str] | None = None,
+    warning_items: list[str] | None = None,
+) -> Callable[[pl.LazyFrame, pl.LazyFrame], pl.LazyFrame]:
+    """Returns a function that joins a dataframe to the `patient` table and adds pseudotimes.
 
-    The output of this process is ultimately converted to events via the `admissiondx` key in the
-    `configs/event_configs.yaml` file.
+    Also raises specified warning strings via the logger for uncertain columns.
+
+    TODO
     """
 
-    admission_dx_pseudotime = pl.col("unitAdmitTimestamp") + pl.duration(
-        minutes=pl.col("admitDxEnteredOffset")
-    )
+    if output_data_cols is None:
+        output_data_cols = []
 
-    logger.warning(
-        "NOT SURE ABOUT THE FOLLOWING for admissiondx table. Check with the eICU team:\n"
-        "  - How should we use `admitDxTest`? It's not used here.\n"
-        "  - How should we use `admitDxPath`? It's not used here.\n"
-    )
+    def fn(df: pl.LazyFrame, patient_df: pl.LazyFrame) -> pl.LazyFrame:
+        f"""Takes the {table_name} table and converts it to a form that includes pseudo-timestamps.
 
-    return df.join(patient_df, on=UNIT_STAY_ID, how="inner").select(
-        HEALTH_SYSTEM_STAY_ID,
-        UNIT_STAY_ID,
-        admission_dx_pseudotime.alias("admitDxEnteredTimestamp"),
-        "admitDxName",
-        "admitDxID",
-    )
+        The output of this process is ultimately converted to events via the `{table_name}` key in the
+        `configs/event_configs.yaml` file.
+        """
 
+        pseudotime = pl.col("unitAdmitTimestamp") + pl.duration(minutes=pl.col(offset_col))
 
-def process_allergy(df: pl.LazyFrame, patient_df: pl.LazyFrame) -> pl.LazyFrame:
-    """Takes the allergy table and converts it to a form that includes timestamps.
+        if warning_items:
+            warning_lines = [
+                f"NOT SURE ABOUT THE FOLLOWING for {table_name} table. Check with the eICU team:",
+                *(f"  - {item}" for item in warning_items),
+            ]
+            logger.warning("\n".join(warning_lines))
 
-    The output of this process is ultimately converted to events via the `allergy` key in the
-    `configs/event_configs.yaml` file.
-    """
+        return df.join(patient_df, on=UNIT_STAY_ID, how="inner").select(
+            HEALTH_SYSTEM_STAY_ID,
+            UNIT_STAY_ID,
+            pseudotime.alias(pseudotime_col),
+            *output_data_cols,
+        )
 
-    allergy_pseudotime = pl.col("unitAdmitTimestamp") + pl.duration(minutes=pl.col("allergyEnteredOffset"))
-
-    logger.warning(
-        "NOT SURE ABOUT THE FOLLOWING for allergy table. Check with the eICU team:\n"
-        "  - How should we use `allergyNoteType`? It's not used here.\n"
-        "  - How should we use `specialtyType`? It's not used here.\n"
-        "  - How should we use `userType`? It's not used here.\n"
-        "  - Is `drugName` the name of the drug to which the patient is allergic or the drug given to the "
-        "patient (docs say 'name of the selected admission drug')?\n"
-    )
-
-    return df.join(patient_df, on=UNIT_STAY_ID, how="inner").select(
-        HEALTH_SYSTEM_STAY_ID,
-        UNIT_STAY_ID,
-        allergy_pseudotime.alias("allergyEnteredTimestamp"),
-        "allergyType",
-        "allergyName",
-    )
+    return fn
 
 
 class PreProcessor(NamedTuple):
@@ -221,22 +211,16 @@ class PreProcessor(NamedTuple):
     dependencies: tuple[str, list[str]]
 
 
-FUNCTIONS: dict[str, PreProcessor] = {
+NEEDED_PATIENT_COLS = [UNIT_STAY_ID, HEALTH_SYSTEM_STAY_ID, "unitAdmitTimestamp"]
+PATIENT_DEPENDENCY = ("patient", NEEDED_PATIENT_COLS)
+
+# Generic "copy from patients" functions are stored in `configs/table_preprocessors.yaml` and loaded in
+# `main`.
+SPECIALTY_FUNCTIONS: dict[str, PreProcessor] = {
     "patient": PreProcessor(
         process_patient, ("hospital", ["hospitalid", "numbedscategory", "teachingstatus", "region"])
     ),
-    "admissiondx": PreProcessor(
-        process_admissiondx, ("patient", [UNIT_STAY_ID, HEALTH_SYSTEM_STAY_ID, "unitAdmitTimestamp"])
-    ),
-    "allergy": PreProcessor(
-        process_allergy, ("patient", [UNIT_STAY_ID, HEALTH_SYSTEM_STAY_ID, "unitAdmitTimestamp"])
-    ),
 }
-
-# From MIMIC
-# "hosp/diagnoses_icd": (add_discharge_time_by_hadm_id, ("hosp/admissions", ["hadm_id", "dischtime"])),
-# "hosp/drgcodes": (add_discharge_time_by_hadm_id, ("hosp/admissions", ["hadm_id", "dischtime"])),
-# "hosp/patients": (fix_static_data, ("hosp/admissions", ["subject_id", "deathtime"])),
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="pre_MEDS")
@@ -264,6 +248,20 @@ def main(cfg: DictConfig):
       1. `admissiondrug`: This table is noted in the
          [documentation](https://eicu-crd.mit.edu/eicutables/admissiondrug/) as being "Extremely infrequently
          used".
+      2. `apacheApsVar`: This table is a sort of "meta-table" that contains variables used to compute the
+         APACHE score; we won't use these raw variables from this table, but instead will use the raw data.
+      3. `apachePatientResult`: This table has pre-computed APACHE score variables; we won't use these and
+         will use the raw data directly.
+      4. `apachePredVar`: This table contains variables used to compute the APACHE score; we won't use these
+         in favor of the raw data directly.
+      5. `carePlanCareProvider`: This table contains information about the provider for given care-plan
+         entries; however, as we can't link this table to the particular care-plan entries, we don't use it
+         here. It also is not clear (to the author of this script; the eICU team may know more) how reliable
+         the time-offsets are for this table as they merely denote when a provider was entered into the care
+         plan.
+      6. `customLab`: The documentation for this table is very sparse, so we skip it.
+      7. `intakeOutput`: There are a number of significant warnings about duplicates, cumulative values, and
+         more in the documentation for this table, so for now we skip it.
 
     Args (all as part of the config file):
         raw_cohort_dir: The directory containing the raw eICU files.
@@ -273,6 +271,17 @@ def main(cfg: DictConfig):
     raise NotImplementedError("This script is not yet implemented for eICU.")
 
     hydra_loguru_init()
+
+    functions = {**SPECIALTY_FUNCTIONS}
+
+    logger.info("Loading table preprocessors from configs/table_preprocessors.yaml...")
+    preprocessors = OmegaConf.load("configs/table_preprocessors.yaml")
+    for table_name, preprocessor_cfg in preprocessors.items():
+        logger.info(f"  Adding preprocessor for {table_name}:\n{OmegaConf.to_yaml(preprocessor_cfg)}")
+        functions[table_name] = PreProcessor(
+            join_and_get_pseudotime_fntr(table_name=table_name, **preprocessor_cfg),
+            PATIENT_DEPENDENCY,
+        )
 
     raw_cohort_dir = Path(cfg.raw_cohort_dir)
     MEDS_input_dir = Path(cfg.output_dir)
@@ -292,7 +301,7 @@ def main(cfg: DictConfig):
 
         out_fp.parent.mkdir(parents=True, exist_ok=True)
 
-        if pfx not in FUNCTIONS:
+        if pfx not in functions:
             logger.info(
                 f"No function needed for {pfx}: "
                 f"Symlinking {str(in_fp.resolve())} to {str(out_fp.resolve())}"
@@ -306,7 +315,7 @@ def main(cfg: DictConfig):
                 print(f"Done with {pfx}. Continuing")
                 continue
 
-            fn, need_df = FUNCTIONS[pfx]
+            fn, need_df = functions[pfx]
             if not need_df:
                 st = datetime.now()
                 logger.info(f"Processing {pfx}...")
@@ -340,7 +349,7 @@ def main(cfg: DictConfig):
             out_fp = MEDS_input_dir / f"{pfx}.parquet"
 
             logger.info(f"  Processing dependent df @ {pfx}...")
-            fn, _ = FUNCTIONS[pfx]
+            fn, _ = functions[pfx]
 
             fp_st = datetime.now()
             logger.info(f"    Loading {str(fp.resolve())}...")
