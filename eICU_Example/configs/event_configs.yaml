@@ -36,6 +36,7 @@ patient:
       - col("unitStayType")
     timestamp: "unitAdmitTimestamp"
     ward_id: "wardID"
+    unit_stay_id: "patientUnitStayID"
   unit_admission_weight:
     code:
       - "UNIT_ADMISSION_WEIGHT"
@@ -58,4 +59,19 @@ patient:
     timestamp: "unitDischargeTimestamp"
     numerical_value: "unitDischargeWeight"
 
-timestamp_format: "%Y-%m-%d %H:%M:%S"
+admissiondx:
+  admission_diagnosis:
+    code:
+      - "ADMISSION_DX"
+      - col("admitDxName")
+    timestamp: "admitDxEnteredTimestamp"
+    admission_dx_id: "admitDxID"
+    unit_stay_id: "patientUnitStayID"
+
+allergy:
+  allergy:
+    code:
+      - "ALLERGY"
+      - col("allergyType")
+      - col("allergyName")
+    timestamp: "allergyEnteredTimestamp"

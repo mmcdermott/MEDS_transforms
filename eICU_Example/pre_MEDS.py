@@ -66,7 +66,7 @@ def check_timestamps_agree(df: pl.LazyFrame, pseudotime_col: pl.Expr, given_24ht
         )
 
 
-def process_patient_table(df: pl.LazyFrame, hospital_df: pl.LazyFrame) -> pl.LazyFrame:
+def process_patient(df: pl.LazyFrame, hospital_df: pl.LazyFrame) -> pl.LazyFrame:
     """Takes the patient table and converts it to a form that includes timestamps.
 
     As eICU stores only offset times, note here that we add a CONSTANT TIME ACROSS ALL PATIENTS for the true
@@ -121,12 +121,12 @@ def process_patient_table(df: pl.LazyFrame, hospital_df: pl.LazyFrame) -> pl.Laz
 
     return df.join(hospital_df, left_on="hospitalID", right_on="hospitalid", how="left").select(
         # 1. Static variables
-        "uniquepid",
+        PATIENT_ID,
         "gender",
         pseudo_date_of_birth.alias("dateOfBirth"),
         "ethnicity",
         # 2. Health system stay parameters
-        "patientHealthSystemStayID",
+        HEALTH_SYSTEM_STAY_ID,
         "hospitalID",
         pl.col("numbedscategory").alias("hospitalNumBedsCategory"),
         pl.col("teachingstatus").alias("hospitalTeachingStatus"),
@@ -139,7 +139,7 @@ def process_patient_table(df: pl.LazyFrame, hospital_df: pl.LazyFrame) -> pl.Laz
         "hospitalDischargeLocation",
         "hospitalDischargeStatus",
         # 3. Unit stay parameters
-        "patientUnitStayID",  # The unit stay ID
+        UNIT_STAY_ID,
         "wardID",
         # 3.1 Admission parameters
         unit_admit_pseudotime.alias("unitAdmitTimestamp"),
@@ -152,6 +152,59 @@ def process_patient_table(df: pl.LazyFrame, hospital_df: pl.LazyFrame) -> pl.Laz
         "unitDischargeLocation",
         "unitDischargeStatus",
         pl.col("dischargeWeight").alias("unitDischargeWeight"),
+    )
+
+
+def process_admissiondx(df: pl.LazyFrame, patient_df: pl.LazyFrame) -> pl.LazyFrame:
+    """Takes the admissiondx table and converts it to a form that includes timestamps.
+
+    The output of this process is ultimately converted to events via the `admissiondx` key in the
+    `configs/event_configs.yaml` file.
+    """
+
+    admission_dx_pseudotime = pl.col("unitAdmitTimestamp") + pl.duration(
+        minutes=pl.col("admitDxEnteredOffset")
+    )
+
+    logger.warning(
+        "NOT SURE ABOUT THE FOLLOWING for admissiondx table. Check with the eICU team:\n"
+        "  - How should we use `admitDxTest`? It's not used here.\n"
+        "  - How should we use `admitDxPath`? It's not used here.\n"
+    )
+
+    return df.join(patient_df, on=UNIT_STAY_ID, how="inner").select(
+        HEALTH_SYSTEM_STAY_ID,
+        UNIT_STAY_ID,
+        admission_dx_pseudotime.alias("admitDxEnteredTimestamp"),
+        "admitDxName",
+        "admitDxID",
+    )
+
+
+def process_allergy(df: pl.LazyFrame, patient_df: pl.LazyFrame) -> pl.LazyFrame:
+    """Takes the allergy table and converts it to a form that includes timestamps.
+
+    The output of this process is ultimately converted to events via the `allergy` key in the
+    `configs/event_configs.yaml` file.
+    """
+
+    allergy_pseudotime = pl.col("unitAdmitTimestamp") + pl.duration(minutes=pl.col("allergyEnteredOffset"))
+
+    logger.warning(
+        "NOT SURE ABOUT THE FOLLOWING for allergy table. Check with the eICU team:\n"
+        "  - How should we use `allergyNoteType`? It's not used here.\n"
+        "  - How should we use `specialtyType`? It's not used here.\n"
+        "  - How should we use `userType`? It's not used here.\n"
+        "  - Is `drugName` the name of the drug to which the patient is allergic or the drug given to the "
+        "patient (docs say 'name of the selected admission drug')?\n"
+    )
+
+    return df.join(patient_df, on=UNIT_STAY_ID, how="inner").select(
+        HEALTH_SYSTEM_STAY_ID,
+        UNIT_STAY_ID,
+        allergy_pseudotime.alias("allergyEnteredTimestamp"),
+        "allergyType",
+        "allergyName",
     )
 
 
@@ -170,7 +223,13 @@ class PreProcessor(NamedTuple):
 
 FUNCTIONS: dict[str, PreProcessor] = {
     "patient": PreProcessor(
-        process_patient_table, ("hospital", ["hospitalid", "numbedscategory", "teachingstatus", "region"])
+        process_patient, ("hospital", ["hospitalid", "numbedscategory", "teachingstatus", "region"])
+    ),
+    "admissiondx": PreProcessor(
+        process_admissiondx, ("patient", [UNIT_STAY_ID, HEALTH_SYSTEM_STAY_ID, "unitAdmitTimestamp"])
+    ),
+    "allergy": PreProcessor(
+        process_allergy, ("patient", [UNIT_STAY_ID, HEALTH_SYSTEM_STAY_ID, "unitAdmitTimestamp"])
     ),
 }
 
