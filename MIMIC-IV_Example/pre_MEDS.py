@@ -59,7 +59,7 @@ def fix_static_data(raw_static_df: pl.LazyFrame, death_times_df: pl.LazyFrame) -
 
     return raw_static_df.join(death_times_df, on="subject_id", how="left").select(
         "subject_id",
-        pl.coalesce(pl.col("dod"), pl.col("deathtime")).alias("dod"),
+        pl.coalesce(pl.col("deathtime"), pl.col("dod")).alias("dod"),
         (pl.col("anchor_year") - pl.col("anchor_age")).cast(str).alias("year_of_birth"),
         "gender",
     )
@@ -106,7 +106,7 @@ def main(cfg: DictConfig):
                 f"No function needed for {pfx}: "
                 f"Symlinking {str(in_fp.resolve())} to {str(out_fp.resolve())}"
             )
-            relative_in_fp = in_fp.relative_to(out_fp.parent, walk_up=True)
+            relative_in_fp = in_fp.relative_to(out_fp.resolve().parent, walk_up=True)
             out_fp.symlink_to(relative_in_fp)
             continue
         else:
