@@ -157,7 +157,10 @@ def hydra_loguru_init() -> None:
 
 
 def write_lazyframe(df: pl.LazyFrame, out_fp: Path) -> None:
-    df.collect().write_parquet(out_fp, use_pyarrow=True)
+    if isinstance(df, pl.LazyFrame):
+        df = df.collect()
+
+    df.write_parquet(out_fp, use_pyarrow=True)
 
 
 def get_shard_prefix(base_path: Path, fp: Path) -> str:
