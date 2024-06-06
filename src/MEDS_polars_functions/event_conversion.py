@@ -379,9 +379,8 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
     df = df.select(**event_exprs).unique(maintain_order=True)
 
     # if numerical_value column is not numeric, convert it to float
-    if "numerical_value" in df.columns:
-        if not df.schema["numerical_value"].is_numeric():
-            logger.warning(f"Converting numerical_value to float for codes {codes}")
+    if "numerical_value" in df.columns and not df.schema["numerical_value"].is_numeric():
+        logger.warning(f"Converting numerical_value to float for codes {codes}")
         df = df.with_columns(pl.col("numerical_value").cast(pl.Float64, strict=False))
 
     return df
