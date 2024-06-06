@@ -8,6 +8,79 @@ from pathlib import Path
 
 from loguru import logger
 
+LOCK_TIME_FMT = "%Y-%m-%dT%H:%M:%S.%f"
+
+
+def get_earliest_lock(cache_directory: Path) -> datetime | None:
+    """Returns the earliest start time of any lock file present in a cache directory, or None if none exist.
+
+    Args:
+        cache_directory: The cache directory to check for the presence of a lock file.
+
+    Examples:
+        >>> import tempfile
+        >>> directory = tempfile.TemporaryDirectory()
+        >>> root = Path(directory.name)
+        >>> empty_directory = root / "cache_empty"
+        >>> empty_directory.mkdir(exist_ok=True, parents=True)
+        >>> cache_directory = root / "cache_with_locks"
+        >>> locks_directory = cache_directory / "locks"
+        >>> locks_directory.mkdir(exist_ok=True, parents=True)
+        >>> time_1 = datetime(2021, 1, 1)
+        >>> time_1_str = time_1.strftime(LOCK_TIME_FMT) # "2021-01-01T00:00:00.000000"
+        >>> lock_fp_1 = locks_directory / f"{time_1_str}.json"
+        >>> _ = lock_fp_1.write_text(json.dumps({"start": time_1_str}))
+        >>> time_2 = datetime(2021, 1, 2, 3, 4, 5)
+        >>> time_2_str = time_2.strftime(LOCK_TIME_FMT) # "2021-01-02T03:04:05.000000"
+        >>> lock_fp_2 = locks_directory / f"{time_2_str}.json"
+        >>> _ = lock_fp_2.write_text(json.dumps({"start": time_2_str}))
+        >>> get_earliest_lock(cache_directory)
+        datetime.datetime(2021, 1, 1, 0, 0)
+        >>> get_earliest_lock(empty_directory) is None
+        True
+        >>> lock_fp_1.unlink()
+        >>> get_earliest_lock(cache_directory)
+        datetime.datetime(2021, 1, 2, 3, 4, 5)
+        >>> directory.cleanup()
+    """
+    locks_directory = cache_directory / "locks"
+
+    lock_times = [
+        datetime.strptime(json.loads(lock_fp.read_text())["start"], LOCK_TIME_FMT)
+        for lock_fp in locks_directory.glob("*.json")
+    ]
+
+    return min(lock_times) if lock_times else None
+
+
+def register_lock(cache_directory: Path) -> tuple[datetime, Path]:
+    """Register a lock file in a cache directory.
+
+    Args:
+        cache_directory: The cache directory to register a lock file in.
+
+    Examples:
+        >>> import tempfile
+        >>> directory = tempfile.TemporaryDirectory()
+        >>> root = Path(directory.name)
+        >>> cache_directory = root / "cache_with_locks"
+        >>> lock_time, lock_fp = register_lock(cache_directory)
+        >>> assert (datetime.now() - lock_time).total_seconds() < 1, "Lock time should be ~ now."
+        >>> lock_fp.is_file()
+        True
+        >>> lock_fp.read_text() == f'{{"start": "{lock_time.strftime(LOCK_TIME_FMT)}"}}'
+        True
+        >>> directory.cleanup()
+    """
+
+    lock_directory = cache_directory / "locks"
+    lock_directory.mkdir(exist_ok=True, parents=True)
+
+    lock_time = datetime.now()
+    lock_fp = lock_directory / f"{lock_time.strftime(LOCK_TIME_FMT)}.json"
+    lock_fp.write_text(json.dumps({"start": lock_time.strftime(LOCK_TIME_FMT)}))
+    return lock_time, lock_fp
+
 
 def wrap[
     DF_T
@@ -108,15 +181,15 @@ def wrap[
         │ 3   ┆ 5   ┆ 12  │
         └─────┴─────┴─────┘
         >>> shutil.rmtree(cache_directory)
-        >>> lock_fp = cache_directory / "lock.json"
-        >>> assert not lock_fp.is_file()
-        >>> def lock_fp_checker_fn(df: pl.DataFrame) -> pl.DataFrame:
-        ...     print(f"Lock fp exists? {lock_fp.is_file()}")
+        >>> lock_dir = cache_directory / "locks"
+        >>> assert not lock_dir.exists()
+        >>> def lock_dir_checker_fn(df: pl.DataFrame) -> pl.DataFrame:
+        ...     print(f"Lock dir exists? {lock_dir.exists()}")
         ...     return df
         >>> result_computed, out_df = wrap(
-        ...     in_fp, out_fp, read_fn, write_fn, lock_fp_checker_fn, do_return=True
+        ...     in_fp, out_fp, read_fn, write_fn, lock_dir_checker_fn, do_return=True
         ... )
-        Lock fp exists? True
+        Lock dir exists? True
         >>> assert result_computed
         >>> out_df
         shape: (3, 3)
@@ -146,21 +219,19 @@ def wrap[
     cache_directory = out_fp.parent / f".{out_fp.stem}_cache"
     cache_directory.mkdir(exist_ok=True, parents=True)
 
-    st_time = datetime.now()
-    runtime_info = {"start": str(st_time)}
+    earliest_lock_time = get_earliest_lock(cache_directory)
+    if earliest_lock_time is not None:
+        logger.info(f"{out_fp} is in progress as of {earliest_lock_time}. Returning.")
+        return False, None if do_return else False
 
-    lock_fp = cache_directory / "lock.json"
-    if lock_fp.is_file():
-        started_at = json.loads(lock_fp.read_text())["start"]
-        logger.info(
-            f"{out_fp} is under construction as of {started_at} as {lock_fp} exists. " "Returning None."
-        )
-        if do_return:
-            return False, None
-        else:
-            return False
+    st_time, lock_fp = register_lock(cache_directory)
 
-    lock_fp.write_text(json.dumps(runtime_info))
+    logger.info(f"Registered lock at {st_time}. Double checking no earlier locks have been registered.")
+    earliest_lock_time = get_earliest_lock(cache_directory)
+    if earliest_lock_time < st_time:
+        logger.info(f"Earlier lock found at {earliest_lock_time}. Deleting current lock and returning.")
+        lock_fp.unlink()
+        return False, None if do_return else False
 
     logger.info(f"Reading input dataframe from {in_fp}")
     df = read_fn(in_fp)
