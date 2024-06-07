@@ -27,7 +27,7 @@ if [[ "$1" == "-h" || "$1" == "--help" ]]; then
 fi
 
 # Check for mandatory parameters
-if [ "$#" -ne 4 ]; then
+if [ "$#" -lt 4 ]; then
     echo "Error: Incorrect number of arguments provided."
     display_help
 fi
