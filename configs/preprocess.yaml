@@ -36,9 +36,11 @@ stage_configs:
     aggregations:
       - "code/n_occurrences"
       - "code/n_patients"
+    do_summarize_over_all_codes: true # This indicates we should include overall, code-independent counts
 
   filter_codes:
-    min_code_occurrences: null
+    min_patients_per_code: null
+    min_occurrences_per_code: null
 
   fit_outlier_detection:
     aggregations:
