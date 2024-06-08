@@ -70,6 +70,14 @@ In practice, on a machine with 150 GB of RAM and 10 cores, this step takes less 
 
 ## Step 3: Run the MEDS extraction ETL
 
+Note that eICU has a lot more observations per patient than does MIMIC-IV, so to keep to a reasonable memory
+burden (e.g., \< 150GB per worker), you will want a smaller shard size, as well as to turn off the final unique
+check (which should not be necessary given the structure of eICU and is expensive) in the merge stage. You can
+do this by setting the following parameters at the end of the mandatory args when running this script:
+
+- `stage_configs.split_and_shard_patients.n_patients_per_shard=10000`
+- `stage_configs.merge_to_MEDS_cohort.unique_by=null`
+
 ### Running locally, serially
 
 We will assume you want to output the final MEDS dataset into a directory we'll denote as `$EICU_MEDS_DIR`.
