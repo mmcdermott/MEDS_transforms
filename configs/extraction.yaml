@@ -25,3 +25,4 @@ stage_configs:
       held_out: 0.1
   merge_to_MEDS_cohort:
     output_dir: ${cohort_dir}/final_cohort
+    unique_by: "*"
