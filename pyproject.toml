@@ -19,7 +19,7 @@ classifiers = [
 dependencies = ["polars", "pyarrow", "nested_ragged_tensors", "loguru", "hydra-core", "numpy"]
 
 [project.optional-dependencies]
-mimic = ["rootutils"]
+examples = ["rootutils"]
 dev = ["pre-commit"]
 tests = ["pytest", "pytest-cov[toml]", "rootutils"]
 local_parallelism = ["hydra-joblib-launcher"]

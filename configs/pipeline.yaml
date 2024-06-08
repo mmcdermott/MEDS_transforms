@@ -2,7 +2,7 @@
 input_dir: ???
 cohort_dir: ???
 
-log_dir: "${cohort_dir}/.logs"
+log_dir: "${cohort_dir}/.logs/${stage}"
 
 # General pipeline variables
 do_overwrite: False
