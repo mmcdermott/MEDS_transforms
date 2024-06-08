@@ -38,7 +38,7 @@ def main(cfg: DictConfig):
     patient_splits = list(shards.keys())
     random.shuffle(patient_splits)
 
-    mapper_fn = mapper_fntr(cfg, cfg.stage)
+    mapper_fn = mapper_fntr(cfg.stage_cfg, cfg.get("code_modifier_columns", None))
 
     start = datetime.now()
     logger.info("Starting code metadata mapping computation")
@@ -75,7 +75,7 @@ def main(cfg: DictConfig):
 
     start = datetime.now()
     logger.info("All map shards complete! Starting code metadata reduction computation.")
-    reducer_fn = reducer_fntr(cfg, cfg.stage)
+    reducer_fn = reducer_fntr(cfg.stage_cfg, cfg.get("code_modifier_columns", None))
 
     reduced = reducer_fn(pl.scan_parquet(fp, glob=False) for fp in all_out_fps)
     write_lazyframe(reduced, output_dir / "code_metadata.parquet")
