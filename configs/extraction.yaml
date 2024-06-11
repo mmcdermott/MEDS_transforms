@@ -29,7 +29,7 @@ stage_configs:
       This stage shards the raw input events into smaller files for easier processing. Arguments:
         - `row_chunksize`: The number of rows to read in at a time.
         - `infer_schema_length`: The number of rows to read in to infer the schema (only used if the source
-          files are pdfs)
+          files are csvs)
     row_chunksize: 200000000
     infer_schema_length: 10000
   split_and_shard_patients:
@@ -41,6 +41,11 @@ stage_configs:
           held-out test sets beyond the IID held out set that will be produced (e.g., for prospective
           datasets, etc.).
         - `split_fracs`: The fraction of patients to include in the IID training, tuning, and held-out sets.
+          Split fractions can be changed for the default names by adding a hydra-syntax command line argument
+          for the nested name; e.g., `split_fracs.train=0.7 split_fracs.tuning=0.1 split_fracs.held_out=0.2`.
+          A split can be removed with the `~` override Hydra syntax. Similarly, a new split name can be added
+          with the standard Hydra `+` override option. E.g., `~split_fracs.held_out +split_fracs.test=0.1`. It
+          is the user's responsibility to ensure that split fractions sum to 1.
     is_metadata: True
     output_dir: ${cohort_dir}
     n_patients_per_shard: 50000
