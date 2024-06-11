@@ -1,59 +1,51 @@
-# Raw data
-MEDS_cohort_dir: ???
-output_data_dir: ???
-log_dir: "${output_data_dir}/.logs"
+defaults:
+  - pipeline
+  - _self_
 
-# Worker / Stage information
-stage: ???
-worker: 1
-polling_time: 300 # wait time in seconds before beginning reduction steps
-
-# Filtering parameters
-min_code_occurrences: null
-min_events_per_patient: null
-min_measurements_per_patient: null
-
-# Time-derived measurements
-time_derived_measurements:
-  age:
-    dob_code: ???
-    age_code: "AGE"
-    age_unit: "years"
-  time_of_day:
-    bin_endpoints: [6, 12, 18, 24]
-
-# Code modifiers will be used as adjoining parts of the `code` columns during group-bys and eventual
+# Global pipeline parameters:
+# 1. Code modifiers will be used as adjoining parts of the `code` columns during group-bys and eventual
 # tokenization.
 code_modifier_columns: ???
 
-# Code metadata extraction. These may contain duplicates because the data may be filtered between different
-# stages, depending on the pipeline in question.
-code_processing_stages:
-  preliminary_counts:
-    - "code/n_occurrences"
-    - "code/n_patients"
-  outlier_detection:
-    - "values/n_occurrences"
-    - "values/sum"
-    - "values/sum_sqd"
-  normalization:
-    - "code/n_occurrences"
-    - "code/n_patients"
-    - "values/n_occurrences"
-    - "values/sum"
-    - "values/sum_sqd"
+# Pipeline Structure
+stages:
+  - name: filter_patients
+    min_events_per_patient: null
+    min_measurements_per_patient: null
 
-# Outlier detection
-outlier_stddev_cutoff: 4.5
+  - name: add_time_derived_measurements
+    age:
+      dob_code: ???
+      age_code: "AGE"
+      age_unit: "years"
+    time_of_day:
+      bin_endpoints: [6, 12, 18, 24]
 
-# Misc
-do_overwrite: False
+  - name: preliminary_counts
+    obs_aggregations:
+      - "code/n_occurrences"
+      - "code/n_patients"
 
-# Hydra
-hydra:
-  job:
-    name: "MEDS_Preprocessor/stage_${stage}/worker_${worker}/${now:%Y-%m-%d_%H-%M-%S}"
-  run:
-    dir: "${log_dir}/${hydra.job.name}"
-  sweep:
-    dir: "${log_dir}/${hydra.job.name}"
+  - name: filter_codes
+    min_code_occurrences: null
+
+  - name: fit_outlier_detection
+    aggregations:
+      - "values/n_occurrences"
+      - "values/sum"
+      - "values/sum_sqd"
+
+  - name: filter_outliers
+    stddev_cutoff: 4.5
+
+  - name: fit_normalization
+    aggregations:
+      - "code/n_occurrences"
+      - "code/n_patients"
+      - "values/n_occurrences"
+      - "values/sum"
+      - "values/sum_sqd"
+
+  - name: normalization
+  - name: tokenization
+  - name: tensorization

@@ -190,9 +190,14 @@ def main(cfg: DictConfig):
     """
     hydra_loguru_init()
 
-    raw_cohort_dir = Path(cfg.raw_cohort_dir)
-    MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
-    row_chunksize = cfg.row_chunksize
+    logger.info(
+        f"Running with config:\n{OmegaConf.to_yaml(cfg)}\n"
+        f"Stage: {cfg.stage}\n\n"
+        f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
+    )
+
+    raw_cohort_dir = Path(cfg.stage_cfg.data_input_dir)
+    row_chunksize = cfg.stage_cfg.row_chunksize
 
     event_conversion_cfg_fp = Path(cfg.event_conversion_config_fp)
     if not event_conversion_cfg_fp.exists():
@@ -217,6 +222,9 @@ def main(cfg: DictConfig):
                 input_files_to_subshard.append(f)
                 seen_files.add(get_shard_prefix(raw_cohort_dir, f))
 
+    if not input_files_to_subshard:
+        raise FileNotFoundError(f"Can't find any files in {str(raw_cohort_dir.resolve())} to sub-shard!")
+
     random.shuffle(input_files_to_subshard)
 
     subsharding_files_strs = "\n".join([f"  * {str(fp.resolve())}" for fp in input_files_to_subshard])
@@ -226,19 +234,21 @@ def main(cfg: DictConfig):
     )
     logger.info(
         f"Will read raw data from {str(raw_cohort_dir.resolve())}/$IN_FILE.parquet and write sub-sharded "
-        f"data to {str(MEDS_cohort_dir.resolve())}/sub_sharded/$IN_FILE/$ROW_START-$ROW_END.parquet"
+        f"data to {cfg.stage_cfg.output_dir}/$IN_FILE/$ROW_START-$ROW_END.parquet"
     )
 
     start = datetime.now()
     for input_file in input_files_to_subshard:
         columns = prefix_to_columns[get_shard_prefix(raw_cohort_dir, input_file)]
 
-        out_dir = MEDS_cohort_dir / "sub_sharded" / get_shard_prefix(raw_cohort_dir, input_file)
+        out_dir = Path(cfg.stage_cfg.output_dir) / get_shard_prefix(raw_cohort_dir, input_file)
         out_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Processing {input_file} to {out_dir}.")
 
         logger.info(f"Performing preliminary read of {str(input_file.resolve())} to determine row count.")
-        df = scan_with_row_idx(input_file, columns=columns, infer_schema_length=cfg["infer_schema_length"])
+        df = scan_with_row_idx(
+            input_file, columns=columns, infer_schema_length=cfg.stage_cfg.infer_schema_length
+        )
 
         row_count = df.select(pl.len()).collect().item()
 
@@ -272,7 +282,9 @@ def main(cfg: DictConfig):
             rwlock_wrap(
                 input_file,
                 out_fp,
-                partial(scan_with_row_idx, columns=columns, infer_schema_length=cfg["infer_schema_length"]),
+                partial(
+                    scan_with_row_idx, columns=columns, infer_schema_length=cfg.stage_cfg.infer_schema_length
+                ),
                 write_lazyframe,
                 compute_fn,
                 do_overwrite=cfg.do_overwrite,

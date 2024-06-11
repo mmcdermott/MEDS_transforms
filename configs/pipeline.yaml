@@ -1,0 +1,43 @@
+# Global IO
+input_dir: ???
+cohort_dir: ???
+
+_default_description: |-
+  This is a MEDS pipeline ETL. Please set a more detailed description at the top of your specific pipeline
+  configuration file.
+
+log_dir: "${cohort_dir}/.logs/${stage}"
+
+# General pipeline variables
+do_overwrite: False
+seed: 1
+stages: ??? # The list of stages to this overall pipeline (in order)
+stage_configs: ??? # The configurations for each stage, keyed by stage name
+
+# Mapreduce information
+worker: 1
+polling_time: 300 # wait time in seconds before beginning reduction steps
+
+# Filling in the current stage
+stage: ${current_script_name:}
+stage_cfg: ${oc.create:${populate_stage:${stage}, ${input_dir}, ${cohort_dir}, ${stages}, ${stage_configs}}}
+
+# Hydra
+hydra:
+  job:
+    name: "${stage}_${worker}_${now:%Y-%m-%d_%H-%M-%S}"
+  run:
+    dir: "${log_dir}"
+  sweep:
+    dir: "${log_dir}"
+  help:
+    app_name: "MEDS/${stage}"
+    template: |-
+      == ${hydra.help.app_name} ==
+      ${hydra.help.app_name} is a command line tool that provides an interface for running MEDS pipelines.
+
+      **Pipeline description:**
+      ${oc.select:description, ${_default_description}}
+
+      **Stage description:**
+      ${oc.select:stage_configs.${stage}.description, ${get_script_docstring:}}

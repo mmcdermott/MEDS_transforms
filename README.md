@@ -15,6 +15,11 @@ more information.
 This package provides three things:
 
 1. A working, scalable, simple example of how to extract and pre-process MEDS data for downstream modeling.
+   These examples are provided in the form of:
+   - A set of integration tests that are run over synthetic data to verify correctness of the ETL pipeline.
+     See `tests/test_extraction.py` for the ETL tests with the in-built synthetic source data.
+   - A working MIMIC-IV MEDS ETL pipeline that can be run over MIMIC-IV v2.2 in approximately 1 hour in serial
+     mode (and much faster if parallelized). See `MIMIC-IV_Example` for more details.
 2. A flexible ETL for extracting MEDS data from a variety of source formats.
 3. A pre-processing pipeline that can be used for models that require:
    - Filtering data to only include patients with a certain number of events
@@ -27,9 +32,92 @@ This package provides three things:
 
 ## Installation
 
-For now, clone this repository and run `pip install -e .` from the repository root.
+- For a base installation, clone this repository and run `pip install .` from the repository root.
+- For running the MIMIC-IV example, install the optional MIMIC dependencies as well with `pip install .[mimic]`.
+- To support same-machine, process-based parallelism, install the optional joblib dependencies with `pip install .[local_parallelism]`.
+- To support cluster-based parallelism, install the optional submitit dependencies with `pip install .[slurm_parallelism]`.
+- For working on development, install the optional development dependencies with `pip install .[dev,tests]`.
+- Optional dependencies can be mutually installed by combining the optional dependency names with commas in
+  the square brackets, e.g., `pip install .[mimic,local_parallelism]`.
 
-## MEDS ETL / Extraction Pipeline
+## Usage -- High Level
+
+The MEDS ETL and pre-processing pipelines are designed to be run in a modular, stage-based manner, with each
+stage of the pipeline being run as a separate script. For a single pipeline, all scripts will take the same
+arguments by leveraging the same Hydra configuration file, and to run multiple workers on a single stage in
+parallel, the user can launch the same script multiple times _without changing the arguments or configuration
+file_, and the scripts will automatically handle the parallelism and avoid duplicative work. This permits
+tremendous flexibility in how these pipelines can be run.
+
+- The user can run the entire pipeline in serial, through a single shell script simply by calling each
+  stage's script in sequence.
+- The user can leverage arbitrary scheduling systems (e.g., Slurm, LSF, Kubernetes, etc.) to run each stage
+  in parallel on a cluster, by constructing the appropriate worker scripts to run each stage's script and
+  simply launching as many worker jobs as is desired (note this will typically required a distributed file
+  system to work correctly, as these scripts use manually created file locks to avoid duplicative work).
+- The user can run each stage in parallel on a single machine by launching multiple copies of the same
+  script in different terminal sessions. This can result in a significant speedup depending on the machine
+  configuration as it ensures that parallelism can be used with minimal file read contention.
+
+Two of these methods of parallelism, in particular local-machine parallelism and slurm-based cluster
+parallelism, are supported explicitly by this package through the use of the `joblib` and `submitit` Hydra
+plugins and Hydra's multirun capabilities, which will be discussed in more detail below.
+
+By following this design convention, each individual stage of the pipeline can be kept extremely simple (often
+each stage corresponds simply to a single short "dataframe" function), can be rigorously tested, can be cached
+after completion to permit easy re-suming or re-running of the pipeline, and permits extremely flexible and
+efficient (through parallelization) use of the pipeline in a variety of environments, all without imposing
+significant complexity, overhead, or computational dependencies on the user.
+
+Below we walk through usage of this mechanism for both the ETL and the model-specific pre-processing
+pipelines in more detail.
+
+### Scripts for the ETL Pipeline
+
+The ETL pipeline (which is more complete, and likely to be viable for a wider range of input datasets out of
+the box) relies on the following configuration files and scripts:
+
+Configuration: `configs/extraction.yaml`
+
+```yaml
+# The event conversion configuration file is used throughout the pipeline to define the events to extract.
+event_conversion_config_fp: ???
+
+stages:
+  - shard_events
+  - split_and_shard_patients
+  - convert_to_sharded_events
+  - merge_to_MEDS_cohort
+
+stage_configs:
+  shard_events:
+    row_chunksize: 200000000
+    infer_schema_length: 10000
+  split_and_shard_patients:
+    is_metadata: true
+    output_dir: ${cohort_dir}
+    n_patients_per_shard: 50000
+    external_splits_json_fp:
+    split_fracs:
+      train: 0.8
+      tuning: 0.1
+      held_out: 0.1
+  merge_to_MEDS_cohort:
+    output_dir: ${cohort_dir}/final_cohort
+```
+
+Scripts:
+
+1. `shard_events.py`: Shards the input data into smaller, event-level shards.
+2. `split_and_shard_patients.py`: Splits the patient population into ML splits and shards these splits into
+   patient-level shards.
+3. `convert_to_sharded_events.py`: Converts the input, event-level shards into the MEDS event format and
+   sub-shards them into patient-level sub-shards.
+4. `merge_to_MEDS_cohort.py`: Merges the patient-level, event-level shards into full patient-level shards.
+
+See the `MIMIC-IV_Example` directory for a full, worked example of the ETL on MIMIC-IV v2.2.
+
+## MEDS ETL / Extraction Pipeline Details
 
 ### Overview
 
@@ -196,6 +284,39 @@ to the ETL, this pipeline is designed to enable seamless parallelism and efficie
 running multiple copies of the same script on independent workers to process the data in parallel. "Reduction"
 steps again need to happen in a single-threaded manner, but these steps are generally very fast and should not
 be a bottleneck.
+
+## Overview of configuration manipulation
+
+### Pipeline configuration: Stages and OmegaConf Resolvers
+
+The pipeline configuration file for both the provided extraction and pre-processing pipelines are structured
+to permit both ease of understanding, flexibility for user-derived modifications, and ease of use in the
+simple, file-in/file-out scripts that this repository promotes. How this works is that each pipeline
+(extraction and pre-processing) defines one global configuration file which is used as the Hydra specification
+for all scripts in that pipeline. This file leverages some generic pipeline configuration options, specified
+in `pipeline.yaml` and imported via the Hydra `defaults:` list, but also defines a list of stages with
+stage-specific configurations.
+
+The user can specify the stage in question on the command line either manually (e.g., `stage=stage_name`) or
+allow the stage name to be inferred automatically from the script name. Each script receives both the global
+configuration file but also a sub-configuration (within the `stage_cfg` node in the received global
+configuration) which is pre-populated with the stage-specific configuration for the stage in question and
+automatically inferred input and output file paths (if not overwritten in the config file) based on the stage
+name and its position in the overall pipeline. This makes it easy to leverage transformations and scripts
+defined here in new configuration pipelines, simply by placing them as a stage in a broader pipeline in a
+different configuration or order relative to other stages.
+
+### Running the Pipeline in Parallel via Hydra Multirun
+
+We support two (optional) hydra multirun job launchers for parallelizing ETL and pre-processing pipeline
+steps: [`joblib`](https://hydra.cc/docs/plugins/joblib_launcher/) (for local parallelism) and
+[`submitit`](https://hydra.cc/docs/plugins/submitit_launcher/) to launch things with slurm for cluster
+parallelism.
+
+To use either of these, you need to install additional optional dependencies:
+
+1. `pip install -e .[local_parallelism]` for joblib local parallelism support, or
+2. `pip install -e .[slurm_parallelism]` for submitit cluster parallelism support.
 
 ## TODOs:
 
