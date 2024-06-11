@@ -59,3 +59,4 @@ stage_configs:
           datasets, etc.).
         - `split_fracs`: The fraction of patients to include in the IID training, tuning, and held-out sets.
     output_dir: ${cohort_dir}/final_cohort
+    unique_by: "*"

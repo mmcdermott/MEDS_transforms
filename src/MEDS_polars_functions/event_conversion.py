@@ -278,6 +278,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
             ...
         ValueError: Source column 'discharge_time' for event column foobar is not numeric or categorical! Cannot be used as an event col.
     """  # noqa: E501
+    df = df
     event_exprs = {"patient_id": pl.col("patient_id")}
 
     if "code" not in event_cfg:
@@ -550,5 +551,5 @@ def convert_to_events(
         except Exception as e:
             raise ValueError(f"Error extracting event {event_name}: {e}") from e
 
-    df = pl.concat(event_dfs, how="diagonal")
+    df = pl.concat(event_dfs, how="diagonal_relaxed")
     return df
