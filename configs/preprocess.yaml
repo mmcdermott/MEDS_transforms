@@ -1,5 +1,6 @@
 defaults:
   - pipeline
+  - _self_
 
 # Global pipeline parameters:
 # 1. Code modifiers will be used as adjoining parts of the `code` columns during group-bys and eventual
