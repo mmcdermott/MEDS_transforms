@@ -85,4 +85,5 @@ stage_configs:
       - "values/sum_sqd"
     do_summarize_over_all_codes: true # This indicates we should include overall, code-independent counts
     is_metadata: True
-    output_dir: ${cohort_dir}
+    mapper_output_dir: "${cohort_dir}/code_metadata"
+    output_dir: "${cohort_dir}"
