@@ -16,7 +16,7 @@ from MEDS_polars_functions.mapper import wrap as rwlock_wrap
 from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
 
 
-@hydra.main(version_base=None, config_path="../../configs", config_name="preprocess")
+@hydra.main(version_base=None, config_path="../../configs", config_name="extraction")
 def main(cfg: DictConfig):
     """Computes code metadata."""
 
@@ -30,6 +30,7 @@ def main(cfg: DictConfig):
 
     input_dir = Path(cfg.stage_cfg.data_input_dir)
     output_dir = Path(cfg.stage_cfg.output_dir)
+    mapper_output_dir = Path(cfg.stage_cfg.mapper_output_dir)
 
     shards = json.loads((Path(cfg.stage_cfg.metadata_input_dir) / "splits.json").read_text())
 
@@ -44,7 +45,7 @@ def main(cfg: DictConfig):
     all_out_fps = []
     for sp in patient_splits:
         in_fp = input_dir / f"{sp}.parquet"
-        out_fp = output_dir / f"{sp}.parquet"
+        out_fp = mapper_output_dir / f"{sp}.parquet"
         all_out_fps.append(out_fp)
 
         logger.info(
