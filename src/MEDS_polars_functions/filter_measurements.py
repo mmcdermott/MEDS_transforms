@@ -115,7 +115,7 @@ def filter_codes_fntr(
 
     allowed_code_metadata = (code_metadata.filter(pl.all_horizontal(filter_exprs)).select(join_cols)).lazy()
 
-    def filter_codes(df: pl.LazyFrame) -> pl.LazyFrame:
+    def filter_codes_fn(df: pl.LazyFrame) -> pl.LazyFrame:
         f"""Filters patient events to only encompass those with a set of permissible codes.
 
         In particular, this function filters the DataFrame to only include (code, modifier) pairs that have
@@ -133,7 +133,7 @@ def filter_codes_fntr(
             .drop(idx_col)
         )
 
-    return filter_codes
+    return filter_codes_fn
 
 
 def filter_outliers_fntr(
@@ -150,19 +150,78 @@ def filter_outliers_fntr(
 
     Examples:
         >>> code_metadata_df = pl.DataFrame({
-        ...     "code": pl.Series(["A", "A", "B", "C"], dtype=pl.Categorical),
-        ...     "modifier1": [1, 2, 1, 2],
-        ...     "code/n_patients":  [1, 1, 2, 2],
-        ...     "code/n_occurrences": [2, 1, 3, 2],
-        ...     "values/n_patients":  [1, 1, 2, 2],
-        ...     "values/n_occurrences": [2, 1, 3, 2],
-        ...     "values/n_ints": [0, 1, 3, 1],
-        ...     "values/sum": [2.2, 6.0, 14.0, 12.5],
-        ...     "values/sum_sqd": [2.42, 36.0, 84.0, 81.25],
-        ...     "values/min": [0, -1, 2, 2.],
-        ...     "values/max": [1.1, 6.0, 8.0, 7.5],
+        ...     "code":       pl.Series(["A",  "A",  "B",  "C"], dtype=pl.Categorical),
+        ...     "modifier1":            [1,    2,    1,    2],
+        ...     "values/n_occurrences": [3,    1,    3,    2],
+        ...     "values/sum":           [0.0,  4.0,  12.0, 2.0],
+        ...     "values/sum_sqd":       [27.0, 16.0, 75.0, 4.0],
+        ... # for clarity: ----- mean = [0.0,  4.0,  4.0,  1.0]
+        ... # for clarity: --- stddev = [3.0,  0.0,  3.0,  1.0]
         ... })
-        >>> raise NotImplementedError
+        >>> data = pl.DataFrame({
+        ...     "patient_id":      [1,   1,   2,   2],
+        ...     "code":  pl.Series(["A", "B", "A", "C"], dtype=pl.Categorical),
+        ...     "modifier1":       [1,   1,   2,   2],
+        ... # for clarity: mean    [0.0, 4.0, 4.0, 1.0]
+        ... # for clarity: stddev  [3.0, 3.0, 0.0, 1.0]
+        ...     "numerical_value": [15., 16., 3.9, 1.0],
+        ... }).lazy()
+        >>> stage_cfg = DictConfig({"stddev_cutoff": 4.5})
+        >>> fn = filter_outliers_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn(data).collect()
+        shape: (4, 5)
+        ┌────────────┬──────┬───────────┬─────────────────┬───────────────────────────┐
+        │ patient_id ┆ code ┆ modifier1 ┆ numerical_value ┆ numerical_value/is_inlier │
+        │ ---        ┆ ---  ┆ ---       ┆ ---             ┆ ---                       │
+        │ i64        ┆ cat  ┆ i64       ┆ f64             ┆ bool                      │
+        ╞════════════╪══════╪═══════════╪═════════════════╪═══════════════════════════╡
+        │ 1          ┆ A    ┆ 1         ┆ null            ┆ false                     │
+        │ 1          ┆ B    ┆ 1         ┆ 16.0            ┆ true                      │
+        │ 2          ┆ A    ┆ 2         ┆ null            ┆ false                     │
+        │ 2          ┆ C    ┆ 2         ┆ 1.0             ┆ true                      │
+        └────────────┴──────┴───────────┴─────────────────┴───────────────────────────┘
     """
 
-    raise NotImplementedError
+    stddev_cutoff = stage_cfg.get("stddev_cutoff", None)
+    if stddev_cutoff is None:
+        return lambda df: df
+
+    join_cols = ["code"]
+    if code_modifier_columns:
+        join_cols.extend(code_modifier_columns)
+
+    cols_to_select = ["code"]
+    if code_modifier_columns:
+        cols_to_select.extend(code_modifier_columns)
+
+    mean_col = pl.col("values/sum") / pl.col("values/n_occurrences")
+    stddev_col = (pl.col("values/sum_sqd") / pl.col("values/n_occurrences") - mean_col**2) ** 0.5
+    if "values/mean" not in code_metadata.columns:
+        cols_to_select.append(mean_col.alias("values/mean"))
+    if "values/stddev" not in code_metadata.columns:
+        cols_to_select.append(stddev_col.alias("values/stddev"))
+
+    code_metadata = code_metadata.lazy().select(cols_to_select)
+
+    def filter_outliers_fn(df: pl.LazyFrame) -> pl.LazyFrame:
+        f"""Filters out outlier numerical values from patient events.
+
+        In particular, this function filters the DataFrame to only include numerical values that are within
+        {stddev_cutoff} standard deviations of the mean for the corresponding (code, modifier) pair.
+        """
+
+        val = pl.col("numerical_value")
+        mean = pl.col("values/mean")
+        stddev = pl.col("values/stddev")
+        filter_expr = (val - mean).abs() <= stddev_cutoff * stddev
+
+        return (
+            df.join(code_metadata, on=join_cols, how="left")
+            .with_columns(
+                filter_expr.alias("numerical_value/is_inlier"),
+                pl.when(filter_expr).then(pl.col("numerical_value")).alias("numerical_value"),
+            )
+            .drop("values/mean", "values/stddev")
+        )
+
+    return filter_outliers_fn
