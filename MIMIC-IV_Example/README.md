@@ -238,7 +238,8 @@ mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps
 
 7. Fit normalization parameters:
 ```bash
-
+mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 16m25s 
+❯ ./scripts/preprocessing/collect_code_metadata.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null stage=fit_normalization
 ```
 
 
