@@ -30,10 +30,11 @@ def main(cfg: DictConfig):
         f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
     )
 
+    metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
     input_dir = Path(cfg.stage_cfg.data_input_dir)
     output_dir = Path(cfg.stage_cfg.output_dir)
 
-    shards = json.loads((cfg.input_dir / "splits.json").read_text())
+    shards = json.loads((metadata_input_dir / "splits.json").read_text())
 
     patient_splits = list(shards.keys())
     random.shuffle(patient_splits)
