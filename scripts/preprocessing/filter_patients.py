@@ -40,23 +40,23 @@ def main(cfg: DictConfig):
     random.shuffle(patient_splits)
 
     compute_fns = []
-    if cfg.min_measurements_per_patient:
+    if cfg.stage_cfg.min_measurements_per_patient:
         logger.info(
-            f"Filtering patients with fewer than {cfg.min_measurements_per_patient} measurements "
+            f"Filtering patients with fewer than {cfg.stage_cfg.min_measurements_per_patient} measurements "
             "(observations of any kind)."
         )
         compute_fns.append(
             partial(
                 filter_patients_by_num_measurements,
-                min_measurements_per_patient=cfg.min_measurements_per_patient,
+                min_measurements_per_patient=cfg.stage_cfg.min_measurements_per_patient,
             )
         )
-    if cfg.min_events_per_patient:
+    if cfg.stage_cfg.min_events_per_patient:
         logger.info(
-            f"Filtering patients with fewer than {cfg.min_events_per_patient} events (unique timepoints)."
+            f"Filtering patients with fewer than {cfg.stage_cfg.min_events_per_patient} events (unique timepoints)."
         )
         compute_fns.append(
-            partial(filter_patients_by_num_events, min_events_per_patient=cfg.min_events_per_patient)
+            partial(filter_patients_by_num_events, min_events_per_patient=cfg.stage_cfg.min_events_per_patient)
         )
 
     for sp in patient_splits:
