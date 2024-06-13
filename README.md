@@ -1,121 +1,163 @@
 # MEDS polars functions
 
-A simple set of MEDS polars-based ETL and transformation functions. These functions include basic utilities
-for putting data into MEDS format, pre-processing MEDS formatted data for deep learning modeling, tensorizing
-MEDS data for efficient, at-scale deep learning training. Close analogs of these functions have been used to
-successfully process data at the scale of billions of clinical events and millions of patients with modest
-computational resource requirements in several hours of total runtime.
+This repository contains a set of functions and scripts for extraction to and transformation/pre-processing of
+MEDS-formatted data.
 
-More details to come soon. In the meantime, see [this google
+Completed functions include scripts and utilities for extraction of various forms of raw data into the MEDS
+format in a scalable, parallelizable manner, as well as general configuration management utilities for complex
+pipelines over MEDS data. In progress functions include more model-specific pre-processing steps for MEDS
+data. See the "Roadmap" section below and [this google
 doc](https://docs.google.com/document/d/14NKaIPAMKC1bXWV_IVJ7nQfMo09PpUQCRrqqVY6qVT4/edit?usp=sharing) for
 more information.
 
-## Overview
-
-This package provides three things:
-
-1. A working, scalable, simple example of how to extract and pre-process MEDS data for downstream modeling.
-   These examples are provided in the form of:
-   - A set of integration tests that are run over synthetic data to verify correctness of the ETL pipeline.
-     See `tests/test_extraction.py` for the ETL tests with the in-built synthetic source data.
-   - A working MIMIC-IV MEDS ETL pipeline that can be run over MIMIC-IV v2.2 in approximately 1 hour in serial
-     mode (and much faster if parallelized). See `MIMIC-IV_Example` for more details.
-2. A flexible ETL for extracting MEDS data from a variety of source formats.
-3. A pre-processing pipeline that can be used for models that require:
-   - Filtering data to only include patients with a certain number of events
-   - Filtering events to only include those whose codes occur a certain number of times
-   - Removing numerical values that are more than a certain number of standard deviations from the mean on a
-     per-code basis.
-   - Normalizing numerical values on a per-code basis.
-   - Modeling data in a 3D format, with patients X unique timestamps X codes & numerical values per
-     timestamp.
+Examples of these capabilities in action can be seen in the `MIMIC-IV_Example` and `eICU_Example` directories,
+which contain working, end-to-end examples to extract MEDS formatted data from MIMIC-IV v2.2 and eICU v2.0.
+These directories also have `README.md` files with more detailed information on how to run the scripts in
+those directories.
 
 ## Installation
 
 - For a base installation, clone this repository and run `pip install .` from the repository root.
-- For running the MIMIC-IV example, install the optional MIMIC dependencies as well with `pip install .[mimic]`.
+- For running the MIMIC-IV example, install the optional MIMIC dependencies as well with
+  `pip install .[mimic]`.
 - To support same-machine, process-based parallelism, install the optional joblib dependencies with `pip install .[local_parallelism]`.
-- To support cluster-based parallelism, install the optional submitit dependencies with `pip install .[slurm_parallelism]`.
+- To support cluster-based parallelism, install the optional submitit dependencies with
+  `pip install .[slurm_parallelism]`.
 - For working on development, install the optional development dependencies with `pip install .[dev,tests]`.
 - Optional dependencies can be mutually installed by combining the optional dependency names with commas in
   the square brackets, e.g., `pip install .[mimic,local_parallelism]`.
 
-## Usage -- High Level
+## Design Philosophy
+
+The fundamental design philosophy of this repository can be summarized as follows:
+
+1. _(The MEDS Assumption)_: All structured electronic health record (EHR) data can be represented as a
+   series of events, each of which is associated with a patient, a timestamp, and a set of codes and
+   numerical values. This representation is the Medical Event Data Standard (MEDS) format, and in this
+   repository we use it in the "flat" format, where data is organized as rows of `patient_id`,
+   `timestamp`, `code`, `numerical_value` columns.
+2. _Easy Efficiency through Sharding_: MEDS datasets in this repository are sharded into smaller, more
+   manageable pieces (organized as separate files) at the patient level (and, during the raw-data extraction
+   process, the event level). This enables users to scale up their processing capabilities ad nauseum by
+   leveraging more workers to process these shards in parallel. This parallelization is seamlessly enabled
+   with the configuration schema used in the scripts in this repository. This style of parallelization
+   does not require complex packages to manage, complex systems of parallelization support, and can be
+   employed on single machines or across clusters. Through this style of parallelism, the MIMIC-IV ETL
+   included in this repository has been run end to end in under ten minutes with suitable parallelization.
+3. _Simple, Modular, and Testable_: Each stage of the pipelines demonstrated in this repository is designed
+   to be simple, modular, and testable. Each operation is a single script that can be run independently of
+   the others, and each stage is designed to do a small amount of work and be easily testable in isolation.
+   This design philosophy ensures that the pipeline is robust to changes, easy to debug, and easy to extend.
+   In particular, to add new operations specific to a given model or dataset, the user need only write
+   simple functions that take in a flat MEDS dataframe (representing a single patient level shard) and
+   return a new flat MEDS dataframe, and then wrap that function in a script by following the examples
+   provided in this repository. These individual functions can use the same configuration schema as other
+   stages in the pipeline or include a separate, stage-specific configuration, and can use whatever
+   dataframe or data-processing tool desired (e.g., Pandas, Polars, DuckDB, FEMR, etc.), though the examples
+   in this repository leverage Polars.
+4. _Configuration Extensibility through Hydra_: We rely heavily on Hydra and OmegaConf in this repository to
+   simplify configuration management within and across stages for a single pipeline. This design enables
+   easy choice of parallelization by leveraging distinct Hydra launcher plugins for local or cluster-driven
+   parallelism, natural capturing of logs and outputs for each stage, easy incorporation of documentation
+   and help-text for both overall pipelines and individual stages, and extensibility beyond default patterns
+   for more complex use-cases.
+5. _Configuration Files over Code_: Wherever _sensible_, we prefer to rely on configuration files rather
+   than code to specify repeated behavior prototypes over customized, dataset-specific code to enable
+   maximal reproducibility. The core strength of MEDS is that it is a shared, standardized format for EHR
+   data, and this repository is designed to leverage that strength to the fullest extent possible by
+   designing pipelines that can be, wherever possible, run identically save for configuration file inputs
+   across disparate datasets. Configuration files also can be easier to communicate to local data experts,
+   who may not have Python expertise, providing another benefit. This design philosophy is not absolute,
+   however, and local code can and _should_ be used where appropriate -- see the `MIMIC-IV_Example` and
+   `eICU_Example` directories for examples of how and where per-dataset code can be leveraged in concert
+   with the configurable aspects of the standardized MEDS extraction pipeline.
+
+## Intended Usage
+
+This pipeline is intended to be used both as a total or partial standalone ETL pipeline for converting raw EHR
+data into the MEDS format (this operation is often much more standardized than model-specific pre-processing
+needs) and as a template for model-specific pre-processing pipelines.
+
+### Existing Scripts
 
 The MEDS ETL and pre-processing pipelines are designed to be run in a modular, stage-based manner, with each
 stage of the pipeline being run as a separate script. For a single pipeline, all scripts will take the same
 arguments by leveraging the same Hydra configuration file, and to run multiple workers on a single stage in
 parallel, the user can launch the same script multiple times _without changing the arguments or configuration
-file_, and the scripts will automatically handle the parallelism and avoid duplicative work. This permits
-tremendous flexibility in how these pipelines can be run.
+file_ or (to facilitate multirun capabilities) by simply changing the `worker` configuration value (this
+configuration value is not used by anything except log file names), and the scripts will automatically handle
+the parallelism and avoid duplicative work. This permits significant flexibility in how these pipelines can be
+run.
 
 - The user can run the entire pipeline in serial, through a single shell script simply by calling each
   stage's script in sequence.
 - The user can leverage arbitrary scheduling systems (e.g., Slurm, LSF, Kubernetes, etc.) to run each stage
-  in parallel on a cluster, by constructing the appropriate worker scripts to run each stage's script and
-  simply launching as many worker jobs as is desired (note this will typically required a distributed file
-  system to work correctly, as these scripts use manually created file locks to avoid duplicative work).
+  in parallel on a cluster, either by manually constructing the appropriate worker scripts to run each stage's
+  script and simply launching as many worker jobs as is desired or by using Hydra launchers such as the
+  `submitit` launcher to automate the creation of appropriate scheduler worker jobs. Note this will typically
+  required a distributed file system to work correctly, as these scripts use manually created file locks to
+  avoid duplicative work.
 - The user can run each stage in parallel on a single machine by launching multiple copies of the same
-  script in different terminal sessions. This can result in a significant speedup depending on the machine
-  configuration as it ensures that parallelism can be used with minimal file read contention.
+  script in different terminal sessions or all at once via the Hydra `joblib` launcher. This can result in a
+  significant speedup depending on the machine configuration as sharding ensures that parallelism can be used
+  with minimal file read contention.
 
 Two of these methods of parallelism, in particular local-machine parallelism and slurm-based cluster
 parallelism, are supported explicitly by this package through the use of the `joblib` and `submitit` Hydra
 plugins and Hydra's multirun capabilities, which will be discussed in more detail below.
 
 By following this design convention, each individual stage of the pipeline can be kept extremely simple (often
-each stage corresponds simply to a single short "dataframe" function), can be rigorously tested, can be cached
+each stage corresponds to a single short "dataframe" function), can be rigorously tested, can be cached
 after completion to permit easy re-suming or re-running of the pipeline, and permits extremely flexible and
 efficient (through parallelization) use of the pipeline in a variety of environments, all without imposing
 significant complexity, overhead, or computational dependencies on the user.
 
-Below we walk through usage of this mechanism for both the ETL and the model-specific pre-processing
-pipelines in more detail.
+To see each of the scripts for the various pipelines, examine the `scripts` directory. Each script will, when
+run with the `--help` flag, provide a detailed description of the script's purpose, arguments, and usage.
+E.g.,
 
-### Scripts for the ETL Pipeline
+```bash
+❯ ./scripts/extraction/shard_events.py --help
+== MEDS/shard_events ==
+MEDS/shard_events is a command line tool that provides an interface for running MEDS pipelines.
 
-The ETL pipeline (which is more complete, and likely to be viable for a wider range of input datasets out of
-the box) relies on the following configuration files and scripts:
+**Pipeline description:**
+This pipeline extracts raw MEDS events in longitudinal, sparse form from an input dataset meeting select
+criteria and converts them to the flattened, MEDS format. It can be run in its entirety, with controllable
+levels of parallelism, or in stages. Arguments:
+  - `event_conversion_config_fp`: The path to the event conversion configuration file. This file defines
+    the events to extract from the various rows of the various input files encountered in the global input
+    directory.
+  - `input_dir`: The path to the directory containing the raw input files.
+  - `cohort_dir`: The path to the directory where the output cohort will be written. It will be written in
+    various subfolders of this dir depending on the stage, as intermediate stages cache their output during
+    computation for efficiency of re-running and distributing.
 
-Configuration: `configs/extraction.yaml`
-
-```yaml
-# The event conversion configuration file is used throughout the pipeline to define the events to extract.
-event_conversion_config_fp: ???
-
-stages:
-  - shard_events
-  - split_and_shard_patients
-  - convert_to_sharded_events
-  - merge_to_MEDS_cohort
-
-stage_configs:
-  shard_events:
-    row_chunksize: 200000000
-    infer_schema_length: 10000
-  split_and_shard_patients:
-    is_metadata: true
-    output_dir: ${cohort_dir}
-    n_patients_per_shard: 50000
-    external_splits_json_fp:
-    split_fracs:
-      train: 0.8
-      tuning: 0.1
-      held_out: 0.1
-  merge_to_MEDS_cohort:
-    output_dir: ${cohort_dir}/final_cohort
+**Stage description:**
+This stage shards the raw input events into smaller files for easier processing. Arguments:
+  - `row_chunksize`: The number of rows to read in at a time.
+  - `infer_schema_length`: The number of rows to read in to infer the schema (only used if the source
+    files are csvs)
 ```
 
-Scripts:
+### As a template
 
-1. `shard_events.py`: Shards the input data into smaller, event-level shards.
-2. `split_and_shard_patients.py`: Splits the patient population into ML splits and shards these splits into
-   patient-level shards.
-3. `convert_to_sharded_events.py`: Converts the input, event-level shards into the MEDS event format and
-   sub-shards them into patient-level sub-shards.
-4. `merge_to_MEDS_cohort.py`: Merges the patient-level, event-level shards into full patient-level shards.
+To use this repository as a template, the user should follow these steps:
 
-See the `MIMIC-IV_Example` directory for a full, worked example of the ETL on MIMIC-IV v2.2.
+1. Fork the repository to a new repository for their dedicated pipeline.
+2. Design the set of "stages" (e.g., distinct operations that must be completed) that will be required for
+   their needs. As a best practice, each stage should be realized as a single or set of simple functions
+   that can be applied on a per-shard basis to the data. Reduction stages (where data needs to be aggregated
+   across the entire pipeline) should be kept as simple as possible to avoid bottlenecks, but are supported
+   through this pipeline design; see the (in progress) `scripts/preprocessing/collect_code_metadata.py`
+   script for an example.
+3. Mimic the structure of the `configs/preprocessing.yaml` configuration file to assemble a configuration
+   file for the necessary stages of your pipeline. Identify in advance what dataset-specific information the
+   user will need to specify to run your pipeline (e.g., will they need links between dataset codes and
+   external ontologies? Will they need to specify select key-event concepts to identify in the data? etc.).
+   Proper pipeline design should enable running the pipeline across multiple datasets with minimal
+   dataset-specific information required, and such that that information can be specified in as easy a
+   manner as possible. Examples of how to do this are forthcoming.
 
 ## MEDS ETL / Extraction Pipeline Details
 
