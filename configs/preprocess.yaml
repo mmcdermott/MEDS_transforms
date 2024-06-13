@@ -27,11 +27,12 @@ stage_configs:
 
   add_time_derived_measurements:
     age:
-      dob_code: ???
+      DOB_code: ???
       age_code: "AGE"
       age_unit: "years"
     time_of_day:
-      bin_endpoints: [6, 12, 18, 24]
+      time_of_day_code: "TIME_OF_DAY"
+      endpoints: [6, 12, 18, 24]
 
   preliminary_counts:
     aggregations:

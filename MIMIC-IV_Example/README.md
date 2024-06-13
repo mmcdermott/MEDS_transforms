@@ -193,6 +193,25 @@ and performance is not necessary; however, for larger datasets, it can be.
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
 
+5. (Optional) Generate preliminary code statistics and merge to external metadata.
+
+## Pre-processing for a model
+To run the pre-processing steps for a model, consider the sample script provided here:
+
+1. Filter patients to only those with at least 32 events (unique timepoints):
+```bash
+mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines 
+❯ ./scripts/preprocessing/filter_patients.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null stage_configs.filter_patients.min_events_per_patient=32
+```
+
+2. Add time-derived measurements (age and time-of-day):
+```bash
+mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 3s                                                       
+❯ ./scripts/preprocessing/add_time_derived_measurements.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DI
+R/test" code_modifier_columns=null stage_configs.add_time_derived_measurements.age.DOB_code="DOB"
+```
+
+
 ## Limitations / TO-DOs:
 
 Currently, some tables are ignored, including:

@@ -17,6 +17,8 @@ from MEDS_polars_functions.time_derived_measurements import (
 )
 from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
 
+INFERRED_STAGE_KEYS = {"is_metadata", "data_input_dir", "metadata_input_dir", "output_dir"}
+
 
 @hydra.main(version_base=None, config_path="../../configs", config_name="preprocess")
 def main(cfg: DictConfig):
@@ -49,6 +51,8 @@ def main(cfg: DictConfig):
                 compute_fns.append(add_new_events_fntr(age_fntr(feature_cfg)))
             case "time_of_day":
                 compute_fns.append(add_new_events_fntr(time_of_day_fntr(feature_cfg)))
+            case str() if feature_name in INFERRED_STAGE_KEYS:
+                continue
             case _:
                 raise ValueError(f"Unknown time-derived measurement: {feature_name}")
 
