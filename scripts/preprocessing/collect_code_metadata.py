@@ -31,7 +31,7 @@ def main(cfg: DictConfig):
     input_dir = Path(cfg.stage_cfg.data_input_dir)
     output_dir = Path(cfg.stage_cfg.output_dir)
 
-    shards = json.loads((Path(cfg.stage_cfg.metadata_input_dir) / "splits.json").read_text())
+    shards = json.loads((Path(cfg.input_dir) / "splits.json").read_text())
 
     patient_splits = list(shards.keys())
     random.shuffle(patient_splits)

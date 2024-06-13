@@ -217,6 +217,30 @@ mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps
 ❯ ./scripts/preprocessing/collect_code_metadata.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null stage="preliminary_counts"
 ```
 
+4. Filter codes:
+```bash
+mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 4s                                                       
+❯ ./scripts/preprocessing/filter_codes.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modi
+fier_columns=null stage_configs.filter_codes.min_patients_per_code=128 stage_configs.filter_codes.min_occurrences_per_code=256
+```
+
+5. Get outlier detection params:
+```bash
+mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 19m57s 
+❯ ./scripts/preprocessing/collect_code_metadata.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null stage=fit_outlier_detection
+```
+
+6. Filter outliers:
+```bash
+mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 5m14s 
+❯ ./scripts/preprocessing/filter_outliers.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null
+```
+
+7. Fit normalization parameters:
+```bash
+
+```
+
 
 ## Limitations / TO-DOs:
 
