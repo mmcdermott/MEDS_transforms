@@ -211,6 +211,12 @@ mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps
 R/test" code_modifier_columns=null stage_configs.add_time_derived_measurements.age.DOB_code="DOB"
 ```
 
+3. Get preliminary counts for code filtering:
+```bash
+mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines 
+❯ ./scripts/preprocessing/collect_code_metadata.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null stage="preliminary_counts"
+```
+
 
 ## Limitations / TO-DOs:
 

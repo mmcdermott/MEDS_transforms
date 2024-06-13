@@ -34,7 +34,7 @@ def main(cfg: DictConfig):
     input_dir = Path(cfg.stage_cfg.data_input_dir)
     output_dir = Path(cfg.stage_cfg.output_dir)
 
-    shards = json.loads((metadata_input_dir / "splits.json").read_text())
+    shards = json.loads((Path(cfg.input_dir) / "splits.json").read_text())
 
     patient_splits = list(shards.keys())
     random.shuffle(patient_splits)
@@ -60,7 +60,7 @@ def main(cfg: DictConfig):
         )
 
     for sp in patient_splits:
-        in_fp = input_dir / "final_cohort" / f"{sp}.parquet"
+        in_fp = input_dir / f"{sp}.parquet"
         out_fp = output_dir / f"{sp}.parquet"
 
         logger.info(f"Filtering {str(in_fp.resolve())} into {str(out_fp.resolve())}")
