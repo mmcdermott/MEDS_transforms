@@ -43,7 +43,7 @@ def main(cfg: DictConfig):
     compute_fns = []
     # We use the raw stages object as the induced `stage_cfg` has extra properties like the input and output
     # directories.
-    for feature_name, feature_cfg in cfg.stages[cfg.stage].items():
+    for feature_name, feature_cfg in cfg.stage_cfg.items():
         match feature_name:
             case "age":
                 compute_fns.append(add_new_events_fntr(age_fntr(feature_cfg)))
