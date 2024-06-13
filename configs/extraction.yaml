@@ -16,12 +16,15 @@ description: |-
 
 # The event conversion configuration file is used throughout the pipeline to define the events to extract.
 event_conversion_config_fp: ???
+# The code modifier columns are in this pipeline only used in the collect_code_metadata stage.
+code_modifiers: null
 
 stages:
   - shard_events
   - split_and_shard_patients
   - convert_to_sharded_events
   - merge_to_MEDS_cohort
+  - collect_code_metadata
 
 stage_configs:
   shard_events:
@@ -32,6 +35,7 @@ stage_configs:
           files are csvs)
     row_chunksize: 200000000
     infer_schema_length: 10000
+
   split_and_shard_patients:
     description: |-
       This stage splits the patients into training, tuning, and held-out sets, and further splits those sets
@@ -54,6 +58,7 @@ stage_configs:
       train: 0.8
       tuning: 0.1
       held_out: 0.1
+
   merge_to_MEDS_cohort:
     description: |-
       This stage splits the patients into training, tuning, and held-out sets, and further splits those sets
@@ -65,3 +70,19 @@ stage_configs:
         - `split_fracs`: The fraction of patients to include in the IID training, tuning, and held-out sets.
     output_dir: ${cohort_dir}/final_cohort
     unique_by: "*"
+
+  collect_code_metadata:
+    description: |-
+      This stage collects some descriptive metadata about the codes in the cohort. Arguments:
+        - `aggregations`: The aggregations to compute over the codes. Defaults to counts of code occurrences,
+          counts of patients with the code, and counts of value occurrences per code, as well as the sum and
+          sum of squares of values (for use in computing means and variances).
+    aggregations:
+      - "code/n_occurrences"
+      - "code/n_patients"
+      - "values/n_occurrences"
+      - "values/sum"
+      - "values/sum_sqd"
+    do_summarize_over_all_codes: true # This indicates we should include overall, code-independent counts
+    is_metadata: True
+    output_dir: ${cohort_dir}

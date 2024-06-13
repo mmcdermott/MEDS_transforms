@@ -434,4 +434,21 @@ def test_extraction():
             print(f"stdout:\n{full_stdout}")
             raise e
 
-    logger.warning("Only checked the train/0 split for now. TODO: add the rest of the splits.")
+        logger.warning("Only checked the train/0 split for now. TODO: add the rest of the splits.")
+
+        # Step 4: Merge to the final output
+        stderr, stdout = run_command(
+            extraction_root / "collect_code_metadata.py",
+            extraction_config_kwargs,
+            "collect_code_metadata",
+        )
+        all_stderrs.append(stderr)
+        all_stdouts.append(stdout)
+
+        full_stderr = "\n".join(all_stderrs)
+        full_stdout = "\n".join(all_stdouts)
+
+        output_file = MEDS_cohort_dir / "code_metadata.parquet"
+        assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
+
+        logger.warning("Didn't check contents of code metadata!")
