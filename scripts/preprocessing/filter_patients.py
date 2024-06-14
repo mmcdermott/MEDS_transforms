@@ -30,7 +30,6 @@ def main(cfg: DictConfig):
         f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
     )
 
-    metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
     input_dir = Path(cfg.stage_cfg.data_input_dir)
     output_dir = Path(cfg.stage_cfg.output_dir)
 
@@ -53,10 +52,13 @@ def main(cfg: DictConfig):
         )
     if cfg.stage_cfg.min_events_per_patient:
         logger.info(
-            f"Filtering patients with fewer than {cfg.stage_cfg.min_events_per_patient} events (unique timepoints)."
+            f"Filtering patients with fewer than {cfg.stage_cfg.min_events_per_patient} events "
+            "(unique timepoints)."
         )
         compute_fns.append(
-            partial(filter_patients_by_num_events, min_events_per_patient=cfg.stage_cfg.min_events_per_patient)
+            partial(
+                filter_patients_by_num_events, min_events_per_patient=cfg.stage_cfg.min_events_per_patient
+            )
         )
 
     for sp in patient_splits:

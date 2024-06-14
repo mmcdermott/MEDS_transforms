@@ -150,7 +150,7 @@ def populate_stage(
         "output_dir": os.path.join(cohort_dir, stage_name),
     }
 
-    if "is_metadata" in stage and not isinstance(stage["is_metadata"], bool):
+    if "is_metadata" in stage and not isinstance(stage["is_metadata"], (bool, type(None))):
         raise TypeError(f"If specified manually, is_metadata must be a boolean. Got {stage['is_metadata']}")
 
     out = {**stage}
