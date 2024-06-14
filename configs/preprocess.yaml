@@ -15,6 +15,7 @@ stages:
   - fit_outlier_detection
   - filter_outliers
   - fit_normalization
+  - fit_vocabulary_indices
   - normalize
   - tokenize
   - tensorize
@@ -60,3 +61,10 @@ stage_configs:
       - "values/n_occurrences"
       - "values/sum"
       - "values/sum_sqd"
+
+  fit_vocabulary_indices:
+    is_metadata: true
+    ordering_method: "lexicographic"
+    output_dir: "${cohort_dir}"
+
+  normalize:

@@ -34,6 +34,10 @@ def main(cfg: DictConfig):
 
     shards = json.loads((Path(cfg.stage_cfg.metadata_input_dir) / "splits.json").read_text())
 
+    examine_splits = [f"{sp}/" for sp in cfg.stage_cfg.get("examine_splits", ["train"])]
+    logger.info(f"Computing metadata over shards with any prefix in {examine_splits}")
+    shards = {k: v for k, v in shards.items() if any(k.startswith(prefix) for prefix in examine_splits)}
+
     patient_splits = list(shards.keys())
     random.shuffle(patient_splits)
 

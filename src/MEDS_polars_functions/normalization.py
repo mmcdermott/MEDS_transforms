@@ -17,14 +17,14 @@ def normalize(
     In addition, the `code_metadata` dataset should contain information about the codes in the MEDS dataset,
     including:
       - `code` (`categorical`)
-      - `code/vocab_id` (`int`)
+      - `code/vocab_index` (`int`)
       - `value/mean` (`float`)
       - `value/std` (`float`)
 
     The `value/*` functions will be used to normalize the code numerical values to have a mean of 0 and a
     standard deviation of 1. The output dataframe will further be filtered to only contain rows where the
     `code` in the MEDS dataset appears in the `code_metadata` dataset, and the output `code` column will be
-    converted to the `code/vocab_id` integral ID from the `code_metadata` dataset.
+    converted to the `code/vocab_index` integral ID from the `code_metadata` dataset.
 
     This function can further be customized by specifying additional columns to join on, via the
     `extra_join_columns` parameter, which must appear in both the MEDS dataset and the code metadata. These
@@ -68,13 +68,13 @@ def normalize(
         >>> code_metadata = pl.DataFrame(
         ...     {
         ...         "code": ["lab//A", "lab//C", "dx//B", "dx//E", "lab//F"],
-        ...         "code/vocab_id": [0, 2, 3, 4, 5],
+        ...         "code/vocab_index": [0, 2, 3, 4, 5],
         ...         "value/mean": [2.0, None, None, None, 3],
         ...         "value/std": [0.5, None, None, None, 0.2],
         ...     },
         ...     schema = {
         ...         "code": pl.Categorical(ordering='physical'),
-        ...         "code/vocab_id": pl.UInt32,
+        ...         "code/vocab_index": pl.UInt32,
         ...         "value/mean": pl.Float64,
         ...         "value/std": pl.Float64,
         ...     },
@@ -121,14 +121,14 @@ def normalize(
         ...     {
         ...         "code": ["lab//A", "lab//A", "lab//C", "dx//B", "dx//E", "lab//F"],
         ...         "unit": ["mg/dL", "g/dL", None, None, None, None],
-        ...         "code/vocab_id": [0, 1, 2, 3, 4, 5],
+        ...         "code/vocab_index": [0, 1, 2, 3, 4, 5],
         ...         "value/mean": [2.0, 3.0, None, None, None, 3],
         ...         "value/std": [0.5, 2.0, None, None, None, 0.2],
         ...     },
         ...     schema = {
         ...         "code": pl.Categorical(ordering='physical'),
         ...         "unit": pl.Utf8,
-        ...         "code/vocab_id": pl.UInt32,
+        ...         "code/vocab_index": pl.UInt32,
         ...         "value/mean": pl.Float64,
         ...         "value/std": pl.Float64,
         ...     },
@@ -160,6 +160,6 @@ def normalize(
     ).select(
         "patient_id",
         "timestamp",
-        pl.col("code/vocab_id").alias("code"),
+        pl.col("code/vocab_index").alias("code"),
         ((pl.col("numerical_value") - pl.col("value/mean")) / pl.col("value/std")).alias("numerical_value"),
     )
