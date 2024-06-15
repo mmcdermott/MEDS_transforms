@@ -80,9 +80,8 @@ def main(cfg: DictConfig):
     logger.info("All map shards complete! Starting code metadata reduction computation.")
     reducer_fn = reducer_fntr(cfg.stage_cfg, cfg.get("code_modifier_columns", None))
 
-    reduced = (
-        reducer_fn(*[pl.scan_parquet(fp, glob=False) for fp in all_out_fps])
-        .with_columns(cs.is_numeric().shrink_dtype().keep_name())
+    reduced = reducer_fn(*[pl.scan_parquet(fp, glob=False) for fp in all_out_fps]).with_columns(
+        cs.is_numeric().shrink_dtype().keep_name()
     )
     write_lazyframe(reduced, output_dir / "code_metadata.parquet")
     logger.info(f"Finished reduction in {datetime.now() - start}")

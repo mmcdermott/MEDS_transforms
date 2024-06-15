@@ -198,8 +198,8 @@ def filter_outliers_fntr(
     stddev_col = (pl.col("values/sum_sqd") / pl.col("values/n_occurrences") - mean_col**2) ** 0.5
     if "values/mean" not in code_metadata.columns:
         cols_to_select.append(mean_col.alias("values/mean"))
-    if "values/stddev" not in code_metadata.columns:
-        cols_to_select.append(stddev_col.alias("values/stddev"))
+    if "values/std" not in code_metadata.columns:
+        cols_to_select.append(stddev_col.alias("values/std"))
 
     code_metadata = code_metadata.lazy().select(cols_to_select)
 
@@ -212,7 +212,7 @@ def filter_outliers_fntr(
 
         val = pl.col("numerical_value")
         mean = pl.col("values/mean")
-        stddev = pl.col("values/stddev")
+        stddev = pl.col("values/std")
         filter_expr = (val - mean).abs() <= stddev_cutoff * stddev
 
         return (
@@ -221,7 +221,7 @@ def filter_outliers_fntr(
                 filter_expr.alias("numerical_value/is_inlier"),
                 pl.when(filter_expr).then(pl.col("numerical_value")).alias("numerical_value"),
             )
-            .drop("values/mean", "values/stddev")
+            .drop("values/mean", "values/std")
         )
 
     return filter_outliers_fn
