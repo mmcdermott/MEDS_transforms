@@ -42,7 +42,11 @@ def main(cfg: DictConfig):
     logger.info(f"Assigning code vocabulary indices via a {ordering_method} order.")
     ordering_fn = VOCABULARY_ORDERING_METHODS[ordering_method]
 
-    code_metadata = ordering_fn(code_metadata, cfg.code_modifier_columns)
+    code_modifiers = cfg.get("code_modifier_columns", None)
+    if code_modifiers is None:
+        code_modifiers = []
+
+    code_metadata = ordering_fn(code_metadata, code_modifiers)
 
     output_fp = output_dir / "code_metadata.parquet"
     logger.info(f"Indices assigned. Writing to {output_fp}")
