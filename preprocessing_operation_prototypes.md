@@ -1,5 +1,8 @@
 # MEDS Pre-processing Operation Prototypes STILL IN PROGRESS
 
+**NOTE**: This document is currently aspirational, not yet implemented. Some functions in these patterns are
+implemented, but not universally.
+
 To support communal development and sharing of pre-processing operations, MEDS defines a set of core operation
 "prototypes", which are extensible, reusable operations that can be applied to MEDS datasets in a variety of
 circumstances to accomplish diverse, yet common, pre-processing tasks. The intent with these prototypes is
@@ -12,7 +15,24 @@ Note that, pursuant to the [core MEDS terminology](terminology.md), we will use 
 sets (with `null`s allowed) of `code` and all `code_modifier` columns. All operations should be presumed to be
 potentially parametrized by the datasets list of code modifier columns.
 
-## Core Prototypes
+A note on terminology: We will use the term "removing data" to refer to operations that fully drop data from
+the record, retaining no notion of the corresponding data occurring in the dataset. Operations that remove
+data will result in smaller overall datasets (either in number of patients or number of measurements). We will
+use the term "occluding data" to refer to operations that set data to `UNK`, `None`, or `np.NaN`, but retain
+that there was _some_ data in the dataset originally. Operations that occlude data will result in the same
+size dataset in terms of number of patients, number of measurements, etc., but will not have the same degree
+of data granularity or information content. Occlud operations will typically *not* be reversible, but will
+include a boolean indicator identifying that data was definitively occluded.
+
+## Filtering Prototypes (a.k.a. Match and Revise)
+
+A subset of the prototypes listed below can be modified to only be applied to a subset of the data. These
+subsets can be based on patient level criteria (e.g., patients who meet certain criteria) or via code filters
+(e.g., to only apply a certain value extraction regex to codes that match a certain pattern), with the
+results being merged into the output dataset in a consistent manner. Currently, these capabilities are only
+planned, not yet implemented.
+
+## Prototypes
 
 ### Transform Codes (just codes, not patient data!)
 
@@ -83,15 +103,6 @@ None at this time. To request a new operation, please open a GitHub issue.
 
 ### Filtering the Dataset
 
-A note on terminology: We will use the term "removing data" to refer to operations that fully drop data from
-the record, retaining no notion of the corresponding data occurring in the dataset. Operations that remove
-data will result in smaller overall datasets (either in number of patients or number of measurements). We will
-use the term "occluding data" to refer to operations that set data to `UNK`, `None`, or `np.NaN`, but retain
-that there was _some_ data in the dataset originally. Operations that occlude data will result in the same
-size dataset in terms of number of patients, number of measurements, etc., but will not have the same degree
-of data granularity or information content. Occlud operations will typically *not* be reversible, but will
-include a boolean indicator identifying that data was definitively occluded.
-
 There are a few modes of filtering data from MEDS datasets that are configured as separate prototypes. These
 include:
 
@@ -100,8 +111,6 @@ include:
    data that is not within pre-identified ranges of time on a per-patient basis).
 3. Filtering individual measurements from the data based on some criteria (e.g., removing measurements that
    have codes that are not included in the overall vocabulary, etc.).
-4. Occluding features from individual measurements from the data based on some criteria (e.g., occluding
-   outlier numerical values or infrequent codes, etc.)
 
 #### Filtering Patients
 
@@ -166,13 +175,26 @@ thresholds, which are read from the `code_metadata.parquet` file via the `code/n
 
 None at this time. To request a new operation, please open a GitHub issue.
 
+### Transforming Features within Measurements
+
+These prototypes or functional patterns are for transforming features within measurements. Critically, they
+leave the output dataset in the same length and in the same order as the input dataset, and only transform
+features. For operations that change the length or order (within the mandated `patient_id` and `timepoint`
+order), see the "Transforming Measurements within Events" section.
+
+**TODO** Add or merge in the following:
+
+1. Normalizing numerical values (this is currently implemented with `normalization.py`).
+2. Extract numerical values from text (e.g., extracting a number from a string).
+
 #### Occluding Features within Measurements
 
 This operation assumes that any requisite aggregate, per-code information is pre-computed and can be joined in
 via a `code_metadata.parquet` file.
 
-**TODO**: Should this operation be considered a realization of the "feature transformation" prototype, instead
-of a special case in this section?
+**TODO** This is not really a prototype, but is really a single function, or a subset of a prototype. IT has
+functionally the same API as numerical value normalization, with the modification that the indicator columns
+are added and this function is not reversible.
 
 ##### Operation Steps
 
@@ -185,8 +207,8 @@ of a special case in this section?
 ##### Parameters
 
 1. What criteria should be used to occlude features.
-   \- Relatedly, what occlusion value should be used for occluded features.
-   \- Relatedly, what the name of the occlusion column should be (can be set by default for features).
+   - Relatedly, what occlusion value should be used for occluded features.
+   - Relatedly, what the name of the occlusion column should be (can be set by default for features).
 2. What, if any, columns in the `code_metadata.parquet` file should be joined in to the data.
 
 ##### Status
@@ -198,6 +220,17 @@ This operation is only supported through the single `filter_outliers_fntr` funct
 
 1. Occluding numerical values if they take a value more distant from the code's mean by a specified number
    of standard deviations.
+
+### Transforming Measurements within Events
+
+These aren't implemented yet, but are planned:
+
+1. Re-order measurements within the event ordering.
+2. Split measurements into multiple measurements in a particular order and via a particular functional form.
+   E.g.,
+   - Performing ontology expansion
+   - Splitting a multi-faceted measurement (e.g., blood pressure recorded as `"120/80"`) into multiple
+     measurements (e.g., a systolic and diastolic blood pressure measurement with values `120` and `80`).
 
 ## Requesting New Prototypes
 
@@ -229,34 +262,3 @@ select to realize different functions within this prototype).
 ##### Planned Future Operations
 ADD TEXT HERE
 ```
-
-### Uncategorized as of yet.
-
-#### `reorder_measurements`
-
-Some pipelines desire a specific order of measurements within the broader per-patient event order (meaning the
-order as implied by unique timestamps).
-
-#### `extract_numeric_values`
-
-These prototypes are for extracting numeric values from other columns in the dataset, most notably `text` or
-`categorical` value columns.
-
-#### `extract_categorical_values`
-
-These prototypes are for extracting numeric values from other columns in the dataset, most notably `text` or
-`categorical` value columns.
-
-## Possible Future Prototypes
-
-### `remove_events`
-
-For filtering unique timestamps based on some criteria.
-
-### `filter_to_cohort`
-
-For filtering the dataset to only include data matching some cohort specification, as defined by a dataframe
-of patient IDs and start/end timestamps. This is not currently occluded as it can often happen trivially
-during the dataloading stage for machine learning models, but for true supervised training, it may be useful
-so that train-set pre-processing parameters can be fit specific to the cohort-specific train set, rather than
-the general train set.
