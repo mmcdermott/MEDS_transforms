@@ -66,5 +66,3 @@ stage_configs:
     is_metadata: true
     ordering_method: "lexicographic"
     output_dir: "${cohort_dir}"
-
-  normalize:

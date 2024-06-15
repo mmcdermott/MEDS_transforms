@@ -256,6 +256,13 @@ mbm47 in  compute-e-16-230 in MEDS_polars_functions on  preprocessing_step
 ❯ ./scripts/preprocessing/fit_vocabulary_indices.py input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null
 ```
 
+9. Normalize:
+```bash
+mbm47 in  compute-e-16-230 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 4s                                                      
+❯ ./scripts/preprocessing/normalize.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifie
+r_columns=null
+```
+
 ## Limitations / TO-DOs:
 
 Currently, some tables are ignored, including:
