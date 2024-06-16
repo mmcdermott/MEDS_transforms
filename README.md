@@ -327,6 +327,60 @@ running multiple copies of the same script on independent workers to process the
 steps again need to happen in a single-threaded manner, but these steps are generally very fast and should not
 be a bottleneck.
 
+### Tokenization
+
+Tokenization is the process of producing dataframes that are arranged into the sequences that will eventually
+be processed by deep-learning methods. Generally, these dataframes will be arranged such that each row
+corresponds to a unique patient, with nested list-type columns corresponding either to _events_ (unique
+timepoints), themselves with nested, list-type measurements, or to _measurements_ (unique measurements within
+a timepoint) directly. Importantly, _tokenized files are generally not ideally suited to direct ingestion by
+PyTorch datasets_. Instead, they should undergo a _tensorization_ process to be converted into a format that
+permits fast, efficient, scalable retrieval for deep-learning training.
+
+### Tensorization
+
+Tensorization is the process of producing files of the tokenized, normalized sequences that permit efficient,
+scalable deep-learning. Here, by _efficiency_, we mean that the file structure and arrangement should permit
+the deep learning process to (1) begin smoothly after startup, without a long, data-ingestion phase, (2) be
+organized such that individual items (e.g., in a `__getitem__` call) can be retrieved quickly in a manner that
+does not inhibit rapid training, and (3) be organized such that CPU and GPU resources are used efficiently
+during training. Similarly, by _scalability_, we mean that the three desiderata above should hold true even as
+the dataset size grows much larger---while total training time can increase, time to begin training, to
+process the data per-item, and CPU/GPU resources required should remain constant, or only grow negligibly,
+such as the cost of maintaining a larger index of patient IDs to file offsets or paths (though disk space will
+of course increase).
+
+Depending on one's performance needs and dataset sizes, there are 3 modes of deep learning training that can
+be used that warrant different styles of tensorization:
+
+#### In-memory Training
+
+This mode of training does not scale to large datasets, and given the parallelizability of the data-loading
+phase, may or may not actually be significantly faster than other modes. It is not currently supported in this
+repository. **TODO** describe in more detail.
+
+#### Direct Retrieval
+
+This mode of training has the data needed for any given PyTorch Dataset `__getitem__` call retrieved from disk
+on an as-needed basis. This mode is extremely scalable, because the entire dataset never need be
+loaded or stored in memory in its entirety. When done properly, retrieving data from disk can be done in a
+manner that is independent of the total dataset size as well, thereby rendering the load time similarly
+unconstrained by total dataset size. This mode is also extremely flexible, because different cohorts can be
+loaded from the same base dataset simply by changing which patients and what offsets within patient data are
+read on any given cohort, all without changing the base files or underlying code. However, this mode does
+require ragged dataset collation which can be more resource intensive than pre-batched iteration, so it is
+slower than the "Fixed-batch retrieval" approach. This mode is what is currently supported by this repository.
+
+#### Fixed-batch Retrieval
+
+In this mode of training, batches are selected once (potentially over many epochs), the items making up those
+batches are selected, then their contents are frozen and written to disk in a fully tensorized, padded format.
+This enables one to merely load batched data from disk directly onto the GPU during training, which is the
+fastest possible way to train a model. However, this mode is less flexible than the other modes, as the
+batches are frozen during training and cannot be changed without re-tensorizing the dataset, meaning that
+every new cohort for training requires a new tensorization step. This mode is not currently supported by this
+repository.
+
 ## Overview of configuration manipulation
 
 ### Pipeline configuration: Stages and OmegaConf Resolvers
