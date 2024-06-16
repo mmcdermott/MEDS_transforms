@@ -1,0 +1,9 @@
+
+MEDS_cohort_dir: ???
+task_name: null
+
+code_metadata_fp: ${MEDS_cohort_dir}/code_metadata.parquet
+split_shards_fp: ${MEDS_cohort_dir}/splits.json
+schema_files_root: ${MEDS_cohort_dir}/tokenize/schemas
+tasks_root: ${MEDS_cohort_dir}/tasks
+tensorized_root: ${MEDS_cohort_dir}/tensorized
