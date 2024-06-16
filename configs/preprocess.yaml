@@ -25,6 +25,7 @@ stage_configs:
   filter_patients:
     min_events_per_patient: null
     min_measurements_per_patient: null
+    data_input_dir: ${input_dir}/final_cohort
 
   add_time_derived_measurements:
     age:
