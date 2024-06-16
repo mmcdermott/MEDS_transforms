@@ -172,7 +172,8 @@ def hydra_loguru_init() -> None:
     Must be called from a hydra main!
     """
     hydra_path = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
-    logger.add(os.path.join(hydra_path, "main.log"))
+    logfile_name = hydra.core.hydra_config.HydraConfig.get().job.name
+    logger.add(os.path.join(hydra_path, f"{logfile_name}.log"))
 
 
 def write_lazyframe(df: pl.LazyFrame, out_fp: Path) -> None:
