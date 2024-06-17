@@ -57,10 +57,37 @@ def split_static_and_dynamic(df: pl.LazyFrame) -> tuple[pl.LazyFrame, pl.LazyFra
         dynamic data.
 
     Examples:
-        >>> raise NotImplementedError
+        >>> from datetime import datetime
+        >>> df = pl.DataFrame({
+        ...     "patient_id": [1, 1, 2, 2],
+        ...     "timestamp": [None, datetime(2021, 1, 1), None, datetime(2021, 1, 2)],
+        ...     "code": [100, 101, 200, 201],
+        ...     "numerical_value": [1.0, 2.0, 3.0, 4.0]
+        ... }).lazy()
+        >>> static, dynamic = split_static_and_dynamic(df)
+        >>> static.collect()
+        shape: (2, 3)
+        ┌────────────┬──────┬─────────────────┐
+        │ patient_id ┆ code ┆ numerical_value │
+        │ ---        ┆ ---  ┆ ---             │
+        │ i64        ┆ i64  ┆ f64             │
+        ╞════════════╪══════╪═════════════════╡
+        │ 1          ┆ 100  ┆ 1.0             │
+        │ 2          ┆ 200  ┆ 3.0             │
+        └────────────┴──────┴─────────────────┘
+        >>> dynamic.collect()
+        shape: (2, 4)
+        ┌────────────┬─────────────────────┬──────┬─────────────────┐
+        │ patient_id ┆ timestamp           ┆ code ┆ numerical_value │
+        │ ---        ┆ ---                 ┆ ---  ┆ ---             │
+        │ i64        ┆ datetime[μs]        ┆ i64  ┆ f64             │
+        ╞════════════╪═════════════════════╪══════╪═════════════════╡
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ 101  ┆ 2.0             │
+        │ 2          ┆ 2021-01-02 00:00:00 ┆ 201  ┆ 4.0             │
+        └────────────┴─────────────────────┴──────┴─────────────────┘
     """
 
-    static = df.filter(pl.col("timestamp").is_null())
+    static = df.filter(pl.col("timestamp").is_null()).drop("timestamp")
     dynamic = df.filter(pl.col("timestamp").is_not_null())
     return static, dynamic
 
