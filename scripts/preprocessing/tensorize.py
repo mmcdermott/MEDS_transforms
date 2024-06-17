@@ -11,7 +11,7 @@ from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 from omegaconf import DictConfig, OmegaConf
 
 from MEDS_polars_functions.mapper import wrap as rwlock_wrap
-from MEDS_polars_functions.tensorize import tensorize
+from MEDS_polars_functions.tensorize import convert_to_NRT
 from MEDS_polars_functions.utils import hydra_loguru_init
 
 
@@ -37,7 +37,7 @@ def main(cfg: DictConfig):
 
     for sp in patient_splits:
         in_fp = input_dir / "event_seqs" / f"{sp}.parquet"
-        out_fp = output_dir / f"{sp}.parquet"
+        out_fp = output_dir / f"{sp}.nrt"
 
         logger.info(f"Tensorizing {str(in_fp.resolve())} into {str(out_fp.resolve())}")
 
@@ -46,7 +46,7 @@ def main(cfg: DictConfig):
             out_fp,
             pl.scan_parquet,
             JointNestedRaggedTensorDict.save,
-            tensorize,
+            convert_to_NRT,
             do_return=False,
             cache_intermediate=False,
             do_overwrite=cfg.do_overwrite,
