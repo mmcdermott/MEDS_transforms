@@ -41,15 +41,18 @@ def convert_to_NRT(tokenized_df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
         │ 2          ┆ [NaN]           ┆ [[201.0, 202.0]]          ┆ [[6.0, 7.0]]        │
         └────────────┴─────────────────┴───────────────────────────┴─────────────────────┘
         >>> nrt = convert_to_NRT(df.lazy())
-        >>> for k, v in nrt.to_dense().items():
+        >>> for k, v in sorted(list(nrt.to_dense().items())):
         ...     print(k)
         ...     print(v)
+        code
+        [[[101. 102.]
+          [103.   0.]]
+        <BLANKLINE>
+         [[201. 202.]
+          [  0.   0.]]]
         dim1/mask
         [[ True  True]
          [ True False]]
-        time_delta_days
-        [[nan 12.]
-         [nan  0.]]
         dim2/mask
         [[[ True  True]
           [ True False]]
@@ -62,12 +65,9 @@ def convert_to_NRT(tokenized_df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
         <BLANKLINE>
          [[6. 7.]
           [0. 0.]]]
-        code
-        [[[101. 102.]
-          [103.   0.]]
-        <BLANKLINE>
-         [[201. 202.]
-          [  0.   0.]]]
+        time_delta_days
+        [[nan 12.]
+         [nan  0.]]
     """
 
     # There should only be one time delta column, but this ensures we catch it regardless of the unit of time
