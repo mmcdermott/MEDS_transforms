@@ -16,7 +16,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-dependencies = ["polars", "pyarrow", "nested_ragged_tensors", "loguru", "hydra-core", "numpy", "ml-mixins"]
+dependencies = ["polars", "pyarrow", "nested_ragged_tensors", "loguru", "hydra-core", "numpy"]
 
 [project.optional-dependencies]
 examples = ["rootutils"]
