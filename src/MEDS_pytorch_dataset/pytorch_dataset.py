@@ -16,12 +16,8 @@ from nested_ragged_tensors.ragged_numpy import (
 from omegaconf import DictConfig
 from tqdm.auto import tqdm
 
-PROPORTION = float
-COUNT_OR_PROPORTION = int | PROPORTION
-WHOLE = int | pl.Expr
 
-
-def count_or_proportion(N: WHOLE | None, cnt_or_prop: COUNT_OR_PROPORTION) -> int:
+def count_or_proportion(N: int | pl.Expr | None, cnt_or_prop: int | float) -> int:
     """Returns `cnt_or_prop` if it is an integer or `int(N*cnt_or_prop)` if it is a float.
 
     Resolves cutoff variables that can either be passed as integer counts or fractions of a whole. E.g., the
@@ -227,7 +223,7 @@ class PytorchDataset(SeedableMixin, torch.utils.data.Dataset):
         self.subj_map = {subj: sp for sp, subjs in self.shards.items() for subj in subjs}
 
     def read_patient_descriptors(self):
-        """Reads the patient descriptors from the ESGPT or MEDS dataset."""
+        """Reads the patient schemas and static data."""
         self.static_dfs = {}
         self.subj_indices = {}
         self.subj_seq_bounds = {}
@@ -259,12 +255,6 @@ class PytorchDataset(SeedableMixin, torch.utils.data.Dataset):
                 self.subj_seq_bounds[subj] = (0, n_events)
 
         if self.has_task:
-            self.index = [(subj, *bounds) for subj, bounds in self.subj_seq_bounds.items()]
-            self.labels = {}
-            self.tasks = None
-            self.task_types = None
-            self.task_vocabs = None
-        else:
             task_df_fp = self.config.tasks_root / f"{self.config.task_name}.parquet"
             task_info_fp = self.config.tasks_root / f"{self.config.task_name}_info.json"
 
@@ -303,28 +293,16 @@ class PytorchDataset(SeedableMixin, torch.utils.data.Dataset):
                     on="patient_id",
                     how="left",
                 )
-                .with_columns(pl.col("timestamp").alias("min_since_start"))
+                .with_columns(pl.col("timestamp"))
             )
 
-            min_at_task_start = (
-                (pl.col("start_time") - pl.col("start_time_global")).dt.total_seconds() / 60
-            ).alias("min_at_task_start")
-            min_at_task_end = (
-                (pl.col("end_time") - pl.col("start_time_global")).dt.total_seconds() / 60
-            ).alias("min_at_task_end")
-
-            start_idx_expr = (pl.col("min_since_start").search_sorted(pl.col("min_at_task_start"))).alias(
-                "start_idx"
-            )
-            end_idx_expr = (pl.col("min_since_start").search_sorted(pl.col("min_at_task_end"))).alias(
-                "end_idx"
-            )
+            start_idx_expr = (pl.col("start_time").search_sorted(pl.col("timestamp"))).alias("start_idx")
+            end_idx_expr = (pl.col("end_time").search_sorted(pl.col("timestamp"))).alias("end_idx")
 
             task_df_joint = (
                 task_df_joint.explode(idx_col, "start_time", "end_time")
-                .with_columns(min_at_task_start, min_at_task_end)
-                .explode("min_since_start")
-                .group_by("patient_id", idx_col, "min_at_task_start", "min_at_task_end", maintain_order=True)
+                .explode("timestamp")
+                .group_by("patient_id", idx_col, "start_time", "end_time", maintain_order=True)
                 .agg(start_idx_expr.first(), end_idx_expr.first())
                 .sort(by=idx_col, descending=False)
             )
@@ -335,6 +313,12 @@ class PytorchDataset(SeedableMixin, torch.utils.data.Dataset):
 
             self.labels = {t: task_df.get_column(t).to_list() for t in self.tasks}
             self.index = list(zip(patient_ids, start_indices, end_indices))
+        else:
+            self.index = [(subj, *bounds) for subj, bounds in self.subj_seq_bounds.items()]
+            self.labels = {}
+            self.tasks = None
+            self.task_types = None
+            self.task_vocabs = None
 
     def get_task_info(self, task_df: pl.DataFrame):
         """Gets the task information from the task dataframe."""
