@@ -17,7 +17,7 @@ stages:
   - fit_normalization
   - fit_vocabulary_indices
   - normalize
-  - tokenize
+  - tokenization
   - tensorize
 
 # Pipeline Structure
