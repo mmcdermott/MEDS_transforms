@@ -24,12 +24,55 @@ def convert_to_NRT(tokenized_df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
         ValueError: If there are no time delta columns or if there are multiple time delta columns.
 
     Examples:
-        >>> raise NotImplementedError
+        >>> df = pl.DataFrame({
+        ...     "patient_id": [1, 2],
+        ...     "time_delta_days": [[float("nan"), 12.0], [float("nan")]],
+        ...     "code": [[[101.0, 102.0], [103.0]], [[201.0, 202.0]]],
+        ...     "numerical_value": [[[2.0, 3.0], [4.0]], [[6.0, 7.0]]]
+        ... })
+        >>> df
+        shape: (2, 4)
+        ┌────────────┬─────────────────┬───────────────────────────┬─────────────────────┐
+        │ patient_id ┆ time_delta_days ┆ code                      ┆ numerical_value     │
+        │ ---        ┆ ---             ┆ ---                       ┆ ---                 │
+        │ i64        ┆ list[f64]       ┆ list[list[f64]]           ┆ list[list[f64]]     │
+        ╞════════════╪═════════════════╪═══════════════════════════╪═════════════════════╡
+        │ 1          ┆ [NaN, 12.0]     ┆ [[101.0, 102.0], [103.0]] ┆ [[2.0, 3.0], [4.0]] │
+        │ 2          ┆ [NaN]           ┆ [[201.0, 202.0]]          ┆ [[6.0, 7.0]]        │
+        └────────────┴─────────────────┴───────────────────────────┴─────────────────────┘
+        >>> nrt = convert_to_NRT(df.lazy())
+        >>> for k, v in nrt.to_dense().items():
+        ...     print(k)
+        ...     print(v)
+        dim1/mask
+        [[ True  True]
+         [ True False]]
+        time_delta_days
+        [[nan 12.]
+         [nan  0.]]
+        dim2/mask
+        [[[ True  True]
+          [ True False]]
+        <BLANKLINE>
+         [[ True  True]
+          [False False]]]
+        numerical_value
+        [[[2. 3.]
+          [4. 0.]]
+        <BLANKLINE>
+         [[6. 7.]
+          [0. 0.]]]
+        code
+        [[[101. 102.]
+          [103.   0.]]
+        <BLANKLINE>
+         [[201. 202.]
+          [  0.   0.]]]
     """
 
     # There should only be one time delta column, but this ensures we catch it regardless of the unit of time
     # used to convert the time deltas, and that we verify there is only one such column.
-    time_delta_cols = [c for c in tokenized_df.columns if c.startswith("time_delta/")]
+    time_delta_cols = [c for c in tokenized_df.columns if c.startswith("time_delta_")]
 
     if len(time_delta_cols) == 0:
         raise ValueError("Expected at least one time delta column, found none")

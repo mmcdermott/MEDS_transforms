@@ -162,7 +162,7 @@ def extract_seq_of_patient_events(df: pl.LazyFrame) -> pl.LazyFrame:
     Returns:
         A `pl.LazyFrame` object containing the sequences of patient events, with the following columns:
             - `patient_id`: The patient ID.
-            - `time_delta/days`: The time delta in days, as a list of floats (ragged).
+            - `time_delta_days`: The time delta in days, as a list of floats (ragged).
             - `code`: The code, as a list of lists of ints (ragged in both levels).
             - `numerical_value`: The numerical value as a list of lists of floats (ragged in both levels).
 
@@ -179,7 +179,7 @@ def extract_seq_of_patient_events(df: pl.LazyFrame) -> pl.LazyFrame:
         >>> extract_seq_of_patient_events(df).collect()
         shape: (2, 4)
         ┌────────────┬─────────────────┬───────────────────────────┬─────────────────────┐
-        │ patient_id ┆ time_delta/days ┆ code                      ┆ numerical_value     │
+        │ patient_id ┆ time_delta_days ┆ code                      ┆ numerical_value     │
         │ ---        ┆ ---             ┆ ---                       ┆ ---                 │
         │ i64        ┆ list[f64]       ┆ list[list[f64]]           ┆ list[list[f64]]     │
         ╞════════════╪═════════════════╪═══════════════════════════╪═════════════════════╡
@@ -197,7 +197,7 @@ def extract_seq_of_patient_events(df: pl.LazyFrame) -> pl.LazyFrame:
         .agg(fill_to_nans("code").keep_name(), fill_to_nans("numerical_value").keep_name())
         .group_by("patient_id", maintain_order=True)
         .agg(
-            fill_to_nans(time_delta_days_expr).alias("time_delta/days"),
+            fill_to_nans(time_delta_days_expr).alias("time_delta_days"),
             "code",
             "numerical_value",
         )
