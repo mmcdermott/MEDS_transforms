@@ -3,8 +3,9 @@
 TODO
 """
 
-from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 import polars as pl
+from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
+
 
 def convert_to_NRT(tokenized_df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
     """This converts a tokenized dataframe into a nested ragged tensor.
@@ -38,8 +39,5 @@ def convert_to_NRT(tokenized_df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
     time_delta_col = time_delta_cols[0]
 
     return JointNestedRaggedTensorDict(
-        tokenized_df.select(
-            time_delta_col,
-            "code",
-            "numerical_value").collect().to_dict(as_series=False)
+        tokenized_df.select(time_delta_col, "code", "numerical_value").collect().to_dict(as_series=False)
     )

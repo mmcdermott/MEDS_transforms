@@ -14,6 +14,7 @@ SECONDS_PER_MINUTE = 60.0
 SECONDS_PER_HOUR = SECONDS_PER_MINUTE * 60.0
 SECONDS_PER_DAY = SECONDS_PER_HOUR * 24.0
 
+
 def fill_to_nans(col: str | pl.Expr) -> pl.Expr:
     """This function fills infinite and null values with NaN.
 
@@ -32,12 +33,8 @@ def fill_to_nans(col: str | pl.Expr) -> pl.Expr:
     if isinstance(col, str):
         col = pl.col(col)
 
-    return (
-        pl.when(col.is_infinite() | col.is_null())
-        .then(float('nan'))
-        .otherwise(col)
-        .keep_name()
-    )
+    return pl.when(col.is_infinite() | col.is_null()).then(float("nan")).otherwise(col).keep_name()
+
 
 def split_static_and_dynamic(df: pl.LazyFrame) -> tuple[pl.LazyFrame, pl.LazyFrame]:
     """This function splits the input data into static and dynamic data.
@@ -59,6 +56,7 @@ def split_static_and_dynamic(df: pl.LazyFrame) -> tuple[pl.LazyFrame, pl.LazyFra
     dynamic = df.filter(pl.col("timestamp").is_not_null())
     return static, dynamic
 
+
 def extract_statics_and_schema(df: pl.LazyFrame) -> pl.LazyFrame:
     """This function extracts static data and schema information (sequence of patient unique timestamps).
 
@@ -76,19 +74,12 @@ def extract_statics_and_schema(df: pl.LazyFrame) -> pl.LazyFrame:
     static_by_patient = static.group_by("patient_id", maintain_order=True).agg("code", "numerical_value")
 
     # This collects the unique timestamps for each patient.
-    schema_by_patient = (
-        dynamic
-        .group_by("patient_id", maintain_order=True)
-        .agg(
-            pl.col("timestamp").min().alias("start_time"),
-            pl.col("timestamp").unique(maintain_order=True)
-        )
+    schema_by_patient = dynamic.group_by("patient_id", maintain_order=True).agg(
+        pl.col("timestamp").min().alias("start_time"), pl.col("timestamp").unique(maintain_order=True)
     )
 
-    return (
-        static_by_patient
-        .join(schema_by_patient, on="patient_id", how="inner")
-        .with_row_index("patient_offset")
+    return static_by_patient.join(schema_by_patient, on="patient_id", how="inner").with_row_index(
+        "patient_offset"
     )
 
 
@@ -116,8 +107,7 @@ def extract_seq_of_patient_events(df: pl.LazyFrame) -> pl.LazyFrame:
     time_delta_days_expr = (pl.col("timestamp").diff().dt.total_seconds() / SECONDS_PER_DAY).cast(pl.Float64)
 
     return (
-        dynamic
-        .group_by("patient_id", "timestamp", maintain_order=True)
+        dynamic.group_by("patient_id", "timestamp", maintain_order=True)
         .agg(fill_to_nans("code"), fill_to_nans("numerical_value"))
         .group_by("patient_id", maintain_order=True)
         .agg(

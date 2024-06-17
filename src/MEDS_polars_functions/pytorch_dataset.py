@@ -1,7 +1,6 @@
-
 import json
 from collections import defaultdict
-from pathlib import Path
+from enum import StrEnum
 
 import numpy as np
 import polars as pl
@@ -14,21 +13,92 @@ from nested_ragged_tensors.ragged_numpy import (
     NP_UINT_TYPES,
     JointNestedRaggedTensorDict,
 )
+from omegaconf import DictConfig
 from tqdm.auto import tqdm
 
-from ..utils import count_or_proportion
-from .config import PytorchDatasetConfig, SeqPaddingSide, SubsequenceSamplingStrategy
+PROPORTION = float
+COUNT_OR_PROPORTION = int | PROPORTION
+WHOLE = int | pl.Expr
 
 
-import dataclasses
-import enum
-from collections import defaultdict
-from typing import Any, Union
+def count_or_proportion(N: WHOLE | None, cnt_or_prop: COUNT_OR_PROPORTION) -> int:
+    """Returns `cnt_or_prop` if it is an integer or `int(N*cnt_or_prop)` if it is a float.
 
-import polars as pl
-import torch
+    Resolves cutoff variables that can either be passed as integer counts or fractions of a whole. E.g., the
+    vocabulary should contain only elements that occur with count or proportion at least X, where X might be
+    20 times, or 1%.
 
-from omegaconf import DictConfig
+    Arguments:
+        N: The total number of elements in the whole. Only used if `cnt_or_prop` is a proportion (float).
+        cnt_or_prop: The cutoff value, either as an integer count or a proportion of the whole.
+
+    Returns:
+        The cutoff value as an integer count of the whole.
+
+    Raises:
+        TypeError: If `cnt_or_prop` is not an integer or a float or if `N` is needed and is not an integer or
+            a polars Expression.
+        ValueError: If `cnt_or_prop` is not a positive integer or a float between 0 and 1.
+
+    Examples:
+        >>> count_or_proportion(100, 0.1)
+        10
+        >>> count_or_proportion(None, 11)
+        11
+        >>> count_or_proportion(100, 0.116)
+        12
+        >>> count_or_proportion(None, 0)
+        Traceback (most recent call last):
+            ...
+        ValueError: 0 must be positive if it is an integer
+        >>> count_or_proportion(None, 1.3)
+        Traceback (most recent call last):
+            ...
+        ValueError: 1.3 must be between 0 and 1 if it is a float
+        >>> count_or_proportion(None, "a")
+        Traceback (most recent call last):
+            ...
+        TypeError: a must be a positive integer or a float between 0 or 1
+        >>> count_or_proportion("a", 0.2)
+        Traceback (most recent call last):
+            ...
+        TypeError: a must be an integer or a polars.Expr when cnt_or_prop is a float!
+    """
+
+    match cnt_or_prop:
+        case int() if 0 < cnt_or_prop:
+            return cnt_or_prop
+        case int():
+            raise ValueError(f"{cnt_or_prop} must be positive if it is an integer")
+        case float() if 0 < cnt_or_prop < 1:
+            pass
+        case float():
+            raise ValueError(f"{cnt_or_prop} must be between 0 and 1 if it is a float")
+        case _:
+            raise TypeError(f"{cnt_or_prop} must be a positive integer or a float between 0 or 1")
+
+    match N:
+        case int():
+            return int(round(cnt_or_prop * N))
+        case pl.Expr():
+            return (N * cnt_or_prop).round(0).cast(int)
+        case _:
+            raise TypeError(f"{N} must be an integer or a polars.Expr when cnt_or_prop is a float!")
+
+
+class SubsequenceSamplingStrategy(StrEnum):
+    """An enumeration of the possible subsequence sampling strategies for the dataset."""
+
+    RANDOM = "random"
+    TO_END = "to_end"
+    FROM_START = "from_start"
+
+
+class SeqPaddingSide(StrEnum):
+    """An enumeration of the possible sequence padding sides for the dataset."""
+
+    LEFT = "left"
+    RIGHT = "right"
 
 
 def to_int_index(col: pl.Expr) -> pl.Expr:
@@ -115,6 +185,18 @@ class PytorchDataset(SeedableMixin, torch.utils.data.Dataset):
     def __init__(self, cfg: DictConfig, split: str):
         super().__init__()
 
+        if cfg.subsequence_sampling_strategy not in SubsequenceSamplingStrategy:
+            raise ValueError(
+                f"Invalid subsequence sampling strategy {cfg.subsequence_sampling_strategy}! "
+                f"Valid options are {', '.join(SubsequenceSamplingStrategy.__members__)}"
+            )
+
+        if cfg.seq_padding_side not in SeqPaddingSide:
+            raise ValueError(
+                f"Invalid sequence padding side {cfg.seq_padding_side}! "
+                f"Valid options are {', '.join(SeqPaddingSide.__members__)}"
+            )
+
         self.config = cfg
         self.split = split
 
@@ -128,7 +210,7 @@ class PytorchDataset(SeedableMixin, torch.utils.data.Dataset):
         self.read_patient_descriptors()
 
         if self.config.min_seq_len is not None and self.config.min_seq_len > 1:
-            logger.info(f"Restricting to subjects with at least {config.min_seq_len} events")
+            logger.info(f"Restricting to subjects with at least {self.config.min_seq_len} events")
             self.filter_to_min_seq_len()
 
         if self.config.train_subset_size not in (None, "FULL") and self.split == "train":
@@ -143,11 +225,6 @@ class PytorchDataset(SeedableMixin, torch.utils.data.Dataset):
         all_shards = json.loads(shards_fp.read_text())
         self.shards = {sp: subjs for sp, subjs in all_shards.items() if sp.startswith(f"{self.split}/")}
         self.subj_map = {subj: sp for sp, subjs in self.shards.items() for subj in subjs}
-
-    @property
-    def measurement_configs(self):
-        """Grabs the measurement configs from the config."""
-        return self.config.measurement_configs
 
     def read_patient_descriptors(self):
         """Reads the patient descriptors from the ESGPT or MEDS dataset."""
@@ -212,7 +289,7 @@ class PytorchDataset(SeedableMixin, torch.utils.data.Dataset):
             while idx_col in task_df.columns:
                 idx_col = f"_{idx_col}"
 
-            raise NotImplementedError("Need to figure out task constraints still"
+            raise NotImplementedError("Need to figure out task constraints still")
 
             task_df_joint = (
                 task_df.select("patient_id", "start_time", "end_time")
@@ -226,9 +303,7 @@ class PytorchDataset(SeedableMixin, torch.utils.data.Dataset):
                     on="patient_id",
                     how="left",
                 )
-                .with_columns(
-                    pl.col("timestamp").alias("min_since_start")
-                )
+                .with_columns(pl.col("timestamp").alias("min_since_start"))
             )
 
             min_at_task_start = (
@@ -288,7 +363,7 @@ class PytorchDataset(SeedableMixin, torch.utils.data.Dataset):
         return {"tasks": sorted(self.tasks), "vocabs": self.task_vocabs, "types": self.task_types}
 
     def filter_to_min_seq_len(self):
-        """Filters the dataset to only include subjects with at least `config.min_seq_len` events."""
+        """Filters the dataset to only include subjects with at least `self.config.min_seq_len` events."""
         if self.has_task:
             logger.warning(
                 f"Filtering task {self.config.task_name} to min_seq_len {self.config.min_seq_len}. "
@@ -353,8 +428,8 @@ class PytorchDataset(SeedableMixin, torch.utils.data.Dataset):
                 f"Bad Subject IDs: {', '.join(str(x) for x in bad_patient_ids)}",
                 f"Global min: {stats['min'].item()}",
             ]
-            if self.config.save_dir is not None:
-                fp = self.config.save_dir / f"malformed_data_{self.split}.parquet"
+            if self.config.MEDS_cohort_dir is not None:
+                fp = self.config.MEDS_cohort_dir / f"malformed_data_{self.split}.parquet"
                 bad_inter_event_times.write_parquet(fp)
                 warning_strs.append(f"Wrote malformed data records to {fp}")
             warning_strs.append("Removing malformed subjects")
@@ -378,16 +453,8 @@ class PytorchDataset(SeedableMixin, torch.utils.data.Dataset):
         return self.config.task_name is not None
 
     @property
-    def seq_padding_side(self) -> SeqPaddingSide:
-        return self.config.seq_padding_side
-
-    @property
     def max_seq_len(self) -> int:
         return self.config.max_seq_len
-
-    @property
-    def is_subset_dataset(self) -> bool:
-        return self.config.train_subset_size != "FULL"
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         """Returns a Returns a dictionary corresponding to a single subject's data.
@@ -462,11 +529,9 @@ class PytorchDataset(SeedableMixin, torch.utils.data.Dataset):
             out["start_idx"] = st
             out["end_idx"] = end
 
-        out["dynamic"] = (
-            JointNestedRaggedTensorDict.load_slice(
-                self.config.tensorized_root / f"{shard}.pt", patient_idx
-            )[st:end]
-        )
+        out["dynamic"] = JointNestedRaggedTensorDict.load_slice(
+            self.config.tensorized_root / f"{shard}.pt", patient_idx
+        )[st:end]
 
         if self.config.do_include_start_time_min:
             out["start_time"] = static_row["start_time"] = static_row[
@@ -489,7 +554,7 @@ class PytorchDataset(SeedableMixin, torch.utils.data.Dataset):
             dense_collated = {}
 
         dynamic = JointNestedRaggedTensorDict.vstack([x["dynamic"] for x in batch]).to_dense(
-            padding_side=self.seq_padding_side
+            padding_side=self.config.seq_padding_side
         )
         dynamic["event_mask"] = dynamic.pop("dim1/mask")
         dynamic["dynamic_values_mask"] = dynamic.pop("dim2/mask") & ~np.isnan(dynamic["dynamic_values"])

@@ -1,4 +1,15 @@
-"""A pytorch batch object for ease of working with tensorized data. Curently **IN PROGRESS**"""
+"""A pytorch batch object for ease of working with tensorized data.
+
+Currently **IN PROGRESS**
+"""
+
+import dataclasses
+from collections import defaultdict
+from typing import Any
+
+import polars as pl
+import torch
+
 
 @dataclasses.dataclass
 class PytorchBatch:
@@ -86,28 +97,28 @@ class PytorchBatch:
     @staticmethod
     def de_pad(L: list[int], *other_L) -> list[int] | tuple[list[int]]:
         """Filters down all passed lists to only the indices where the first arg is non-zero.
-    
+
         Args:
             L: The list whose entries denote padding (0) or non-padding (non-zero).
             *other_L: Any other lists that should be de-padded in the same way as L.
-    
+
         Examples:
             >>> de_pad([1, 3, 0, 4, 0, 0], [10, 0, 5, 8, 1, 0])
             ([1, 3, 4], [10, 0, 8])
             >>> de_pad([1, 3, 0, 4, 0, 0])
             [1, 3, 4]
         """
-    
+
         out_L = []
         out_other = [None if x is None else [] for x in other_L]
-    
+
         for i, v in enumerate(L):
             if v != 0:
                 out_L.append(v)
                 for j, LL in enumerate(other_L):
                     if LL is not None:
                         out_other[j].append(LL[i])
-    
+
         if other_L:
             return tuple([out_L] + out_other)
         else:
@@ -199,7 +210,7 @@ class PytorchBatch:
             time=None if self.time is None else self.time[batch_index, seq_index],
         )
 
-    def __getitem__(self, item: str | tuple[int | slice]) -> Union[torch.Tensor, "PytorchBatch"]:
+    def __getitem__(self, item: str | tuple[int | slice]) -> torch.Tensor | "PytorchBatch":
         match item:
             case str():
                 return dataclasses.asdict(self)[item]
