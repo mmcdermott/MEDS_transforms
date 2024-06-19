@@ -85,9 +85,9 @@ This is a step in 4 parts:
 
 ```bash
 ./scripts/extraction/shard_events.py \
-    input_dir=$MIMICIV_PREMEDS_DIR \
-    cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
+       input_dir=$MIMICIV_PREMEDS_DIR \
+       cohort_dir=$MIMICIV_MEDS_DIR \
+       event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
 
 In practice, on a machine with 150 GB of RAM and 10 cores, this step takes approximately 20 minutes in total.
@@ -96,9 +96,9 @@ In practice, on a machine with 150 GB of RAM and 10 cores, this step takes appro
 
 ```bash
 ./scripts/extraction/split_and_shard_patients.py \
-    input_dir=$MIMICIV_PREMEDS_DIR \
-    cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
+       input_dir=$MIMICIV_PREMEDS_DIR \
+       cohort_dir=$MIMICIV_MEDS_DIR \
+       event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
 
 In practice, on a machine with 150 GB of RAM and 10 cores, this step takes less than 5 minutes in total.
@@ -107,9 +107,9 @@ In practice, on a machine with 150 GB of RAM and 10 cores, this step takes less 
 
 ```bash
 ./scripts/extraction/convert_to_sharded_events.py \
-    input_dir=$MIMICIV_PREMEDS_DIR \
-    cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
+       input_dir=$MIMICIV_PREMEDS_DIR \
+       cohort_dir=$MIMICIV_MEDS_DIR \
+       event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
 
 In practice, serially, this also takes around 20 minutes or more. However, it can be trivially parallelized to
@@ -122,9 +122,9 @@ and performance is not necessary; however, for larger datasets, it can be.
 
 ```bash
 ./scripts/extraction/merge_to_MEDS_cohort.py \
-    input_dir=$MIMICIV_PREMEDS_DIR \
-    cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
+       input_dir=$MIMICIV_PREMEDS_DIR \
+       cohort_dir=$MIMICIV_MEDS_DIR \
+       event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
 
 ### Running Locally, in Parallel.
@@ -143,17 +143,17 @@ to finish before moving on to the next stage. Let `$N_PARALLEL_WORKERS` be the n
 
 ```bash
 ./scripts/extraction/shard_events.py \
-    --multirun \
-    worker="range(0,$N_PARALLEL_WORKERS)" \
-    hydra/launcher=submitit_slurm \
-    hydra.launcher.timeout_min=60 \
-    hydra.launcher.cpus_per_task=10 \
-    hydra.launcher.mem_gb=50 \
-    hydra.launcher.name="${hydra.job.name}_${worker}" \
-    hydra.launcher.partition="short" \
-    input_dir=$MIMICIV_PREMEDS_DIR \
-    cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
+       --multirun \
+       worker="range(0,$N_PARALLEL_WORKERS)" \
+       hydra/launcher=submitit_slurm \
+       hydra.launcher.timeout_min=60 \
+       hydra.launcher.cpus_per_task=10 \
+       hydra.launcher.mem_gb=50 \
+       hydra.launcher.name="${hydra.job.name}_${worker}" \
+       hydra.launcher.partition="short" \
+       input_dir=$MIMICIV_PREMEDS_DIR \
+       cohort_dir=$MIMICIV_MEDS_DIR \
+       event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
 
 In practice, on a machine with 150 GB of RAM and 10 cores, this step takes approximately 20 minutes in total.
@@ -162,9 +162,9 @@ In practice, on a machine with 150 GB of RAM and 10 cores, this step takes appro
 
 ```bash
 ./scripts/extraction/split_and_shard_patients.py \
-    input_dir=$MIMICIV_PREMEDS_DIR \
-    cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
+       input_dir=$MIMICIV_PREMEDS_DIR \
+       cohort_dir=$MIMICIV_MEDS_DIR \
+       event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
 
 In practice, on a machine with 150 GB of RAM and 10 cores, this step takes less than 5 minutes in total.
@@ -173,9 +173,9 @@ In practice, on a machine with 150 GB of RAM and 10 cores, this step takes less 
 
 ```bash
 ./scripts/extraction/convert_to_sharded_events.py \
-    input_dir=$MIMICIV_PREMEDS_DIR \
-    cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
+       input_dir=$MIMICIV_PREMEDS_DIR \
+       cohort_dir=$MIMICIV_MEDS_DIR \
+       event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
 
 In practice, serially, this also takes around 20 minutes or more. However, it can be trivially parallelized to
@@ -188,9 +188,9 @@ and performance is not necessary; however, for larger datasets, it can be.
 
 ```bash
 ./scripts/extraction/merge_to_MEDS_cohort.py \
-    input_dir=$MIMICIV_PREMEDS_DIR \
-    cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
+       input_dir=$MIMICIV_PREMEDS_DIR \
+       cohort_dir=$MIMICIV_MEDS_DIR \
+       event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
 ```
 
 5. (Optional) Generate preliminary code statistics and merge to external metadata.
