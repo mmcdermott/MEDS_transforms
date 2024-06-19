@@ -221,10 +221,10 @@ def mapper_fntr(
         >>> import numpy as np
         >>> df = pl.DataFrame({
         ...     "code":   pl.Series(["A", "B", "A", "B", "C", "A", "C", "B",    "D"], dtype=pl.Categorical),
-        ...     "modifier1":        [1,   2,   1,   2,   1,   2,   1,   2,      None],
-        ...     "modifier_ignored": [3,   3,   4,   4,   5,   5,   6,   6,      7],
-        ...     "patient_id":       [1,   2,   1,   3,   1,   2,   2,   2,      1],
-        ...     "numerical_value":  [1.1, 2.,  1.1, 4.,  5.,  6.,  7.5, np.NaN, None],
+        ...     "modifier1":        [1,   2,   1,   2,   1,   2,   1,   2,            None],
+        ...     "modifier_ignored": [3,   3,   4,   4,   5,   5,   6,   6,            7],
+        ...     "patient_id":       [1,   2,   1,   3,   1,   2,   2,   2,            1],
+        ...     "numerical_value":  [1.1, 2.,  1.1, 4.,  5.,  6.,  7.5, float('nan'), None],
         ... })
         >>> df
         shape: (9, 5)
