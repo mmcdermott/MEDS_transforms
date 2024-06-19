@@ -147,31 +147,87 @@ patient_id,timestamp,code,numerical_value
 1195293,"06/20/2010, 20:50:04",DISCHARGE,
 """
 
+MEDS_OUTPUT_TRAIN_1_SUBJECTS = """
+patient_id,timestamp,code,numerical_value
+68729,,EYE_COLOR//HAZEL,
+68729,,HEIGHT,160.3953106166676
+68729,"03/09/1978, 00:00:00",DOB,
+814703,,EYE_COLOR//HAZEL,
+814703,,HEIGHT,156.48559093209357
+814703,"03/28/1976, 00:00:00",DOB,
+"""
+
+MEDS_OUTPUT_TRAIN_1_ADMIT_VITALS = """
+patient_id,timestamp,code,numerical_value
+68729,"05/26/2010, 02:30:56",ADMISSION//PULMONARY,
+68729,"05/26/2010, 02:30:56",HR,86.0
+68729,"05/26/2010, 02:30:56",TEMP,97.8
+68729,"05/26/2010, 04:51:52",DISCHARGE,
+814703,"02/05/2010, 05:55:39",ADMISSION//ORTHOPEDIC,
+814703,"02/05/2010, 05:55:39",HR,170.2
+814703,"02/05/2010, 05:55:39",TEMP,100.1
+814703,"02/05/2010, 07:02:30",DISCHARGE,
+"""
+
+MEDS_OUTPUT_TUNING_0_SUBJECTS = """
+patient_id,timestamp,code,numerical_value
+754281,,EYE_COLOR//BROWN,
+754281,,HEIGHT,166.22261567137025
+754281,"12/19/1988, 00:00:00",DOB,
+"""
+
+MEDS_OUTPUT_TUNING_0_ADMIT_VITALS = """
+patient_id,timestamp,code,numerical_value
+754281,"01/03/2010, 06:27:59",ADMISSION//PULMONARY,
+754281,"01/03/2010, 06:27:59",HR,142.0
+754281,"01/03/2010, 06:27:59",TEMP,99.8
+754281,"01/03/2010, 08:22:13",DISCHARGE,
+"""
+
+MEDS_OUTPUT_HELD_OUT_0_SUBJECTS = """
+patient_id,timestamp,code,numerical_value
+1500733,,EYE_COLOR//BROWN,
+1500733,,HEIGHT,158.60131573580904
+1500733,"07/20/1986, 00:00:00",DOB,
+"""
+
+MEDS_OUTPUT_HELD_OUT_0_ADMIT_VITALS = """
+patient_id,timestamp,code,numerical_value
+1500733,"06/03/2010, 14:54:38",ADMISSION//ORTHOPEDIC,
+1500733,"06/03/2010, 14:54:38",HR,91.4
+1500733,"06/03/2010, 14:54:38",TEMP,100.0
+1500733,"06/03/2010, 15:39:49",HR,84.4
+1500733,"06/03/2010, 15:39:49",TEMP,100.3
+1500733,"06/03/2010, 16:20:49",HR,90.1
+1500733,"06/03/2010, 16:20:49",TEMP,100.1
+1500733,"06/03/2010, 16:44:26",DISCHARGE,
+"""
+
 SUB_SHARDED_OUTPUTS = {
     "train/0": {
         "subjects": MEDS_OUTPUT_TRAIN_0_SUBJECTS,
         "admit_vitals": MEDS_OUTPUT_TRAIN_0_ADMIT_VITALS,
     },
     "train/1": {
-        "subjects": None,
-        "admit_vitals": None,
+        "subjects": MEDS_OUTPUT_TRAIN_1_SUBJECTS,
+        "admit_vitals": MEDS_OUTPUT_TRAIN_1_ADMIT_VITALS,
     },
     "tuning/0": {
-        "subjects": None,
-        "admit_vitals": None,
+        "subjects": MEDS_OUTPUT_TUNING_0_SUBJECTS,
+        "admit_vitals": MEDS_OUTPUT_TUNING_0_ADMIT_VITALS,
     },
     "held_out/0": {
-        "subjects": None,
-        "admit_vitals": None,
+        "subjects": MEDS_OUTPUT_HELD_OUT_0_SUBJECTS,
+        "admit_vitals": MEDS_OUTPUT_HELD_OUT_0_ADMIT_VITALS,
     },
 }
 
 
 MEDS_OUTPUTS = {
     "train/0": [MEDS_OUTPUT_TRAIN_0_SUBJECTS, MEDS_OUTPUT_TRAIN_0_ADMIT_VITALS],
-    "train/1": None,
-    "tuning/0": None,
-    "held_out/0": None,
+    "train/1": [MEDS_OUTPUT_TRAIN_1_SUBJECTS, MEDS_OUTPUT_TRAIN_1_ADMIT_VITALS],
+    "tuning/0": [MEDS_OUTPUT_TUNING_0_SUBJECTS, MEDS_OUTPUT_TUNING_0_ADMIT_VITALS],
+    "held_out/0": [MEDS_OUTPUT_HELD_OUT_0_SUBJECTS, MEDS_OUTPUT_HELD_OUT_0_ADMIT_VITALS],
 }
 
 
@@ -358,9 +414,6 @@ def test_extraction():
 
         for split, expected_outputs in SUB_SHARDED_OUTPUTS.items():
             for prefix, expected_df_L in expected_outputs.items():
-                if expected_df_L is None:
-                    continue
-
                 if not isinstance(expected_df_L, list):
                     expected_df_L = [expected_df_L]
 
