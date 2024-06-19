@@ -15,8 +15,9 @@ stages:
   - fit_outlier_detection
   - filter_outliers
   - fit_normalization
+  - fit_vocabulary_indices
   - normalize
-  - tokenize
+  - tokenization
   - tensorize
 
 # Pipeline Structure
@@ -24,14 +25,16 @@ stage_configs:
   filter_patients:
     min_events_per_patient: null
     min_measurements_per_patient: null
+    data_input_dir: ${input_dir}/final_cohort
 
   add_time_derived_measurements:
     age:
-      dob_code: ???
+      DOB_code: ???
       age_code: "AGE"
       age_unit: "years"
     time_of_day:
-      bin_endpoints: [6, 12, 18, 24]
+      time_of_day_code: "TIME_OF_DAY"
+      endpoints: [6, 12, 18, 24]
 
   preliminary_counts:
     aggregations:
@@ -59,3 +62,8 @@ stage_configs:
       - "values/n_occurrences"
       - "values/sum"
       - "values/sum_sqd"
+
+  fit_vocabulary_indices:
+    is_metadata: true
+    ordering_method: "lexicographic"
+    output_dir: "${cohort_dir}"

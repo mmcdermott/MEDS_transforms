@@ -9,8 +9,11 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_polars_functions.filter_measurements import filter_outliers_fntr
 from MEDS_polars_functions.mapper import wrap as rwlock_wrap
+from MEDS_polars_functions.tokenize import (
+    extract_seq_of_patient_events,
+    extract_statics_and_schema,
+)
 from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
 
 
@@ -27,7 +30,6 @@ def main(cfg: DictConfig):
     )
 
     input_dir = Path(cfg.stage_cfg.data_input_dir)
-    metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
     output_dir = Path(cfg.stage_cfg.output_dir)
 
     shards = json.loads((Path(cfg.input_dir) / "splits.json").read_text())
@@ -35,21 +37,32 @@ def main(cfg: DictConfig):
     patient_splits = list(shards.keys())
     random.shuffle(patient_splits)
 
-    code_metadata = pl.read_parquet(metadata_input_dir / "code_metadata.parquet", use_pyarrow=True)
-    compute_fn = filter_outliers_fntr(cfg.stage_cfg, code_metadata)
-
     for sp in patient_splits:
         in_fp = input_dir / f"{sp}.parquet"
-        out_fp = output_dir / f"{sp}.parquet"
+        schema_out_fp = output_dir / "schemas" / f"{sp}.parquet"
+        event_seq_out_fp = output_dir / "event_seqs" / f"{sp}.parquet"
 
-        logger.info(f"Filtering {str(in_fp.resolve())} into {str(out_fp.resolve())}")
+        logger.info(f"Tokenizing {str(in_fp.resolve())} into schemas at {str(schema_out_fp.resolve())}")
 
         rwlock_wrap(
             in_fp,
-            out_fp,
+            schema_out_fp,
             pl.scan_parquet,
             write_lazyframe,
-            compute_fn,
+            extract_statics_and_schema,
+            do_return=False,
+            cache_intermediate=False,
+            do_overwrite=cfg.do_overwrite,
+        )
+
+        logger.info(f"Tokenizing {str(in_fp.resolve())} into event_seqs at {str(event_seq_out_fp.resolve())}")
+
+        rwlock_wrap(
+            in_fp,
+            event_seq_out_fp,
+            pl.scan_parquet,
+            write_lazyframe,
+            extract_seq_of_patient_events,
             do_return=False,
             cache_intermediate=False,
             do_overwrite=cfg.do_overwrite,

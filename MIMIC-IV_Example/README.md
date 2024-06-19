@@ -45,13 +45,24 @@ that page. You will need the raw `.csv.gz` files for this example. We will use `
 the root directory of where the resulting _core data files_ are stored -- e.g., there should be a `hosp` and
 `icu` subdirectory of `$MIMICIV_RAW_DIR`.
 
-## Step 2: Get the data ready for base MEDS extraction
+## Step 2: Run the basic MEDS ETL
+
+This step contains several sub-steps; luckily, all these substeps can be run via a single script, with the
+`joint_script.sh` script which uses the Hydra `joblib` launcher to run things with local parallelism (make
+sure you enable this feature by including the `[local_parallelism]` option during installation) or via
+`joint_script_slurm.sh` which uses the Hydra `submitit` launcher to run things through slurm (make sure you
+enable this feature by including the `[slurm_parallelism]` option during installation). This script entails
+several steps:
+
+### Step 2.1: Get the data ready for base MEDS extraction
 
 This is a step in a few parts:
 
 1. Join a few tables by `hadm_id` to get the right timestamps in the right rows for processing. In
    particular, we need to join:
-   - TODO
+   - the `hosp/diagnoses_icd` table with the `hosp/admissions` table to get the `dischtime` for each
+     `hadm_id`.
+   - the `hosp/drgcodes` table with the `hosp/admissions` table to get the `dischtime` for each `hadm_id`.
 2. Convert the patient's static data to a more parseable form. This entails:
    - Get the patient's DOB in a format that is usable for MEDS, rather than the integral `anchor_year` and
      `anchor_offset` fields.
@@ -61,7 +72,8 @@ After these steps, modified files or symlinks to the original files will be writ
 will be used as the input to the actual MEDS extraction ETL. We'll use `$MIMICIV_PREMEDS_DIR` to denote this
 directory.
 
-To run this step, you can use the following script (assumed to be run **not** from this directory but from the
+This step is run in the `joint_script.sh` script or the `joint_script_slurm.sh` script, but in either case the
+base command that is run is as follows (assumed to be run **not** from this directory but from the
 root directory of this repository):
 
 ```bash
@@ -70,9 +82,7 @@ root directory of this repository):
 
 In practice, on a machine with 150 GB of RAM and 10 cores, this step takes less than 5 minutes in total.
 
-## Step 3: Run the MEDS extraction ETL
-
-### Running locally, serially
+### Step 2.2: Run the MEDS extraction ETL
 
 We will assume you want to output the final MEDS dataset into a directory we'll denote as `$MIMICIV_MEDS_DIR`.
 Note this is a different directory than the pre-MEDS directory (though, of course, they can both be
@@ -83,114 +93,91 @@ This is a step in 4 parts:
 1. Sub-shard the raw files. Run this command as many times simultaneously as you would like to have workers
    performing this sub-sharding step. See below for how to automate this parallelism using hydra launchers.
 
+   This step uses the `./scripts/extraction/shard_events.py` script. See `joint_script*.sh` for the expected
+   format of the command.
+
+2. Extract and form the patient splits and sub-shards. The `./scripts/extraction/split_and_shard_patients.py`
+   script is used for this step. See `joint_script*.sh` for the expected format of the command.
+
+3. Extract patient sub-shards and convert to MEDS events. The
+   `./scripts/extraction/convert_to_sharded_events.py` script is used for this step. See `joint_script*.sh` for
+   the expected format of the command.
+
+4. Merge the MEDS events into a single file per patient sub-shard. The
+   `./scripts/extraction/merge_to_MEDS_cohort.py` script is used for this step. See `joint_script*.sh` for the
+   expected format of the command.
+
+5. (Optional) Generate preliminary code statistics and merge to external metadata. This is not performed
+   currently in the `joint_script*.sh` scripts.
+
+## Pre-processing for a model
+
+To run the pre-processing steps for a model, consider the sample script provided here:
+
+1. Filter patients to only those with at least 32 events (unique timepoints):
+
 ```bash
-./scripts/extraction/shard_events.py \
-    input_dir=$MIMICIV_PREMEDS_DIR \
-    cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
+mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines
+❯ ./scripts/preprocessing/filter_patients.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null stage_configs.filter_patients.min_events_per_patient=32
 ```
 
-In practice, on a machine with 150 GB of RAM and 10 cores, this step takes approximately 20 minutes in total.
-
-2. Extract and form the patient splits and sub-shards.
+2. Add time-derived measurements (age and time-of-day):
 
 ```bash
-./scripts/extraction/split_and_shard_patients.py \
-    input_dir=$MIMICIV_PREMEDS_DIR \
-    cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
+mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 3s
+❯ ./scripts/preprocessing/add_time_derived_measurements.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DI
+R/test" code_modifier_columns=null stage_configs.add_time_derived_measurements.age.DOB_code="DOB"
 ```
 
-In practice, on a machine with 150 GB of RAM and 10 cores, this step takes less than 5 minutes in total.
-
-3. Extract patient sub-shards and convert to MEDS events.
+3. Get preliminary counts for code filtering:
 
 ```bash
-./scripts/extraction/convert_to_sharded_events.py \
-    input_dir=$MIMICIV_PREMEDS_DIR \
-    cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
+mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines
+❯ ./scripts/preprocessing/collect_code_metadata.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null stage="preliminary_counts"
 ```
 
-In practice, serially, this also takes around 20 minutes or more. However, it can be trivially parallelized to
-cut the time down by a factor of the number of workers processing the data by simply running the command
-multiple times (though this will, of course, consume more resources). If your filesystem is distributed, these
-commands can also be launched as separate slurm jobs, for example. For MIMIC-IV, this level of parallelization
-and performance is not necessary; however, for larger datasets, it can be.
-
-4. Merge the MEDS events into a single file per patient sub-shard.
+4. Filter codes:
 
 ```bash
-./scripts/extraction/merge_to_MEDS_cohort.py \
-    input_dir=$MIMICIV_PREMEDS_DIR \
-    cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
+mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 4s
+❯ ./scripts/preprocessing/filter_codes.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modi
+fier_columns=null stage_configs.filter_codes.min_patients_per_code=128 stage_configs.filter_codes.min_occurrences_per_code=256
 ```
 
-### Running Locally, in Parallel.
-
-This step is the exact same commands as above, but leverages Hydra's multirun capabilities with the `joblib`
-launcher. Install this package with the optional `local_parallelism` option (e.g., `pip install -e .[local_parallelism]` and run `./MIMIC-IV_Example/joint_script.sh`. See that script for expected args.
-
-### Running Each Step over Slurm
-
-To use slurm, run each command with the number of workers desired using Hydra's multirun capabilities with the
-`submitit_slurm` launcher. Install this package with the optional `slurm_parallelism` option. See below for
-modified commands. Note these can't be chained in a single script as the jobs will not wait for all slurm jobs
-to finish before moving on to the next stage. Let `$N_PARALLEL_WORKERS` be the number of desired workers
-
-1. Sub-shard the raw files.
+5. Get outlier detection params:
 
 ```bash
-./scripts/extraction/shard_events.py \
-    --multirun \
-    worker="range(0,$N_PARALLEL_WORKERS)" \
-    hydra/launcher=submitit_slurm \
-    hydra.launcher.timeout_min=60 \
-    hydra.launcher.cpus_per_task=10 \
-    hydra.launcher.mem_gb=50 \
-    hydra.launcher.name="${hydra.job.name}_${worker}" \
-    hydra.launcher.partition="short" \
-    input_dir=$MIMICIV_PREMEDS_DIR \
-    cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
+mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 19m57s
+❯ ./scripts/preprocessing/collect_code_metadata.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null stage=fit_outlier_detection
 ```
 
-In practice, on a machine with 150 GB of RAM and 10 cores, this step takes approximately 20 minutes in total.
-
-2. Extract and form the patient splits and sub-shards.
+6. Filter outliers:
 
 ```bash
-./scripts/extraction/split_and_shard_patients.py \
-    input_dir=$MIMICIV_PREMEDS_DIR \
-    cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
+mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 5m14s
+❯ ./scripts/preprocessing/filter_outliers.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null
 ```
 
-In practice, on a machine with 150 GB of RAM and 10 cores, this step takes less than 5 minutes in total.
-
-3. Extract patient sub-shards and convert to MEDS events.
+7. Fit normalization parameters:
 
 ```bash
-./scripts/extraction/convert_to_sharded_events.py \
-    input_dir=$MIMICIV_PREMEDS_DIR \
-    cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
+mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 16m25s
+❯ ./scripts/preprocessing/collect_code_metadata.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null stage=fit_normalization
 ```
 
-In practice, serially, this also takes around 20 minutes or more. However, it can be trivially parallelized to
-cut the time down by a factor of the number of workers processing the data by simply running the command
-multiple times (though this will, of course, consume more resources). If your filesystem is distributed, these
-commands can also be launched as separate slurm jobs, for example. For MIMIC-IV, this level of parallelization
-and performance is not necessary; however, for larger datasets, it can be.
-
-4. Merge the MEDS events into a single file per patient sub-shard.
+8. Fit vocabulary:
 
 ```bash
-./scripts/extraction/merge_to_MEDS_cohort.py \
-    input_dir=$MIMICIV_PREMEDS_DIR \
-    cohort_dir=$MIMICIV_MEDS_DIR \
-    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml
+mbm47 in  compute-e-16-230 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 2s
+❯ ./scripts/preprocessing/fit_vocabulary_indices.py input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null
+```
+
+9. Normalize:
+
+```bash
+mbm47 in  compute-e-16-230 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 4s
+❯ ./scripts/preprocessing/normalize.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifie
+r_columns=null
 ```
 
 ## Limitations / TO-DOs:

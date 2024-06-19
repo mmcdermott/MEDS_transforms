@@ -33,33 +33,36 @@ def main(cfg: DictConfig):
     input_dir = Path(cfg.stage_cfg.data_input_dir)
     output_dir = Path(cfg.stage_cfg.output_dir)
 
-    shards = json.loads((cfg.input_dir / "splits.json").read_text())
+    shards = json.loads((Path(cfg.input_dir) / "splits.json").read_text())
 
     patient_splits = list(shards.keys())
     random.shuffle(patient_splits)
 
     compute_fns = []
-    if cfg.min_measurements_per_patient:
+    if cfg.stage_cfg.min_measurements_per_patient:
         logger.info(
-            f"Filtering patients with fewer than {cfg.min_measurements_per_patient} measurements "
+            f"Filtering patients with fewer than {cfg.stage_cfg.min_measurements_per_patient} measurements "
             "(observations of any kind)."
         )
         compute_fns.append(
             partial(
                 filter_patients_by_num_measurements,
-                min_measurements_per_patient=cfg.min_measurements_per_patient,
+                min_measurements_per_patient=cfg.stage_cfg.min_measurements_per_patient,
             )
         )
-    if cfg.min_events_per_patient:
+    if cfg.stage_cfg.min_events_per_patient:
         logger.info(
-            f"Filtering patients with fewer than {cfg.min_events_per_patient} events (unique timepoints)."
+            f"Filtering patients with fewer than {cfg.stage_cfg.min_events_per_patient} events "
+            "(unique timepoints)."
         )
         compute_fns.append(
-            partial(filter_patients_by_num_events, min_events_per_patient=cfg.min_events_per_patient)
+            partial(
+                filter_patients_by_num_events, min_events_per_patient=cfg.stage_cfg.min_events_per_patient
+            )
         )
 
     for sp in patient_splits:
-        in_fp = input_dir / "final_cohort" / f"{sp}.parquet"
+        in_fp = input_dir / f"{sp}.parquet"
         out_fp = output_dir / f"{sp}.parquet"
 
         logger.info(f"Filtering {str(in_fp.resolve())} into {str(out_fp.resolve())}")

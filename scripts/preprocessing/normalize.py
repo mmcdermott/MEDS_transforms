@@ -2,6 +2,7 @@
 
 import json
 import random
+from functools import partial
 from pathlib import Path
 
 import hydra
@@ -9,8 +10,8 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_polars_functions.filter_measurements import filter_outliers_fntr
 from MEDS_polars_functions.mapper import wrap as rwlock_wrap
+from MEDS_polars_functions.normalization import normalize
 from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
 
 
@@ -35,8 +36,9 @@ def main(cfg: DictConfig):
     patient_splits = list(shards.keys())
     random.shuffle(patient_splits)
 
-    code_metadata = pl.read_parquet(metadata_input_dir / "code_metadata.parquet", use_pyarrow=True)
-    compute_fn = filter_outliers_fntr(cfg.stage_cfg, code_metadata)
+    code_metadata = pl.read_parquet(metadata_input_dir / "code_metadata.parquet", use_pyarrow=True).lazy()
+    code_modifiers = cfg.get("code_modifier_columns", None)
+    compute_fn = partial(normalize, code_metadata=code_metadata, code_modifiers=code_modifiers)
 
     for sp in patient_splits:
         in_fp = input_dir / f"{sp}.parquet"
