@@ -48,7 +48,11 @@ the root directory of where the resulting _core data files_ are stored -- e.g., 
 ## Step 2: Run the basic MEDS ETL
 
 This step contains several sub-steps; luckily, all these substeps can be run via a single script, with the
-`joint_script.sh` script. This script entails several steps:
+`joint_script.sh` script which uses the Hydra `joblib` launcher to run things with local parallelism (make
+sure you enable this feature by including the `[local_parallelism]` option during installation) or via
+`joint_script_slurm.sh` which uses the Hydra `submitit` launcher to run things through slurm (make sure you
+enable this feature by including the `[slurm_parallelism]` option during installation). This script entails
+several steps:
 
 ### Step 2.1: Get the data ready for base MEDS extraction
 
