@@ -3,9 +3,9 @@
 from collections.abc import Callable
 
 import polars as pl
+from omegaconf import DictConfig
 
 pl.enable_string_cache()
-from omegaconf import DictConfig
 
 
 def filter_codes_fntr(
