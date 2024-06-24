@@ -21,7 +21,7 @@ dependencies = ["polars", "pyarrow", "nested_ragged_tensors", "loguru", "hydra-c
 [project.optional-dependencies]
 examples = ["rootutils"]
 dev = ["pre-commit"]
-tests = ["pytest", "pytest-cov[toml]", "rootutils"]
+tests = ["pytest", "pytest-cov", "rootutils"]
 local_parallelism = ["hydra-joblib-launcher"]
 slurm_parallelism = ["hydra-submitit-launcher"]
 

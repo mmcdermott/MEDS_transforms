@@ -17,8 +17,10 @@ from MEDS_polars_functions.time_derived_measurements import (
 )
 from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
 
+INFERRED_STAGE_KEYS = {"is_metadata", "data_input_dir", "metadata_input_dir", "output_dir"}
 
-@hydra.main(version_base=None, config_path="configs", config_name="preprocess")
+
+@hydra.main(version_base=None, config_path="../../configs", config_name="preprocess")
 def main(cfg: DictConfig):
     """Adds time-derived measurements to a MEDS cohort as separate observations at each unique timestamp."""
 
@@ -30,31 +32,27 @@ def main(cfg: DictConfig):
         f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
     )
 
-    output_dir = Path(cfg.stage_dfg.output_dir)
+    output_dir = Path(cfg.stage_cfg.output_dir)
 
     shards = json.loads((Path(cfg.stage_cfg.metadata_input_dir) / "splits.json").read_text())
+    input_dir = Path(cfg.stage_cfg.data_input_dir)
 
-    final_cohort_dir = cfg.stage_cfg.data_input_dir / "final_cohort"
-    filtered_patients_dir = output_dir / "patients_above_length_threshold"
-    with_time_derived_dir = output_dir / "with_time_derived_measurements"
-
-    if filtered_patients_dir.is_dir():
-        logger.info(f"Reading data from filtered cohort directory {str(filtered_patients_dir.resolve())}")
-        input_dir = filtered_patients_dir
-    else:
-        logger.info(f"Reading data from raw cohort directory {str(final_cohort_dir.resolve())}")
-        input_dir = final_cohort_dir
+    logger.info(f"Reading data from {str(input_dir.resolve())}")
 
     patient_splits = list(shards.keys())
     random.shuffle(patient_splits)
 
     compute_fns = []
-    for feature_name, feature_cfg in cfg.time_derived_measurements.items():
+    # We use the raw stages object as the induced `stage_cfg` has extra properties like the input and output
+    # directories.
+    for feature_name, feature_cfg in cfg.stage_cfg.items():
         match feature_name:
             case "age":
                 compute_fns.append(add_new_events_fntr(age_fntr(feature_cfg)))
             case "time_of_day":
                 compute_fns.append(add_new_events_fntr(time_of_day_fntr(feature_cfg)))
+            case str() if feature_name in INFERRED_STAGE_KEYS:
+                continue
             case _:
                 raise ValueError(f"Unknown time-derived measurement: {feature_name}")
 
@@ -62,7 +60,7 @@ def main(cfg: DictConfig):
 
     for sp in patient_splits:
         in_fp = input_dir / f"{sp}.parquet"
-        out_fp = with_time_derived_dir / f"{sp}.parquet"
+        out_fp = output_dir / f"{sp}.parquet"
 
         logger.info(
             f"Adding time derived measurements to {str(in_fp.resolve())} into {str(out_fp.resolve())}"

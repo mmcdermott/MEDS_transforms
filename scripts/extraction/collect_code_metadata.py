@@ -8,7 +8,6 @@ from pathlib import Path
 
 import hydra
 import polars as pl
-import polars.selectors as cs
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
@@ -17,7 +16,7 @@ from MEDS_polars_functions.mapper import wrap as rwlock_wrap
 from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
 
 
-@hydra.main(version_base=None, config_path="../../configs", config_name="preprocess")
+@hydra.main(version_base=None, config_path="../../configs", config_name="extraction")
 def main(cfg: DictConfig):
     """Computes code metadata."""
 
@@ -31,8 +30,9 @@ def main(cfg: DictConfig):
 
     input_dir = Path(cfg.stage_cfg.data_input_dir)
     output_dir = Path(cfg.stage_cfg.output_dir)
+    mapper_output_dir = Path(cfg.stage_cfg.mapper_output_dir)
 
-    shards = json.loads((Path(cfg.input_dir) / "splits.json").read_text())
+    shards = json.loads((Path(cfg.stage_cfg.metadata_input_dir) / "splits.json").read_text())
 
     examine_splits = [f"{sp}/" for sp in cfg.stage_cfg.get("examine_splits", ["train"])]
     logger.info(f"Computing metadata over shards with any prefix in {examine_splits}")
@@ -49,7 +49,7 @@ def main(cfg: DictConfig):
     all_out_fps = []
     for sp in patient_splits:
         in_fp = input_dir / f"{sp}.parquet"
-        out_fp = output_dir / f"{sp}.parquet"
+        out_fp = mapper_output_dir / f"{sp}.parquet"
         all_out_fps.append(out_fp)
 
         logger.info(
@@ -69,7 +69,7 @@ def main(cfg: DictConfig):
 
     logger.info(f"Finished mapping in {datetime.now() - start}")
 
-    if cfg.worker != 0:
+    if cfg.worker != 1:
         return
 
     while not all(fp.is_file() for fp in all_out_fps):
@@ -80,9 +80,7 @@ def main(cfg: DictConfig):
     logger.info("All map shards complete! Starting code metadata reduction computation.")
     reducer_fn = reducer_fntr(cfg.stage_cfg, cfg.get("code_modifier_columns", None))
 
-    reduced = reducer_fn(*[pl.scan_parquet(fp, glob=False) for fp in all_out_fps]).with_columns(
-        cs.numeric().shrink_dtype().keep_name()
-    )
+    reduced = reducer_fn(*[pl.scan_parquet(fp, glob=False) for fp in all_out_fps])
     write_lazyframe(reduced, output_dir / "code_metadata.parquet")
     logger.info(f"Finished reduction in {datetime.now() - start}")
 

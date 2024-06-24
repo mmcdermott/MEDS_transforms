@@ -2,7 +2,6 @@
 
 import json
 import random
-from functools import partial
 from pathlib import Path
 
 import hydra
@@ -10,10 +9,7 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_polars_functions.filter_patients_by_length import (
-    filter_patients_by_num_events,
-    filter_patients_by_num_measurements,
-)
+from MEDS_polars_functions.filter_measurements import filter_codes_fntr
 from MEDS_polars_functions.mapper import wrap as rwlock_wrap
 from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
 
@@ -31,6 +27,7 @@ def main(cfg: DictConfig):
     )
 
     input_dir = Path(cfg.stage_cfg.data_input_dir)
+    metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
     output_dir = Path(cfg.stage_cfg.output_dir)
 
     shards = json.loads((Path(cfg.input_dir) / "splits.json").read_text())
@@ -38,28 +35,8 @@ def main(cfg: DictConfig):
     patient_splits = list(shards.keys())
     random.shuffle(patient_splits)
 
-    compute_fns = []
-    if cfg.stage_cfg.min_measurements_per_patient:
-        logger.info(
-            f"Filtering patients with fewer than {cfg.stage_cfg.min_measurements_per_patient} measurements "
-            "(observations of any kind)."
-        )
-        compute_fns.append(
-            partial(
-                filter_patients_by_num_measurements,
-                min_measurements_per_patient=cfg.stage_cfg.min_measurements_per_patient,
-            )
-        )
-    if cfg.stage_cfg.min_events_per_patient:
-        logger.info(
-            f"Filtering patients with fewer than {cfg.stage_cfg.min_events_per_patient} events "
-            "(unique timepoints)."
-        )
-        compute_fns.append(
-            partial(
-                filter_patients_by_num_events, min_events_per_patient=cfg.stage_cfg.min_events_per_patient
-            )
-        )
+    code_metadata = pl.read_parquet(metadata_input_dir / "code_metadata.parquet", use_pyarrow=True)
+    compute_fn = filter_codes_fntr(cfg.stage_cfg, code_metadata)
 
     for sp in patient_splits:
         in_fp = input_dir / f"{sp}.parquet"
@@ -72,13 +49,13 @@ def main(cfg: DictConfig):
             out_fp,
             pl.scan_parquet,
             write_lazyframe,
-            *compute_fns,
+            compute_fn,
             do_return=False,
             cache_intermediate=False,
             do_overwrite=cfg.do_overwrite,
         )
 
-    logger.info("Filtered patients.")
+    logger.info(f"Done with {cfg.stage}")
 
 
 if __name__ == "__main__":

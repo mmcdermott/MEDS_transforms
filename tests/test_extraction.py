@@ -11,7 +11,6 @@ from io import StringIO
 from pathlib import Path
 
 import polars as pl
-from loguru import logger
 from polars.testing import assert_frame_equal
 
 pl.enable_string_cache()
@@ -147,31 +146,103 @@ patient_id,timestamp,code,numerical_value
 1195293,"06/20/2010, 20:50:04",DISCHARGE,
 """
 
+MEDS_OUTPUT_TRAIN_1_SUBJECTS = """
+patient_id,timestamp,code,numerical_value
+68729,,EYE_COLOR//HAZEL,
+68729,,HEIGHT,160.3953106166676
+68729,"03/09/1978, 00:00:00",DOB,
+814703,,EYE_COLOR//HAZEL,
+814703,,HEIGHT,156.48559093209357
+814703,"03/28/1976, 00:00:00",DOB,
+"""
+
+MEDS_OUTPUT_TRAIN_1_ADMIT_VITALS = """
+patient_id,timestamp,code,numerical_value
+68729,"05/26/2010, 02:30:56",ADMISSION//PULMONARY,
+68729,"05/26/2010, 02:30:56",HR,86.0
+68729,"05/26/2010, 02:30:56",TEMP,97.8
+68729,"05/26/2010, 04:51:52",DISCHARGE,
+814703,"02/05/2010, 05:55:39",ADMISSION//ORTHOPEDIC,
+814703,"02/05/2010, 05:55:39",HR,170.2
+814703,"02/05/2010, 05:55:39",TEMP,100.1
+814703,"02/05/2010, 07:02:30",DISCHARGE,
+"""
+
+MEDS_OUTPUT_TUNING_0_SUBJECTS = """
+patient_id,timestamp,code,numerical_value
+754281,,EYE_COLOR//BROWN,
+754281,,HEIGHT,166.22261567137025
+754281,"12/19/1988, 00:00:00",DOB,
+"""
+
+MEDS_OUTPUT_TUNING_0_ADMIT_VITALS = """
+patient_id,timestamp,code,numerical_value
+754281,"01/03/2010, 06:27:59",ADMISSION//PULMONARY,
+754281,"01/03/2010, 06:27:59",HR,142.0
+754281,"01/03/2010, 06:27:59",TEMP,99.8
+754281,"01/03/2010, 08:22:13",DISCHARGE,
+"""
+
+MEDS_OUTPUT_HELD_OUT_0_SUBJECTS = """
+patient_id,timestamp,code,numerical_value
+1500733,,EYE_COLOR//BROWN,
+1500733,,HEIGHT,158.60131573580904
+1500733,"07/20/1986, 00:00:00",DOB,
+"""
+
+MEDS_OUTPUT_HELD_OUT_0_ADMIT_VITALS = """
+patient_id,timestamp,code,numerical_value
+1500733,"06/03/2010, 14:54:38",ADMISSION//ORTHOPEDIC,
+1500733,"06/03/2010, 14:54:38",HR,91.4
+1500733,"06/03/2010, 14:54:38",TEMP,100.0
+1500733,"06/03/2010, 15:39:49",HR,84.4
+1500733,"06/03/2010, 15:39:49",TEMP,100.3
+1500733,"06/03/2010, 16:20:49",HR,90.1
+1500733,"06/03/2010, 16:20:49",TEMP,100.1
+1500733,"06/03/2010, 16:44:26",DISCHARGE,
+"""
+
+MEDS_OUTPUT_CODE_METADATA_FILE = """
+code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd
+,44,4,28,3198.8389005974336,382968.28937288234
+ADMISSION//CARDIAC,2,2,0,,
+ADMISSION//ORTHOPEDIC,1,1,0,,
+ADMISSION//PULMONARY,1,1,0,,
+DISCHARGE,4,4,0,,
+DOB,4,4,0,,
+EYE_COLOR//BLUE,1,1,0,,
+EYE_COLOR//BROWN,1,1,0,,
+EYE_COLOR//HAZEL,2,2,0,,
+HEIGHT,4,4,4,656.8389005974336,108056.12937288235
+HR,12,4,12,1360.5000000000002,158538.77
+TEMP,12,4,12,1181.4999999999998,116373.38999999998
+"""
+
 SUB_SHARDED_OUTPUTS = {
     "train/0": {
         "subjects": MEDS_OUTPUT_TRAIN_0_SUBJECTS,
         "admit_vitals": MEDS_OUTPUT_TRAIN_0_ADMIT_VITALS,
     },
     "train/1": {
-        "subjects": None,
-        "admit_vitals": None,
+        "subjects": MEDS_OUTPUT_TRAIN_1_SUBJECTS,
+        "admit_vitals": MEDS_OUTPUT_TRAIN_1_ADMIT_VITALS,
     },
     "tuning/0": {
-        "subjects": None,
-        "admit_vitals": None,
+        "subjects": MEDS_OUTPUT_TUNING_0_SUBJECTS,
+        "admit_vitals": MEDS_OUTPUT_TUNING_0_ADMIT_VITALS,
     },
     "held_out/0": {
-        "subjects": None,
-        "admit_vitals": None,
+        "subjects": MEDS_OUTPUT_HELD_OUT_0_SUBJECTS,
+        "admit_vitals": MEDS_OUTPUT_HELD_OUT_0_ADMIT_VITALS,
     },
 }
 
 
 MEDS_OUTPUTS = {
     "train/0": [MEDS_OUTPUT_TRAIN_0_SUBJECTS, MEDS_OUTPUT_TRAIN_0_ADMIT_VITALS],
-    "train/1": None,
-    "tuning/0": None,
-    "held_out/0": None,
+    "train/1": [MEDS_OUTPUT_TRAIN_1_SUBJECTS, MEDS_OUTPUT_TRAIN_1_ADMIT_VITALS],
+    "tuning/0": [MEDS_OUTPUT_TUNING_0_SUBJECTS, MEDS_OUTPUT_TUNING_0_ADMIT_VITALS],
+    "held_out/0": [MEDS_OUTPUT_HELD_OUT_0_SUBJECTS, MEDS_OUTPUT_HELD_OUT_0_ADMIT_VITALS],
 }
 
 
@@ -358,9 +429,6 @@ def test_extraction():
 
         for split, expected_outputs in SUB_SHARDED_OUTPUTS.items():
             for prefix, expected_df_L in expected_outputs.items():
-                if expected_df_L is None:
-                    continue
-
                 if not isinstance(expected_df_L, list):
                     expected_df_L = [expected_df_L]
 
@@ -401,9 +469,6 @@ def test_extraction():
         output_folder = MEDS_cohort_dir / "final_cohort"
         try:
             for split, expected_df_L in MEDS_OUTPUTS.items():
-                if expected_df_L is None:
-                    continue
-
                 if not isinstance(expected_df_L, list):
                     expected_df_L = [expected_df_L]
 
@@ -434,4 +499,36 @@ def test_extraction():
             print(f"stdout:\n{full_stdout}")
             raise e
 
-    logger.warning("Only checked the train/0 split for now. TODO: add the rest of the splits.")
+        # Step 4: Merge to the final output
+        stderr, stdout = run_command(
+            extraction_root / "collect_code_metadata.py",
+            extraction_config_kwargs,
+            "collect_code_metadata",
+        )
+        all_stderrs.append(stderr)
+        all_stdouts.append(stdout)
+
+        full_stderr = "\n".join(all_stderrs)
+        full_stdout = "\n".join(all_stdouts)
+
+        output_file = MEDS_cohort_dir / "code_metadata.parquet"
+        assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
+
+        got_df = pl.read_parquet(output_file, glob=False)
+
+        want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE)).with_columns(
+            pl.col("code").cast(pl.Categorical),
+            pl.col("code/n_occurrences").cast(pl.UInt32),
+            pl.col("code/n_patients").cast(pl.UInt32),
+            pl.col("values/n_occurrences").cast(pl.UInt32),
+            pl.col("values/sum").cast(pl.Float64).fill_null(0),
+            pl.col("values/sum_sqd").cast(pl.Float64).fill_null(0),
+        )
+
+        assert_df_equal(
+            want=want_df,
+            got=got_df,
+            msg="Code metadata differs!",
+            check_column_order=False,
+            check_row_order=False,
+        )
