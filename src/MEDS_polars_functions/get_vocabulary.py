@@ -87,7 +87,7 @@ def validate_code_metadata(code_metadata: pl.DataFrame, code_modifiers: list[str
     n_total_rows = len(code_metadata)
 
     if n_unique_codes != n_total_rows:
-        code_counts = code_metadata.groupby(cols).agg(pl.len().alias("count")).sort("count", descending=True)
+        code_counts = code_metadata.group_by(cols).agg(pl.len().alias("count")).sort("count", descending=True)
         extra_codes = code_counts.filter(pl.col("count") > 1)
         raise ValueError(f"The code and code modifiers are not unique:\n{extra_codes.head(100)}")
 

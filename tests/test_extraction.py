@@ -327,7 +327,7 @@ def test_extraction():
             "hydra.verbose": True,
         }
 
-        extraction_root = root / "scripts" / "extraction"
+        extraction_root = root / "src" / "MEDS_polars_functions" / "scripts" / "extraction"
 
         all_stderrs = []
         all_stdouts = []

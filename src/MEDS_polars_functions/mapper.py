@@ -1,12 +1,19 @@
 """Basic utilities for parallelizable map operations on sharded MEDS datasets with caching and locking."""
 
 import json
+import random
 import shutil
 from collections.abc import Callable
 from datetime import datetime
+from functools import wraps
 from pathlib import Path
 
+import hydra
+import polars as pl
 from loguru import logger
+from omegaconf import DictConfig, OmegaConf
+
+from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
 
 LOCK_TIME_FMT = "%Y-%m-%dT%H:%M:%S.%f"
 
@@ -82,7 +89,7 @@ def register_lock(cache_directory: Path) -> tuple[datetime, Path]:
     return lock_time, lock_fp
 
 
-def wrap[
+def rwlock_wrap[
     DF_T
 ](
     in_fp: Path,
@@ -149,7 +156,7 @@ def wrap[
         ...     lambda df: df.with_columns(pl.col("c") * 2),
         ...     lambda df: df.filter(pl.col("c") > 4)
         ... ]
-        >>> result_computed = wrap(in_fp, out_fp, read_fn, write_fn, *transform_fns, do_return=False)
+        >>> result_computed = rwlock_wrap(in_fp, out_fp, read_fn, write_fn, *transform_fns, do_return=False)
         >>> assert result_computed
         >>> print(out_fp.read_text())
         a,b,c
@@ -163,7 +170,7 @@ def wrap[
         ...     lambda df: df.with_columns(pl.col("c") * 2),
         ...     lambda df: df.filter(pl.col("d") > 4)
         ... ]
-        >>> wrap(in_fp, out_fp, read_fn, write_fn, *transform_fns)
+        >>> rwlock_wrap(in_fp, out_fp, read_fn, write_fn, *transform_fns)
         Traceback (most recent call last):
             ...
         polars.exceptions.ColumnNotFoundError: unable to find column "d"; valid columns: ["a", "b", "c"]
@@ -186,7 +193,7 @@ def wrap[
         >>> def lock_dir_checker_fn(df: pl.DataFrame) -> pl.DataFrame:
         ...     print(f"Lock dir exists? {lock_dir.exists()}")
         ...     return df
-        >>> result_computed, out_df = wrap(
+        >>> result_computed, out_df = rwlock_wrap(
         ...     in_fp, out_fp, read_fn, write_fn, lock_dir_checker_fn, do_return=True
         ... )
         Lock dir exists? True
@@ -276,3 +283,90 @@ def wrap[
         logger.warning(f"Clearing lock due to Exception {e} at {lock_fp} after {datetime.now() - st_time}")
         lock_fp.unlink()
         raise e
+
+
+def get_paths_and_debug(cfg: DictConfig, stage_cfg: DictConfig):
+    input_dir = Path(stage_cfg.data_input_dir)
+    output_dir = Path(stage_cfg.output_dir)
+    metadata_input_dir = Path(stage_cfg.metadata_input_dir)
+    shards_map_fn = Path(stage_cfg.shards_map_fp)
+
+    def chk(x: Path):
+        return "✅" if x.exists() else "❌"
+
+    paths_strs = [
+        f"  - {k}: {chk(v)} {str(v.resolve())}"
+        for k, v in {
+            "input_dir": input_dir,
+            "output_dir": output_dir,
+            "metadata_input_dir": metadata_input_dir,
+            "shards_map_fn": shards_map_fn,
+        }.items()
+    ]
+
+    logger_strs = [
+        f"Running with config:\n{OmegaConf.to_yaml(cfg)}",
+        f"Stage: {cfg.stage}",
+        f"Stage config:\n{OmegaConf.to_yaml(stage_cfg)}",
+        "Paths: (checkbox indicates if it exists)",
+    ]
+    logger.debug("\n".join(logger_strs + paths_strs))
+
+    return input_dir, output_dir, metadata_input_dir, shards_map_fn
+
+
+def map_over[
+    DF_T
+](
+    config_path: str,
+    config_name: str,
+    read_fn: Callable[[Path], DF_T] = pl.scan_parquet,
+    write_fn: Callable[[DF_T, Path], None] = write_lazyframe,
+    version_base=None,
+):
+    """A wrapper for doing a mapreduce over a set of shards with a mapper function."""
+    hydra_kwargs = {"version_base": version_base, "config_path": config_path, "config_name": config_name}
+
+    def decorator(mapper_fn: callable):
+        @wraps(mapper_fn)
+        def wrapper(cfg: DictConfig):
+            hydra_loguru_init()
+
+            stage_cfg = cfg.stage_cfg
+
+            input_dir, output_dir, metadata_input_dir, shards_map_fn = get_paths_and_debug(cfg, stage_cfg)
+
+            shards = json.loads(shards_map_fn.read_text())
+
+            if "process_shard_prefix" in stage_cfg:
+                logger.info(f'Processing shards with prefix "{stage_cfg.process_shard_prefix}"')
+                shards = {k: v for k, v in shards.items() if k.startswith(stage_cfg.process_shard_prefix)}
+
+            shards = list(shards.keys())
+            random.shuffle(shards)
+
+            start = datetime.now()
+            logger.info(f"Mapping computation over {len(shards)} shards")
+
+            for sp in shards:
+                in_fp = input_dir / f"{sp}.parquet"
+                out_fp = output_dir / f"{sp}.parquet"
+
+                logger.info(f"Processing {str(in_fp.resolve())} into {str(out_fp.resolve())}")
+
+                rwlock_wrap(
+                    in_fp,
+                    out_fp,
+                    read_fn,
+                    write_fn,
+                    mapper_fn,
+                    do_return=False,
+                    cache_intermediate=False,
+                    do_overwrite=cfg.do_overwrite,
+                )
+
+            logger.info(f"Finished mapping in {datetime.now() - start}")
+
+        return hydra.main(**hydra_kwargs)(wrapper)
+
+    return decorator

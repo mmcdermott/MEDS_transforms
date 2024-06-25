@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-
 import json
 import random
 from functools import partial
+from importlib.resources import files
 from pathlib import Path
 
 import hydra
@@ -10,7 +10,7 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_polars_functions.mapper import wrap as rwlock_wrap
+from MEDS_polars_functions.mapper import rwlock_wrap
 from MEDS_polars_functions.utils import hydra_loguru_init
 
 pl.enable_string_cache()
@@ -55,7 +55,10 @@ def identity_fn(df: pl.LazyFrame) -> pl.LazyFrame:
     return df
 
 
-@hydra.main(version_base=None, config_path="../../configs", config_name="extraction")
+config_yaml = files("MEDS_polars_functions").joinpath("configs/extraction.yaml")
+
+
+@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
 def main(cfg: DictConfig):
     """Merges the patient sub-sharded events into a single parquet file per patient shard."""
 

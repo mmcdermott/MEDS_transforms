@@ -194,7 +194,7 @@ def extract_seq_of_patient_events(df: pl.LazyFrame) -> pl.LazyFrame:
 
     return (
         dynamic.group_by("patient_id", "timestamp", maintain_order=True)
-        .agg(fill_to_nans("code").keep_name(), fill_to_nans("numerical_value").keep_name())
+        .agg(fill_to_nans("code").name.keep(), fill_to_nans("numerical_value").name.keep())
         .group_by("patient_id", maintain_order=True)
         .agg(
             fill_to_nans(time_delta_days_expr).alias("time_delta_days"),

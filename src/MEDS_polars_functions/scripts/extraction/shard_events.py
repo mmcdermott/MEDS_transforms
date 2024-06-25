@@ -1,11 +1,11 @@
 #!/usr/bin/env python
-
 import copy
 import gzip
 import random
 from collections.abc import Sequence
 from datetime import datetime
 from functools import partial
+from importlib.resources import files
 from pathlib import Path
 
 import hydra
@@ -13,7 +13,7 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_polars_functions.mapper import wrap as rwlock_wrap
+from MEDS_polars_functions.mapper import rwlock_wrap
 from MEDS_polars_functions.utils import (
     get_shard_prefix,
     hydra_loguru_init,
@@ -180,7 +180,10 @@ def filter_to_row_chunk(df: pl.LazyFrame, start: int, end: int) -> pl.LazyFrame:
     return df.filter(pl.col(ROW_IDX_NAME).is_between(start, end, closed="left")).drop(ROW_IDX_NAME)
 
 
-@hydra.main(version_base=None, config_path="../../configs", config_name="extraction")
+config_yaml = files("MEDS_polars_functions").joinpath("configs/extraction.yaml")
+
+
+@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
 def main(cfg: DictConfig):
     """Runs the input data re-sharding process. Can be parallelized across output shards.
 

@@ -1,20 +1,23 @@
 #!/usr/bin/env python
-
 import json
 import random
+from importlib.resources import files
 from pathlib import Path
 
 import hydra
 import polars as pl
 from loguru import logger
+from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_polars_functions.filter_measurements import filter_codes_fntr
-from MEDS_polars_functions.mapper import wrap as rwlock_wrap
-from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
+from MEDS_polars_functions.mapper import rwlock_wrap
+from MEDS_polars_functions.tensorize import convert_to_NRT
+from MEDS_polars_functions.utils import hydra_loguru_init
+
+config_yaml = files("MEDS_polars_functions").joinpath("configs/preprocess.yaml")
 
 
-@hydra.main(version_base=None, config_path="../../configs", config_name="preprocess")
+@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
 def main(cfg: DictConfig):
     """TODO."""
 
@@ -27,7 +30,6 @@ def main(cfg: DictConfig):
     )
 
     input_dir = Path(cfg.stage_cfg.data_input_dir)
-    metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
     output_dir = Path(cfg.stage_cfg.output_dir)
 
     shards = json.loads((Path(cfg.input_dir) / "splits.json").read_text())
@@ -35,21 +37,18 @@ def main(cfg: DictConfig):
     patient_splits = list(shards.keys())
     random.shuffle(patient_splits)
 
-    code_metadata = pl.read_parquet(metadata_input_dir / "code_metadata.parquet", use_pyarrow=True)
-    compute_fn = filter_codes_fntr(cfg.stage_cfg, code_metadata)
-
     for sp in patient_splits:
-        in_fp = input_dir / f"{sp}.parquet"
-        out_fp = output_dir / f"{sp}.parquet"
+        in_fp = input_dir / "event_seqs" / f"{sp}.parquet"
+        out_fp = output_dir / f"{sp}.nrt"
 
-        logger.info(f"Filtering {str(in_fp.resolve())} into {str(out_fp.resolve())}")
+        logger.info(f"Tensorizing {str(in_fp.resolve())} into {str(out_fp.resolve())}")
 
         rwlock_wrap(
             in_fp,
             out_fp,
             pl.scan_parquet,
-            write_lazyframe,
-            compute_fn,
+            JointNestedRaggedTensorDict.save,
+            convert_to_NRT,
             do_return=False,
             cache_intermediate=False,
             do_overwrite=cfg.do_overwrite,

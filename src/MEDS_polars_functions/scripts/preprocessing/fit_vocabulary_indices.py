@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+from importlib.resources import files
 from pathlib import Path
 
 import hydra
@@ -13,8 +13,10 @@ from MEDS_polars_functions.get_vocabulary import (
 )
 from MEDS_polars_functions.utils import hydra_loguru_init
 
+config_yaml = files("MEDS_polars_functions").joinpath("configs/preprocess.yaml")
 
-@hydra.main(version_base=None, config_path="../../configs", config_name="preprocess")
+
+@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
 def main(cfg: DictConfig):
     """TODO."""
 

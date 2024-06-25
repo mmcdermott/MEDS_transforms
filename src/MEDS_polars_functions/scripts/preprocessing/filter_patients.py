@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-
 import json
 import random
 from functools import partial
+from importlib.resources import files
 from pathlib import Path
 
 import hydra
@@ -14,11 +14,13 @@ from MEDS_polars_functions.filter_patients_by_length import (
     filter_patients_by_num_events,
     filter_patients_by_num_measurements,
 )
-from MEDS_polars_functions.mapper import wrap as rwlock_wrap
+from MEDS_polars_functions.mapper import rwlock_wrap
 from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
 
+config_yaml = files("MEDS_polars_functions").joinpath("configs/preprocess.yaml")
 
-@hydra.main(version_base=None, config_path="../../configs", config_name="preprocess")
+
+@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
 def main(cfg: DictConfig):
     """TODO."""
 

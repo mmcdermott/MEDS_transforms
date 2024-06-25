@@ -127,7 +127,7 @@ def filter_codes_fntr(
             idx_col = f"_{idx_col}"
 
         return (
-            df.with_row_count(idx_col)
+            df.with_row_index(idx_col)
             .join(allowed_code_metadata, on=join_cols, how="inner")
             .sort(idx_col)
             .drop(idx_col)
@@ -216,7 +216,7 @@ def filter_outliers_fntr(
         filter_expr = (val - mean).abs() <= stddev_cutoff * stddev
 
         return (
-            df.join(code_metadata, on=join_cols, how="left")
+            df.join(code_metadata, on=join_cols, how="left", coalesce=True)
             .with_columns(
                 filter_expr.alias("numerical_value/is_inlier"),
                 pl.when(filter_expr).then(pl.col("numerical_value")).alias("numerical_value"),
