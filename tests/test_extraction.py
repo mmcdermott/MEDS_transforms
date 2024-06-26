@@ -335,7 +335,7 @@ def test_extraction():
 
         # Step 1: Sub-shard the data
         stderr, stdout = run_command(
-            extraction_root / "shard_events.py", extraction_config_kwargs, "shard_events"
+            extraction_lib_root / "shard_events.py", extraction_config_kwargs, "shard_events"
         )
 
         all_stderrs.append(stderr)
