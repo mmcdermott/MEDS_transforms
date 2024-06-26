@@ -246,9 +246,9 @@ MEDS_OUTPUTS = {
 }
 
 
-def run_command(script: Path, hydra_kwargs: dict[str, str], test_name: str):
-    script = str(script.resolve())
-    command_parts = ["python", script] + [f"{k}={v}" for k, v in hydra_kwargs.items()]
+def run_command(script: Path | str, hydra_kwargs: dict[str, str], test_name: str):
+    script = ["python", str(script.resolve())] if isinstance(script, Path) else [script]
+    command_parts = script + [f"{k}={v}" for k, v in hydra_kwargs.items()]
     command_out = subprocess.run(" ".join(command_parts), shell=True, capture_output=True)
     stderr = command_out.stderr.decode()
     stdout = command_out.stdout.decode()
@@ -381,8 +381,15 @@ def test_extraction():
         )
 
         # Step 2: Collect the patient splits
+        # stderr, stdout = run_command(
+        #     "MEDS_extract_shard_patients",
+        #     {**extraction_config_kwargs, "stage":"split_and_shard_patients"},
+        #     "split_and_shard_patients",
+        # )
+
+        # Step 2: Collect the patient splits
         stderr, stdout = run_command(
-            extraction_root / "split_and_shard_patients.py",
+            (root / "src" / "MEDS_polars_functions" / "extraction" / "split_and_shard_patients.py"),
             extraction_config_kwargs,
             "split_and_shard_patients",
         )

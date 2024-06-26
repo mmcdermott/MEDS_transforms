@@ -25,6 +25,9 @@ tests = ["pytest", "pytest-cov", "rootutils"]
 local_parallelism = ["hydra-joblib-launcher"]
 slurm_parallelism = ["hydra-submitit-launcher"]
 
+[project.scripts]
+MEDS_extract_shard_patients = "MEDS_polars_functions.extraction.split_and_shard_patients:main"
+
 [project.urls]
 Homepage = "https://github.com/mmcdermott/MEDS_polars_functions"
 Issues = "https://github.com/mmcdermott/MEDS_polars_functions/issues"
