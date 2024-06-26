@@ -2,6 +2,7 @@
 
 from collections.abc import Callable, Generator
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -26,7 +27,7 @@ def identity_fn(df: Any) -> Any:
 def map_over(
     cfg: DictConfig,
     compute_fn: MAP_FN_T | None = None,
-    read_fn: Callable[[Path], DF_T] = pl.scan_parquet,
+    read_fn: Callable[[Path], DF_T] = partial(pl.scan_parquet, glob=False),
     write_fn: Callable[[DF_T, Path], None] = write_lazyframe,
     shard_iterator_fntr: SHARD_ITR_FNTR_T = shard_iterator,
 ):
@@ -39,6 +40,7 @@ def map_over(
 
     if not isinstance(compute_fn, tuple):
         compute_fn = (compute_fn,)
+
     for in_fp, out_fp in shard_iterator_fntr(cfg):
         logger.info(f"Processing {str(in_fp.resolve())} into {str(out_fp.resolve())}")
         rwlock_wrap(

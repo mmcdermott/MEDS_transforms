@@ -13,7 +13,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from MEDS_polars_functions.extraction.event_conversion import convert_to_events
 from MEDS_polars_functions.mapreduce.mapper import rwlock_wrap
-from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
+from MEDS_polars_functions.utils import stage_init, write_lazyframe
 
 config_yaml = files("MEDS_polars_functions").joinpath("configs/extraction.yaml")
 
@@ -22,15 +22,9 @@ config_yaml = files("MEDS_polars_functions").joinpath("configs/extraction.yaml")
 def main(cfg: DictConfig):
     """Converts the sub-sharded or raw data into events which are sharded by patient X input shard."""
 
-    hydra_loguru_init()
+    input_dir, patient_subsharded_dir, metadata_input_dir, shards_map_fn = stage_init(cfg)
 
-    logger.info(
-        f"Running with config:\n{OmegaConf.to_yaml(cfg)}\n"
-        f"Stage: {cfg.stage}\n\n"
-        f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
-    )
-
-    shards = json.loads((Path(cfg.stage_cfg.metadata_input_dir) / "splits.json").read_text())
+    shards = json.loads(shards_map_fn.read_text())
 
     event_conversion_cfg_fp = Path(cfg.event_conversion_config_fp)
     if not event_conversion_cfg_fp.exists():
@@ -44,7 +38,6 @@ def main(cfg: DictConfig):
 
     default_patient_id_col = event_conversion_cfg.pop("patient_id_col", "patient_id")
 
-    patient_subsharded_dir = Path(cfg.stage_cfg.output_dir)
     patient_subsharded_dir.mkdir(parents=True, exist_ok=True)
     OmegaConf.save(event_conversion_cfg, patient_subsharded_dir / "event_conversion_config.yaml")
 
@@ -62,7 +55,7 @@ def main(cfg: DictConfig):
             event_cfgs = copy.deepcopy(event_cfgs)
             input_patient_id_column = event_cfgs.pop("patient_id_col", default_patient_id_col)
 
-            event_shards = list((Path(cfg.stage_cfg.data_input_dir) / input_prefix).glob("*.parquet"))
+            event_shards = list((input_dir / input_prefix).glob("*.parquet"))
             random.shuffle(event_shards)
 
             for shard_fp in event_shards:
