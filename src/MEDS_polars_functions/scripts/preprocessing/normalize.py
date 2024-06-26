@@ -11,8 +11,8 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_polars_functions.mapper import rwlock_wrap
-from MEDS_polars_functions.normalization import normalize
+from MEDS_polars_functions.mapreduce.mapper import rwlock_wrap
+from MEDS_polars_functions.transforms.normalization import normalize
 from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
 
 config_yaml = files("MEDS_polars_functions").joinpath("configs/preprocess.yaml")

@@ -10,8 +10,8 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_polars_functions.mapper import rwlock_wrap
-from MEDS_polars_functions.tokenize import (
+from MEDS_polars_functions.mapreduce.mapper import rwlock_wrap
+from MEDS_polars_functions.transforms.tokenize import (
     extract_seq_of_patient_events,
     extract_statics_and_schema,
 )

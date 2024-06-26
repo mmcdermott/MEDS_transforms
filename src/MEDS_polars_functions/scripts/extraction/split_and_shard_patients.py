@@ -8,7 +8,7 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_polars_functions.sharding import shard_patients
+from MEDS_polars_functions.extraction.sharding import shard_patients
 from MEDS_polars_functions.utils import hydra_loguru_init
 
 config_yaml = files("MEDS_polars_functions").joinpath("configs/extraction.yaml")

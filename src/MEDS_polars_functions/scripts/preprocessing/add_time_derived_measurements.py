@@ -9,8 +9,8 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_polars_functions.mapper import rwlock_wrap
-from MEDS_polars_functions.time_derived_measurements import (
+from MEDS_polars_functions.mapreduce.mapper import rwlock_wrap
+from MEDS_polars_functions.transforms.time_derived_measurements import (
     add_new_events_fntr,
     age_fntr,
     time_of_day_fntr,

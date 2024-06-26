@@ -7,7 +7,7 @@ import polars as pl
 from loguru import logger
 from omegaconf.listconfig import ListConfig
 
-from .utils import is_col_field, parse_col_field
+from ..utils import is_col_field, parse_col_field
 
 
 def in_format(fmt: str, ts_name: str) -> pl.Expr:

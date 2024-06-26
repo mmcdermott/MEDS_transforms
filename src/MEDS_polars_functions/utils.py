@@ -8,9 +8,77 @@ from pathlib import Path
 import hydra
 import polars as pl
 from loguru import logger
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 
 pl.enable_string_cache()
+
+
+def write_lazyframe(df: pl.LazyFrame, out_fp: Path) -> None:
+    if isinstance(df, pl.LazyFrame):
+        df = df.collect()
+
+    df.write_parquet(out_fp, use_pyarrow=True)
+
+
+def get_paths_and_debug(stage_cfg: DictConfig):
+    """TODO.
+
+    Args:
+        stage_cfg: TODO
+
+    Returns:
+        TODO
+
+    Examples:
+        >>> raise NotImplementedError
+    """
+    input_dir = Path(stage_cfg.data_input_dir)
+    output_dir = Path(stage_cfg.output_dir)
+    metadata_input_dir = Path(stage_cfg.metadata_input_dir)
+    shards_map_fn = Path(stage_cfg.shards_map_fp)
+
+    def chk(x: Path):
+        return "✅" if x.exists() else "❌"
+
+    paths_strs = [
+        f"  - {k}: {chk(v)} {str(v.resolve())}"
+        for k, v in {
+            "input_dir": input_dir,
+            "output_dir": output_dir,
+            "metadata_input_dir": metadata_input_dir,
+            "shards_map_fn": shards_map_fn,
+        }.items()
+    ]
+
+    logger_strs = [
+        f"Stage config:\n{OmegaConf.to_yaml(stage_cfg)}",
+        "Paths: (checkbox indicates if it exists)",
+    ]
+    logger.debug("\n".join(logger_strs + paths_strs))
+
+    return input_dir, output_dir, metadata_input_dir, shards_map_fn
+
+
+def stage_init(cfg: DictConfig):
+    """TODO.
+
+    Args:
+        cfg: TODO
+        stage_cfg: TODO
+
+    Returns:
+        TODO
+
+    Examples:
+        >>> raise NotImplementedError
+    """
+    hydra_loguru_init()
+
+    logger.info(
+        f"Running {current_script_name()} with the following configuration:\n{OmegaConf.to_yaml(cfg)}"
+    )
+
+    return get_paths_and_debug(cfg.stage_cfg)
 
 
 def get_script_docstring() -> str:
@@ -174,13 +242,6 @@ def hydra_loguru_init() -> None:
     hydra_path = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
     logfile_name = hydra.core.hydra_config.HydraConfig.get().job.name
     logger.add(os.path.join(hydra_path, f"{logfile_name}.log"))
-
-
-def write_lazyframe(df: pl.LazyFrame, out_fp: Path) -> None:
-    if isinstance(df, pl.LazyFrame):
-        df = df.collect()
-
-    df.write_parquet(out_fp, use_pyarrow=True)
 
 
 def get_shard_prefix(base_path: Path, fp: Path) -> str:

@@ -7,7 +7,7 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_polars_functions.get_vocabulary import (
+from MEDS_polars_functions.transforms.get_vocabulary import (
     VOCABULARY_ORDERING,
     VOCABULARY_ORDERING_METHODS,
 )

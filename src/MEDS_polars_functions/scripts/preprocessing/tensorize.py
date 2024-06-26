@@ -10,8 +10,8 @@ from loguru import logger
 from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_polars_functions.mapper import rwlock_wrap
-from MEDS_polars_functions.tensorize import convert_to_NRT
+from MEDS_polars_functions.mapreduce.mapper import rwlock_wrap
+from MEDS_polars_functions.transforms.tensorize import convert_to_NRT
 from MEDS_polars_functions.utils import hydra_loguru_init
 
 config_yaml = files("MEDS_polars_functions").joinpath("configs/preprocess.yaml")
