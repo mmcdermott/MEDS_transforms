@@ -328,6 +328,7 @@ def test_extraction():
         }
 
         extraction_root = root / "src" / "MEDS_polars_functions" / "scripts" / "extraction"
+        extraction_lib_root = root / "src" / "MEDS_polars_functions" / "extraction"
 
         all_stderrs = []
         all_stdouts = []
@@ -389,7 +390,7 @@ def test_extraction():
 
         # Step 2: Collect the patient splits
         stderr, stdout = run_command(
-            (root / "src" / "MEDS_polars_functions" / "extraction" / "split_and_shard_patients.py"),
+            (extraction_lib_root / "split_and_shard_patients.py"),
             extraction_config_kwargs,
             "split_and_shard_patients",
         )
@@ -424,7 +425,7 @@ def test_extraction():
 
         # Step 3: Extract the events and sub-shard by patient
         stderr, stdout = run_command(
-            extraction_root / "convert_to_sharded_events.py",
+            extraction_lib_root / "convert_to_sharded_events.py",
             extraction_config_kwargs,
             "convert_events",
         )
