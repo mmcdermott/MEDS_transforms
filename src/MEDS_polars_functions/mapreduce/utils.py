@@ -291,17 +291,15 @@ def shard_iterator(cfg: DictConfig, in_suffix: str = ".parquet", out_suffix: str
         >>> raise NotImplementedError
     """
 
-    stage_cfg = cfg.stage_cfg
-
-    input_dir = Path(stage_cfg.data_input_dir)
-    output_dir = Path(stage_cfg.output_dir)
-    shards_map_fn = Path(stage_cfg.shards_map_fp)
+    input_dir = Path(cfg.stage_cfg.data_input_dir)
+    output_dir = Path(cfg.stage_cfg.output_dir)
+    shards_map_fn = Path(cfg.shards_map_fp)
 
     shards = json.loads(shards_map_fn.read_text())
 
-    if "process_shard_prefix" in stage_cfg:
-        logger.info(f'Processing shards with prefix "{stage_cfg.process_shard_prefix}"')
-        shards = {k: v for k, v in shards.items() if k.startswith(stage_cfg.process_shard_prefix)}
+    if "process_shard_prefix" in cfg.stage_cfg:
+        logger.info(f'Processing shards with prefix "{cfg.stage_cfg.process_shard_prefix}"')
+        shards = {k: v for k, v in shards.items() if k.startswith(cfg.stage_cfg.process_shard_prefix)}
 
     shards = list(shards.keys())
     random.shuffle(shards)

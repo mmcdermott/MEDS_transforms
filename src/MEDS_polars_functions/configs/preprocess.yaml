@@ -7,6 +7,9 @@ defaults:
 # tokenization.
 code_modifier_columns: ???
 
+# The shards map filepath is stored in the global input directory for model-specific pre-processing.
+shards_map_fp: "${input_dir}/splits.json"
+
 stages:
   - filter_patients
   - add_time_derived_measurements

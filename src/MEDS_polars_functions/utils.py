@@ -24,8 +24,8 @@ def stage_init(cfg: DictConfig):
     """Initializes the stage by logging the configuration and the stage-specific paths.
 
     Args:
-        cfg: The global configuration object, which should have a ``stage_cfg`` attribute containing the stage
-            specific configuration.
+        cfg: The global configuration object, which should have a ``cfg.stage_cfg`` attribute containing the
+            stage specific configuration.
 
     Returns: The data input directory, stage output directory, metadata input directory, and the shards file
         path.
@@ -36,12 +36,10 @@ def stage_init(cfg: DictConfig):
         f"Running {current_script_name()} with the following configuration:\n{OmegaConf.to_yaml(cfg)}"
     )
 
-    stage_cfg = cfg.stage_cfg
-
-    input_dir = Path(stage_cfg.data_input_dir)
-    output_dir = Path(stage_cfg.output_dir)
-    metadata_input_dir = Path(stage_cfg.metadata_input_dir)
-    shards_map_fn = Path(stage_cfg.shards_map_fp)
+    input_dir = Path(cfg.stage_cfg.data_input_dir)
+    output_dir = Path(cfg.stage_cfg.output_dir)
+    metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
+    shards_map_fp = Path(cfg.shards_map_fp)
 
     def chk(x: Path):
         return "✅" if x.exists() else "❌"
@@ -52,17 +50,17 @@ def stage_init(cfg: DictConfig):
             "input_dir": input_dir,
             "output_dir": output_dir,
             "metadata_input_dir": metadata_input_dir,
-            "shards_map_fn": shards_map_fn,
+            "shards_map_fp": shards_map_fp,
         }.items()
     ]
 
     logger_strs = [
-        f"Stage config:\n{OmegaConf.to_yaml(stage_cfg)}",
+        f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}",
         "Paths: (checkbox indicates if it exists)",
     ]
     logger.debug("\n".join(logger_strs + paths_strs))
 
-    return input_dir, output_dir, metadata_input_dir, shards_map_fn
+    return input_dir, output_dir, metadata_input_dir, shards_map_fp
 
 
 def get_script_docstring() -> str:

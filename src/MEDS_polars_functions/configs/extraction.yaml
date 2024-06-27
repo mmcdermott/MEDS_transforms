@@ -18,6 +18,8 @@ description: |-
 event_conversion_config_fp: ???
 # The code modifier columns are in this pipeline only used in the collect_code_metadata stage.
 code_modifiers: null
+# The shards mapping is stored in the root of the final output directory.
+shards_map_fp: "${cohort_dir}/splits.json"
 
 stages:
   - shard_events
