@@ -15,7 +15,7 @@ stages: ??? # The list of stages to this overall pipeline (in order)
 stage_configs: ??? # The configurations for each stage, keyed by stage name
 
 # Mapreduce information
-worker: 1
+worker: 0
 polling_time: 300 # wait time in seconds before beginning reduction steps
 
 # Filling in the current stage

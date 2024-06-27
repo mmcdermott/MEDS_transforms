@@ -89,3 +89,4 @@ stage_configs:
     is_metadata: True
     mapper_output_dir: "${cohort_dir}/code_metadata"
     output_dir: "${cohort_dir}"
+    process_shard_prefix: "train/" # we only want to summarize over the training set

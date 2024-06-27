@@ -30,7 +30,7 @@ def map_over(
     read_fn: Callable[[Path], DF_T] = partial(pl.scan_parquet, glob=False),
     write_fn: Callable[[DF_T, Path], None] = write_lazyframe,
     shard_iterator_fntr: SHARD_ITR_FNTR_T = shard_iterator,
-):
+) -> list[Path]:
     stage_init(cfg)
 
     start = datetime.now()
@@ -41,6 +41,7 @@ def map_over(
     if not isinstance(compute_fn, tuple):
         compute_fn = (compute_fn,)
 
+    all_out_fps = []
     for in_fp, out_fp in shard_iterator_fntr(cfg):
         logger.info(f"Processing {str(in_fp.resolve())} into {str(out_fp.resolve())}")
         rwlock_wrap(
@@ -53,5 +54,7 @@ def map_over(
             cache_intermediate=False,
             do_overwrite=cfg.do_overwrite,
         )
+        all_out_fps.append(out_fp)
 
     logger.info(f"Finished mapping in {datetime.now() - start}")
+    return all_out_fps

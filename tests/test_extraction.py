@@ -525,11 +525,11 @@ def test_extraction():
 
         want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE)).with_columns(
             pl.col("code").cast(pl.Categorical),
-            pl.col("code/n_occurrences").cast(pl.UInt32),
-            pl.col("code/n_patients").cast(pl.UInt32),
-            pl.col("values/n_occurrences").cast(pl.UInt32),
-            pl.col("values/sum").cast(pl.Float64).fill_null(0),
-            pl.col("values/sum_sqd").cast(pl.Float64).fill_null(0),
+            pl.col("code/n_occurrences").cast(pl.UInt8),
+            pl.col("code/n_patients").cast(pl.UInt8),
+            pl.col("values/n_occurrences").cast(pl.UInt8),
+            pl.col("values/sum").cast(pl.Float32).fill_null(0),
+            pl.col("values/sum_sqd").cast(pl.Float32).fill_null(0),
         )
 
         assert_df_equal(
