@@ -327,15 +327,14 @@ def test_extraction():
             "hydra.verbose": True,
         }
 
-        extraction_root = root / "src" / "MEDS_polars_functions" / "scripts" / "extraction"
-        extraction_lib_root = root / "src" / "MEDS_polars_functions" / "extraction"
+        extraction_root = root / "src" / "MEDS_polars_functions" / "extraction"
 
         all_stderrs = []
         all_stdouts = []
 
         # Step 1: Sub-shard the data
         stderr, stdout = run_command(
-            extraction_lib_root / "shard_events.py", extraction_config_kwargs, "shard_events"
+            extraction_root / "shard_events.py", extraction_config_kwargs, "shard_events"
         )
 
         all_stderrs.append(stderr)
@@ -390,7 +389,7 @@ def test_extraction():
 
         # Step 2: Collect the patient splits
         stderr, stdout = run_command(
-            (extraction_lib_root / "split_and_shard_patients.py"),
+            extraction_root / "split_and_shard_patients.py",
             extraction_config_kwargs,
             "split_and_shard_patients",
         )
@@ -425,7 +424,7 @@ def test_extraction():
 
         # Step 3: Extract the events and sub-shard by patient
         stderr, stdout = run_command(
-            extraction_lib_root / "convert_to_sharded_events.py",
+            extraction_root / "convert_to_sharded_events.py",
             extraction_config_kwargs,
             "convert_events",
         )
