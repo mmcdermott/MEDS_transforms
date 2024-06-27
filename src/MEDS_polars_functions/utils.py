@@ -20,18 +20,24 @@ def write_lazyframe(df: pl.LazyFrame, out_fp: Path) -> None:
     df.write_parquet(out_fp, use_pyarrow=True)
 
 
-def get_paths_and_debug(stage_cfg: DictConfig):
-    """TODO.
+def stage_init(cfg: DictConfig):
+    """Initializes the stage by logging the configuration and the stage-specific paths.
 
     Args:
-        stage_cfg: TODO
+        cfg: The global configuration object, which should have a ``stage_cfg`` attribute containing the stage
+            specific configuration.
 
-    Returns:
-        TODO
-
-    Examples:
-        >>> raise NotImplementedError
+    Returns: The data input directory, stage output directory, metadata input directory, and the shards file
+        path.
     """
+    hydra_loguru_init()
+
+    logger.info(
+        f"Running {current_script_name()} with the following configuration:\n{OmegaConf.to_yaml(cfg)}"
+    )
+
+    stage_cfg = cfg.stage_cfg
+
     input_dir = Path(stage_cfg.data_input_dir)
     output_dir = Path(stage_cfg.output_dir)
     metadata_input_dir = Path(stage_cfg.metadata_input_dir)
@@ -59,33 +65,11 @@ def get_paths_and_debug(stage_cfg: DictConfig):
     return input_dir, output_dir, metadata_input_dir, shards_map_fn
 
 
-def stage_init(cfg: DictConfig):
-    """TODO.
-
-    Args:
-        cfg: TODO
-        stage_cfg: TODO
-
-    Returns:
-        TODO
-
-    Examples:
-        >>> raise NotImplementedError
-    """
-    hydra_loguru_init()
-
-    logger.info(
-        f"Running {current_script_name()} with the following configuration:\n{OmegaConf.to_yaml(cfg)}"
-    )
-
-    return get_paths_and_debug(cfg.stage_cfg)
-
-
 def get_script_docstring() -> str:
     """Returns the docstring of the main function of the script that was called.
 
     Returns:
-        str: TODO
+        str: The docstring of the main function of the script that was called.
     """
 
     main_module = sys.modules["__main__"]
