@@ -66,11 +66,7 @@ def stage_init(cfg: DictConfig):
 
 
 def get_script_docstring() -> str:
-    """Returns the docstring of the main function of the script that was called.
-
-    Returns:
-        str: The docstring of the main function of the script that was called.
-    """
+    """Returns the docstring of the main function of the script from which this function was called."""
 
     main_module = sys.modules["__main__"]
     func = getattr(main_module, "main", None)
@@ -80,11 +76,7 @@ def get_script_docstring() -> str:
 
 
 def current_script_name() -> str:
-    """Returns the name of the script that called this function.
-
-    Returns:
-        str: The name of the script that called this function.
-    """
+    """Returns the name of the script that called this function."""
     return Path(sys.argv[0]).stem
 
 
