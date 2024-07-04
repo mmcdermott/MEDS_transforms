@@ -420,3 +420,14 @@ To use either of these, you need to install additional optional dependencies:
    files. Similar to task configuration files, but for models.
 2. Figure out how to ensure that each pre-processing step reads from the right prior files. Likely need some
    kind of a "prior stage name" config variable.
+
+## Notes:
+
+You can overwrite the `stages` parameter on the command line to run a dynamic pipeline with just a subset of
+options (the `--cfg job --resolve` is just to make hydra show the induced, resolved config instead of trying
+to run anything):
+
+```bash
+MEDS_polars_functions on  reusable_interface [$⇡] is 󰏗 v0.0.1 via  v3.12.4 via  MEDS_fns
+❯ ./src/MEDS_polars_functions/scripts/preprocessing/normalize.py input_dir=foo cohort_dir=bar 'stages=["normalize", "tensorize"]' --cfg job --resolve
+```
