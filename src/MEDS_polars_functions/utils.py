@@ -153,10 +153,6 @@ def populate_stage(
             stage6
     """
 
-    for s in stage_configs.keys():
-        if s not in stages:
-            raise ValueError(f"stage config key '{s}' is not a valid stage name. Options are: {list(stages)}")
-
     if stage_name not in stages:
         raise ValueError(f"'{stage_name}' is not a valid stage name. Options are: {', '.join(stages)}")
 
