@@ -193,7 +193,7 @@ def main(cfg: DictConfig):
     logger.info(f"Joining all patient IDs from {len(dfs)} dataframes")
     patient_ids = (
         pl.concat(dfs)
-        .select(pl.col("patient_id").unique())
+        .select(pl.col("patient_id").drop_nulls().drop_nans().unique())
         .collect(streaming=True)["patient_id"]
         .to_numpy(use_pyarrow=True)
     )
