@@ -1,21 +1,17 @@
 #!/usr/bin/env python
-import json
-import random
 from functools import partial
 from importlib.resources import files
-from pathlib import Path
 
 import hydra
-import polars as pl
 from loguru import logger
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 
-from MEDS_polars_functions.mapreduce.mapper import rwlock_wrap
+from MEDS_polars_functions.mapreduce.mapper import map_over
 from MEDS_polars_functions.transforms.filter_patients_by_length import (
     filter_patients_by_num_events,
     filter_patients_by_num_measurements,
 )
-from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
+from MEDS_polars_functions.utils import hydra_loguru_init
 
 config_yaml = files("MEDS_polars_functions").joinpath("configs/preprocess.yaml")
 
@@ -25,20 +21,6 @@ def main(cfg: DictConfig):
     """TODO."""
 
     hydra_loguru_init()
-
-    logger.info(
-        f"Running with config:\n{OmegaConf.to_yaml(cfg)}\n"
-        f"Stage: {cfg.stage}\n\n"
-        f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
-    )
-
-    input_dir = Path(cfg.stage_cfg.data_input_dir)
-    output_dir = Path(cfg.stage_cfg.output_dir)
-
-    shards = json.loads((Path(cfg.input_dir) / "splits.json").read_text())
-
-    patient_splits = list(shards.keys())
-    random.shuffle(patient_splits)
 
     compute_fns = []
     if cfg.stage_cfg.min_measurements_per_patient:
@@ -63,24 +45,7 @@ def main(cfg: DictConfig):
             )
         )
 
-    for sp in patient_splits:
-        in_fp = input_dir / f"{sp}.parquet"
-        out_fp = output_dir / f"{sp}.parquet"
-
-        logger.info(f"Filtering {str(in_fp.resolve())} into {str(out_fp.resolve())}")
-
-        rwlock_wrap(
-            in_fp,
-            out_fp,
-            pl.scan_parquet,
-            write_lazyframe,
-            *compute_fns,
-            do_return=False,
-            cache_intermediate=False,
-            do_overwrite=cfg.do_overwrite,
-        )
-
-    logger.info("Filtered patients.")
+    map_over(cfg, compute_fn=tuple(compute_fns))
 
 
 if __name__ == "__main__":
