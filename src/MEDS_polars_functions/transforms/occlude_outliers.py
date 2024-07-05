@@ -1,9 +1,14 @@
+#!/usr/bin/env python
 """A polars-to-polars transformation function for filtering patients by sequence length."""
-
 from collections.abc import Callable
+from importlib.resources import files
+from pathlib import Path
 
+import hydra
 import polars as pl
 from omegaconf import DictConfig
+
+from MEDS_polars_functions.mapreduce.mapper import map_over
 
 pl.enable_string_cache()
 
@@ -39,7 +44,7 @@ def occlude_outliers_fntr(
         ...     "numerical_value": [15., 16., 3.9, 1.0],
         ... }).lazy()
         >>> stage_cfg = DictConfig({"stddev_cutoff": 4.5})
-        >>> fn = filter_outliers_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = occlude_outliers_fntr(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (4, 5)
         ┌────────────┬──────┬───────────┬─────────────────┬───────────────────────────┐
@@ -75,7 +80,7 @@ def occlude_outliers_fntr(
 
     code_metadata = code_metadata.lazy().select(cols_to_select)
 
-    def filter_outliers_fn(df: pl.LazyFrame) -> pl.LazyFrame:
+    def occlude_outliers_fn(df: pl.LazyFrame) -> pl.LazyFrame:
         f"""Filters out outlier numerical values from patient events.
 
         In particular, this function filters the DataFrame to only include numerical values that are within
@@ -96,4 +101,23 @@ def occlude_outliers_fntr(
             .drop("values/mean", "values/std")
         )
 
-    return filter_outliers_fn
+    return occlude_outliers_fn
+
+
+config_yaml = files("MEDS_polars_functions").joinpath("configs/preprocess.yaml")
+
+
+@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
+def main(cfg: DictConfig):
+    """TODO."""
+
+    code_metadata = pl.read_parquet(
+        Path(cfg.stage_cfg.metadata_input_dir) / "code_metadata.parquet", use_pyarrow=True
+    )
+    compute_fn = occlude_outliers_fntr(cfg.stage_cfg, code_metadata)
+
+    map_over(cfg, compute_fn=compute_fn)
+
+
+if __name__ == "__main__":
+    main()

@@ -280,7 +280,13 @@ def rwlock_wrap[
         raise e
 
 
-def shard_iterator(cfg: DictConfig, in_suffix: str = ".parquet", out_suffix: str = ".parquet"):
+def shard_iterator(
+    cfg: DictConfig,
+    in_suffix: str = ".parquet",
+    out_suffix: str = ".parquet",
+    in_prefix: str = "",
+    out_prefix: str = "",
+):
     """TODO.
 
     Args:
@@ -307,8 +313,8 @@ def shard_iterator(cfg: DictConfig, in_suffix: str = ".parquet", out_suffix: str
     logger.info(f"Mapping computation over a maximum of {len(shards)} shards")
 
     for sp in shards:
-        in_fp = input_dir / f"{sp}{in_suffix}"
-        out_fp = output_dir / f"{sp}{out_suffix}"
+        in_fp = input_dir / f"{in_prefix}{sp}{in_suffix}"
+        out_fp = output_dir / f"{out_prefix}{sp}{out_suffix}"
 
         # TODO: Could add checking logic for existence of in_fp and/or out_fp here.
 

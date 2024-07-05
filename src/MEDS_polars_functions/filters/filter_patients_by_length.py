@@ -1,6 +1,16 @@
+#!/usr/bin/env python
 """A polars-to-polars transformation function for filtering patients by sequence length."""
+from collections.abc import Callable
+from functools import partial
+from importlib.resources import files
 
+import hydra
 import polars as pl
+from loguru import logger
+from omegaconf import DictConfig
+
+from MEDS_polars_functions.mapreduce.mapper import map_over
+from MEDS_polars_functions.utils import hydra_loguru_init
 
 
 def filter_patients_by_num_measurements(df: pl.LazyFrame, min_measurements_per_patient: int) -> pl.LazyFrame:
@@ -155,3 +165,48 @@ def filter_patients_by_num_events(df: pl.LazyFrame, min_events_per_patient: int)
         )
 
     return df.filter(pl.col("timestamp").n_unique().over("patient_id") >= min_events_per_patient)
+
+
+def filter_patients_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
+    compute_fns = []
+    if stage_cfg.min_measurements_per_patient:
+        logger.info(
+            f"Filtering patients with fewer than {stage_cfg.min_measurements_per_patient} measurements "
+            "(observations of any kind)."
+        )
+        compute_fns.append(
+            partial(
+                filter_patients_by_num_measurements,
+                min_measurements_per_patient=stage_cfg.min_measurements_per_patient,
+            )
+        )
+    if stage_cfg.min_events_per_patient:
+        logger.info(
+            f"Filtering patients with fewer than {stage_cfg.min_events_per_patient} events "
+            "(unique timepoints)."
+        )
+        compute_fns.append(
+            partial(filter_patients_by_num_events, min_events_per_patient=stage_cfg.min_events_per_patient)
+        )
+
+    def fn(data: pl.LazyFrame) -> pl.LazyFrame:
+        for compute_fn in compute_fns:
+            data = compute_fn(data)
+        return data
+
+
+config_yaml = files("MEDS_polars_functions").joinpath("configs/preprocess.yaml")
+
+
+@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
+def main(cfg: DictConfig):
+    """TODO."""
+
+    hydra_loguru_init()
+    compute_fn = filter_patients_fntr(cfg.stage_cfg)
+
+    map_over(cfg, compute_fn=compute_fn)
+
+
+if __name__ == "__main__":
+    main()

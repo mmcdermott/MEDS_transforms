@@ -565,13 +565,8 @@ def reducer_fntr(
     return reducer
 
 
-config_yaml = files("MEDS_polars_functions").joinpath("configs/extraction.yaml")
-
-
-@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
-def main(cfg: DictConfig):
-    """Computes code metadata."""
-
+def run_map_reduce(cfg: DictConfig):
+    """Stored separately so it can be easily imported into the pre-built extraction pipelines."""
     mapper_fn = mapper_fntr(cfg.stage_cfg, cfg.get("code_modifier_columns", None))
     all_out_fps = map_over(cfg, compute_fn=mapper_fn)
 
@@ -595,6 +590,16 @@ def main(cfg: DictConfig):
     logger.debug("For an extraction task specifically, we write out specifically to the cohort dir")
     write_lazyframe(reduced, Path(cfg.cohort_dir) / "code_metadata.parquet")
     logger.info(f"Finished reduction in {datetime.now() - start}")
+
+
+config_yaml = files("MEDS_polars_functions").joinpath("configs/extraction.yaml")
+
+
+@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
+def main(cfg: DictConfig):
+    """Computes code metadata."""
+
+    run_map_reduce(cfg)
 
 
 if __name__ == "__main__":

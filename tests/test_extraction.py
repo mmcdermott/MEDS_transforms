@@ -508,9 +508,9 @@ def test_extraction():
 
         # Step 4: Merge to the final output
         stderr, stdout = run_command(
-            extraction_root / "collect_code_metadata.py",
+            extraction_root / "aggregate_code_metadata.py",
             extraction_config_kwargs,
-            "collect_code_metadata",
+            "aggregate_code_metadata",
         )
         all_stderrs.append(stderr)
         all_stdouts.append(stdout)

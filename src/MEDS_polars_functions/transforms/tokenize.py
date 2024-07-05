@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Functions for tokenizing MEDS datasets.
 
 Here, _tokenization_ refers specifically to the process of converting a longitudinal, irregularly sampled,
@@ -8,7 +9,18 @@ as those have been normalized alongside codes into integer indices (in the outpu
 columns of concern here thus are `patient_id`, `timestamp`, `code`, `numerical_value`.
 """
 
+import json
+import random
+from importlib.resources import files
+from pathlib import Path
+
+import hydra
 import polars as pl
+from loguru import logger
+from omegaconf import DictConfig, OmegaConf
+
+from MEDS_polars_functions.mapreduce.mapper import rwlock_wrap
+from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
 
 SECONDS_PER_MINUTE = 60.0
 SECONDS_PER_HOUR = SECONDS_PER_MINUTE * 60.0
@@ -202,3 +214,64 @@ def extract_seq_of_patient_events(df: pl.LazyFrame) -> pl.LazyFrame:
             "numerical_value",
         )
     )
+
+
+config_yaml = files("MEDS_polars_functions").joinpath("configs/preprocess.yaml")
+
+
+@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
+def main(cfg: DictConfig):
+    """TODO."""
+
+    hydra_loguru_init()
+
+    logger.info(
+        f"Running with config:\n{OmegaConf.to_yaml(cfg)}\n"
+        f"Stage: {cfg.stage}\n\n"
+        f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
+    )
+
+    input_dir = Path(cfg.stage_cfg.data_input_dir)
+    output_dir = Path(cfg.stage_cfg.output_dir)
+
+    shards = json.loads((Path(cfg.input_dir) / "splits.json").read_text())
+
+    patient_splits = list(shards.keys())
+    random.shuffle(patient_splits)
+
+    for sp in patient_splits:
+        in_fp = input_dir / f"{sp}.parquet"
+        schema_out_fp = output_dir / "schemas" / f"{sp}.parquet"
+        event_seq_out_fp = output_dir / "event_seqs" / f"{sp}.parquet"
+
+        logger.info(f"Tokenizing {str(in_fp.resolve())} into schemas at {str(schema_out_fp.resolve())}")
+
+        rwlock_wrap(
+            in_fp,
+            schema_out_fp,
+            pl.scan_parquet,
+            write_lazyframe,
+            extract_statics_and_schema,
+            do_return=False,
+            cache_intermediate=False,
+            do_overwrite=cfg.do_overwrite,
+        )
+
+        logger.info(f"Tokenizing {str(in_fp.resolve())} into event_seqs at {str(event_seq_out_fp.resolve())}")
+
+        rwlock_wrap(
+            in_fp,
+            event_seq_out_fp,
+            pl.scan_parquet,
+            write_lazyframe,
+            extract_seq_of_patient_events,
+            do_return=False,
+            cache_intermediate=False,
+            do_overwrite=cfg.do_overwrite,
+        )
+
+    logger.info(f"Done with {cfg.stage}")
+
+
+if __name__ == "__main__":
+    main()
