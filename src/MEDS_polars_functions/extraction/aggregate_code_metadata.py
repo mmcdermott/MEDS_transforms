@@ -5,7 +5,7 @@ from importlib.resources import files
 import hydra
 from omegaconf import DictConfig
 
-from MEDS_polars_functions.transforms.aggregate_code_metadata import run_map_reduce
+from MEDS_polars_functions.aggregate_code_metadata import run_map_reduce
 
 config_yaml = files("MEDS_polars_functions").joinpath("configs/extraction.yaml")
 
