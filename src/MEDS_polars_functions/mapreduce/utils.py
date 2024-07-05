@@ -287,14 +287,71 @@ def shard_iterator(
     in_prefix: str = "",
     out_prefix: str = "",
 ):
-    """TODO.
+    """Provides a generator that yields shard input and output files for mapreduce operations.
 
     Args:
+        cfg: The configuration dictionary for the overall pipeline. Should (possibly) contain the following
+            keys (some are optional, as marked below):
+            - ``stage_cfg.data_input_dir`` (mandatory): The directory containing the input data.
+            - ``stage_cfg.output_dir`` (mandatory): The directory to write the output data.
+            - ``shards_map_fp`` (mandatory): The file path to the shards map JSON file.
+            - ``stage_cfg.process_shard_prefix`` (optional): The prefix of the shards to process (e.g.,
+              ``"train/"``). If not provided, all shards will be processed.
+            - ``worker`` (optional): The worker ID for the MR worker; this is also used to seed the
+              randomization process. If not provided, the randomization process is unseeded.
+        in_suffix: The suffix of the input files. Defaults to ".parquet". This can be set to "" to process
+            entire directories.
+        out_suffix: The suffix of the output files. Defaults to ".parquet".
+        in_prefix: The prefix of the input files. Defaults to "". This can be used to load files from a
+            subdirectory of the input directory by including a "/" at the end of the prefix.
+        out_prefix: The prefix of the output files. Defaults to "".
 
-    Returns:
+    Yields:
+        Randomly shuffled pairs of input and output file paths for each shard. The randomization process is
+        seeded by the worker ID in ``cfg``, if provided, otherwise it is left unseeded.
 
     Examples:
-        >>> raise NotImplementedError
+        >>> from tempfile import NamedTemporaryFile
+        >>> shards = {"train/0": [1, 2, 3], "train/1": [4, 5, 6], "held_out": [4, 5, 6], "foo": [5]}
+        >>> with NamedTemporaryFile() as tmp:
+        ...     _ = Path(tmp.name).write_text(json.dumps(shards))
+        ...     cfg = DictConfig({
+        ...         "stage_cfg": {"data_input_dir": "data/", "output_dir": "output/"},
+        ...         "shards_map_fp": tmp.name,
+        ...         "worker": 1,
+        ...     })
+        ...     gen = shard_iterator(cfg)
+        ...     list(gen) # doctest: +NORMALIZE_WHITESPACE
+        [(PosixPath('data/foo.parquet'),      PosixPath('output/foo.parquet')),
+         (PosixPath('data/train/0.parquet'),  PosixPath('output/train/0.parquet')),
+         (PosixPath('data/held_out.parquet'), PosixPath('output/held_out.parquet')),
+         (PosixPath('data/train/1.parquet'),  PosixPath('output/train/1.parquet'))]
+        >>> with NamedTemporaryFile() as tmp:
+        ...     _ = Path(tmp.name).write_text(json.dumps(shards))
+        ...     cfg = DictConfig({
+        ...         "stage_cfg": {"data_input_dir": "data/", "output_dir": "output/"},
+        ...         "shards_map_fp": tmp.name,
+        ...         "worker": 1,
+        ...     })
+        ...     gen = shard_iterator(cfg, in_suffix="", out_suffix=".csv", in_prefix="a/", out_prefix="b/")
+        ...     list(gen) # doctest: +NORMALIZE_WHITESPACE
+        [(PosixPath('data/a/foo'),      PosixPath('output/b/foo.csv')),
+         (PosixPath('data/a/train/0'),  PosixPath('output/b/train/0.csv')),
+         (PosixPath('data/a/held_out'), PosixPath('output/b/held_out.csv')),
+         (PosixPath('data/a/train/1'),  PosixPath('output/b/train/1.csv'))]
+        >>> with NamedTemporaryFile() as tmp:
+        ...     _ = Path(tmp.name).write_text(json.dumps(shards))
+        ...     cfg = DictConfig({
+        ...         "stage_cfg": {
+        ...             "data_input_dir": "data/", "output_dir": "output/", "process_shard_prefix": "train/"
+        ...         },
+        ...         "shards_map_fp": tmp.name,
+        ...         "worker": 1,
+        ...     })
+        ...     gen = shard_iterator(cfg)
+        ...     list(gen) # doctest: +NORMALIZE_WHITESPACE
+        [(PosixPath('data/train/1.parquet'),  PosixPath('output/train/1.parquet')),
+         (PosixPath('data/train/0.parquet'),  PosixPath('output/train/0.parquet'))]
     """
 
     input_dir = Path(cfg.stage_cfg.data_input_dir)
@@ -308,6 +365,8 @@ def shard_iterator(
         shards = {k: v for k, v in shards.items() if k.startswith(cfg.stage_cfg.process_shard_prefix)}
 
     shards = list(shards.keys())
+    if "worker" in cfg:
+        random.seed(cfg.worker)
     random.shuffle(shards)
 
     logger.info(f"Mapping computation over a maximum of {len(shards)} shards")
