@@ -42,6 +42,9 @@ shift 4
 echo "Running pre-MEDS conversion."
 ./MIMIC-IV_Example/pre_MEDS.py raw_cohort_dir="$MIMICIV_RAW_DIR" output_dir="$MIMICIV_PREMEDS_DIR"
 
+echo "Unzipping the pre-MEDS gunzip csv files."
+for file in ${MIMICIV_PREMEDS_DIR}/*/*.csv.gz; do gzip -d --force "$file"; done
+
 echo "Running shard_events.py with $N_PARALLEL_WORKERS workers in parallel"
 MEDS_extract-shard_events \
     --multirun \
