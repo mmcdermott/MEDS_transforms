@@ -1,0 +1,11 @@
+merge_to_MEDS_cohort:
+  description: |-
+    This stage splits the patients into training, tuning, and held-out sets, and further splits those sets
+    into shards. Arguments:
+      - `n_patients_per_shard`: The number of patients to include in a shard.
+      - `external_splits_json_fp`: The path to a json file containing any pre-defined splits for specially
+        held-out test sets beyond the IID held out set that will be produced (e.g., for prospective
+        datasets, etc.).
+      - `split_fracs`: The fraction of patients to include in the IID training, tuning, and held-out sets.
+  output_dir: ${cohort_dir}/final_cohort
+  unique_by: "*"

@@ -1,0 +1,8 @@
+shard_events:
+  description: |-
+    This stage shards the raw input events into smaller files for easier processing. Arguments:
+      - `row_chunksize`: The number of rows to read in at a time.
+      - `infer_schema_length`: The number of rows to read in to infer the schema (only used if the source
+        files are csvs)
+  row_chunksize: 200000000
+  infer_schema_length: 10000

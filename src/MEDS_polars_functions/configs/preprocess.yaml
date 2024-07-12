@@ -1,15 +1,25 @@
 defaults:
   - pipeline
+  - stage_configs:
+      - filter_patients
+      - add_time_derived_measurements
+      - count_code_occurrences
+      - filter_codes
+      - fit_outlier_detection
+      - filter_outliers
+      - fit_normalization
+      - fit_vocabulary_indices
   - _self_
 
 # Global pipeline parameters:
 # 1. Code modifiers will be used as adjoining parts of the `code` columns during group-bys and eventual
-# tokenization.
+#    tokenization.
 code_modifier_columns: ???
 
 # The shards map filepath is stored in the global input directory for model-specific pre-processing.
 shards_map_fp: "${input_dir}/splits.json"
 
+# Pipeline Structure
 stages:
   - filter_patients
   - add_time_derived_measurements
@@ -22,51 +32,3 @@ stages:
   - normalize
   - tokenization
   - tensorize
-
-# Pipeline Structure
-stage_configs:
-  filter_patients:
-    min_events_per_patient: null
-    min_measurements_per_patient: null
-    data_input_dir: ${input_dir}/final_cohort
-
-  add_time_derived_measurements:
-    age:
-      DOB_code: ???
-      age_code: "AGE"
-      age_unit: "years"
-    time_of_day:
-      time_of_day_code: "TIME_OF_DAY"
-      endpoints: [6, 12, 18, 24]
-
-  preliminary_counts:
-    aggregations:
-      - "code/n_occurrences"
-      - "code/n_patients"
-    do_summarize_over_all_codes: true # This indicates we should include overall, code-independent counts
-
-  filter_codes:
-    min_patients_per_code: null
-    min_occurrences_per_code: null
-
-  fit_outlier_detection:
-    aggregations:
-      - "values/n_occurrences"
-      - "values/sum"
-      - "values/sum_sqd"
-
-  filter_outliers:
-    stddev_cutoff: 4.5
-
-  fit_normalization:
-    aggregations:
-      - "code/n_occurrences"
-      - "code/n_patients"
-      - "values/n_occurrences"
-      - "values/sum"
-      - "values/sum_sqd"
-
-  fit_vocabulary_indices:
-    is_metadata: true
-    ordering_method: "lexicographic"
-    output_dir: "${cohort_dir}"
