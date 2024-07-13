@@ -15,8 +15,8 @@ import polars.selectors as cs
 from loguru import logger
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
-from .mapreduce.mapper import map_over
-from .utils import write_lazyframe
+from MEDS_polars_functions.mapreduce.mapper import map_over
+from MEDS_polars_functions.utils import write_lazyframe
 
 pl.enable_string_cache()
 
@@ -592,7 +592,7 @@ def run_map_reduce(cfg: DictConfig):
     logger.info(f"Finished reduction in {datetime.now() - start}")
 
 
-config_yaml = files("MEDS_polars_functions").joinpath("configs/extraction.yaml")
+config_yaml = files("MEDS_polars_functions").joinpath("configs/preprocess.yaml")
 
 
 @hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)

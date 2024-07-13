@@ -246,14 +246,22 @@ MEDS_OUTPUTS = {
 }
 
 
-def run_command(script: Path | str, hydra_kwargs: dict[str, str], test_name: str):
+def run_command(
+    script: Path | str, hydra_kwargs: dict[str, str], test_name: str, config_name: str | None = None
+):
     script = ["python", str(script.resolve())] if isinstance(script, Path) else [script]
-    command_parts = script + [f"{k}={v}" for k, v in hydra_kwargs.items()]
-    command_out = subprocess.run(" ".join(command_parts), shell=True, capture_output=True)
+    command_parts = script
+    if config_name is not None:
+        command_parts.append(f"--config-name={config_name}")
+    command_parts.extend([f"{k}={v}" for k, v in hydra_kwargs.items()])
+
+    full_cmd = " ".join(command_parts)
+    command_out = subprocess.run(full_cmd, shell=True, capture_output=True)
+
     stderr = command_out.stderr.decode()
     stdout = command_out.stdout.decode()
     if command_out.returncode != 0:
-        raise AssertionError(f"{test_name} failed!\nstdout:\n{stdout}\nstderr:\n{stderr}")
+        raise AssertionError(f"{test_name} failed!\ncommand:{full_cmd}\nstdout:\n{stdout}\nstderr:\n{stderr}")
     return stderr, stdout
 
 
@@ -508,9 +516,10 @@ def test_extraction():
 
         # Step 4: Merge to the final output
         stderr, stdout = run_command(
-            extraction_root / "aggregate_code_metadata.py",
+            extraction_root.parent / "aggregate_code_metadata.py",
             extraction_config_kwargs,
             "aggregate_code_metadata",
+            config_name="extraction",
         )
         all_stderrs.append(stderr)
         all_stdouts.append(stdout)
