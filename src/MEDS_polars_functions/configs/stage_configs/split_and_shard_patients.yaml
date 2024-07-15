@@ -1,17 +1,4 @@
 split_and_shard_patients:
-  description: |-
-    This stage splits the patients into training, tuning, and held-out sets, and further splits those sets
-    into shards. Arguments:
-      - `n_patients_per_shard`: The number of patients to include in a shard.
-      - `external_splits_json_fp`: The path to a json file containing any pre-defined splits for specially
-        held-out test sets beyond the IID held out set that will be produced (e.g., for prospective
-        datasets, etc.).
-      - `split_fracs`: The fraction of patients to include in the IID training, tuning, and held-out sets.
-        Split fractions can be changed for the default names by adding a hydra-syntax command line argument
-        for the nested name; e.g., `split_fracs.train=0.7 split_fracs.tuning=0.1 split_fracs.held_out=0.2`.
-        A split can be removed with the `~` override Hydra syntax. Similarly, a new split name can be added
-        with the standard Hydra `+` override option. E.g., `~split_fracs.held_out +split_fracs.test=0.1`. It
-        is the user's responsibility to ensure that split fractions sum to 1.
   is_metadata: True
   output_dir: ${cohort_dir}
   n_patients_per_shard: 50000

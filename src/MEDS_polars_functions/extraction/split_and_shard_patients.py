@@ -158,7 +158,27 @@ config_yaml = files("MEDS_polars_functions").joinpath("configs/extraction.yaml")
 
 @hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
 def main(cfg: DictConfig):
-    """Extracts the set of unique patients from the raw data and splits/shards them and saves the result."""
+    """Extracts the set of unique patients from the raw data and splits/shards them and saves the result.
+
+    This stage splits the patients into training, tuning, and held-out sets, and further splits those sets
+    into shards.
+
+    Args:
+      cfg.stage_cfg.n_patients_per_shard: The maximum number of patients to include in any shard. Realized
+        shards will not necessarily have this many patients, though they will never exceed this number.
+        Instead, the number of shards necessary to include all patients in a split such that no shard exceeds
+        this number will be calculated, then the patients will be evenly, randomly split amongst those shards
+        so that all shards within a split have approximately the same number of patietns.
+      cfg.stage_cfg.external_splits_json_fp: The path to a json file containing any pre-defined splits for
+        specialty held-out test sets beyond the IID held out set that will be produced (e.g., for prospective
+        datasets, etc.).
+      cfg.stage_cfg.split_fracs: The fraction of patients to include in the IID training, tuning, and held-out
+        sets. Split fractions can be changed for the default names by adding a hydra-syntax command line
+        argument for the nested name; e.g., `split_fracs.train=0.7 split_fracs.tuning=0.1
+        split_fracs.held_out=0.2`. A split can be removed with the `~` override Hydra syntax. Similarly, a new
+        split name can be added with the standard Hydra `+` override option. E.g., `~split_fracs.held_out
+        +split_fracs.test=0.1`. It is the user's responsibility to ensure that split fractions sum to 1.
+    """
 
     subsharded_dir, MEDS_cohort_dir, _, _ = stage_init(cfg)
 
