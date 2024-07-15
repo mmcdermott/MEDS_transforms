@@ -424,7 +424,7 @@ def reducer_fntr(
         ...     "values/n_ints": [4, 0, 1, 3, 1],
         ...     "values/sum": [13.2, 2.2, 6.0, 14.0, 12.5],
         ...     "values/sum_sqd": [21.3, 2.42, 36.0, 84.0, 81.25],
-        ...     "values/min": [-1, 0, -1, 2, 2.],
+        ...     "values/min": [-1, 0, -1, 2, 2],
         ...     "values/max": [8.0, 1.1, 6.0, 8.0, 7.5],
         ... })
         >>> df_2 = pl.DataFrame({
@@ -437,7 +437,7 @@ def reducer_fntr(
         ...     "values/n_ints": [0, 1, 3, 1],
         ...     "values/sum": [0., 7.0, 14.0, 12.5],
         ...     "values/sum_sqd": [0., 103.2, 84.0, 81.25],
-        ...     "values/min": [None, -1, 0.2, -2.],
+        ...     "values/min": [None, -1., 0.2, -2.],
         ...     "values/max": [None, 6.2, 1.0, 1.5],
         ... })
         >>> df_3 = pl.DataFrame({
