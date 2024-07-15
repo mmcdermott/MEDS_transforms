@@ -128,7 +128,8 @@ def filter_codes_fntr(
         """
 
         idx_col = "_row_idx"
-        while idx_col in df.columns:
+        df_columns = set(df.collect_schema().names())
+        while idx_col in df_columns:
             idx_col = f"_{idx_col}"
 
         return (

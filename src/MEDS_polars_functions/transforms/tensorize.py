@@ -81,7 +81,7 @@ def convert_to_NRT(tokenized_df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
 
     # There should only be one time delta column, but this ensures we catch it regardless of the unit of time
     # used to convert the time deltas, and that we verify there is only one such column.
-    time_delta_cols = [c for c in tokenized_df.columns if c.startswith("time_delta_")]
+    time_delta_cols = [c for c in tokenized_df.collect_schema().names() if c.startswith("time_delta_")]
 
     if len(time_delta_cols) == 0:
         raise ValueError("Expected at least one time delta column, found none")

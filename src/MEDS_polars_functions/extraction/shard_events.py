@@ -2,6 +2,7 @@
 import copy
 import gzip
 import random
+import warnings
 from collections.abc import Sequence
 from datetime import datetime
 from functools import partial
@@ -100,7 +101,9 @@ def scan_with_row_idx(fp: Path, columns: Sequence[str], **scan_kwargs) -> pl.Laz
         >>> with TemporaryDirectory() as tmpdir:
         ...     fp = Path(tmpdir) / "test.csv.gz"
         ...     with gzip.open(fp, mode="wb") as f:
-        ...         df.write_csv(f)
+        ...         with warnings.catch_warnings():
+        ...             warnings.simplefilter("ignore", category=UserWarning)
+        ...             df.write_csv(f)
         ...     scan_with_row_idx(fp, columns=["b"]).collect()
         shape: (3, 2)
         ┌─────────────┬─────┐
@@ -132,7 +135,9 @@ def scan_with_row_idx(fp: Path, columns: Sequence[str], **scan_kwargs) -> pl.Laz
             )
             logger.warning("Reading compressed CSV files may be slow and limit parallelizability.")
             with gzip.open(fp, mode="rb") as f:
-                return pl.read_csv(f, **kwargs).with_row_index(ROW_IDX_NAME).lazy()
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", category=UserWarning)
+                    return pl.read_csv(f, **kwargs).with_row_index(ROW_IDX_NAME).lazy()
         case ".csv":
             logger.debug(f"Reading {str(fp.resolve())} as CSV with kwargs:\n{kwargs_strs(kwargs)}.")
             df = pl.scan_csv(fp, **kwargs)
@@ -153,7 +158,7 @@ def scan_with_row_idx(fp: Path, columns: Sequence[str], **scan_kwargs) -> pl.Laz
 
     df = df.with_row_index(ROW_IDX_NAME)
 
-    logger.debug(f"Returning df with columns: {', '.join(df.columns)}")
+    logger.debug(f"Returning df with columns: {', '.join(df.collect_schema().names())}")
     return df
 
 

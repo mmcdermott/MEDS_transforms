@@ -177,12 +177,13 @@ def normalize(
     mean_col = pl.col("values/sum") / pl.col("values/n_occurrences")
     stddev_col = (pl.col("values/sum_sqd") / pl.col("values/n_occurrences") - mean_col**2) ** 0.5
 
-    if "values/mean" in code_metadata.columns:
+    code_metadata_columns = set(code_metadata.collect_schema().names())
+    if "values/mean" in code_metadata_columns:
         cols_to_select.append("values/mean")
     else:
         cols_to_select.append(mean_col.alias("values/mean"))
 
-    if "values/std" in code_metadata.columns:
+    if "values/std" in code_metadata_columns:
         cols_to_select.append("values/std")
     else:
         cols_to_select.append(stddev_col.alias("values/std"))

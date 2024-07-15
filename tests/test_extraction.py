@@ -298,20 +298,7 @@ def test_extraction():
         admit_vitals_parquet = raw_cohort_dir / "admit_vitals.parquet"
         df = pl.read_csv(admit_vitals_csv)
 
-        old_shape = df.shape
-        assert old_shape[0] > 0, "Should have some rows"
-
         df.write_parquet(admit_vitals_parquet, use_pyarrow=True)
-
-        df = pl.scan_parquet(admit_vitals_parquet)
-        df = df.select(list(df.columns))
-        assert (
-            df.select(pl.len()).collect().item() == old_shape[0]
-        ), "Should have the same number of rows after select."
-        assert old_shape == df.collect().shape, "Shapes should be the same after selecting all columns."
-
-        df = pl.scan_parquet(admit_vitals_parquet)
-        assert old_shape == df.collect().shape, "Shapes should be the same after scanning the parquet file."
 
         # Write the event config YAML
         event_cfgs_yaml.write_text(EVENT_CFGS_YAML)

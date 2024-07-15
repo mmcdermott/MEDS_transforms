@@ -156,6 +156,8 @@ def merge_subdirs_and_sort(
     dfs = [pl.scan_parquet(fp, glob=False) for fp in files_to_read]
     df = pl.concat(dfs, how="diagonal_relaxed")
 
+    df_columns = set(df.collect_schema().names())
+
     match unique_by:
         case None:
             pass
@@ -164,7 +166,7 @@ def merge_subdirs_and_sort(
         case list() if len(unique_by) > 0 and all(isinstance(u, str) for u in unique_by):
             subset = []
             for u in unique_by:
-                if u in df.columns:
+                if u in df_columns:
                     subset.append(u)
                 else:
                     logger.warning(f"Column {u} not found in dataframe. Omitting from unique-by subset.")
@@ -175,7 +177,7 @@ def merge_subdirs_and_sort(
     sort_by = ["patient_id", "timestamp"]
     if additional_sort_by is not None:
         for s in additional_sort_by:
-            if s in df.columns:
+            if s in df_columns:
                 sort_by.append(s)
             else:
                 logger.warning(f"Column {s} not found in dataframe. Omitting from sort-by list.")
