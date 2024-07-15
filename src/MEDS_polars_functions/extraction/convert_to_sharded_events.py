@@ -576,6 +576,14 @@ def convert_to_events(
 def main(cfg: DictConfig):
     """Converts the event-sharded raw data into MEDS events and storing them in patient subsharded flat files.
 
+    All arguments are specified through the command line into the `cfg` object through Hydra.
+
+    The `cfg.stage_cfg` object is a special key that is imputed by OmegaConf to contain the stage-specific
+    configuration arguments based on the global, pipeline-level configuration file. It cannot be overwritten
+    directly on the command line, but can be overwritten implicitly by overwriting components of the
+    `stage_configs.convert_to_sharded_events` key.
+
+
     This stage has no stage-specific configuration arguments. It does, naturally, require the global,
     `event_conversion_config_fp` configuration argument to be set to the path of the event conversion yaml
     file.

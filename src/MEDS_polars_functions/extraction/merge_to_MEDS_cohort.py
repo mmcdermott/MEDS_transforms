@@ -195,11 +195,19 @@ def main(cfg: DictConfig):
     format, and cover the same group of patients (specific to the shard being processed). The merged dataframe
     will also be sorted by patient ID and timestamp.
 
-    Non-standard Args:
-        cfg.stage_cfg.unique_by: The list of columns that should be ensured to be unique after the dataframes
-            are merged. Defaults to `"*"`, which means all columns are used.
-        cfg.stage_cfg.additional_sort_by: Additional columns to sort by, in addition to the default sorting by
-            patient ID and timestamp. Defaults to `None`, which means only patient ID and timestamp are used.
+    All arguments are specified through the command line into the `cfg` object through Hydra.
+
+    The `cfg.stage_cfg` object is a special key that is imputed by OmegaConf to contain the stage-specific
+    configuration arguments based on the global, pipeline-level configuration file. It cannot be overwritten
+    directly on the command line, but can be overwritten implicitly by overwriting components of the
+    `stage_configs.merge_to_MEDS_cohort` key.
+
+    Args:
+        stage_configs.merge_to_MEDS_cohort.unique_by: The list of columns that should be ensured to be unique
+            after the dataframes are merged. Defaults to `"*"`, which means all columns are used.
+        stage_configs.merge_to_MEDS_cohort.additional_sort_by: Additional columns to sort by, in addition to
+            the default sorting by patient ID and timestamp. Defaults to `None`, which means only patient ID
+            and timestamp are used.
 
     Returns:
         Writes the merged dataframes to the shard-specific output filepath in the `cfg.stage_cfg.output_dir`.
