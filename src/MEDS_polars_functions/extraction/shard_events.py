@@ -187,9 +187,15 @@ config_yaml = files("MEDS_polars_functions").joinpath("configs/extraction.yaml")
 def main(cfg: DictConfig):
     """Runs the input data re-sharding process. Can be parallelized across output shards.
 
-    Output shards are simply row-chunks of the input data. There is no randomization or re-ordering of the
-    input data. Read contention on the input files may render additional parallelism beyond one worker per
-    input file ineffective.
+    This stage takes the raw input files and splits them into smaller files by taking consecutive chunks of
+    rows and writing them out to new files. This is useful for parallelizing the processing of the input data.
+    There is no randomization or re-ordering of the input data, and furthermore read contention on the input
+    files being split may render additional parallelism beyond one worker per input file ineffective.
+
+    Args:
+        stage_cfg.row_chunksize (int): The number of rows to read in at a time.
+        stage_cfg.infer_schema_length (int): The number of rows to read in to infer the schema (only used if
+            the source files are csvs).
     """
     hydra_loguru_init()
 

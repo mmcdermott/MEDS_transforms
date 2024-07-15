@@ -574,7 +574,12 @@ def convert_to_events(
 
 @hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
 def main(cfg: DictConfig):
-    """Converts the sub-sharded or raw data into events which are sharded by patient X input shard."""
+    """Converts the event-sharded raw data into MEDS events and storing them in patient subsharded flat files.
+
+    This stage has no stage-specific configuration arguments. It does, naturally, require the global,
+    `event_conversion_config_fp` configuration argument to be set to the path of the event conversion yaml
+    file.
+    """
 
     input_dir, patient_subsharded_dir, metadata_input_dir, shards_map_fn = stage_init(cfg)
 

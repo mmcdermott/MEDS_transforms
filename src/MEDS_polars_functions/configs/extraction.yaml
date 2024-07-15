@@ -4,6 +4,8 @@ defaults:
       - shard_events
       - split_and_shard_patients
       - merge_to_MEDS_cohort
+      # There is no configuration beyond the global "event_conversion_config_fp" for the
+      # convert_to_sharded_events stage, so it doesn't have a stage config block here or below.
   - _self_
 
 description: |-
@@ -35,10 +37,13 @@ stages:
 stage_configs:
   aggregate_code_metadata:
     description: |-
-      This stage collects some descriptive metadata about the codes in the cohort. Arguments:
-        - `aggregations`: The aggregations to compute over the codes. Defaults to counts of code occurrences,
-          counts of patients with the code, and counts of value occurrences per code, as well as the sum and
-          sum of squares of values (for use in computing means and variances).
+      This stage collects some descriptive metadata about the codes in the cohort.
+
+      Args:
+        stage_cfg.aggregations: The aggregations to compute over the codes.
+          Defaults to counts of code occurrences, counts of patients with the code, and counts of value
+          occurrences per code, as well as the sum and sum of squares of values (for use in computing means
+          and variances).
     aggregations:
       - "code/n_occurrences"
       - "code/n_patients"
