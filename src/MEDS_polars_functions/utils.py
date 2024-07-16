@@ -74,7 +74,18 @@ def get_script_docstring() -> str:
 
 
 def current_script_name() -> str:
-    """Returns the name of the script that called this function."""
+    """Returns the name of the module that called this function."""
+
+    main_module = sys.modules["__main__"]
+    main_func = getattr(main_module, "main", None)
+    if main_func and callable(main_func):
+        func_module = main_func.__module__
+        if func_module == "__main__":
+            return Path(sys.argv[0]).stem
+        else:
+            return func_module.split(".")[-1]
+
+    logger.warning("Can't find main function in __main__ module. Using sys.argv[0] as a fallback.")
     return Path(sys.argv[0]).stem
 
 
