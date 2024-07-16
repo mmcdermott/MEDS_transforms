@@ -1,8 +1,30 @@
-"""Tests the full end-to-end extraction process."""
+"""Tests the full end-to-end extraction process.
+
+Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, rather than the installed
+scripts.
+"""
+
+import os
 
 import rootutils
 
 root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
+
+code_root = root / "src" / "MEDS_polars_functions"
+extraction_root = code_root / "extraction"
+
+if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
+    SHARD_EVENTS_SCRIPT = extraction_root / "shard_events.py"
+    SPLIT_AND_SHARD_SCRIPT = extraction_root / "split_and_shard_patients.py"
+    CONVERT_TO_SHARDED_EVENTS_SCRIPT = extraction_root / "convert_to_sharded_events.py"
+    MERGE_TO_MEDS_COHORT_SCRIPT = extraction_root / "merge_to_MEDS_cohort.py"
+    AGGREGATE_CODE_METADATA_SCRIPT = code_root / "aggregate_code_metadata.py"
+else:
+    SHARD_EVENTS_SCRIPT = "MEDS_extract-shard_events"
+    SPLIT_AND_SHARD_SCRIPT = "MEDS_extract-split_and_shard_patients"
+    CONVERT_TO_SHARDED_EVENTS_SCRIPT = "MEDS_extract-convert_to_sharded_events"
+    MERGE_TO_MEDS_COHORT_SCRIPT = "MEDS_extract-merge_to_MEDS_cohort"
+    AGGREGATE_CODE_METADATA_SCRIPT = "MEDS_transform-aggregate_code_metadata"
 
 import json
 import subprocess
@@ -246,14 +268,22 @@ MEDS_OUTPUTS = {
 }
 
 
-def run_command(script: Path, hydra_kwargs: dict[str, str], test_name: str):
-    script = str(script.resolve())
-    command_parts = ["python", script] + [f"{k}={v}" for k, v in hydra_kwargs.items()]
-    command_out = subprocess.run(" ".join(command_parts), shell=True, capture_output=True)
+def run_command(
+    script: Path | str, hydra_kwargs: dict[str, str], test_name: str, config_name: str | None = None
+):
+    script = ["python", str(script.resolve())] if isinstance(script, Path) else [script]
+    command_parts = script
+    if config_name is not None:
+        command_parts.append(f"--config-name={config_name}")
+    command_parts.extend([f"{k}={v}" for k, v in hydra_kwargs.items()])
+
+    full_cmd = " ".join(command_parts)
+    command_out = subprocess.run(full_cmd, shell=True, capture_output=True)
+
     stderr = command_out.stderr.decode()
     stdout = command_out.stdout.decode()
     if command_out.returncode != 0:
-        raise AssertionError(f"{test_name} failed!\nstdout:\n{stdout}\nstderr:\n{stderr}")
+        raise AssertionError(f"{test_name} failed!\ncommand:{full_cmd}\nstdout:\n{stdout}\nstderr:\n{stderr}")
     return stderr, stdout
 
 
@@ -290,20 +320,7 @@ def test_extraction():
         admit_vitals_parquet = raw_cohort_dir / "admit_vitals.parquet"
         df = pl.read_csv(admit_vitals_csv)
 
-        old_shape = df.shape
-        assert old_shape[0] > 0, "Should have some rows"
-
         df.write_parquet(admit_vitals_parquet, use_pyarrow=True)
-
-        df = pl.scan_parquet(admit_vitals_parquet)
-        df = df.select(list(df.columns))
-        assert (
-            df.select(pl.len()).collect().item() == old_shape[0]
-        ), "Should have the same number of rows after select."
-        assert old_shape == df.collect().shape, "Shapes should be the same after selecting all columns."
-
-        df = pl.scan_parquet(admit_vitals_parquet)
-        assert old_shape == df.collect().shape, "Shapes should be the same after scanning the parquet file."
 
         # Write the event config YAML
         event_cfgs_yaml.write_text(EVENT_CFGS_YAML)
@@ -327,15 +344,11 @@ def test_extraction():
             "hydra.verbose": True,
         }
 
-        extraction_root = root / "scripts" / "extraction"
-
         all_stderrs = []
         all_stdouts = []
 
         # Step 1: Sub-shard the data
-        stderr, stdout = run_command(
-            extraction_root / "shard_events.py", extraction_config_kwargs, "shard_events"
-        )
+        stderr, stdout = run_command(SHARD_EVENTS_SCRIPT, extraction_config_kwargs, "shard_events")
 
         all_stderrs.append(stderr)
         all_stdouts.append(stdout)
@@ -381,8 +394,15 @@ def test_extraction():
         )
 
         # Step 2: Collect the patient splits
+        # stderr, stdout = run_command(
+        #     "MEDS_extract_shard_patients",
+        #     {**extraction_config_kwargs, "stage":"split_and_shard_patients"},
+        #     "split_and_shard_patients",
+        # )
+
+        # Step 2: Collect the patient splits
         stderr, stdout = run_command(
-            extraction_root / "split_and_shard_patients.py",
+            SPLIT_AND_SHARD_SCRIPT,
             extraction_config_kwargs,
             "split_and_shard_patients",
         )
@@ -417,7 +437,7 @@ def test_extraction():
 
         # Step 3: Extract the events and sub-shard by patient
         stderr, stdout = run_command(
-            extraction_root / "convert_to_sharded_events.py",
+            CONVERT_TO_SHARDED_EVENTS_SCRIPT,
             extraction_config_kwargs,
             "convert_events",
         )
@@ -455,7 +475,7 @@ def test_extraction():
 
         # Step 4: Merge to the final output
         stderr, stdout = run_command(
-            extraction_root / "merge_to_MEDS_cohort.py",
+            MERGE_TO_MEDS_COHORT_SCRIPT,
             extraction_config_kwargs,
             "merge_sharded_events",
         )
@@ -501,9 +521,10 @@ def test_extraction():
 
         # Step 4: Merge to the final output
         stderr, stdout = run_command(
-            extraction_root / "collect_code_metadata.py",
+            AGGREGATE_CODE_METADATA_SCRIPT,
             extraction_config_kwargs,
-            "collect_code_metadata",
+            "aggregate_code_metadata",
+            config_name="extraction",
         )
         all_stderrs.append(stderr)
         all_stdouts.append(stdout)
@@ -518,11 +539,11 @@ def test_extraction():
 
         want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE)).with_columns(
             pl.col("code").cast(pl.Categorical),
-            pl.col("code/n_occurrences").cast(pl.UInt32),
-            pl.col("code/n_patients").cast(pl.UInt32),
-            pl.col("values/n_occurrences").cast(pl.UInt32),
-            pl.col("values/sum").cast(pl.Float64).fill_null(0),
-            pl.col("values/sum_sqd").cast(pl.Float64).fill_null(0),
+            pl.col("code/n_occurrences").cast(pl.UInt8),
+            pl.col("code/n_patients").cast(pl.UInt8),
+            pl.col("values/n_occurrences").cast(pl.UInt8),
+            pl.col("values/sum").cast(pl.Float32).fill_null(0),
+            pl.col("values/sum_sqd").cast(pl.Float32).fill_null(0),
         )
 
         assert_df_equal(

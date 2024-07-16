@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "setuptools-scm>=8.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -16,7 +16,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-dependencies = ["polars", "pyarrow", "nested_ragged_tensors", "loguru", "hydra-core", "numpy"]
+dependencies = ["polars>=1.1.0", "pyarrow", "nested_ragged_tensors", "loguru", "hydra-core", "numpy"]
 
 [project.optional-dependencies]
 examples = ["rootutils"]
@@ -24,6 +24,13 @@ dev = ["pre-commit"]
 tests = ["pytest", "pytest-cov", "rootutils"]
 local_parallelism = ["hydra-joblib-launcher"]
 slurm_parallelism = ["hydra-submitit-launcher"]
+
+[project.scripts]
+MEDS_extract-split_and_shard_patients = "MEDS_polars_functions.extraction.split_and_shard_patients:main"
+MEDS_extract-shard_events = "MEDS_polars_functions.extraction.shard_events:main"
+MEDS_extract-convert_to_sharded_events = "MEDS_polars_functions.extraction.convert_to_sharded_events:main"
+MEDS_extract-merge_to_MEDS_cohort = "MEDS_polars_functions.extraction.merge_to_MEDS_cohort:main"
+MEDS_transform-aggregate_code_metadata = "MEDS_polars_functions.aggregate_code_metadata:main"
 
 [project.urls]
 Homepage = "https://github.com/mmcdermott/MEDS_polars_functions"

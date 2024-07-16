@@ -1,0 +1,34 @@
+defaults:
+  - pipeline
+  - stage_configs:
+      - filter_patients
+      - add_time_derived_measurements
+      - count_code_occurrences
+      - filter_codes
+      - fit_outlier_detection
+      - filter_outliers
+      - fit_normalization
+      - fit_vocabulary_indices
+  - _self_
+
+# Global pipeline parameters:
+# 1. Code modifiers will be used as adjoining parts of the `code` columns during group-bys and eventual
+#    tokenization.
+code_modifier_columns: ???
+
+# The shards map filepath is stored in the global input directory for model-specific pre-processing.
+shards_map_fp: "${input_dir}/splits.json"
+
+# Pipeline Structure
+stages:
+  - filter_patients
+  - add_time_derived_measurements
+  - preliminary_counts
+  - filter_codes
+  - fit_outlier_detection
+  - filter_outliers
+  - fit_normalization
+  - fit_vocabulary_indices
+  - normalize
+  - tokenization
+  - tensorize

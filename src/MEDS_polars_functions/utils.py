@@ -8,17 +8,63 @@ from pathlib import Path
 import hydra
 import polars as pl
 from loguru import logger
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 
 pl.enable_string_cache()
 
 
-def get_script_docstring() -> str:
-    """Returns the docstring of the main function of the script that was called.
+def write_lazyframe(df: pl.LazyFrame, out_fp: Path) -> None:
+    if isinstance(df, pl.LazyFrame):
+        df = df.collect()
 
-    Returns:
-        str: TODO
+    df.write_parquet(out_fp, use_pyarrow=True)
+
+
+def stage_init(cfg: DictConfig):
+    """Initializes the stage by logging the configuration and the stage-specific paths.
+
+    Args:
+        cfg: The global configuration object, which should have a ``cfg.stage_cfg`` attribute containing the
+            stage specific configuration.
+
+    Returns: The data input directory, stage output directory, metadata input directory, and the shards file
+        path.
     """
+    hydra_loguru_init()
+
+    logger.info(
+        f"Running {current_script_name()} with the following configuration:\n{OmegaConf.to_yaml(cfg)}"
+    )
+
+    input_dir = Path(cfg.stage_cfg.data_input_dir)
+    output_dir = Path(cfg.stage_cfg.output_dir)
+    metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
+    shards_map_fp = Path(cfg.shards_map_fp)
+
+    def chk(x: Path):
+        return "✅" if x.exists() else "❌"
+
+    paths_strs = [
+        f"  - {k}: {chk(v)} {str(v.resolve())}"
+        for k, v in {
+            "input_dir": input_dir,
+            "output_dir": output_dir,
+            "metadata_input_dir": metadata_input_dir,
+            "shards_map_fp": shards_map_fp,
+        }.items()
+    ]
+
+    logger_strs = [
+        f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}",
+        "Paths: (checkbox indicates if it exists)",
+    ]
+    logger.debug("\n".join(logger_strs + paths_strs))
+
+    return input_dir, output_dir, metadata_input_dir, shards_map_fp
+
+
+def get_script_docstring() -> str:
+    """Returns the docstring of the main function of the script from which this function was called."""
 
     main_module = sys.modules["__main__"]
     func = getattr(main_module, "main", None)
@@ -28,11 +74,18 @@ def get_script_docstring() -> str:
 
 
 def current_script_name() -> str:
-    """Returns the name of the script that called this function.
+    """Returns the name of the module that called this function."""
 
-    Returns:
-        str: The name of the script that called this function.
-    """
+    main_module = sys.modules["__main__"]
+    main_func = getattr(main_module, "main", None)
+    if main_func and callable(main_func):
+        func_module = main_func.__module__
+        if func_module == "__main__":
+            return Path(sys.argv[0]).stem
+        else:
+            return func_module.split(".")[-1]
+
+    logger.warning("Can't find main function in __main__ module. Using sys.argv[0] as a fallback.")
     return Path(sys.argv[0]).stem
 
 
@@ -168,13 +221,6 @@ def hydra_loguru_init() -> None:
     hydra_path = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
     logfile_name = hydra.core.hydra_config.HydraConfig.get().job.name
     logger.add(os.path.join(hydra_path, f"{logfile_name}.log"))
-
-
-def write_lazyframe(df: pl.LazyFrame, out_fp: Path) -> None:
-    if isinstance(df, pl.LazyFrame):
-        df = df.collect()
-
-    df.write_parquet(out_fp, use_pyarrow=True)
 
 
 def get_shard_prefix(base_path: Path, fp: Path) -> str:
