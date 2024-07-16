@@ -1,8 +1,30 @@
-"""Tests the full end-to-end extraction process."""
+"""Tests the full end-to-end extraction process.
+
+Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, rather than the installed
+scripts.
+"""
+
+import os
 
 import rootutils
 
 root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
+
+code_root = root / "src" / "MEDS_polars_functions"
+extraction_root = code_root / "extraction"
+
+if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
+    SHARD_EVENTS_SCRIPT = extraction_root / "shard_events.py"
+    SPLIT_AND_SHARD_SCRIPT = extraction_root / "split_and_shard_patients.py"
+    CONVERT_TO_SHARDED_EVENTS_SCRIPT = extraction_root / "convert_to_sharded_events.py"
+    MERGE_TO_MEDS_COHORT_SCRIPT = extraction_root / "merge_to_MEDS_cohort.py"
+    AGGREGATE_CODE_METADATA_SCRIPT = code_root / "aggregate_code_metadata.py"
+else:
+    SHARD_EVENTS_SCRIPT = "MEDS_extract-shard_events"
+    SPLIT_AND_SHARD_SCRIPT = "MEDS_extract-split_and_shard_patients"
+    CONVERT_TO_SHARDED_EVENTS_SCRIPT = "MEDS_extract-convert_to_sharded_events"
+    MERGE_TO_MEDS_COHORT_SCRIPT = "MEDS_extract-merge_to_MEDS_cohort"
+    AGGREGATE_CODE_METADATA_SCRIPT = "MEDS_transform-aggregate_code_metadata"
 
 import json
 import subprocess
@@ -322,15 +344,11 @@ def test_extraction():
             "hydra.verbose": True,
         }
 
-        extraction_root = root / "src" / "MEDS_polars_functions" / "extraction"
-
         all_stderrs = []
         all_stdouts = []
 
         # Step 1: Sub-shard the data
-        stderr, stdout = run_command(
-            extraction_root / "shard_events.py", extraction_config_kwargs, "shard_events"
-        )
+        stderr, stdout = run_command(SHARD_EVENTS_SCRIPT, extraction_config_kwargs, "shard_events")
 
         all_stderrs.append(stderr)
         all_stdouts.append(stdout)
@@ -384,7 +402,7 @@ def test_extraction():
 
         # Step 2: Collect the patient splits
         stderr, stdout = run_command(
-            extraction_root / "split_and_shard_patients.py",
+            SPLIT_AND_SHARD_SCRIPT,
             extraction_config_kwargs,
             "split_and_shard_patients",
         )
@@ -419,7 +437,7 @@ def test_extraction():
 
         # Step 3: Extract the events and sub-shard by patient
         stderr, stdout = run_command(
-            extraction_root / "convert_to_sharded_events.py",
+            CONVERT_TO_SHARDED_EVENTS_SCRIPT,
             extraction_config_kwargs,
             "convert_events",
         )
@@ -457,7 +475,7 @@ def test_extraction():
 
         # Step 4: Merge to the final output
         stderr, stdout = run_command(
-            extraction_root / "merge_to_MEDS_cohort.py",
+            MERGE_TO_MEDS_COHORT_SCRIPT,
             extraction_config_kwargs,
             "merge_sharded_events",
         )
@@ -503,7 +521,7 @@ def test_extraction():
 
         # Step 4: Merge to the final output
         stderr, stdout = run_command(
-            extraction_root.parent / "aggregate_code_metadata.py",
+            AGGREGATE_CODE_METADATA_SCRIPT,
             extraction_config_kwargs,
             "aggregate_code_metadata",
             config_name="extraction",
