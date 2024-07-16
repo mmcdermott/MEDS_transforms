@@ -125,24 +125,27 @@ def merge_subdirs_and_sort(
         ...     df2.write_parquet(sp_dir / "subdir1" / "file2.parquet")
         ...     (sp_dir / "subdir2").mkdir()
         ...     df3.write_parquet(sp_dir / "subdir2" / "df.parquet")
+        ...     # We just display the patient ID, timestamp, and code columns as the numerical value column
+        ...     # is not guaranteed to be deterministic in the output given some rows will be dropped due to
+        ...     # the unique-by constraint.
         ...     merge_subdirs_and_sort(
         ...         sp_dir,
         ...         unique_by=["patient_id", "timestamp", "code"],
         ...         additional_sort_by=["code", "numerical_value"]
-        ...     ).collect()
-        shape: (6, 4)
-        ┌────────────┬───────────┬──────┬─────────────────┐
-        │ patient_id ┆ timestamp ┆ code ┆ numerical_value │
-        │ ---        ┆ ---       ┆ ---  ┆ ---             │
-        │ i64        ┆ i64       ┆ str  ┆ f64             │
-        ╞════════════╪═══════════╪══════╪═════════════════╡
-        │ 1          ┆ 1         ┆ D    ┆ 2.0             │
-        │ 1          ┆ 2         ┆ C    ┆ null            │
-        │ 1          ┆ 2         ┆ D    ┆ 2.0             │
-        │ 1          ┆ 10        ┆ A    ┆ null            │
-        │ 2          ┆ 20        ┆ B    ┆ null            │
-        │ 3          ┆ 8         ┆ E    ┆ null            │
-        └────────────┴───────────┴──────┴─────────────────┘
+        ...     ).select("patient_id", "timestamp", "code").collect()
+        shape: (6, 3)
+        ┌────────────┬───────────┬──────┐
+        │ patient_id ┆ timestamp ┆ code │
+        │ ---        ┆ ---       ┆ ---  │
+        │ i64        ┆ i64       ┆ str  │
+        ╞════════════╪═══════════╪══════╡
+        │ 1          ┆ 1         ┆ D    │
+        │ 1          ┆ 2         ┆ C    │
+        │ 1          ┆ 2         ┆ D    │
+        │ 1          ┆ 10        ┆ A    │
+        │ 2          ┆ 20        ┆ B    │
+        │ 3          ┆ 8         ┆ E    │
+        └────────────┴───────────┴──────┘
     """
 
     files_to_read = list(sp_dir.glob("**/*.parquet"))
