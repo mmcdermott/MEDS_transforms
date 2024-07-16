@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 from functools import partial
-from importlib.resources import files
 from pathlib import Path
 
 import hydra
@@ -8,6 +7,7 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig
 
+from MEDS_polars_functions.extract import CONFIG_YAML
 from MEDS_polars_functions.mapreduce.mapper import map_over, shard_iterator
 
 pl.enable_string_cache()
@@ -188,10 +188,7 @@ def merge_subdirs_and_sort(
     return df.sort(by=sort_by, multithreaded=False)
 
 
-config_yaml = files("MEDS_polars_functions").joinpath("configs/extraction.yaml")
-
-
-@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
+@hydra.main(version_base=None, config_path=str(CONFIG_YAML.parent), config_name=CONFIG_YAML.stem)
 def main(cfg: DictConfig):
     """Merges the patient sub-sharded events into a single parquet file per patient shard.
 

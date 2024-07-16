@@ -28,10 +28,10 @@ local_parallelism = ["hydra-joblib-launcher"]
 slurm_parallelism = ["hydra-submitit-launcher"]
 
 [project.scripts]
-MEDS_extract-split_and_shard_patients = "MEDS_polars_functions.extraction.split_and_shard_patients:main"
-MEDS_extract-shard_events = "MEDS_polars_functions.extraction.shard_events:main"
-MEDS_extract-convert_to_sharded_events = "MEDS_polars_functions.extraction.convert_to_sharded_events:main"
-MEDS_extract-merge_to_MEDS_cohort = "MEDS_polars_functions.extraction.merge_to_MEDS_cohort:main"
+MEDS_extract-split_and_shard_patients = "MEDS_polars_functions.extract.split_and_shard_patients:main"
+MEDS_extract-shard_events = "MEDS_polars_functions.extract.shard_events:main"
+MEDS_extract-convert_to_sharded_events = "MEDS_polars_functions.extract.convert_to_sharded_events:main"
+MEDS_extract-merge_to_MEDS_cohort = "MEDS_polars_functions.extract.merge_to_MEDS_cohort:main"
 MEDS_transform-aggregate_code_metadata = "MEDS_polars_functions.aggregate_code_metadata:main"
 
 [project.urls]

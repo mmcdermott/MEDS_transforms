@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import json
 from collections.abc import Sequence
-from importlib.resources import files
 from pathlib import Path
 
 import hydra
@@ -10,6 +9,7 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
+from MEDS_polars_functions.extract import CONFIG_YAML
 from MEDS_polars_functions.utils import stage_init
 
 
@@ -153,10 +153,7 @@ def shard_patients[
     return final_shards
 
 
-config_yaml = files("MEDS_polars_functions").joinpath("configs/extraction.yaml")
-
-
-@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
+@hydra.main(version_base=None, config_path=str(CONFIG_YAML.parent), config_name=CONFIG_YAML.stem)
 def main(cfg: DictConfig):
     """Extracts the set of unique patients from the raw data and splits/shards them and saves the result.
 

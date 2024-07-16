@@ -11,7 +11,7 @@ import rootutils
 root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
 code_root = root / "src" / "MEDS_polars_functions"
-extraction_root = code_root / "extraction"
+extraction_root = code_root / "extract"
 
 if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
     SHARD_EVENTS_SCRIPT = extraction_root / "shard_events.py"
@@ -524,7 +524,7 @@ def test_extraction():
             AGGREGATE_CODE_METADATA_SCRIPT,
             extraction_config_kwargs,
             "aggregate_code_metadata",
-            config_name="extraction",
+            config_name="extract",
         )
         all_stderrs.append(stderr)
         all_stdouts.append(stdout)
