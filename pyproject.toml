@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0", "setuptools-scm>=8.0", "wheel"]
+requires = ["setuptools>=64", "setuptools-scm>=8.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "MEDS_polars_functions"
-version = "0.0.1"
+dynamic = ["version"]
 authors = [
   { name="Matthew McDermott", email="mattmcdermott8@gmail.com" },
 ]
@@ -17,6 +17,8 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = ["polars>=1.1.0", "pyarrow", "nested_ragged_tensors", "loguru", "hydra-core", "numpy"]
+
+[tool.setuptools_scm]
 
 [project.optional-dependencies]
 examples = ["rootutils"]
