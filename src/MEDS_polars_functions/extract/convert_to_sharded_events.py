@@ -6,7 +6,6 @@ import json
 import random
 from collections.abc import Sequence
 from functools import partial, reduce
-from importlib.resources import files
 from pathlib import Path
 
 import hydra
@@ -15,6 +14,7 @@ from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 from omegaconf.listconfig import ListConfig
 
+from MEDS_polars_functions.extract import CONFIG_YAML
 from MEDS_polars_functions.mapreduce.mapper import rwlock_wrap
 from MEDS_polars_functions.utils import (
     is_col_field,
@@ -22,8 +22,6 @@ from MEDS_polars_functions.utils import (
     stage_init,
     write_lazyframe,
 )
-
-config_yaml = files("MEDS_polars_functions").joinpath("configs/extraction.yaml")
 
 
 def in_format(fmt: str, ts_name: str) -> pl.Expr:
@@ -572,7 +570,7 @@ def convert_to_events(
     return df
 
 
-@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
+@hydra.main(version_base=None, config_path=str(CONFIG_YAML.parent), config_name=CONFIG_YAML.stem)
 def main(cfg: DictConfig):
     """Converts the event-sharded raw data into MEDS events and storing them in patient subsharded flat files.
 

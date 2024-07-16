@@ -10,6 +10,9 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
+from MEDS_polars_functions import __package_name__ as package_name
+from MEDS_polars_functions import __version__ as package_version
+
 pl.enable_string_cache()
 
 
@@ -61,6 +64,16 @@ def stage_init(cfg: DictConfig):
     logger.debug("\n".join(logger_strs + paths_strs))
 
     return input_dir, output_dir, metadata_input_dir, shards_map_fp
+
+
+def get_package_name() -> str:
+    """Returns the name of the python package running this pipeline."""
+    return package_name
+
+
+def get_package_version() -> str:
+    """Returns the version of the python package running this pipeline."""
+    return package_version
 
 
 def get_script_docstring() -> str:
@@ -211,6 +224,7 @@ def populate_stage(
 OmegaConf.register_new_resolver("get_script_docstring", get_script_docstring, replace=False)
 OmegaConf.register_new_resolver("current_script_name", current_script_name, replace=False)
 OmegaConf.register_new_resolver("populate_stage", populate_stage, replace=False)
+OmegaConf.register_new_resolver("get_package_version", get_package_version, replace=False)
 
 
 def hydra_loguru_init() -> None:

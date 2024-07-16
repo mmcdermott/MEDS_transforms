@@ -22,6 +22,12 @@ polling_time: 300 # wait time in seconds before beginning reduction steps
 stage: ${current_script_name:}
 stage_cfg: ${oc.create:${populate_stage:${stage}, ${input_dir}, ${cohort_dir}, ${stages}, ${stage_configs}}}
 
+# Pipeline
+etl_metadata:
+  pipeline_name: ???
+  package_name: ${get_package_name}
+  package_version: ${get_package_version}
+
 # Hydra
 hydra:
   job:

@@ -8,6 +8,8 @@ defaults:
       # convert_to_sharded_events stage, so it doesn't have a stage config block here or below.
   - _self_
 
+etl_metadata.pipeline_name: "extract"
+
 description: |-
   This pipeline extracts raw MEDS events in longitudinal, sparse form from an input dataset meeting select
   criteria and converts them to the flattened, MEDS format. It can be run in its entirety, with controllable
