@@ -1,0 +1,68 @@
+patient_id_col: patient_id_hashed
+admissions:
+  # gender:
+  #   code: 
+  #     - GENDER
+  #     - col(gender)
+  #   timestamp: null
+  admission:
+    code:
+      - ADMISSION
+      - VS
+    timestamp: col(admission_date_time)
+    timestamp_format: "%Y-%m-%d %H:%M"
+    genc_id: genc_id
+    age: age
+    via_ambulance: admit_via_ambulance
+  discharge:
+    code:
+      - DISCHARGE
+      - VE
+    timestamp: col(discharge_date_time)
+    timestamp_format: "%Y-%m-%d %H:%M"
+    genc_id: genc_id
+    discharge_disposition: discharge_disposition
+  # readmission:
+  #   code:
+  #     - READMISSION
+  #     - col(readmission)
+  #   timestamp: null
+  
+labevents:
+  lab:
+    code:
+      - LAB
+      - col(test_type_mapped_omop)
+    lab_value: result_value
+    timestamp: col(collection_date_time)
+    timestamp_format: "%Y-%m-%d %H:%M"
+    genc_id: genc_id
+   
+interventions:
+  intervention:
+    code:
+      - INTERVENTION
+      - col(intervention_code)
+    medication_type: intervention_type
+    timestamp: col(intervention_episode_start_date_time)
+    timestamp_format: "%Y-%m-%d %H:%M"
+    genc_id: genc_id
+
+medications:
+  medication:
+    code:
+      - MEDICATION
+      - col(med_id_din)
+    timestamp: col(med_order_date_time)
+    timestamp_format: "%Y-%m-%d %H:%M"
+    stop_timestamp: col(med_stop_date_time)
+    genc_id: genc_id
+   
+diagnoses:
+  diagnosis:
+    code:
+      - DIAGNOSIS
+      - col(diagnosis_code)
+    diagnosis_type: diagnosis_type
+    genc_id: genc_id
+    timestamp: null

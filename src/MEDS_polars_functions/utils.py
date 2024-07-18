@@ -113,7 +113,9 @@ def populate_stage(
 
     for s in stage_configs.keys():
         if s not in stages:
-            raise ValueError(f"stage config key '{s}' is not a valid stage name. Options are: {list(stages)}")
+            raise ValueError(
+                f"stage config key '{s}' is not a valid stage name. Options are: {list(stages.keys())}"
+            )
 
     if stage_name not in stages:
         raise ValueError(f"'{stage_name}' is not a valid stage name. Options are: {', '.join(stages)}")
@@ -158,10 +160,10 @@ def populate_stage(
 
     return out
 
-
-OmegaConf.register_new_resolver("get_script_docstring", get_script_docstring, replace=False)
-OmegaConf.register_new_resolver("current_script_name", current_script_name, replace=False)
-OmegaConf.register_new_resolver("populate_stage", populate_stage, replace=False)
+if not OmegaConf.has_resolver("get_script_docstring"):
+    OmegaConf.register_new_resolver("get_script_docstring", get_script_docstring, replace=False)
+    OmegaConf.register_new_resolver("current_script_name", current_script_name, replace=False)
+    OmegaConf.register_new_resolver("populate_stage", populate_stage, replace=False)
 
 
 def hydra_loguru_init() -> None:
@@ -201,7 +203,8 @@ def get_shard_prefix(base_path: Path, fp: Path) -> str:
     relative_path = fp.relative_to(base_path)
     relative_parent = relative_path.parent
     file_name = relative_path.name.split(".")[0]
-
+    if file_name.split("-")[0]:
+        file_name = file_name.split("-")[0]
     return str(relative_parent / file_name)
 
 

@@ -5,6 +5,7 @@ import shutil
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from typing import TypeVar
 
 from loguru import logger
 
@@ -82,9 +83,8 @@ def register_lock(cache_directory: Path) -> tuple[datetime, Path]:
     return lock_time, lock_fp
 
 
-def wrap[
-    DF_T
-](
+DF_T = TypeVar('DF_T')
+def wrap(
     in_fp: Path,
     out_fp: Path,
     read_fn: Callable[[Path], DF_T],

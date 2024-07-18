@@ -17,7 +17,8 @@ pl.enable_string_cache()
 
 
 def read_fn(sp_dir: Path, unique_by: list[str] | str | None) -> pl.LazyFrame:
-    files_to_read = list(sp_dir.glob("**/*.parquet"))
+    # files_to_read = list(sp_dir.glob("**/*.parquet"))
+    files_to_read = [fp for fp in sp_dir.glob("**/*.parquet")]
 
     if not files_to_read:
         raise FileNotFoundError(f"No files found in {sp_dir}/**/*.parquet.")
@@ -50,6 +51,11 @@ def read_fn(sp_dir: Path, unique_by: list[str] | str | None) -> pl.LazyFrame:
 def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
     df.collect().write_parquet(out_fp, use_pyarrow=True)
 
+# def write_fn(df: pl.LazyFrame, out_fp: Path, chunk_size: int = 10_000_000) -> None:
+#     for i, chunk in enumerate(df.collect(streaming=True, chunk_size=chunk_size)):
+#         out_fp = f"/{outfp}_{sp}_{i}.parquet"
+#         chunk.write_parquet(out_fp, use_pyarrow=True, append=True)
+
 
 def identity_fn(df: pl.LazyFrame) -> pl.LazyFrame:
     return df
@@ -79,15 +85,18 @@ def main(cfg: DictConfig):
     random.shuffle(patient_splits)
 
     reader = partial(read_fn, unique_by=cfg.stage_cfg.get("unique_by", None))
-
+    
     for sp in patient_splits:
-        in_dir = patient_subsharded_dir / sp
-        out_fp = Path(cfg.stage_cfg.output_dir) / f"{sp}.parquet"
+        try:
+            in_dir = patient_subsharded_dir / sp
+            out_fp = Path(cfg.stage_cfg.output_dir) / f"{sp}.parquet"
 
-        shard_fps = sorted(list(in_dir.glob("**/*.parquet")))
-        shard_fp_strs = [f"  * {str(fp.resolve())}" for fp in shard_fps]
-        logger.info(f"Merging {len(shard_fp_strs)} shards into {out_fp}:\n" + "\n".join(shard_fp_strs))
-        rwlock_wrap(in_dir, out_fp, reader, write_fn, identity_fn, do_return=False)
+            shard_fps = sorted(list(in_dir.glob("**/*.parquet")))
+            shard_fp_strs = [f"  * {str(fp.resolve())}" for fp in shard_fps]
+            logger.info(f"Merging {len(shard_fp_strs)} shards into {out_fp}:\n" + "\n".join(shard_fp_strs))
+            rwlock_wrap(in_dir, out_fp, reader, write_fn, identity_fn, do_return=False)
+        except: 
+            pass
 
     logger.info("Output cohort written.")
 

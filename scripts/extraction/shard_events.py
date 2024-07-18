@@ -4,6 +4,7 @@ import copy
 import gzip
 import random
 from collections.abc import Sequence
+from collections import Counter
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -189,13 +190,11 @@ def main(cfg: DictConfig):
     input file ineffective.
     """
     hydra_loguru_init()
-
     logger.info(
         f"Running with config:\n{OmegaConf.to_yaml(cfg)}\n"
         f"Stage: {cfg.stage}\n\n"
         f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
     )
-
     raw_cohort_dir = Path(cfg.stage_cfg.data_input_dir)
     row_chunksize = cfg.stage_cfg.row_chunksize
 
@@ -206,16 +205,15 @@ def main(cfg: DictConfig):
     event_conversion_cfg = OmegaConf.load(event_conversion_cfg_fp)
 
     prefix_to_columns = retrieve_columns(event_conversion_cfg)
-
     seen_files = set()
     input_files_to_subshard = []
     for fmt in ["parquet", "csv", "csv.gz"]:
         files_in_fmt = set(list(raw_cohort_dir.glob(f"*.{fmt}")) + list(raw_cohort_dir.glob(f"**/*.{fmt}")))
         for f in files_in_fmt:
-            if get_shard_prefix(raw_cohort_dir, f) in seen_files:
-                logger.warning(f"Skipping {f} as it has already been added in a preferred format.")
-                continue
-            elif get_shard_prefix(raw_cohort_dir, f) not in prefix_to_columns:
+            # if get_shard_prefix(raw_cohort_dir, f) in seen_files:
+            #     logger.warning(f"Skipping {f} as it has already been added in a preferred format.")
+            #     continue
+            if get_shard_prefix(raw_cohort_dir, f) not in prefix_to_columns:
                 logger.warning(f"Skipping {f} as it is not specified in the event conversion configuration.")
                 continue
             else:
@@ -238,6 +236,7 @@ def main(cfg: DictConfig):
     )
 
     start = datetime.now()
+
     for input_file in input_files_to_subshard:
         columns = prefix_to_columns[get_shard_prefix(raw_cohort_dir, input_file)]
 
@@ -270,11 +269,13 @@ def main(cfg: DictConfig):
         row_shards = list(range(0, row_count, row_chunksize))
         random.shuffle(row_shards)
         logger.info(f"Splitting {input_file} into {len(row_shards)} row-chunks of size {row_chunksize}.")
-
+        
         for i, st in enumerate(row_shards):
             end = min(st + row_chunksize, row_count)
-            out_fp = out_dir / f"[{st}-{end}).parquet"
-
+            # out_fp = out_dir / f"[{st}-{end}).parquet"
+            out_filename = (input_file.name).split(".")[0]
+            out_fp = out_dir / f"{out_filename}.parquet"
+            
             compute_fn = partial(filter_to_row_chunk, start=st, end=end)
             logger.info(
                 f"Writing file {i+1}/{len(row_shards)}: {input_file} row-chunk [{st}-{end}) to {out_fp}."

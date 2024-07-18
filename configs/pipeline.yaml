@@ -6,10 +6,10 @@ _default_description: |-
   This is a MEDS pipeline ETL. Please set a more detailed description at the top of your specific pipeline
   configuration file.
 
-log_dir: "${stage_cfg.output_dir}/.logs"
+log_dir: "${stage_cfg.output_dir}/logs"
 
 # General pipeline variables
-do_overwrite: False
+do_overwrite: True
 seed: 1
 stages: ??? # The list of stages to this overall pipeline (in order)
 stage_configs: ??? # The configurations for each stage, keyed by stage name

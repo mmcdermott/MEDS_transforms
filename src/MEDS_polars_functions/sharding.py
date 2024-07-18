@@ -1,14 +1,12 @@
 """Utilities for sharding/re-sharding and splitting MEDS datasets."""
 
 from collections.abc import Sequence
-
+from typing import TypeVar
 import numpy as np
 from loguru import logger
 
-
-def shard_patients[
-    SUBJ_ID_T
-](
+SUBJ_ID_T = TypeVar("SUBJ_ID_T")
+def shard_patients(
     patients: np.ndarray,
     n_patients_per_shard: int = 50000,
     external_splits: dict[str, Sequence[SUBJ_ID_T]] | None = None,
@@ -105,12 +103,12 @@ def shard_patients[
         logger.warning(
             "Some splits are empty. Adjusting splits to ensure all splits have at least 1 patient."
         )
-        max_split = split_lens.argmax()
-        split_lens[max_split] -= 1
-        split_lens[split_lens.argmin()] += 1
+#         max_split = split_lens.argmax()
+#         split_lens[max_split] -= 1
+#         split_lens[split_lens.argmin()] += 1
 
-    if split_lens.min() == 0:
-        raise ValueError("Unable to adjust splits to ensure all splits have at least 1 patient.")
+#     if split_lens.min() == 0:
+#         raise ValueError("Unable to adjust splits to ensure all splits have at least 1 patient.")
 
     patients = rng.permutation(patient_ids_to_split)
     patients_per_split = np.split(patients, split_lens.cumsum())

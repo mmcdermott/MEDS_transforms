@@ -52,12 +52,12 @@ stage_configs:
           is the user's responsibility to ensure that split fractions sum to 1.
     is_metadata: True
     output_dir: ${cohort_dir}
-    n_patients_per_shard: 50000
+    n_patients_per_shard: 40000
     external_splits_json_fp: null
     split_fracs:
-      train: 0.8
-      tuning: 0.1
-      held_out: 0.1
+      train: 1
+      tuning: 0
+      held_out: 0
 
   merge_to_MEDS_cohort:
     description: |-
