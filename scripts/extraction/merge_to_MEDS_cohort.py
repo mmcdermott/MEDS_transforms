@@ -16,11 +16,17 @@ from MEDS_polars_functions.utils import hydra_loguru_init
 pl.enable_string_cache()
 
 
-def read_fn(sp_dir: Path, unique_by: list[str] | str | None) -> pl.LazyFrame:
-    files_to_read = list(sp_dir.glob("**/*.parquet"))
-
+def read_fn(sp_dir: Path, event_subsets: list[str], unique_by: list[str] | str | None) -> pl.LazyFrame:
+    files_to_read = [fp for es in event_subsets for fp in (sp_dir / es).glob("*.parquet")]
     if not files_to_read:
-        raise FileNotFoundError(f"No files found in {sp_dir}/**/*.parquet.")
+        raise FileNotFoundError(f"No parquet files found in {sp_dir}/**/*.parquet.")
+
+    if len(dirs_to_read := {fp.parent for fp in files_to_read}) != len(event_subsets):
+        raise RuntimeError(
+            "Number of files ({}) does not match number of filenames ({}): {}".format(
+                len(dirs_to_read), len(event_subsets), sp_dir
+            )
+        )
 
     file_strs = "\n".join(f"  - {str(fp.resolve())}" for fp in files_to_read)
     logger.info(f"Reading {len(files_to_read)} files:\n{file_strs}")
@@ -32,7 +38,7 @@ def read_fn(sp_dir: Path, unique_by: list[str] | str | None) -> pl.LazyFrame:
         case None:
             pass
         case "*":
-            df = df.unique(maintain_order=False)
+            df = df.unique(maintain_order=True)
         case list() if len(unique_by) == 0 and all(isinstance(u, str) for u in unique_by):
             subset = []
             for u in unique_by:
@@ -40,11 +46,11 @@ def read_fn(sp_dir: Path, unique_by: list[str] | str | None) -> pl.LazyFrame:
                     subset.append(u)
                 else:
                     logger.warning(f"Column {u} not found in dataframe. Omitting from unique-by subset.")
-            df = df.unique(maintain_order=False, subset=subset)
+            df = df.unique(maintain_order=True, subset=subset)
         case _:
             raise ValueError(f"Invalid unique_by value: {unique_by}")
 
-    return df.sort(by=["patient_id", "timestamp"], multithreaded=False)
+    return df.sort(by=["patient_id", "timestamp"], maintain_order=True)
 
 
 def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
@@ -78,7 +84,13 @@ def main(cfg: DictConfig):
     patient_splits = list(shards.keys())
     random.shuffle(patient_splits)
 
-    reader = partial(read_fn, unique_by=cfg.stage_cfg.get("unique_by", None))
+    event_conversion_cfg = OmegaConf.load(cfg.event_conversion_config_fp)
+    event_conversion_cfg.pop("patient_id_col", None)
+    reader = partial(
+        read_fn,
+        event_subsets=list(event_conversion_cfg.keys()),
+        unique_by=cfg.stage_cfg.get("unique_by", None),
+    )
 
     for sp in patient_splits:
         in_dir = patient_subsharded_dir / sp
