@@ -20,7 +20,34 @@ from MEDS_polars_functions.utils import stage_init, write_lazyframe
 
 
 def matcher_to_expr(matcher_cfg: DictConfig | dict) -> tuple[pl.Expr, set[str]]:
-    """TODO."""
+    """Returns an expression and the necessary columns to match a collection of key-value pairs.
+
+    Currently, this only supports checking for equality between column names and values.
+    TODO: Expand (as needed only) to support other types of matchers.
+
+    Args:
+        matcher_cfg: A dictionary of key-value pairs to match against.
+
+    Raises:
+        ValueError: If the matcher configuration is not a dictionary.
+
+    Returns:
+        pl.Expr: A Polars expression that matches the key-value pairs in the input dictionary.
+        set[str]: The set of input columns needed to form the returned expression.
+
+    Examples:
+        >>> matcher_to_expr({"foo": "bar"})
+        pl.all(pl.col("foo") == "bar"), {"foo"}
+        >>> matcher_to_expr({"foo": "bar", "buzz": "baz"})
+        pl.all(pl.col("foo") == "bar", pl.col("buzz") == "baz"), {"foo", "buzz"}
+        >>> matcher_to_expr(["foo", "bar"])
+        Traceback (most recent call last):
+            ...
+        ValueError: Matcher configuration must be a dictionary. Got: ['foo', 'bar']
+    """
+    if not isinstance(matcher_cfg, dict):
+        raise ValueError(f"Matcher configuration must be a dictionary. Got: {matcher_cfg}")
+
     return pl.all(pl.col(k) == v for k, v in matcher_cfg.items()), set(matcher_cfg.keys())
 
 
@@ -28,13 +55,10 @@ def cfg_to_expr(cfg: str | ListConfig | DictConfig) -> tuple[pl.Expr, set[str]]:
     """Converts a metadata column configuration object to a Polars expression.
 
     The input configuration object can take on one of the following formats:
-      - A string literal with no instances of text enclosed in curly braces (e.g., "{foo}"). In this case, the
-        string literal is interpreted to be the _name of a column in the input dataframe_ to extract.
-      - A string literal with instances of text enclosed in curly braces (e.g., "foo{bar}"). In this case, the
-        string is interpreted to be an interpolation pattern, where the text enclosed in curly braces are
-        instances of column names of the input dataframe which will be interpolated into the rest of the
-        string literal, which will be otherwise interpreted as a plain string. If _any_ referenced column is
-        null, it will be dropped.
+      - A string. In this case, the string is interpreted to be an interpolation pattern, where text enclosed
+        in curly braces are instances of column names of the input dataframe which will be interpolated into
+        the rest of the string literal, which will be otherwise interpreted as a plain string. If _any_
+        referenced column is null, it will be dropped.
       - A dictionary of one of the following formats: Either (a) it has a single key, which is interpreted as
         a string output column value (either column or interpolation pattern) mapping to a matcher dictionary
         or it has a "matcher" key which maps to a matcher dictionary and an "output" key which maps to the
@@ -51,13 +75,23 @@ def cfg_to_expr(cfg: str | ListConfig | DictConfig) -> tuple[pl.Expr, set[str]]:
 
     Examples:
         >>> cfg_to_expr("foo")
-        pl.col("foo"), {"foo"}
+        pl.lit("foo"), {}
+        >>> cfg_to_expr("bar//{foo}")
+        "bar//" + pl.col("foo"), {"foo"}
+        >>> cfg_to_expr({"output": "foo", "matcher": {"bar": "baz"}})
+        pl.when(pl.col("bar") == "baz").then(pl.lit("foo")), {"bar"}
+        >>> cfg_to_expr(["bar//{foo}", "bar//UNK"])
+        pl.coalesce("bar//" + pl.col("foo"), "bar//UNK"), {"foo"}
+        >>> cfg_to_expr({"foo": "bar", "buzz": "baz", "fuzz": "fizz"})
+        Traceback (most recent call last):
+            ...
+        ValueError: Dictionary configuration must have one or two keys. Got: {'foo': 'bar'}
     """
 
     input_col_regex = r"{([^}]+)}"
     match cfg:
         case str() if not re.match(input_col_regex, cfg):
-            return pl.col(cfg), {cfg}
+            return pl.lit(cfg, dtype=pl.Utf8), set()
         case str():
             input_cols = re.findall(input_col_regex, cfg)
             empty_interp = re.sub(input_col_regex, "{}", cfg)
@@ -65,14 +99,17 @@ def cfg_to_expr(cfg: str | ListConfig | DictConfig) -> tuple[pl.Expr, set[str]]:
         case dict() | DictConfig:
             if len(cfg) == 1:
                 out_cfg, matcher_cfg = next(iter(cfg.items()))
-            elif len(cfg) == 2:
+            elif len(cfg) == 2 and set(cfg.keys()) == {"output", "matcher"}:
                 out_cfg = cfg["output"]
                 matcher_cfg = cfg["matcher"]
             else:
-                raise ValueError(f"Dictionary configuration must have one or two keys. Got: {cfg}")
+                raise ValueError(
+                    "Dictionary configuration must be either an output mapping to a matcher or have "
+                    f"only two keys: 'output' and 'matcher'. Got: {cfg}"
+                )
 
-            out_expr, out_cols = cfg_to_expr(out_cfg)
             matcher_expr, matcher_cols = matcher_to_expr(matcher_cfg)
+            out_expr, out_cols = cfg_to_expr(out_cfg)
 
             return pl.when(matcher_expr).then(out_expr), out_cols | matcher_cols
         case ListConfig() | list() as cfg_fields:
@@ -83,6 +120,8 @@ def cfg_to_expr(cfg: str | ListConfig | DictConfig) -> tuple[pl.Expr, set[str]]:
                 component_exprs.append(expr)
                 needed_cols.update(cols)
             return pl.coalesce(*component_exprs), needed_cols
+        case _:
+            raise ValueError(f"Invalid configuration object: {cfg}")
 
 
 def extract_metadata(metadata_df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.LazyFrame:
@@ -209,10 +248,54 @@ def extract_metadata(metadata_df: pl.LazyFrame, event_cfg: dict[str, str | None]
     return metadata_df.select(**df_select_exprs).with_columns(code=code_expr).unique(maintain_order=True)
 
 
-def get_events_and_metadata_by_metadata_fp(event_configs):
+def get_events_and_metadata_by_metadata_fp(event_configs: dict | DictConfig) -> dict[str, dict[str, dict]]:
     """Reformats the event conversion config to map metadata file input prefixes to linked event configs.
 
-    TODO
+    Args:
+        event_configs: The event conversion configuration dictionary.
+
+    Returns:
+        A dictionary keyed by metadata input file prefix mapping to a dictionary of event configurations that
+        link to that metadata prefix.
+
+    Examples:
+        >>> event_configs = {
+        ...     "icu/procedureevents": {
+        ...         "start": {
+        ...             "code": ["PROCEDURE", "START", "col(itemid)"],
+        ...             "_metadata": {
+        ...                 "proc_datetimeevents": {"desc": ["omop_concept_name", "label"]},
+        ...                 "proc_itemid": {"desc": ["omop_concept_name", "label"]},
+        ...             },
+        ...         },
+        ...         "end": {
+        ...             "code": ["PROCEDURE", "END", "col(itemid)"],
+        ...             "_metadata": {
+        ...                 "proc_datetimeevents": {"desc": ["omop_concept_name", "label"]},
+        ...                 "proc_itemid": {"desc": ["omop_concept_name", "label"]},
+        ...             },
+        ...         },
+        ...     },
+        ...     "icu/inputevents": {
+        ...         "event": {
+        ...             "code": ["INFUSION", "col(itemid)"],
+        ...             "_metadata": {
+        ...                 "inputevents_to_rxnorm": {"desc": "{label}", "itemid": "{foo}"}
+        ...             },
+        ...         },
+        ...     },
+        ... }
+        >>> get_events_and_metadata_by_metadata_fp(event_configs) # doctest: +NORMALIZE_WHITESPACE
+        {"proc_datetimeevents": [{"code": ["PROCEDURE", "START", "col(itemid)"],
+                                  "_metadata": {"desc": ["omop_concept_name", "label"]}},
+                                 {"code": ["PROCEDURE", "END", "col(itemid)"],
+                                  "_metadata": {"desc": ["omop_concept_name", "label"]}}],
+         "proc_itemid":         [{"code": ["PROCEDURE", "START", "col(itemid)"],
+                                  "_metadata": {"desc": ["omop_concept_name", "label"]}},
+                                 {"code": ["PROCEDURE", "END", "col(itemid)"],
+                                  "_metadata": {"desc": ["omop_concept_name", "label"]}}],
+         "inputevents_to_rxnorm": [{"code": ["INFUSION", "col(itemid)"],
+                                    "_metadata": {"desc": "{label}", "itemid": "{foo}"}}]}
     """
 
     raise NotImplementedError("This function is not yet implemented.")
