@@ -29,6 +29,31 @@ def in_format(fmt: str, ts_name: str) -> pl.Expr:
     return pl.col(ts_name).str.strptime(pl.Datetime, fmt, strict=False)
 
 
+def get_code_expr(code_field: str | list | ListConfig) -> tuple[pl.Expr, pl.Expr | None, set[str]]:
+    """TODO."""
+    if isinstance(code_field, str):
+        code_field = [code_field]
+
+    code_exprs = []
+    code_null_filter_expr = None
+    needed_cols = set()
+    for i, code in enumerate(code_field):
+        match code:
+            case str() if is_col_field(code):
+                code_col = parse_col_field(code)
+                needed_cols.add(code_col)
+                code_exprs.append(pl.col(code_col).cast(pl.Utf8).fill_null("UNK"))
+                if i == 0:
+                    code_null_filter_expr = pl.col(code_col).is_not_null()
+            case str():
+                code_exprs.append(pl.lit(code, dtype=pl.Utf8))
+            case _:
+                raise ValueError(f"Invalid code literal: {code}")
+    code_expr = reduce(lambda a, b: a + pl.lit("//") + b, code_exprs).cast(pl.Categorical)
+
+    return code_expr, code_null_filter_expr, needed_cols
+
+
 def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.LazyFrame:
     """Extracts a single event dataframe from the raw data.
 
@@ -293,7 +318,6 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
             ...
         ValueError: Source column 'discharge_time' for event column foobar is not numeric or categorical! Cannot be used as an event col.
     """  # noqa: E501
-    df = df
     event_exprs = {"patient_id": pl.col("patient_id")}
 
     if "code" not in event_cfg:
@@ -309,29 +333,14 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
     if "patient_id" in event_cfg:
         raise KeyError("Event column name 'patient_id' cannot be overridden.")
 
-    codes = event_cfg.pop("code")
-    if not isinstance(codes, (list, ListConfig)):
-        logger.debug(
-            f"Event code '{codes}' is a {type(codes)}, not a list. Automatically converting to a list."
-        )
-        codes = [codes]
+    code_expr, code_null_filter_expr, needed_cols = get_code_expr(event_cfg.pop("code"))
 
-    code_exprs = []
-    code_null_filter_expr = None
-    for i, code in enumerate(codes):
-        match code:
-            case str() if is_col_field(code) and parse_col_field(code) in df.schema:
-                code_col = parse_col_field(code)
-                logger.info(f"Extracting code column {code_col}")
-                code_exprs.append(pl.col(code_col).cast(pl.Utf8).fill_null("UNK"))
-                if i == 0:
-                    code_null_filter_expr = pl.col(code_col).is_not_null()
-            case str():
-                logger.info(f"Adding code literate {code}")
-                code_exprs.append(pl.lit(code, dtype=pl.Utf8))
-            case _:
-                raise ValueError(f"Invalid code literal: {code}")
-    event_exprs["code"] = reduce(lambda a, b: a + pl.lit("//") + b, code_exprs).cast(pl.Categorical)
+    for col in needed_cols:
+        if col not in df.schema:
+            raise KeyError(f"Source column '{col}' for event column code not found in DataFrame schema.")
+        logger.info(f"Extracting code column {code_col}")
+
+    event_exprs["code"] = code_expr
 
     ts = event_cfg.pop("timestamp")
     ts_format = event_cfg.pop("timestamp_format", None)

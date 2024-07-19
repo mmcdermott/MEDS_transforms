@@ -3,7 +3,7 @@
 
 import copy
 import random
-from functools import partial, reduce
+from functools import partial
 from pathlib import Path
 
 import hydra
@@ -13,17 +13,79 @@ from omegaconf import DictConfig, OmegaConf
 from omegaconf.listconfig import ListConfig
 
 from MEDS_polars_functions.extract import CONFIG_YAML
+from MEDS_polars_functions.extract.convert_to_sharded_events import get_code_expr
 from MEDS_polars_functions.extract.utils import get_supported_fp
 from MEDS_polars_functions.mapreduce.mapper import rwlock_wrap
-from MEDS_polars_functions.utils import (
-    is_col_field,
-    parse_col_field,
-    stage_init,
-    write_lazyframe,
-)
+from MEDS_polars_functions.utils import stage_init, write_lazyframe
 
 
-def extract_metadata(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.LazyFrame:
+def matcher_to_expr(matcher_cfg: DictConfig | dict) -> tuple[pl.Expr, set[str]]:
+    """TODO."""
+    return pl.all(pl.col(k) == v for k, v in matcher_cfg.items()), set(matcher_cfg.keys())
+
+
+def cfg_to_expr(cfg: str | ListConfig | DictConfig) -> tuple[pl.Expr, set[str]]:
+    """Converts a metadata column configuration object to a Polars expression.
+
+    The input configuration object can take on one of the following formats:
+      - A string literal with no instances of text enclosed in curly braces (e.g., "{foo}"). In this case, the
+        string literal is interpreted to be the _name of a column in the input dataframe_ to extract.
+      - A string literal with instances of text enclosed in curly braces (e.g., "foo{bar}"). In this case, the
+        string is interpreted to be an interpolation pattern, where the text enclosed in curly braces are
+        instances of column names of the input dataframe which will be interpolated into the rest of the
+        string literal, which will be otherwise interpreted as a plain string. If _any_ referenced column is
+        null, it will be dropped.
+      - A dictionary of one of the following formats: Either (a) it has a single key, which is interpreted as
+        a string output column value (either column or interpolation pattern) mapping to a matcher dictionary
+        or it has a "matcher" key which maps to a matcher dictionary and an "output" key which maps to the
+        output the column should take on.
+      - A list of any of the above which are evaluated and coalesced.
+
+    Args:
+        cfg: A configuration object that specifies how to extract a column from the metadata. See above for
+            formatting details.
+
+    Returns:
+        pl.Expr: A Polars expression that extracts the column from the metadata DataFrame.
+        set[str]: The set of input columns needed to form the returned expression.
+
+    Examples:
+        >>> cfg_to_expr("foo")
+        pl.col("foo"), {"foo"}
+    """
+
+    input_col_regex = r"{([^}]+)}"
+    match cfg:
+        case str() if not re.match(input_col_regex, cfg):
+            return pl.col(cfg), {cfg}
+        case str():
+            input_cols = re.findall(input_col_regex, cfg)
+            empty_interp = re.sub(input_col_regex, "{}", cfg)
+            return pl.format(empty_interp, *input_cols), set(input_cols)
+        case dict() | DictConfig:
+            if len(cfg) == 1:
+                out_cfg, matcher_cfg = next(iter(cfg.items()))
+            elif len(cfg) == 2:
+                out_cfg = cfg["output"]
+                matcher_cfg = cfg["matcher"]
+            else:
+                raise ValueError(f"Dictionary configuration must have one or two keys. Got: {cfg}")
+
+            out_expr, out_cols = cfg_to_expr(out_cfg)
+            matcher_expr, matcher_cols = matcher_to_expr(matcher_cfg)
+
+            return pl.when(matcher_expr).then(out_expr), out_cols | matcher_cols
+        case ListConfig() | list() as cfg_fields:
+            component_exprs = []
+            needed_cols = set()
+            for field in cfg_fields:
+                expr, cols = cfg_to_expr(field)
+                component_exprs.append(expr)
+                needed_cols.update(cols)
+            return pl.coalesce(*component_exprs), needed_cols
+
+
+def extract_metadata(metadata_df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.LazyFrame:
     """Extracts a single metadata dataframe block for an event configuration from the raw metadata.
 
     Args:
@@ -79,119 +141,79 @@ def extract_metadata(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.L
         │ FOO//C//3 ┆ C with 3 │
         │ FOO//D//4 ┆ D, but 4 │
         └───────────┴──────────┘
+
+    You can also manipulate the columns in more complex ways when assigning metadata from the input source.
         >>> raw_metadata = pl.DataFrame({
         ...     "code": ["A", "A", "C", "D"],
         ...     "code_modifier": ["1", "1", "2", "3"],
         ...     "code_modifier_2": ["1", "2", "3", "4"],
-        ...     "title": ["A-1-1", "A-1-2", "C-2-3", "D-3-4"],
+        ...     "title": ["A-1-1", "A-1-2", "C-2-3", None],
+        ...     "special_title": ["used", None, None, None],
         ... })
         >>> event_cfg = {
         ...     "code": ["FOO", "col(code)", "col(code_modifier)"],
         ...     "_metadata": {
-        ...         "desc": "title",
-        ...         "parent_code": {
-        ...             "OUT_VAL_1": {"code_modifier_2": 2},
-        ...             "OUT_VAL_2": {"code_modifier_2": 3},
-        ...         },
+        ...         "desc": ["special_title", "title"],
+        ...         "parent_code": [
+        ...             {"OUT_VAL/${code_modifier}/2": {"code_modifier_2": 2}},
+        ...             {"OUT_VAL_for_3/${code_modifier}": {"code_modifier_2": 3}},
+        ...             {
+        ...                 "matcher": {"code_modifier_2": 4},
+        ...                 "output": "expanded form",
+        ...             },
+        ...         ],
         ...     },
         ... }
         >>> extract_metadata(raw_metadata, event_cfg)
         shape: (4, 2)
-        ┌───────────┬───────┬───────────────┐
-        │ code      ┆ desc  ┆ parent_code   │
-        │ ---       ┆ ---   ┆ ---           │
-        │ cat       ┆ str   ┆ str           │
-        ╞═══════════╪═══════╪═══════════════╡
-        │ FOO//A//1 ┆ A-1-1 ┆               │
-        │ FOO//A//1 ┆ A-1-2 ┆ OUT_VAL_1     │
-        │ FOO//C//2 ┆ C-2-3 ┆ OUT_VAL_2     │
-        │ FOO//D//3 ┆ D-3-4 ┆               │
-        └───────────┴───────┴───────────────┘
-    """  # noqa: E501
-    df = df
+        ┌───────────┬───────┬─────────────────┐
+        │ code      ┆ desc  ┆ parent_code     │
+        │ ---       ┆ ---   ┆ ---             │
+        │ cat       ┆ str   ┆ str             │
+        ╞═══════════╪═══════╪═════════════════╡
+        │ FOO//A//1 ┆ used  ┆                 │
+        │ FOO//A//1 ┆ A-1-2 ┆ OUT_VAL/1/2     │
+        │ FOO//C//2 ┆ C-2-3 ┆ OUT_VAL_for_3/2 │
+        │ FOO//D//3 ┆       ┆ expanded form   │
+        └───────────┴───────┴─────────────────┘
+    """
     if "code" not in event_cfg:
         raise KeyError(
             "Event configuration dictionary must contain 'code' key. "
             f"Got: [{', '.join(event_cfg.keys())}]."
         )
-    if "_metadata" not in event_cfg:
+    if "_metadata" not in event_cfg or not event_cfg["_metadata"]:
         raise KeyError(
-            "Event configuration dictionary must contain '_metadata' key. "
+            "Event configuration dictionary must contain a non-empty '_metadata' key. "
             f"Got: [{', '.join(event_cfg.keys())}]."
         )
 
-    codes = event_cfg.pop("code")
-    if not isinstance(codes, (list, ListConfig)):
-        logger.debug(
-            f"Event code '{codes}' is a {type(codes)}, not a list. Automatically converting to a list."
-        )
-        codes = [codes]
+    df_select_exprs = {}
+    needed_cols = set()
+    for out_col, in_cfg in event_cfg["_metadata"].items():
+        in_expr, needed = cfg_to_expr(in_cfg)
+        df_select_exprs[out_col] = in_expr
+        needed_cols.update(needed)
 
-    code_exprs = []
-    code_null_filter_expr = None
-    for i, code in enumerate(codes):
-        match code:
-            case str() if is_col_field(code) and parse_col_field(code) in df.schema:
-                code_col = parse_col_field(code)
-                logger.info(f"Extracting code column {code_col}")
-                code_exprs.append(pl.col(code_col).cast(pl.Utf8).fill_null("UNK"))
-                if i == 0:
-                    code_null_filter_expr = pl.col(code_col).is_not_null()
-            case str():
-                logger.info(f"Adding code literate {code}")
-                code_exprs.append(pl.lit(code, dtype=pl.Utf8))
-            case _:
-                raise ValueError(f"Invalid code literal: {code}")
-    event_exprs["code"] = reduce(lambda a, b: a + pl.lit("//") + b, code_exprs).cast(pl.Categorical)
+    code_expr, _, needed_code_cols = get_code_expr(event_cfg.pop("code"))
 
-    for k, v in event_cfg.items():
-        if not isinstance(v, str):
-            raise ValueError(
-                f"For event column {k}, source column {v} must be a string column name. Got {type(v)}."
-            )
-        elif is_col_field(v):
-            logger.warning(
-                f"Source column '{v}' for event column {k} is always interpreted as a column name. "
-                f"Removing col() function call and setting source column to {parse_col_field(v)}."
-            )
-            v = parse_col_field(v)
+    columns = metadata_df.collect_schema().columns
+    missing_cols = (needed_cols + needed_code_cols) - set(columns)
+    if missing_cols:
+        raise KeyError(f"Columns {missing_cols} not found in metadata columns: {columns}")
 
-        if v not in df.schema:
-            raise KeyError(f"Source column '{v}' for event column {k} not found in DataFrame schema.")
+    for col in needed_code_cols:
+        if col not in df_select_exprs:
+            df_select_exprs[col] = pl.col(col)
 
-        col = pl.col(v)
-        if df.schema[v] == pl.Utf8:
-            col = col.cast(pl.Categorical)
-        elif isinstance(df.schema[v], pl.Categorical):
-            pass
-        elif not df.schema[v].is_numeric():
-            raise ValueError(
-                f"Source column '{v}' for event column {k} is not numeric or categorical! "
-                "Cannot be used as an event col."
-            )
-
-        event_exprs[k] = col
-
-    if code_null_filter_expr is not None:
-        logger.info(f"Filtering out rows with null codes via {code_null_filter_expr}")
-        df = df.filter(code_null_filter_expr)
-    if ts_filter_expr is not None:
-        logger.info(f"Filtering out rows with null timestamps via {ts_filter_expr}")
-        df = df.filter(ts_filter_expr)
-
-    df = df.select(**event_exprs).unique(maintain_order=True)
-
-    # if numerical_value column is not numeric, convert it to float
-    if "numerical_value" in df.columns and not df.schema["numerical_value"].is_numeric():
-        logger.warning(f"Converting numerical_value to float for codes {codes}")
-        df = df.with_columns(pl.col("numerical_value").cast(pl.Float64, strict=False))
-
-    return df
+    return metadata_df.select(**df_select_exprs).with_columns(code=code_expr).unique(maintain_order=True)
 
 
 def get_events_and_metadata_by_metadata_fp(event_configs):
-    """This reformats the event conversion config to map metadata file input prefixes to linked event
-    configs."""
+    """Reformats the event conversion config to map metadata file input prefixes to linked event configs.
+
+    TODO
+    """
 
     raise NotImplementedError("This function is not yet implemented.")
 
