@@ -2,7 +2,10 @@
 """Utilities for extracting code metadata about the codes produced for the MEDS events."""
 
 import copy
+import datetime
 import random
+import re
+import time
 from functools import partial
 from pathlib import Path
 
@@ -96,7 +99,7 @@ def cfg_to_expr(cfg: str | ListConfig | DictConfig) -> tuple[pl.Expr, set[str]]:
             input_cols = re.findall(input_col_regex, cfg)
             empty_interp = re.sub(input_col_regex, "{}", cfg)
             return pl.format(empty_interp, *input_cols), set(input_cols)
-        case dict() | DictConfig:
+        case dict() | DictConfig():
             if len(cfg) == 1:
                 out_cfg, matcher_cfg = next(iter(cfg.items()))
             elif len(cfg) == 2 and set(cfg.keys()) == {"output", "matcher"}:
@@ -319,7 +322,7 @@ def main(cfg: DictConfig):
     partial_metadata_dir.mkdir(parents=True, exist_ok=True)
     OmegaConf.save(event_conversion_cfg, partial_metadata_dir / "event_conversion_config.yaml")
 
-    events_and_metadata_by_metadata_fp = get_events_and_metadata_by_metadata_fp(event_configs)
+    events_and_metadata_by_metadata_fp = get_events_and_metadata_by_metadata_fp(event_conversion_cfg)
     event_metadata_configs = list(events_and_metadata_by_metadata_fp.items())
     random.shuffle(event_metadata_configs)
 
@@ -362,7 +365,7 @@ def main(cfg: DictConfig):
     reducer_fn = partial(pl.concat, how="vertical")
 
     reduced = reducer_fn(*[pl.scan_parquet(fp, glob=False) for fp in all_out_fps])
-    join_cols = ["code", *code_modifier_cols]
+    join_cols = ["code", *cfg.get("code_modifier_cols", [])]
     metadata_cols = [c for c in reduced.columns if c not in join_cols]
     reduced = reduced.group_by(join_cols).agg(*(pl.col(c) for c in metadata_cols)).collect()
 
