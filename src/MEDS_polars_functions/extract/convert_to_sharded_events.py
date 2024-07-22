@@ -15,6 +15,7 @@ from omegaconf import DictConfig, OmegaConf
 from omegaconf.listconfig import ListConfig
 
 from MEDS_polars_functions.extract import CONFIG_YAML
+from MEDS_polars_functions.extract.shard_events import META_KEYS
 from MEDS_polars_functions.mapreduce.mapper import rwlock_wrap
 from MEDS_polars_functions.utils import (
     is_col_field,
@@ -406,6 +407,9 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
             raise ValueError(f"Invalid timestamp literal: {ts}")
 
     for k, v in event_cfg.items():
+        if k in META_KEYS:
+            continue
+
         if not isinstance(v, str):
             raise ValueError(
                 f"For event column {k}, source column {v} must be a string column name. Got {type(v)}."

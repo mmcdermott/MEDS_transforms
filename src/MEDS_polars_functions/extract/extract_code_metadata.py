@@ -21,7 +21,9 @@ from MEDS_polars_functions.mapreduce.mapper import rwlock_wrap
 from MEDS_polars_functions.utils import stage_init, write_lazyframe
 
 
-def extract_metadata(metadata_df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.LazyFrame:
+def extract_metadata(
+    metadata_df: pl.LazyFrame, event_cfg: dict[str, str | None], allowed_codes: list | None = None
+) -> pl.LazyFrame:
     """Extracts a single metadata dataframe block for an event configuration from the raw metadata.
 
     Args:
@@ -77,6 +79,24 @@ def extract_metadata(metadata_df: pl.LazyFrame, event_cfg: dict[str, str | None]
         │ FOO//C//3 ┆ C with 3 │
         │ FOO//D//4 ┆ D, but 4 │
         └───────────┴──────────┘
+        >>> extract_metadata(raw_metadata, event_cfg, allowed_codes=["FOO//A//1", "FOO//C//3"])
+        shape: (2, 2)
+        ┌───────────┬──────────┐
+        │ code      ┆ desc     │
+        │ ---       ┆ ---      │
+        │ cat       ┆ str      │
+        ╞═══════════╪══════════╡
+        │ FOO//A//1 ┆ Code A-1 │
+        │ FOO//C//3 ┆ C with 3 │
+        └───────────┴──────────┘
+        >>> extract_metadata(raw_metadata.drop("code_modifier"), event_cfg)
+        Traceback (most recent call last):
+            ...
+        KeyError: "Columns {'code_modifier'} not found in metadata columns: ['code', 'name', 'priority']"
+        >>> extract_metadata(raw_metadata, ['foo'])
+        Traceback (most recent call last):
+            ...
+        TypeError: Event configuration must be a dictionary. Got: <class 'list'> ['foo'].
 
     You can also manipulate the columns in more complex ways when assigning metadata from the input source.
         >>> raw_metadata = pl.DataFrame({
@@ -112,12 +132,12 @@ def extract_metadata(metadata_df: pl.LazyFrame, event_cfg: dict[str, str | None]
         │ FOO//C//2 ┆ C-2-3 ┆ OUT_VAL_for_3/2 │
         │ FOO//D//3 ┆ null  ┆ expanded form   │
         └───────────┴───────┴─────────────────┘
-        >>> extract_metadata(raw_metadata.drop("code_modifier"), event_cfg) # doctest: +NORMALIZE_WHITESPACE
-        Traceback (most recent call last):
-            ...
-        KeyError: "Columns {'code_modifier'} not found in metadata columns:
-            ['code', 'code_modifier_2', 'title', 'special_title']"
     """
+    event_cfg = copy.deepcopy(event_cfg)
+
+    if not isinstance(event_cfg, (dict, DictConfig)):
+        raise TypeError(f"Event configuration must be a dictionary. Got: {type(event_cfg)} {event_cfg}.")
+
     if "code" not in event_cfg:
         raise KeyError(
             "Event configuration dictionary must contain 'code' key. "
@@ -128,8 +148,6 @@ def extract_metadata(metadata_df: pl.LazyFrame, event_cfg: dict[str, str | None]
             "Event configuration dictionary must contain a non-empty '_metadata' key. "
             f"Got: [{', '.join(event_cfg.keys())}]."
         )
-
-    event_cfg = copy.deepcopy(event_cfg)
 
     df_select_exprs = {}
     final_cols = []
@@ -151,12 +169,12 @@ def extract_metadata(metadata_df: pl.LazyFrame, event_cfg: dict[str, str | None]
         if col not in df_select_exprs:
             df_select_exprs[col] = pl.col(col)
 
-    return (
-        metadata_df.select(**df_select_exprs)
-        .with_columns(code=code_expr)
-        .unique(maintain_order=True)
-        .select("code", *final_cols)
-    )
+    metadata_df = metadata_df.select(**df_select_exprs).with_columns(code=code_expr)
+
+    if allowed_codes:
+        metadata_df = metadata_df.filter(pl.col("code").is_in(allowed_codes))
+
+    return metadata_df.unique(maintain_order=True).select("code", *final_cols)
 
 
 def get_events_and_metadata_by_metadata_fp(event_configs: dict | DictConfig) -> dict[str, dict[str, dict]]:
@@ -172,6 +190,7 @@ def get_events_and_metadata_by_metadata_fp(event_configs: dict | DictConfig) -> 
     Examples:
         >>> event_configs = {
         ...     "icu/procedureevents": {
+        ...         "patient_id_col": "subject_id",
         ...         "start": {
         ...             "code": ["PROCEDURE", "START", "col(itemid)"],
         ...             "_metadata": {
@@ -223,7 +242,10 @@ def get_events_and_metadata_by_metadata_fp(event_configs: dict | DictConfig) -> 
     out = {}
 
     for event_cfgs_for_pfx in event_configs.values():
-        for event_cfg in event_cfgs_for_pfx.values():
+        for event_key, event_cfg in event_cfgs_for_pfx.items():
+            if event_key == "patient_id_col":
+                continue
+
             for metadata_pfx, metadata_cfg in event_cfg.get("_metadata", {}).items():
                 if metadata_pfx not in out:
                     out[metadata_pfx] = []
