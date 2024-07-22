@@ -190,19 +190,39 @@ def get_events_and_metadata_by_metadata_fp(event_configs: dict | DictConfig) -> 
         ...     },
         ... }
         >>> get_events_and_metadata_by_metadata_fp(event_configs) # doctest: +NORMALIZE_WHITESPACE
-        {"proc_datetimeevents": [{"code": ["PROCEDURE", "START", "col(itemid)"],
-                                  "_metadata": {"desc": ["omop_concept_name", "label"]}},
-                                 {"code": ["PROCEDURE", "END", "col(itemid)"],
-                                  "_metadata": {"desc": ["omop_concept_name", "label"]}}],
-         "proc_itemid":         [{"code": ["PROCEDURE", "START", "col(itemid)"],
-                                  "_metadata": {"desc": ["omop_concept_name", "label"]}},
-                                 {"code": ["PROCEDURE", "END", "col(itemid)"],
-                                  "_metadata": {"desc": ["omop_concept_name", "label"]}}],
-         "inputevents_to_rxnorm": [{"code": ["INFUSION", "col(itemid)"],
-                                    "_metadata": {"desc": "{label}", "itemid": "{foo}"}}]}
+        {'proc_datetimeevents': [{'code': ['PROCEDURE', 'START', 'col(itemid)'],
+                                  '_metadata': {'desc': ['omop_concept_name', 'label']}},
+                                 {'code': ['PROCEDURE', 'END', 'col(itemid)'],
+                                  '_metadata': {'desc': ['omop_concept_name', 'label']}}],
+         'proc_itemid':         [{'code': ['PROCEDURE', 'START', 'col(itemid)'],
+                                  '_metadata': {'desc': ['omop_concept_name', 'label']}},
+                                 {'code': ['PROCEDURE', 'END', 'col(itemid)'],
+                                  '_metadata': {'desc': ['omop_concept_name', 'label']}}],
+         'inputevents_to_rxnorm': [{'code': ['INFUSION', 'col(itemid)'],
+                                    '_metadata': {'desc': '{label}', 'itemid': '{foo}'}}]}
+        >>> no_metadata_event_configs = {
+        ...     "icu/procedureevents": {
+        ...         "start": {"code": ["PROCEDURE", "START", "col(itemid)"]},
+        ...         "end": {"code": ["PROCEDURE", "END", "col(itemid)"]},
+        ...     },
+        ...     "icu/inputevents": {
+        ...         "event": {"code": ["INFUSION", "col(itemid)"]},
+        ...     },
+        ... }
+        >>> get_events_and_metadata_by_metadata_fp(no_metadata_event_configs)
+        {}
     """
 
-    raise NotImplementedError("This function is not yet implemented.")
+    out = {}
+
+    for event_cfgs_for_pfx in event_configs.values():
+        for event_cfg in event_cfgs_for_pfx.values():
+            for metadata_pfx, metadata_cfg in event_cfg.get("_metadata", {}).items():
+                if metadata_pfx not in out:
+                    out[metadata_pfx] = []
+                out[metadata_pfx].append({"code": event_cfg["code"], "_metadata": metadata_cfg})
+
+    return out
 
 
 @hydra.main(version_base=None, config_path=str(CONFIG_YAML.parent), config_name=CONFIG_YAML.stem)
