@@ -166,11 +166,8 @@ class ColExprType(StrEnum):
             ValueError: If the column expression type is invalid.
 
         Examples:
-            >>> expr, cols = ColExprType.to_pl_expr(ColExprType.COL, "foo")
-            >>> print(expr)
-            col("foo")
-            >>> cols
-            {'foo'}
+            >>> print(*ColExprType.to_pl_expr(ColExprType.COL, "foo"))
+            col("foo") {'foo'}
             >>> expr, cols = ColExprType.to_pl_expr(ColExprType.STR, "bar//{foo}//{baz}")
             >>> print(expr)
             String(bar//).str.concat_horizontal([col("foo"), String(//), col("baz")])
