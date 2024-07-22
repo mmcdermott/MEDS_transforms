@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 import gzip
 import warnings
+from collections.abc import Callable
 from enum import StrEnum
 from pathlib import Path
+from typing import TypeVar
 
 import polars as pl
 from loguru import logger
-
 
 
 class SupportedFileFormats(StrEnum):

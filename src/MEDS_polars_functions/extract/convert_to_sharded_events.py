@@ -338,7 +338,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
     for col in needed_cols:
         if col not in df.schema:
             raise KeyError(f"Source column '{col}' for event column code not found in DataFrame schema.")
-        logger.info(f"Extracting code column {code_col}")
+        logger.info(f"Extracting column {col}")
 
     event_exprs["code"] = code_expr
 
@@ -405,7 +405,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
 
     # if numerical_value column is not numeric, convert it to float
     if "numerical_value" in df.columns and not df.schema["numerical_value"].is_numeric():
-        logger.warning(f"Converting numerical_value to float for codes {codes}")
+        logger.warning(f"Converting numerical_value to float for {code_expr}")
         df = df.with_columns(pl.col("numerical_value").cast(pl.Float64, strict=False))
 
     return df

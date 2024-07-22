@@ -4,7 +4,6 @@
 import copy
 import datetime
 import random
-import re
 import time
 from functools import partial
 from pathlib import Path
@@ -13,118 +12,13 @@ import hydra
 import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
-from omegaconf.listconfig import ListConfig
 
 from MEDS_polars_functions.extract import CONFIG_YAML
 from MEDS_polars_functions.extract.convert_to_sharded_events import get_code_expr
+from MEDS_polars_functions.extract.parser import cfg_to_expr
 from MEDS_polars_functions.extract.utils import get_supported_fp
 from MEDS_polars_functions.mapreduce.mapper import rwlock_wrap
 from MEDS_polars_functions.utils import stage_init, write_lazyframe
-
-
-def matcher_to_expr(matcher_cfg: DictConfig | dict) -> tuple[pl.Expr, set[str]]:
-    """Returns an expression and the necessary columns to match a collection of key-value pairs.
-
-    Currently, this only supports checking for equality between column names and values.
-    TODO: Expand (as needed only) to support other types of matchers.
-
-    Args:
-        matcher_cfg: A dictionary of key-value pairs to match against.
-
-    Raises:
-        ValueError: If the matcher configuration is not a dictionary.
-
-    Returns:
-        pl.Expr: A Polars expression that matches the key-value pairs in the input dictionary.
-        set[str]: The set of input columns needed to form the returned expression.
-
-    Examples:
-        >>> matcher_to_expr({"foo": "bar"})
-        pl.all(pl.col("foo") == "bar"), {"foo"}
-        >>> matcher_to_expr({"foo": "bar", "buzz": "baz"})
-        pl.all(pl.col("foo") == "bar", pl.col("buzz") == "baz"), {"foo", "buzz"}
-        >>> matcher_to_expr(["foo", "bar"])
-        Traceback (most recent call last):
-            ...
-        ValueError: Matcher configuration must be a dictionary. Got: ['foo', 'bar']
-    """
-    if not isinstance(matcher_cfg, dict):
-        raise ValueError(f"Matcher configuration must be a dictionary. Got: {matcher_cfg}")
-
-    return pl.all(pl.col(k) == v for k, v in matcher_cfg.items()), set(matcher_cfg.keys())
-
-
-def cfg_to_expr(cfg: str | ListConfig | DictConfig) -> tuple[pl.Expr, set[str]]:
-    """Converts a metadata column configuration object to a Polars expression.
-
-    The input configuration object can take on one of the following formats:
-      - A string. In this case, the string is interpreted to be an interpolation pattern, where text enclosed
-        in curly braces are instances of column names of the input dataframe which will be interpolated into
-        the rest of the string literal, which will be otherwise interpreted as a plain string. If _any_
-        referenced column is null, it will be dropped.
-      - A dictionary of one of the following formats: Either (a) it has a single key, which is interpreted as
-        a string output column value (either column or interpolation pattern) mapping to a matcher dictionary
-        or it has a "matcher" key which maps to a matcher dictionary and an "output" key which maps to the
-        output the column should take on.
-      - A list of any of the above which are evaluated and coalesced.
-
-    Args:
-        cfg: A configuration object that specifies how to extract a column from the metadata. See above for
-            formatting details.
-
-    Returns:
-        pl.Expr: A Polars expression that extracts the column from the metadata DataFrame.
-        set[str]: The set of input columns needed to form the returned expression.
-
-    Examples:
-        >>> cfg_to_expr("foo")
-        pl.lit("foo"), {}
-        >>> cfg_to_expr("bar//{foo}")
-        "bar//" + pl.col("foo"), {"foo"}
-        >>> cfg_to_expr({"output": "foo", "matcher": {"bar": "baz"}})
-        pl.when(pl.col("bar") == "baz").then(pl.lit("foo")), {"bar"}
-        >>> cfg_to_expr(["bar//{foo}", "bar//UNK"])
-        pl.coalesce("bar//" + pl.col("foo"), "bar//UNK"), {"foo"}
-        >>> cfg_to_expr({"foo": "bar", "buzz": "baz", "fuzz": "fizz"})
-        Traceback (most recent call last):
-            ...
-        ValueError: Dictionary configuration must have one or two keys. Got: {'foo': 'bar'}
-    """
-
-    input_col_regex = r"{([^}]+)}"
-    match cfg:
-        case str() if not re.match(input_col_regex, cfg):
-            return pl.lit(cfg, dtype=pl.Utf8), set()
-        case str():
-            input_cols = re.findall(input_col_regex, cfg)
-            empty_interp = re.sub(input_col_regex, "{}", cfg)
-            return pl.format(empty_interp, *input_cols), set(input_cols)
-        case dict() | DictConfig():
-            if len(cfg) == 1:
-                out_cfg, matcher_cfg = next(iter(cfg.items()))
-            elif len(cfg) == 2 and set(cfg.keys()) == {"output", "matcher"}:
-                out_cfg = cfg["output"]
-                matcher_cfg = cfg["matcher"]
-            else:
-                raise ValueError(
-                    "Dictionary configuration must be either an output mapping to a matcher or have "
-                    f"only two keys: 'output' and 'matcher'. Got: {cfg}"
-                )
-
-            matcher_expr, matcher_cols = matcher_to_expr(matcher_cfg)
-            out_expr, out_cols = cfg_to_expr(out_cfg)
-
-            return pl.when(matcher_expr).then(out_expr), out_cols | matcher_cols
-        case ListConfig() | list() as cfg_fields:
-            component_exprs = []
-            needed_cols = set()
-            for field in cfg_fields:
-                expr, cols = cfg_to_expr(field)
-                component_exprs.append(expr)
-                needed_cols.update(cols)
-            return pl.coalesce(*component_exprs), needed_cols
-        case _:
-            raise ValueError(f"Invalid configuration object: {cfg}")
 
 
 def extract_metadata(metadata_df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.LazyFrame:
@@ -160,7 +54,7 @@ def extract_metadata(metadata_df: pl.LazyFrame, event_cfg: dict[str, str | None]
         >>> extract_metadata(pl.DataFrame(), {"code": "test"})
         Traceback (most recent call last):
             ...
-        KeyError: "Event configuration dictionary must contain '_metadata' key. Got: [code]."
+        KeyError: "Event configuration dictionary must contain a non-empty '_metadata' key. Got: [code]."
         >>> raw_metadata = pl.DataFrame({
         ...     "code": ["A", "B", "C", "D"],
         ...     "code_modifier": ["1", "2", "3", "4"],
@@ -197,26 +91,26 @@ def extract_metadata(metadata_df: pl.LazyFrame, event_cfg: dict[str, str | None]
         ...     "_metadata": {
         ...         "desc": ["special_title", "title"],
         ...         "parent_code": [
-        ...             {"OUT_VAL/${code_modifier}/2": {"code_modifier_2": 2}},
-        ...             {"OUT_VAL_for_3/${code_modifier}": {"code_modifier_2": 3}},
+        ...             {"OUT_VAL/{code_modifier}/2": {"code_modifier_2": "2"}},
+        ...             {"OUT_VAL_for_3/{code_modifier}": {"code_modifier_2": "3"}},
         ...             {
-        ...                 "matcher": {"code_modifier_2": 4},
-        ...                 "output": "expanded form",
+        ...                 "matcher": {"code_modifier_2": "4"},
+        ...                 "output": {"literal": "expanded form"},
         ...             },
         ...         ],
         ...     },
         ... }
         >>> extract_metadata(raw_metadata, event_cfg)
-        shape: (4, 2)
+        shape: (4, 3)
         ┌───────────┬───────┬─────────────────┐
         │ code      ┆ desc  ┆ parent_code     │
         │ ---       ┆ ---   ┆ ---             │
         │ cat       ┆ str   ┆ str             │
         ╞═══════════╪═══════╪═════════════════╡
-        │ FOO//A//1 ┆ used  ┆                 │
+        │ FOO//A//1 ┆ used  ┆ null            │
         │ FOO//A//1 ┆ A-1-2 ┆ OUT_VAL/1/2     │
         │ FOO//C//2 ┆ C-2-3 ┆ OUT_VAL_for_3/2 │
-        │ FOO//D//3 ┆       ┆ expanded form   │
+        │ FOO//D//3 ┆ null  ┆ expanded form   │
         └───────────┴───────┴─────────────────┘
     """
     if "code" not in event_cfg:
@@ -231,16 +125,18 @@ def extract_metadata(metadata_df: pl.LazyFrame, event_cfg: dict[str, str | None]
         )
 
     df_select_exprs = {}
+    final_cols = []
     needed_cols = set()
     for out_col, in_cfg in event_cfg["_metadata"].items():
         in_expr, needed = cfg_to_expr(in_cfg)
         df_select_exprs[out_col] = in_expr
+        final_cols.append(out_col)
         needed_cols.update(needed)
 
     code_expr, _, needed_code_cols = get_code_expr(event_cfg.pop("code"))
 
-    columns = metadata_df.collect_schema().columns
-    missing_cols = (needed_cols + needed_code_cols) - set(columns)
+    columns = metadata_df.collect_schema().names()
+    missing_cols = (needed_cols | needed_code_cols) - set(columns)
     if missing_cols:
         raise KeyError(f"Columns {missing_cols} not found in metadata columns: {columns}")
 
@@ -248,7 +144,12 @@ def extract_metadata(metadata_df: pl.LazyFrame, event_cfg: dict[str, str | None]
         if col not in df_select_exprs:
             df_select_exprs[col] = pl.col(col)
 
-    return metadata_df.select(**df_select_exprs).with_columns(code=code_expr).unique(maintain_order=True)
+    return (
+        metadata_df.select(**df_select_exprs)
+        .with_columns(code=code_expr)
+        .unique(maintain_order=True)
+        .select("code", *final_cols)
+    )
 
 
 def get_events_and_metadata_by_metadata_fp(event_configs: dict | DictConfig) -> dict[str, dict[str, dict]]:
