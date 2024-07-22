@@ -112,6 +112,11 @@ def extract_metadata(metadata_df: pl.LazyFrame, event_cfg: dict[str, str | None]
         │ FOO//C//2 ┆ C-2-3 ┆ OUT_VAL_for_3/2 │
         │ FOO//D//3 ┆ null  ┆ expanded form   │
         └───────────┴───────┴─────────────────┘
+        >>> extract_metadata(raw_metadata.drop("code_modifier"), event_cfg) # doctest: +NORMALIZE_WHITESPACE
+        Traceback (most recent call last):
+            ...
+        KeyError: "Columns {'code_modifier'} not found in metadata columns:
+            ['code', 'code_modifier_2', 'title', 'special_title']"
     """
     if "code" not in event_cfg:
         raise KeyError(
@@ -123,6 +128,8 @@ def extract_metadata(metadata_df: pl.LazyFrame, event_cfg: dict[str, str | None]
             "Event configuration dictionary must contain a non-empty '_metadata' key. "
             f"Got: [{', '.join(event_cfg.keys())}]."
         )
+
+    event_cfg = copy.deepcopy(event_cfg)
 
     df_select_exprs = {}
     final_cols = []
