@@ -56,58 +56,68 @@ def get_supported_fp(root_dir: Path, file_prefix: str | Path) -> tuple[Path, Cal
         >>> from tempfile import TemporaryDirectory
         >>> df = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]}, schema={"a": pl.UInt8, "b": pl.Int64})
         >>> with TemporaryDirectory() as tmpdir:
-        ...     fp = Path(tmpdir) / "test.csv"
+        ...     tmpdir = Path(tmpdir)
+        ...     fp = tmpdir / "test.csv"
         ...     df.write_csv(fp)
-        ...     scan_with_row_idx(fp, columns=["a"], infer_schema_length=40).collect()
-        shape: (3, 2)
-        ┌─────────────┬─────┐
-        │ __row_idx__ ┆ a   │
-        │ ---         ┆ --- │
-        │ u32         ┆ i64 │
-        ╞═════════════╪═════╡
-        │ 0           ┆ 1   │
-        │ 1           ┆ 2   │
-        │ 2           ┆ 3   │
-        └─────────────┴─────┘
+        ...     fp, reader = get_supported_fp(tmpdir, "test")
+        ...     print(str(fp.relative_to(tmpdir)), reader(fp).collect())
+        test.csv shape: (3, 2)
+        ┌─────┬─────┐
+        │ a   ┆ b   │
+        │ --- ┆ --- │
+        │ i64 ┆ i64 │
+        ╞═════╪═════╡
+        │ 1   ┆ 4   │
+        │ 2   ┆ 5   │
+        │ 3   ┆ 6   │
+        └─────┴─────┘
         >>> with TemporaryDirectory() as tmpdir:
-        ...     fp = Path(tmpdir) / "test.parquet"
+        ...     tmpdir = Path(tmpdir)
+        ...     fp = tmpdir / "test.parquet"
+        ...     csv_fp = tmpdir / "test.csv"
         ...     df.write_parquet(fp)
-        ...     scan_with_row_idx(fp, columns=["a", "b"], infer_schema_length=40).collect()
-        shape: (3, 3)
-        ┌─────────────┬─────┬─────┐
-        │ __row_idx__ ┆ a   ┆ b   │
-        │ ---         ┆ --- ┆ --- │
-        │ u32         ┆ u8  ┆ i64 │
-        ╞═════════════╪═════╪═════╡
-        │ 0           ┆ 1   ┆ 4   │
-        │ 1           ┆ 2   ┆ 5   │
-        │ 2           ┆ 3   ┆ 6   │
-        └─────────────┴─────┴─────┘
+        ...     df.write_csv(csv_fp)
+        ...     fp, reader = get_supported_fp(tmpdir, "test")
+        ...     print(str(fp.relative_to(tmpdir)), reader(fp).collect())
+        test.parquet shape: (3, 2)
+        ┌─────┬─────┐
+        │ a   ┆ b   │
+        │ --- ┆ --- │
+        │ u8  ┆ i64 │
+        ╞═════╪═════╡
+        │ 1   ┆ 4   │
+        │ 2   ┆ 5   │
+        │ 3   ┆ 6   │
+        └─────┴─────┘
         >>> import gzip
         >>> with TemporaryDirectory() as tmpdir:
-        ...     fp = Path(tmpdir) / "test.csv.gz"
+        ...     tmpdir = Path(tmpdir)
+        ...     fp = tmpdir / "test.csv.gz"
         ...     with gzip.open(fp, mode="wb") as f:
         ...         with warnings.catch_warnings():
         ...             warnings.simplefilter("ignore", category=UserWarning)
         ...             df.write_csv(f)
-        ...     scan_with_row_idx(fp, columns=["b"]).collect()
-        shape: (3, 2)
-        ┌─────────────┬─────┐
-        │ __row_idx__ ┆ b   │
-        │ ---         ┆ --- │
-        │ u32         ┆ i64 │
-        ╞═════════════╪═════╡
-        │ 0           ┆ 4   │
-        │ 1           ┆ 5   │
-        │ 2           ┆ 6   │
-        └─────────────┴─────┘
+        ...     fp, reader = get_supported_fp(tmpdir, "test")
+        ...     print(str(fp.relative_to(tmpdir)), reader(fp).collect())
+        test.csv.gz shape: (3, 2)
+        ┌─────┬─────┐
+        │ a   ┆ b   │
+        │ --- ┆ --- │
+        │ i64 ┆ i64 │
+        ╞═════╪═════╡
+        │ 1   ┆ 4   │
+        │ 2   ┆ 5   │
+        │ 3   ┆ 6   │
+        └─────┴─────┘
         >>> with TemporaryDirectory() as tmpdir:
-        ...     fp = Path(tmpdir) / "test.json"
+        ...     tmpdir = Path(tmpdir)
+        ...     fp = tmpdir / "test.json"
         ...     df.write_json(fp)
-        ...     scan_with_row_idx(fp, columns=["a", "b"])
+        ...     get_supported_fp(tmpdir, "test") # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
-        ValueError: Unsupported file type: .json
+        FileNotFoundError: No files found with prefix: test and allowed suffixes:
+            ['.parquet', '.csv.gz', '.csv']
     """
 
     for suffix in list(SupportedFileFormats):
@@ -115,3 +125,7 @@ def get_supported_fp(root_dir: Path, file_prefix: str | Path) -> tuple[Path, Cal
         if fp.exists():
             logger.debug(f"Found file: {str(fp.resolve())}")
             return fp, READERS[suffix]
+    raise FileNotFoundError(
+        f"No files found with prefix: {file_prefix} and allowed suffixes: "
+        f"{[x.value for x in SupportedFileFormats]}"
+    )

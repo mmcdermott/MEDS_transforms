@@ -30,9 +30,52 @@ def in_format(fmt: str, ts_name: str) -> pl.Expr:
 
 
 def get_code_expr(code_field: str | list | ListConfig) -> tuple[pl.Expr, pl.Expr | None, set[str]]:
-    """TODO."""
+    """Converts the code field in an event config file to a polars expression, null filter, and column set.
+
+    Args:
+        code_field: The string or list representation of the code field in the event configuration file.
+
+    Returns:
+        pl.Expr: The polars expression representing the code field.
+        pl.Expr | None: The null filter expression for the code field.
+        set[str]: The set of columns needed to construct the code field.
+
+    Raises:
+        ValueError: If the code field is not a valid type.
+
+    Examples:
+        >>> print(*get_code_expr("A")) # doctest: +NORMALIZE_WHITESPACE
+        String(A).strict_cast(String).strict_cast(Categorical(None, Physical))
+        None
+        set()
+        >>> print(*get_code_expr("col(B)")) # doctest: +NORMALIZE_WHITESPACE
+        col("B").strict_cast(String).fill_null([String(UNK)]).strict_cast(Categorical(None, Physical))
+        col("B").is_not_null()
+        {'B'}
+        >>> print(*get_code_expr(["col(A)", "B"])) # doctest: +NORMALIZE_WHITESPACE
+        [([(col("A").strict_cast(String).fill_null([String(UNK)])) + (String(//))]) +
+           (String(B).strict_cast(String))].strict_cast(Categorical(None, Physical))
+        col("A").is_not_null()
+        {'A'}
+        >>> get_code_expr(34)
+        Traceback (most recent call last):
+            ...
+        ValueError: Invalid code field: 34
+
+    Note that it only takes the first column field for the null filter, not all of them.
+        >>> expr, null_filter, cols = get_code_expr(["col(A)", "col(c)"])
+        >>> print(expr) # doctest: +NORMALIZE_WHITESPACE
+        [([(col("A").strict_cast(String).fill_null([String(UNK)])) + (String(//))]) +
+           (col("c").strict_cast(String).fill_null([String(UNK)]))].strict_cast(Categorical(None, Physical))
+        >>> print(null_filter)
+        col("A").is_not_null()
+        >>> print(sorted(cols))
+        ['A', 'c']
+    """
     if isinstance(code_field, str):
         code_field = [code_field]
+    elif not isinstance(code_field, (list, ListConfig)):
+        raise ValueError(f"Invalid code field: {code_field}")
 
     code_exprs = []
     code_null_filter_expr = None
@@ -293,10 +336,6 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         Traceback (most recent call last):
             ..".
         KeyError: "Event configuration dictionary must contain 'timestamp' key. Got: [code, value]."
-        >>> extract_event(complex_raw_data, {"code": 34, "timestamp": "col(admission_time)"})
-        Traceback (most recent call last):
-            ...
-        ValueError: Invalid code literal: 34
         >>> extract_event(complex_raw_data, {"code": "test", "timestamp": "12-01-23"})
         Traceback (most recent call last):
             ...
