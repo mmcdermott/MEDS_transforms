@@ -177,6 +177,56 @@ def extract_metadata(
     return metadata_df.unique(maintain_order=True).select("code", *final_cols)
 
 
+def extract_all_metadata(
+    metadata_df: pl.LazyFrame, event_cfgs: list[dict], allowed_codes: list | None = None
+) -> pl.LazyFrame:
+    """Extracts all metadata for a list of event configurations.
+
+    Args:
+        metadata_df: The raw metadata DataFrame. Mandatory columns are determined by the `event_cfg`
+            configurations.
+        event_cfgs: A list of event configuration dictionaries. Each dictionary must contain the code
+            and metadata elements.
+        allowed_codes: A list of codes to allow in the output metadata. If None, all codes are allowed.
+
+    Returns:
+        A unified DF containing all metadata for all event configurations.
+
+    Examples:
+        >>> raw_metadata = pl.DataFrame({
+        ...     "code": ["A", "B", "C", "D"],
+        ...     "code_modifier": ["1", "2", "3", "4"],
+        ...     "name": ["Code A-1", "B-2", "C with 3", "D, but 4"],
+        ...     "priority": [1, 2, 3, 4],
+        ... })
+        >>> event_cfg_1 = {
+        ...     "code": ["FOO", "col(code)", "col(code_modifier)"],
+        ...     "_metadata": {"desc": "name"},
+        ... }
+        >>> event_cfg_2 = {
+        ...     "code": ["BAR", "col(code)", "col(code_modifier)"],
+        ...     "_metadata": {"desc2": "name"},
+        ... }
+        >>> event_cfgs = [event_cfg_1, event_cfg_2]
+        >>> extract_all_metadata(raw_metadata, event_cfgs, allowed_codes=["FOO//A//1", "BAR//B//2"])
+        shape: (2, 3)
+        ┌───────────┬──────────┬───────┐
+        │ code      ┆ desc     ┆ desc2 │
+        │ ---       ┆ ---      ┆ ---   │
+        │ cat       ┆ str      ┆ str   │
+        ╞═══════════╪══════════╪═══════╡
+        │ FOO//A//1 ┆ Code A-1 ┆ null  │
+        │ BAR//B//2 ┆ null     ┆ B-2   │
+        └───────────┴──────────┴───────┘
+    """
+
+    all_metadata = []
+    for event_cfg in event_cfgs:
+        all_metadata.append(extract_metadata(metadata_df, event_cfg, allowed_codes=allowed_codes))
+
+    return pl.concat(all_metadata, how="diagonal_relaxed").unique(maintain_order=True)
+
+
 def get_events_and_metadata_by_metadata_fp(event_configs: dict | DictConfig) -> dict[str, dict[str, dict]]:
     """Reformats the event conversion config to map metadata file input prefixes to linked event configs.
 
@@ -293,7 +343,7 @@ def main(cfg: DictConfig):
         out_fp = partial_metadata_dir / f"{input_prefix}.parquet"
         logger.info(f"Extracting metadata from {metadata_fp} and saving to {out_fp}")
 
-        compute_fn = partial(extract_metadata, event_cfg=event_metadata_cfgs, allowed_codes=all_codes)
+        compute_fn = partial(extract_all_metadata, event_cfgs=event_metadata_cfgs, allowed_codes=all_codes)
 
         rwlock_wrap(metadata_fp, out_fp, read_fn, write_lazyframe, compute_fn, do_overwrite=cfg.do_overwrite)
         all_out_fps.append(out_fp)
