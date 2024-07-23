@@ -112,7 +112,7 @@ class ColExprType(StrEnum):
     LITERAL = "literal"
 
     @classmethod
-    def is_valid(cls, expr_dict: dict[ColExprType, Any]) -> bool:
+    def is_valid(cls, expr_dict: dict[ColExprType, Any]) -> tuple[bool, str | None]:
         """Checks if a dictionary of expression key to value is a valid column expression.
 
         Args:
@@ -120,35 +120,51 @@ class ColExprType(StrEnum):
 
         Returns:
             bool: True if the input is a valid column expression, False otherwise.
+            str | None: The reason the input is invalid, if it is invalid.
 
         Examples:
             >>> ColExprType.is_valid({"col": "foo"})
-            True
+            (True, None)
+            >>> ColExprType.is_valid({"col": 32})
+            (False, 'Column expressions must have a string value. Got 32')
             >>> ColExprType.is_valid({ColExprType.STR: "bar//{foo}"})
-            True
+            (True, None)
+            >>> ColExprType.is_valid({ColExprType.STR: ["bar//{foo}"]})
+            (False, "String interpolation expressions must have a string value. Got ['bar//{foo}']")
             >>> ColExprType.is_valid({"literal": ["baz", 32]})
-            True
-            >>> ColExprType.is_valid({"col": "foo", "str": "bar"})
-            False
+            (True, None)
+            >>> ColExprType.is_valid({"col": "foo", "str": "bar"}) # doctest: +NORMALIZE_WHITESPACE
+            (False, "Column expressions can only contain a single key-value pair.
+                    Got {'col': 'foo', 'str': 'bar'}")
             >>> ColExprType.is_valid({"foo": "bar"})
-            False
+            (False, "Column expressions must have a key in ColExprType: ['col', 'str', 'literal']. Got foo")
             >>> ColExprType.is_valid([("col", "foo")])
-            False
+            (False, "Column expressions must be a dictionary. Got [('col', 'foo')]")
         """
 
-        if not isinstance(expr_dict, dict) or len(expr_dict) != 1:
-            return False
+        if not isinstance(expr_dict, dict):
+            return False, f"Column expressions must be a dictionary. Got {expr_dict}"
+        if len(expr_dict) != 1:
+            return False, f"Column expressions can only contain a single key-value pair. Got {expr_dict}"
 
         expr_type, expr_val = next(iter(expr_dict.items()))
         match expr_type:
+            case cls.COL if isinstance(expr_val, str):
+                return True, None
             case cls.COL:
-                return isinstance(expr_val, str)
+                return False, f"Column expressions must have a string value. Got {expr_val}"
+            case cls.STR if isinstance(expr_val, str):
+                return True, None
             case cls.STR:
-                return isinstance(expr_val, str)
+                return False, f"String interpolation expressions must have a string value. Got {expr_val}"
             case cls.LITERAL:
-                return True
+                return True, None
             case _:
-                return False
+                return (
+                    False,
+                    f"Column expressions must have a key in ColExprType: {[x.value for x in cls]}. Got "
+                    f"{expr_type}",
+                )
 
     @classmethod
     def to_pl_expr(cls, expr_type: ColExprType, expr_val: Any) -> tuple[pl.Expr, set[str]]:
@@ -180,9 +196,14 @@ class ColExprType(StrEnum):
             ['foo', 'bar']
             >>> cols
             set()
+            >>> ColExprType.to_pl_expr(ColExprType.COL, 32)
+            Traceback (most recent call last):
+                ...
+            ValueError: ...
         """
-        if not cls.is_valid({expr_type: expr_val}):
-            raise ValueError("Invalid column expression")
+        is_valid, err_msg = cls.is_valid({expr_type: expr_val})
+        if not is_valid:
+            raise ValueError(err_msg)
 
         match expr_type:
             case cls.COL:
@@ -218,26 +239,50 @@ def parse_col_expr(cfg: str | list | dict[str, str] | ListConfig | DictConfig) -
         {'literal': ['foo', 'bar']}
         >>> parse_col_expr({"output": "foo", "matcher": {"bar": "baz"}})
         {'output': {'col': 'foo'}, 'matcher': {'bar': 'baz'}}
+        >>> parse_col_expr({"output": "foo", "matcher": {32: "baz"}}) # doctest: +NORMALIZE_WHITESPACE
+        Traceback (most recent call last):
+            ...
+        ValueError: A pre-specified output/matcher configuration must have a valid matcher dictionary,
+                    which is a dictionary with string-type keys. Got cfg['matcher']={32: 'baz'}
         >>> parse_col_expr({"foo": {"bar": "baz"}})
         {'output': {'col': 'foo'}, 'matcher': {'bar': 'baz'}}
+        >>> parse_col_expr({"foo": {32: "baz"}}) # doctest: +NORMALIZE_WHITESPACE
+        Traceback (most recent call last):
+            ...
+        ValueError: A simple-form conditional expression is expressed with a single key-value pair dict,
+                    where the key is not a column expression type and the value is a valid matcher dict,
+                    which is a dictionary with string-type keys. This config has a single key-value pair
+                    with key foo but an invalid matcher: {32: 'baz'}
         >>> parse_col_expr(["bar//{foo}", {"str": "bar//UNK"}])
         [{'str': 'bar//{foo}'}, {'str': 'bar//UNK'}]
-        >>> parse_col_expr({"foo": "bar", "buzz": "baz", "fuzz": "fizz"})
+        >>> parse_col_expr({"foo": "bar", "buzz": "baz", "fuzz": "fizz"}) # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
-        ValueError: Invalid column expression
-        >>> parse_col_expr([["foo", "bar"], "bar//{foo}"])
+        ValueError: Dictionary column expression must either be explicit output/matcher configs, with two
+                    keys, 'output' and 'matcher' with a valid matcher dictionary, or a simple column
+                    expression with a single key-value pair where the key is a column expression type, or a
+                    simple-form conditional expression with a single key-value pair where the key is the
+                    conditional value and the value is a valid matcher dict. Got a dictionary with 3 elements:
+                    {'foo': 'bar', 'buzz': 'baz', 'fuzz': 'fizz'}
+        >>> parse_col_expr(('foo', 'bar')) # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
-        ValueError: Invalid column expression
-        >>> parse_col_expr(('foo', 'bar'))
+        ValueError: A simple column expression must be a string, list, or dictionary.
+                    Got <class 'tuple'>: ('foo', 'bar')
+        >>> parse_col_expr({"col": "foo", "str": "bar"}) # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
-        ValueError: Invalid column expression
-        >>> parse_col_expr({"col": "foo", "str": "bar"})
+        ValueError: Dictionary column expression must either be explicit output/matcher configs, with two
+                    keys, 'output' and 'matcher' with a valid matcher dictionary, or a simple column
+                    expression with a single key-value pair where the key is a column expression type, or a
+                    simple-form conditional expression with a single key-value pair where the key is the
+                    conditional value and the value is a valid matcher dict. Got a dictionary with 2 elements:
+                    {'col': 'foo', 'str': 'bar'}
+        >>> parse_col_expr(["foo", 32]) # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
-        ValueError: Invalid column expression
+        ValueError: If a list (which coalesces columns), all elements must be strings or dictionaries.
+                    Got: ['foo', 32]
     """
     match cfg:
         case str() if re.search(STR_INTERPOLATION_REGEX, cfg):
@@ -246,15 +291,43 @@ def parse_col_expr(cfg: str | list | dict[str, str] | ListConfig | DictConfig) -
             return {"col": cfg}
         case list() | ListConfig() if all(isinstance(x, (str, dict)) for x in cfg):
             return [parse_col_expr(x) for x in cfg]
+        case list() | ListConfig():
+            raise ValueError(
+                "If a list (which coalesces columns), all elements must be strings or dictionaries. "
+                f"Got: {cfg}"
+            )
         case dict() | DictConfig() if set(cfg.keys()) == {"output", "matcher"} and is_matcher(cfg["matcher"]):
             return {"output": parse_col_expr(cfg["output"]), "matcher": cfg["matcher"]}
-        case dict() | DictConfig() if len(cfg) == 1 and ColExprType.is_valid(cfg):
+        case dict() | DictConfig() if set(cfg.keys()) == {"output", "matcher"}:
+            raise ValueError(
+                "A pre-specified output/matcher configuration must have a valid matcher dictionary, which is "
+                f"a dictionary with string-type keys. Got cfg['matcher']={cfg['matcher']}"
+            )
+        case dict() | DictConfig() if len(cfg) == 1 and ColExprType.is_valid(cfg)[0]:
             return cfg
         case dict() | DictConfig() if len(cfg) == 1:
             out_cfg, matcher_cfg = next(iter(cfg.items()))
-            return {"output": parse_col_expr(out_cfg), "matcher": matcher_cfg}
+            if is_matcher(matcher_cfg):
+                return {"output": parse_col_expr(out_cfg), "matcher": matcher_cfg}
+            else:
+                raise ValueError(
+                    "A simple-form conditional expression is expressed with a single key-value pair dict, "
+                    "where the key is not a column expression type and the value is a valid matcher dict, "
+                    "which is a dictionary with string-type keys. This config has a single key-value pair "
+                    f"with key {out_cfg} but an invalid matcher: {matcher_cfg}"
+                )
+        case dict() | DictConfig():
+            raise ValueError(
+                "Dictionary column expression must either be explicit output/matcher configs, with two keys, "
+                "'output' and 'matcher' with a valid matcher dictionary, or a simple column expression with "
+                "a single key-value pair where the key is a column expression type, or a simple-form "
+                "conditional expression with a single key-value pair where the key is the conditional value "
+                f"and the value is a valid matcher dict. Got a dictionary with {len(cfg)} elements: {cfg}"
+            )
         case _:
-            raise ValueError("Invalid column expression")
+            raise ValueError(
+                f"A simple column expression must be a string, list, or dictionary. Got {type(cfg)}: {cfg}"
+            )
 
 
 def structured_expr_to_pl(cfg: dict | list[dict] | ListConfig | DictConfig) -> tuple[pl.Expr, set[str]]:
@@ -287,30 +360,65 @@ def structured_expr_to_pl(cfg: dict | list[dict] | ListConfig | DictConfig) -> t
         col("bar")
         >>> sorted(cols)
         ['bar']
-        >>> structured_expr_to_pl({"foo": "bar"})
+        >>> structured_expr_to_pl(["foo", 32])
         Traceback (most recent call last):
             ...
-        ValueError: Invalid configuration object
+        ValueError: Error processing list config on field 1 for ['foo', 32]
+        >>> structured_expr_to_pl({"output": 32, "matcher": {"bar": "baz"}}) # doctest: +NORMALIZE_WHITESPACE
+        Traceback (most recent call last):
+            ...
+        ValueError: Error processing output/matcher config output expression for
+                    {'output': 32, 'matcher': {'bar': 'baz'}}
+        >>> structured_expr_to_pl({"output": "foo", "matcher": {32: "baz"}}) # doctest: +NORMALIZE_WHITESPACE
+        Traceback (most recent call last):
+            ...
+        ValueError: A pre-specified output/matcher configuration must have a valid matcher dictionary, which
+                    is a dictionary with string-type keys. Got cfg['matcher']={32: 'baz'}
+        >>> structured_expr_to_pl({"col": 32})
+        Traceback (most recent call last):
+            ...
+        ValueError: Column expressions must have a string value. Got 32
+        >>> structured_expr_to_pl("foo")
+        Traceback (most recent call last):
+            ...
+        ValueError: A structured column expression must be a list or dictionary. Got <class 'str'>: foo
     """
 
     match cfg:
         case list() | ListConfig() as cfg_fields:
             component_exprs = []
             needed_cols = set()
-            for field in cfg_fields:
-                expr, cols = cfg_to_expr(field)
+            for i, field in enumerate(cfg_fields):
+                try:
+                    expr, cols = cfg_to_expr(field)
+                except ValueError as e:
+                    raise ValueError(f"Error processing list config on field {i} for {cfg}") from e
                 component_exprs.append(expr)
                 needed_cols.update(cols)
             return pl.coalesce(*component_exprs), needed_cols
         case dict() | DictConfig() if set(cfg.keys()) == {"output", "matcher"} and is_matcher(cfg["matcher"]):
             matcher_expr, matcher_cols = matcher_to_expr(cfg["matcher"])
-            out_expr, out_cols = cfg_to_expr(cfg["output"])
+            try:
+                out_expr, out_cols = cfg_to_expr(cfg["output"])
+            except ValueError as e:
+                raise ValueError(f"Error processing output/matcher config output expression for {cfg}") from e
             return pl.when(matcher_expr).then(out_expr), out_cols | matcher_cols
-        case dict() | DictConfig() if ColExprType.is_valid(cfg):
+        case dict() | DictConfig() if set(cfg.keys()) == {"output", "matcher"}:
+            # TODO(mmd): DRY out this and other error messages.
+            raise ValueError(
+                "A pre-specified output/matcher configuration must have a valid matcher dictionary, which is "
+                f"a dictionary with string-type keys. Got cfg['matcher']={cfg['matcher']}"
+            )
+        case dict() | DictConfig() if ColExprType.is_valid(cfg)[0]:
             expr_type, expr_val = next(iter(cfg.items()))
             return ColExprType.to_pl_expr(expr_type, expr_val)
+        case dict() | DictConfig():
+            _, err_msg = ColExprType.is_valid(cfg)
+            raise ValueError(err_msg)
         case _:
-            raise ValueError("Invalid configuration object")
+            raise ValueError(
+                f"A structured column expression must be a list or dictionary. Got {type(cfg)}: {cfg}"
+            )
 
 
 def cfg_to_expr(cfg: str | ListConfig | DictConfig) -> tuple[pl.Expr, set[str]]:
