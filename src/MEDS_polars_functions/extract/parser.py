@@ -50,6 +50,8 @@ def is_matcher(matcher_cfg: dict[str, Any]) -> bool:
     Examples:
         >>> is_matcher({"foo": "bar"})
         True
+        >>> is_matcher(DictConfig({"foo": "bar"}))
+        True
         >>> is_matcher({"foo": "bar", 32: "baz"})
         False
         >>> is_matcher(["foo", "bar"])
@@ -57,7 +59,7 @@ def is_matcher(matcher_cfg: dict[str, Any]) -> bool:
         >>> is_matcher({})
         True
     """
-    return isinstance(matcher_cfg, dict) and all(isinstance(k, str) for k in matcher_cfg.keys())
+    return isinstance(matcher_cfg, (dict, DictConfig)) and all(isinstance(k, str) for k in matcher_cfg.keys())
 
 
 def matcher_to_expr(matcher_cfg: DictConfig | dict) -> tuple[pl.Expr, set[str]]:
@@ -82,13 +84,18 @@ def matcher_to_expr(matcher_cfg: DictConfig | dict) -> tuple[pl.Expr, set[str]]:
         [(col("foo")) == (String(bar))].all_horizontal([[(col("buzz")) == (String(baz))]])
         >>> sorted(cols)
         ['buzz', 'foo']
+        >>> expr, cols = matcher_to_expr(DictConfig({"foo": "bar", "buzz": "baz"}))
+        >>> print(expr)
+        [(col("foo")) == (String(bar))].all_horizontal([[(col("buzz")) == (String(baz))]])
+        >>> sorted(cols)
+        ['buzz', 'foo']
         >>> matcher_to_expr(["foo", "bar"])
         Traceback (most recent call last):
             ...
-        ValueError: Matcher configuration must be a dictionary. Got: ['foo', 'bar']
+        ValueError: Matcher configuration must be a dictionary with string keys. Got: ['foo', 'bar']
     """
-    if not isinstance(matcher_cfg, dict):
-        raise ValueError(f"Matcher configuration must be a dictionary. Got: {matcher_cfg}")
+    if not is_matcher(matcher_cfg):
+        raise ValueError(f"Matcher configuration must be a dictionary with string keys. Got: {matcher_cfg}")
 
     return pl.all_horizontal((pl.col(k) == v) for k, v in matcher_cfg.items()), set(matcher_cfg.keys())
 

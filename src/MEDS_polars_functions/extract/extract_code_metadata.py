@@ -2,9 +2,9 @@
 """Utilities for extracting code metadata about the codes produced for the MEDS events."""
 
 import copy
-import datetime
 import random
 import time
+from datetime import datetime
 from functools import partial
 from pathlib import Path
 
@@ -362,7 +362,9 @@ def main(cfg: DictConfig):
 
     start = datetime.now()
     logger.info("All map shards complete! Starting code metadata reduction computation.")
-    reducer_fn = partial(pl.concat, how="vertical")
+
+    def reducer_fn(*dfs):
+        return pl.concat(dfs, how="diagonal_relaxed").unique(maintain_order=True)
 
     reduced = reducer_fn(*[pl.scan_parquet(fp, glob=False) for fp in all_out_fps])
     join_cols = ["code", *cfg.get("code_modifier_cols", [])]
@@ -376,7 +378,7 @@ def main(cfg: DictConfig):
         existing = pl.read_parquet(reducer_fp, use_pyarrow=True)
         reduced = existing.join(reduced, on=join_cols, how="outer")
 
-    pl.write_parquet(reduced, reducer_fp, use_pyarrow=True)
+    reduced.write_parquet(reducer_fp, use_pyarrow=True)
     logger.info(f"Finished reduction in {datetime.now() - start}")
 
 
