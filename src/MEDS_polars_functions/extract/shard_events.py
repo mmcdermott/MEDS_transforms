@@ -24,7 +24,7 @@ from MEDS_polars_functions.utils import (
 )
 
 ROW_IDX_NAME = "__row_idx__"
-META_KEYS = {"timestamp_format"}
+META_KEYS = {"timestamp_format", "_metadata"}
 
 
 def kwargs_strs(kwargs: dict) -> str:

@@ -15,6 +15,7 @@ from omegaconf import DictConfig, OmegaConf
 from omegaconf.listconfig import ListConfig
 
 from MEDS_polars_functions.extract import CONFIG_YAML
+from MEDS_polars_functions.extract.shard_events import META_KEYS
 from MEDS_polars_functions.mapreduce.mapper import rwlock_wrap
 from MEDS_polars_functions.utils import (
     is_col_field,
@@ -27,6 +28,78 @@ from MEDS_polars_functions.utils import (
 def in_format(fmt: str, ts_name: str) -> pl.Expr:
     """Returns an expression formatting the column ``ts_name`` in timestamp format ``fmt``."""
     return pl.col(ts_name).str.strptime(pl.Datetime, fmt, strict=False)
+
+
+def get_code_expr(code_field: str | list | ListConfig) -> tuple[pl.Expr, pl.Expr | None, set[str]]:
+    """Converts the code field in an event config file to a polars expression, null filter, and column set.
+
+    Args:
+        code_field: The string or list representation of the code field in the event configuration file.
+
+    Returns:
+        pl.Expr: The polars expression representing the code field.
+        pl.Expr | None: The null filter expression for the code field.
+        set[str]: The set of columns needed to construct the code field.
+
+    Raises:
+        ValueError: If the code field is not a valid type.
+
+    Examples:
+        >>> print(*get_code_expr("A")) # doctest: +NORMALIZE_WHITESPACE
+        String(A).strict_cast(String).strict_cast(Categorical(None, Physical))
+        None
+        set()
+        >>> print(*get_code_expr("col(B)")) # doctest: +NORMALIZE_WHITESPACE
+        col("B").strict_cast(String).fill_null([String(UNK)]).strict_cast(Categorical(None, Physical))
+        col("B").is_not_null()
+        {'B'}
+        >>> print(*get_code_expr(["col(A)", "B"])) # doctest: +NORMALIZE_WHITESPACE
+        [([(col("A").strict_cast(String).fill_null([String(UNK)])) + (String(//))]) +
+           (String(B).strict_cast(String))].strict_cast(Categorical(None, Physical))
+        col("A").is_not_null()
+        {'A'}
+        >>> get_code_expr(34)
+        Traceback (most recent call last):
+            ...
+        ValueError: Invalid code field: 34
+        >>> get_code_expr(["a", 34, "b"])
+        Traceback (most recent call last):
+            ...
+        ValueError: Invalid code literal: 34
+
+    Note that it only takes the first column field for the null filter, not all of them.
+        >>> expr, null_filter, cols = get_code_expr(["col(A)", "col(c)"])
+        >>> print(expr) # doctest: +NORMALIZE_WHITESPACE
+        [([(col("A").strict_cast(String).fill_null([String(UNK)])) + (String(//))]) +
+           (col("c").strict_cast(String).fill_null([String(UNK)]))].strict_cast(Categorical(None, Physical))
+        >>> print(null_filter)
+        col("A").is_not_null()
+        >>> print(sorted(cols))
+        ['A', 'c']
+    """
+    if isinstance(code_field, str):
+        code_field = [code_field]
+    elif not isinstance(code_field, (list, ListConfig)):
+        raise ValueError(f"Invalid code field: {code_field}")
+
+    code_exprs = []
+    code_null_filter_expr = None
+    needed_cols = set()
+    for i, code in enumerate(code_field):
+        match code:
+            case str() if is_col_field(code):
+                code_col = parse_col_field(code)
+                needed_cols.add(code_col)
+                code_exprs.append(pl.col(code_col).cast(pl.Utf8).fill_null("UNK"))
+                if i == 0:
+                    code_null_filter_expr = pl.col(code_col).is_not_null()
+            case str():
+                code_exprs.append(pl.lit(code, dtype=pl.Utf8))
+            case _:
+                raise ValueError(f"Invalid code literal: {code}")
+    code_expr = reduce(lambda a, b: a + pl.lit("//") + b, code_exprs).cast(pl.Categorical)
+
+    return code_expr, code_null_filter_expr, needed_cols
 
 
 def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.LazyFrame:
@@ -183,7 +256,8 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         >>> valid_discharge_event_cfg = {
         ...     "code": ["DISCHARGE", "col(discharge_location)"],
         ...     "timestamp": "col(discharge_time)",
-        ...     "discharge_status": "discharge_status",
+        ...     "categorical_value": "discharge_status", # Note the raw dtype of this col is str
+        ...     "text_value": "discharge_location", # Note the raw dtype of this col is categorical
         ... }
         >>> valid_death_event_cfg = {
         ...     "code": "DEATH",
@@ -223,20 +297,54 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         │ 2          ┆ ADMISSION//E ┆ 2021-01-05 00:00:00 ┆ 5.0             │
         │ 3          ┆ ADMISSION//F ┆ 2021-01-06 00:00:00 ┆ 6.0             │
         └────────────┴──────────────┴─────────────────────┴─────────────────┘
-        >>> extract_event(complex_raw_data, valid_discharge_event_cfg)
+        >>> extract_event(
+        ...     complex_raw_data.with_columns(pl.col("severity_score").cast(pl.Utf8)),
+        ...     valid_admission_event_cfg
+        ... )
         shape: (6, 4)
-        ┌────────────┬─────────────────┬─────────────────────┬──────────────────┐
-        │ patient_id ┆ code            ┆ timestamp           ┆ discharge_status │
-        │ ---        ┆ ---             ┆ ---                 ┆ ---              │
-        │ u8         ┆ cat             ┆ datetime[μs]        ┆ cat              │
-        ╞════════════╪═════════════════╪═════════════════════╪══════════════════╡
-        │ 1          ┆ DISCHARGE//Home ┆ 2021-01-01 11:23:45 ┆ AOx4             │
-        │ 1          ┆ DISCHARGE//SNF  ┆ 2021-01-02 12:34:56 ┆ AO               │
-        │ 2          ┆ DISCHARGE//Home ┆ 2021-01-03 13:45:56 ┆ AAO              │
-        │ 2          ┆ DISCHARGE//SNF  ┆ 2021-01-04 14:56:45 ┆ AOx3             │
-        │ 2          ┆ DISCHARGE//Home ┆ 2021-01-05 15:23:45 ┆ AOx4             │
-        │ 3          ┆ DISCHARGE//SNF  ┆ 2021-01-06 16:34:56 ┆ AOx4             │
-        └────────────┴─────────────────┴─────────────────────┴──────────────────┘
+        ┌────────────┬──────────────┬─────────────────────┬─────────────────┐
+        │ patient_id ┆ code         ┆ timestamp           ┆ numerical_value │
+        │ ---        ┆ ---          ┆ ---                 ┆ ---             │
+        │ u8         ┆ cat          ┆ datetime[μs]        ┆ f64             │
+        ╞════════════╪══════════════╪═════════════════════╪═════════════════╡
+        │ 1          ┆ ADMISSION//A ┆ 2021-01-01 00:00:00 ┆ 1.0             │
+        │ 1          ┆ ADMISSION//B ┆ 2021-01-02 00:00:00 ┆ 2.0             │
+        │ 2          ┆ ADMISSION//C ┆ 2021-01-03 00:00:00 ┆ 3.0             │
+        │ 2          ┆ ADMISSION//D ┆ 2021-01-04 00:00:00 ┆ 4.0             │
+        │ 2          ┆ ADMISSION//E ┆ 2021-01-05 00:00:00 ┆ 5.0             │
+        │ 3          ┆ ADMISSION//F ┆ 2021-01-06 00:00:00 ┆ 6.0             │
+        └────────────┴──────────────┴─────────────────────┴─────────────────┘
+        >>> extract_event(
+        ...     complex_raw_data.with_columns(pl.col("severity_score").cast(pl.Utf8).cast(pl.Categorical)),
+        ...     valid_admission_event_cfg
+        ... )
+        shape: (6, 4)
+        ┌────────────┬──────────────┬─────────────────────┬─────────────────┐
+        │ patient_id ┆ code         ┆ timestamp           ┆ numerical_value │
+        │ ---        ┆ ---          ┆ ---                 ┆ ---             │
+        │ u8         ┆ cat          ┆ datetime[μs]        ┆ f64             │
+        ╞════════════╪══════════════╪═════════════════════╪═════════════════╡
+        │ 1          ┆ ADMISSION//A ┆ 2021-01-01 00:00:00 ┆ 1.0             │
+        │ 1          ┆ ADMISSION//B ┆ 2021-01-02 00:00:00 ┆ 2.0             │
+        │ 2          ┆ ADMISSION//C ┆ 2021-01-03 00:00:00 ┆ 3.0             │
+        │ 2          ┆ ADMISSION//D ┆ 2021-01-04 00:00:00 ┆ 4.0             │
+        │ 2          ┆ ADMISSION//E ┆ 2021-01-05 00:00:00 ┆ 5.0             │
+        │ 3          ┆ ADMISSION//F ┆ 2021-01-06 00:00:00 ┆ 6.0             │
+        └────────────┴──────────────┴─────────────────────┴─────────────────┘
+        >>> extract_event(complex_raw_data, valid_discharge_event_cfg)
+        shape: (6, 5)
+        ┌────────────┬─────────────────┬─────────────────────┬───────────────────┬────────────┐
+        │ patient_id ┆ code            ┆ timestamp           ┆ categorical_value ┆ text_value │
+        │ ---        ┆ ---             ┆ ---                 ┆ ---               ┆ ---        │
+        │ u8         ┆ cat             ┆ datetime[μs]        ┆ cat               ┆ str        │
+        ╞════════════╪═════════════════╪═════════════════════╪═══════════════════╪════════════╡
+        │ 1          ┆ DISCHARGE//Home ┆ 2021-01-01 11:23:45 ┆ AOx4              ┆ Home       │
+        │ 1          ┆ DISCHARGE//SNF  ┆ 2021-01-02 12:34:56 ┆ AO                ┆ SNF        │
+        │ 2          ┆ DISCHARGE//Home ┆ 2021-01-03 13:45:56 ┆ AAO               ┆ Home       │
+        │ 2          ┆ DISCHARGE//SNF  ┆ 2021-01-04 14:56:45 ┆ AOx3              ┆ SNF        │
+        │ 2          ┆ DISCHARGE//Home ┆ 2021-01-05 15:23:45 ┆ AOx4              ┆ Home       │
+        │ 3          ┆ DISCHARGE//SNF  ┆ 2021-01-06 16:34:56 ┆ AOx4              ┆ SNF        │
+        └────────────┴─────────────────┴─────────────────────┴───────────────────┴────────────┘
         >>> extract_event(complex_raw_data, valid_death_event_cfg)
         shape: (3, 3)
         ┌────────────┬───────┬─────────────────────┐
@@ -268,10 +376,6 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         Traceback (most recent call last):
             ..".
         KeyError: "Event configuration dictionary must contain 'timestamp' key. Got: [code, value]."
-        >>> extract_event(complex_raw_data, {"code": 34, "timestamp": "col(admission_time)"})
-        Traceback (most recent call last):
-            ...
-        ValueError: Invalid code literal: 34
         >>> extract_event(complex_raw_data, {"code": "test", "timestamp": "12-01-23"})
         Traceback (most recent call last):
             ...
@@ -291,9 +395,9 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         >>> extract_event(complex_raw_data, {"code": "test", "timestamp": None, "foobar": "discharge_time"})
         Traceback (most recent call last):
             ...
-        ValueError: Source column 'discharge_time' for event column foobar is not numeric or categorical! Cannot be used as an event col.
+        ValueError: Source column 'discharge_time' for event column foobar is not numeric, string, or categorical! Cannot be used as an event col.
     """  # noqa: E501
-    df = df
+    event_cfg = copy.deepcopy(event_cfg)
     event_exprs = {"patient_id": pl.col("patient_id")}
 
     if "code" not in event_cfg:
@@ -309,29 +413,14 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
     if "patient_id" in event_cfg:
         raise KeyError("Event column name 'patient_id' cannot be overridden.")
 
-    codes = event_cfg.pop("code")
-    if not isinstance(codes, (list, ListConfig)):
-        logger.debug(
-            f"Event code '{codes}' is a {type(codes)}, not a list. Automatically converting to a list."
-        )
-        codes = [codes]
+    code_expr, code_null_filter_expr, needed_cols = get_code_expr(event_cfg.pop("code"))
 
-    code_exprs = []
-    code_null_filter_expr = None
-    for i, code in enumerate(codes):
-        match code:
-            case str() if is_col_field(code) and parse_col_field(code) in df.schema:
-                code_col = parse_col_field(code)
-                logger.info(f"Extracting code column {code_col}")
-                code_exprs.append(pl.col(code_col).cast(pl.Utf8).fill_null("UNK"))
-                if i == 0:
-                    code_null_filter_expr = pl.col(code_col).is_not_null()
-            case str():
-                logger.info(f"Adding code literate {code}")
-                code_exprs.append(pl.lit(code, dtype=pl.Utf8))
-            case _:
-                raise ValueError(f"Invalid code literal: {code}")
-    event_exprs["code"] = reduce(lambda a, b: a + pl.lit("//") + b, code_exprs).cast(pl.Categorical)
+    for col in needed_cols:
+        if col not in df.schema:
+            raise KeyError(f"Source column '{col}' for event column code not found in DataFrame schema.")
+        logger.info(f"Extracting column {col}")
+
+    event_exprs["code"] = code_expr
 
     ts = event_cfg.pop("timestamp")
     ts_format = event_cfg.pop("timestamp_format", None)
@@ -358,6 +447,9 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
             raise ValueError(f"Invalid timestamp literal: {ts}")
 
     for k, v in event_cfg.items():
+        if k in META_KEYS:
+            continue
+
         if not isinstance(v, str):
             raise ValueError(
                 f"For event column {k}, source column {v} must be a string column name. Got {type(v)}."
@@ -373,15 +465,33 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
             raise KeyError(f"Source column '{v}' for event column {k} not found in DataFrame schema.")
 
         col = pl.col(v)
-        if df.schema[v] == pl.Utf8:
-            col = col.cast(pl.Categorical)
-        elif isinstance(df.schema[v], pl.Categorical):
-            pass
-        elif not df.schema[v].is_numeric():
-            raise ValueError(
-                f"Source column '{v}' for event column {k} is not numeric or categorical! "
-                "Cannot be used as an event col."
-            )
+        is_numeric = df.schema[v].is_numeric()
+        is_str = df.schema[v] == pl.Utf8
+        is_cat = isinstance(df.schema[v], pl.Categorical)
+        match k:
+            case "numerical_value" if is_numeric:
+                pass
+            case "numerical_value" if is_str:
+                logger.warning(f"Converting numerical_value to float from string for {code_expr}")
+                col = col.cast(pl.Float64, strict=False)
+            case "numerical_value" if is_cat:
+                logger.warning(f"Converting numerical_value to float from categorical for {code_expr}")
+                col = col.cast(pl.Utf8).cast(pl.Float64, strict=False)
+            case "text_value" if not df.schema[v] == pl.Utf8:
+                logger.warning(f"Converting text_value to string for {code_expr}")
+                col = col.cast(pl.Utf8, strict=False)
+            case "categorical_value" if not isinstance(df.schema[v], pl.Categorical):
+                logger.warning(f"Converting categorical_value to categorical for {code_expr}")
+                col = col.cast(pl.Utf8).cast(pl.Categorical)
+            case _ if is_str:
+                # TODO(mmd): Is this right? Is this always a good idea? It probably usually is, but maybe not
+                # always. Maybe a check on unique values first?
+                col = col.cast(pl.Categorical)
+            case _ if not (is_numeric or is_str or is_cat):
+                raise ValueError(
+                    f"Source column '{v}' for event column {k} is not numeric, string, or categorical! "
+                    "Cannot be used as an event col."
+                )
 
         event_exprs[k] = col
 
@@ -393,11 +503,6 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         df = df.filter(ts_filter_expr)
 
     df = df.select(**event_exprs).unique(maintain_order=True)
-
-    # if numerical_value column is not numeric, convert it to float
-    if "numerical_value" in df.columns and not df.schema["numerical_value"].is_numeric():
-        logger.warning(f"Converting numerical_value to float for codes {codes}")
-        df = df.with_columns(pl.col("numerical_value").cast(pl.Float64, strict=False))
 
     return df
 
