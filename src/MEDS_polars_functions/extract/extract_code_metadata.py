@@ -58,10 +58,10 @@ def extract_metadata(
             ...
         KeyError: "Event configuration dictionary must contain a non-empty '_metadata' key. Got: [code]."
         >>> raw_metadata = pl.DataFrame({
-        ...     "code": ["A", "B", "C", "D"],
-        ...     "code_modifier": ["1", "2", "3", "4"],
-        ...     "name": ["Code A-1", "B-2", "C with 3", "D, but 4"],
-        ...     "priority": [1, 2, 3, 4],
+        ...     "code": ["A", "B", "C", "D", "E"],
+        ...     "code_modifier": ["1", "2", "3", "4", "5"],
+        ...     "name": ["Code A-1", "B-2", "C with 3", "D, but 4", None],
+        ...     "priority": [1, 2, 3, 4, 5],
         ... })
         >>> event_cfg = {
         ...     "code": ["FOO", "col(code)", "col(code_modifier)"],
@@ -173,6 +173,8 @@ def extract_metadata(
 
     if allowed_codes:
         metadata_df = metadata_df.filter(pl.col("code").is_in(allowed_codes))
+
+    metadata_df = metadata_df.filter(~pl.all_horizontal(*[pl.col(c).is_null() for c in final_cols]))
 
     return metadata_df.unique(maintain_order=True).select("code", *final_cols)
 
@@ -369,14 +371,22 @@ def main(cfg: DictConfig):
     reduced = reducer_fn(*[pl.scan_parquet(fp, glob=False) for fp in all_out_fps])
     join_cols = ["code", *cfg.get("code_modifier_cols", [])]
     metadata_cols = [c for c in reduced.columns if c not in join_cols]
-    reduced = reduced.group_by(join_cols).agg(*(pl.col(c) for c in metadata_cols)).collect()
+
+    n_unique_obs = reduced.select(pl.n_unique(*join_cols)).collect().item()
+    n_rows = reduced.select(pl.count()).collect().item()
+    logger.info(f"Collected metadata for {n_unique_obs} unique codes among {n_rows} total observations.")
+
+    if n_unique_obs != n_rows:
+        reduced = reduced.group_by(join_cols).agg(*(pl.col(c) for c in metadata_cols)).collect()
+    else:
+        reduced = reduced.collect()
 
     reducer_fp = Path(cfg.cohort_dir) / "code_metadata.parquet"
 
     if reducer_fp.exists():
         logger.info(f"Joining to existing code metadata at {str(reducer_fp.resolve())}")
         existing = pl.read_parquet(reducer_fp, use_pyarrow=True)
-        reduced = existing.join(reduced, on=join_cols, how="outer")
+        reduced = existing.join(reduced, on=join_cols, how="full", coalesce=True)
 
     reduced.write_parquet(reducer_fp, use_pyarrow=True)
     logger.info(f"Finished reduction in {datetime.now() - start}")
