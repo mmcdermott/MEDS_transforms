@@ -2,7 +2,6 @@
 """Simple helper functions to define a consistent code vocabulary for normalizing a MEDS dataset."""
 from collections.abc import Callable
 from enum import StrEnum
-from importlib.resources import files
 from pathlib import Path
 
 import hydra
@@ -10,6 +9,7 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
+from MEDS_polars_functions import PREPROCESS_CONFIG_YAML
 from MEDS_polars_functions.utils import hydra_loguru_init
 
 
@@ -191,10 +191,10 @@ VOCABULARY_ORDERING_METHODS: dict[VOCABULARY_ORDERING, INDEX_ASSIGNMENT_FN] = {
     VOCABULARY_ORDERING.LEXICOGRAPHIC: lexicographic_indices,
 }
 
-config_yaml = files("MEDS_polars_functions").joinpath("configs/preprocess.yaml")
 
-
-@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
+@hydra.main(
+    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
+)
 def main(cfg: DictConfig):
     """TODO."""
 

@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 """Transformations for adding time-derived measurements (e.g., a patient's age) to a MEDS dataset."""
 from collections.abc import Callable
-from importlib.resources import files
 
 import hydra
 import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
+from MEDS_polars_functions import PREPROCESS_CONFIG_YAML
 from MEDS_polars_functions.mapreduce.mapper import map_over
 from MEDS_polars_functions.utils import hydra_loguru_init
 
@@ -395,10 +395,9 @@ def add_time_derived_measurements_fntr(stage_cfg: DictConfig) -> Callable[[pl.La
     return fn
 
 
-config_yaml = files("MEDS_polars_functions").joinpath("configs/preprocess.yaml")
-
-
-@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
+@hydra.main(
+    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
+)
 def main(cfg: DictConfig):
     """Adds time-derived measurements to a MEDS cohort as separate observations at each unique timestamp."""
 

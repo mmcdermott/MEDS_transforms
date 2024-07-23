@@ -2,13 +2,13 @@
 """A polars-to-polars transformation function for filtering patients by sequence length."""
 from collections.abc import Callable
 from functools import partial
-from importlib.resources import files
 
 import hydra
 import polars as pl
 from loguru import logger
 from omegaconf import DictConfig
 
+from MEDS_polars_functions import PREPROCESS_CONFIG_YAML
 from MEDS_polars_functions.mapreduce.mapper import map_over
 from MEDS_polars_functions.utils import hydra_loguru_init
 
@@ -195,10 +195,9 @@ def filter_patients_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.L
         return data
 
 
-config_yaml = files("MEDS_polars_functions").joinpath("configs/preprocess.yaml")
-
-
-@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
+@hydra.main(
+    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
+)
 def main(cfg: DictConfig):
     """TODO."""
 
