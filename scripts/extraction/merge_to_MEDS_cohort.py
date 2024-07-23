@@ -23,9 +23,8 @@ def read_fn(sp_dir: Path, event_subsets: list[str], unique_by: list[str] | str |
 
     if len(dirs_to_read := {fp.parent for fp in files_to_read}) != len(event_subsets):
         raise RuntimeError(
-            "Number of files ({}) does not match number of filenames ({}): {}".format(
-                len(dirs_to_read), len(event_subsets), sp_dir
-            )
+            "Number of found subsets ({}) does not match "
+            "number of subsets in event_config ({}): {}".format(len(dirs_to_read), len(event_subsets), sp_dir)
         )
 
     file_strs = "\n".join(f"  - {str(fp.resolve())}" for fp in files_to_read)
