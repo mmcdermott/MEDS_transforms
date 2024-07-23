@@ -19,12 +19,14 @@ if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
     CONVERT_TO_SHARDED_EVENTS_SCRIPT = extraction_root / "convert_to_sharded_events.py"
     MERGE_TO_MEDS_COHORT_SCRIPT = extraction_root / "merge_to_MEDS_cohort.py"
     AGGREGATE_CODE_METADATA_SCRIPT = code_root / "aggregate_code_metadata.py"
+    EXTRACT_CODE_METADATA_SCRIPT = extraction_root / "extract_code_metadata.py"
 else:
     SHARD_EVENTS_SCRIPT = "MEDS_extract-shard_events"
     SPLIT_AND_SHARD_SCRIPT = "MEDS_extract-split_and_shard_patients"
     CONVERT_TO_SHARDED_EVENTS_SCRIPT = "MEDS_extract-convert_to_sharded_events"
     MERGE_TO_MEDS_COHORT_SCRIPT = "MEDS_extract-merge_to_MEDS_cohort"
     AGGREGATE_CODE_METADATA_SCRIPT = "MEDS_transform-aggregate_code_metadata"
+    EXTRACT_CODE_METADATA_SCRIPT = "MEDS_extract-extract_code_metadata"
 
 import json
 import subprocess
@@ -69,6 +71,20 @@ patient_id,admit_date,disch_date,department,vitals_date,HR,temp
 1500733,"06/03/2010, 14:54:38","06/03/2010, 16:44:26",ORTHOPEDIC,"06/03/2010, 15:39:49",84.4,100.3
 """
 
+INPUT_METADATA_FILE = """
+lab_code,title,loinc
+HR,Heart Rate,8867-4
+temp,Body Temperature,8310-5
+"""
+
+DEMO_METADATA_FILE = """
+eye_color,description
+BROWN,"Brown Eyes. The most common eye color."
+BLUE,"Blue Eyes. Less common than brown."
+HAZEL,"Hazel eyes. These are uncommon"
+GREEN,"Green eyes. These are rare."
+"""
+
 EVENT_CFGS_YAML = """
 subjects:
   patient_id_col: MRN
@@ -77,6 +93,9 @@ subjects:
       - EYE_COLOR
       - col(eye_color)
     timestamp: null
+    _metadata:
+      demo_metadata:
+        description: description
   height:
     code: HEIGHT
     timestamp: null
@@ -101,11 +120,19 @@ admit_vitals:
     timestamp: col(vitals_date)
     timestamp_format: "%m/%d/%Y, %H:%M:%S"
     numerical_value: HR
+    _metadata:
+      input_metadata:
+        description: {"title": {"lab_code": "HR"}}
+        parent_code: {"LOINC/{loinc}": {"lab_code": "HR"}}
   temp:
     code: TEMP
     timestamp: col(vitals_date)
     timestamp_format: "%m/%d/%Y, %H:%M:%S"
     numerical_value: temp
+    _metadata:
+      input_metadata:
+        description: {"title": {"lab_code": "temp"}}
+        parent_code: {"LOINC/{loinc}": {"lab_code": "temp"}}
 """
 
 # Test data (expected outputs) -- ALL OF THIS MAY CHANGE IF THE SEED OR DATA CHANGES
@@ -240,6 +267,22 @@ HR,12,4,12,1360.5000000000002,158538.77
 TEMP,12,4,12,1181.4999999999998,116373.38999999998
 """
 
+MEDS_OUTPUT_CODE_METADATA_FILE_WITH_DESC = """
+code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,description,parent_code
+,44,4,28,3198.8389005974336,382968.28937288234,,
+ADMISSION//CARDIAC,2,2,0,,,,
+ADMISSION//ORTHOPEDIC,1,1,0,,,,
+ADMISSION//PULMONARY,1,1,0,,,,
+DISCHARGE,4,4,0,,,,
+DOB,4,4,0,,,,
+EYE_COLOR//BLUE,1,1,0,,,"Blue Eyes. Less common than brown.",
+EYE_COLOR//BROWN,1,1,0,,,"Brown Eyes. The most common eye color.",
+EYE_COLOR//HAZEL,2,2,0,,,"Hazel eyes. These are uncommon",
+HEIGHT,4,4,4,656.8389005974336,108056.12937288235,,
+HR,12,4,12,1360.5000000000002,158538.77,"Heart Rate",LOINC/8867-4
+TEMP,12,4,12,1181.4999999999998,116373.38999999998,"Body Temperature",LOINC/8310-5
+"""
+
 SUB_SHARDED_OUTPUTS = {
     "train/0": {
         "subjects": MEDS_OUTPUT_TRAIN_0_SUBJECTS,
@@ -312,9 +355,14 @@ def test_extraction():
         admit_vitals_csv = raw_cohort_dir / "admit_vitals.csv"
         event_cfgs_yaml = raw_cohort_dir / "event_cfgs.yaml"
 
+        demo_metadata_csv = raw_cohort_dir / "demo_metadata.csv"
+        input_metadata_csv = raw_cohort_dir / "input_metadata.csv"
+
         # Write the CSV files
         subjects_csv.write_text(SUBJECTS_CSV.strip())
         admit_vitals_csv.write_text(ADMIT_VITALS_CSV.strip())
+        demo_metadata_csv.write_text(DEMO_METADATA_FILE.strip())
+        input_metadata_csv.write_text(INPUT_METADATA_FILE.strip())
 
         # Mix things up -- have one CSV be also in parquet format.
         admit_vitals_parquet = raw_cohort_dir / "admit_vitals.parquet"
@@ -550,6 +598,39 @@ def test_extraction():
             want=want_df,
             got=got_df,
             msg="Code metadata differs!",
+            check_column_order=False,
+            check_row_order=False,
+        )
+
+        stderr, stdout = run_command(
+            EXTRACT_CODE_METADATA_SCRIPT,
+            extraction_config_kwargs,
+            "extract_code_metadata",
+        )
+        all_stderrs.append(stderr)
+        all_stdouts.append(stdout)
+
+        full_stderr = "\n".join(all_stderrs)
+        full_stdout = "\n".join(all_stdouts)
+
+        output_file = MEDS_cohort_dir / "code_metadata.parquet"
+        assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
+
+        got_df = pl.read_parquet(output_file, glob=False)
+
+        want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE_WITH_DESC)).with_columns(
+            pl.col("code").cast(pl.Categorical),
+            pl.col("code/n_occurrences").cast(pl.UInt8),
+            pl.col("code/n_patients").cast(pl.UInt8),
+            pl.col("values/n_occurrences").cast(pl.UInt8),
+            pl.col("values/sum").cast(pl.Float32).fill_null(0),
+            pl.col("values/sum_sqd").cast(pl.Float32).fill_null(0),
+        )
+
+        assert_df_equal(
+            want=want_df,
+            got=got_df,
+            msg="Code metadata with descriptions differs!",
             check_column_order=False,
             check_row_order=False,
         )

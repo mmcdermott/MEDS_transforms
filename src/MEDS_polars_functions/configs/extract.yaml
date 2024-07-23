@@ -35,6 +35,7 @@ stages:
   - convert_to_sharded_events
   - merge_to_MEDS_cohort
   - aggregate_code_metadata
+  - extract_code_metadata
 
 stage_configs:
   aggregate_code_metadata:

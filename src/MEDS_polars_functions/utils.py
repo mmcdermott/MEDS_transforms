@@ -211,6 +211,17 @@ def populate_stage(
             ...
         ValueError: 'stage7' is not a valid stage name. Options are: stage1, stage2, stage3, stage4, stage5,
             stage6
+        >>> root_config = DictConfig({
+        ...     "input_dir": "/a/b",
+        ...     "cohort_dir": "/c/d",
+        ...     "stages": ["stage1", "stage2", "stage3", "stage4", "stage5", "stage6"],
+        ...     "stage_configs": {"stage2": {"is_metadata": 34}},
+        ... })
+        >>> args = [root_config[k] for k in ["input_dir", "cohort_dir", "stages", "stage_configs"]]
+        >>> populate_stage("stage2", *args)
+        Traceback (most recent call last):
+            ...
+        TypeError: If specified manually, is_metadata must be a boolean. Got 34
     """
 
     if stage_name not in stages:
