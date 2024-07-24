@@ -27,7 +27,7 @@ if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
 
     # Filters
     FILTER_MEASUREMENTS_SCRIPT = filters_root / "filter_measurements.py"
-    FILTER_PATIENTS_BY_LENGTH_SCRIPT = filters_root / "filter_patients_by_length.py"
+    FILTER_PATIENTS_SCRIPT = filters_root / "filter_patients.py"
 
     # Transforms
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT = transforms_root / "add_time_derived_measurements.py"
@@ -41,7 +41,7 @@ else:
 
     # Filters
     FILTER_MEASUREMENTS_SCRIPT = "MEDS_transform-filter_measurements"
-    FILTER_PATIENTS_BY_LENGTH_SCRIPT = "MEDS_transform-filter_patients_by_length"
+    FILTER_PATIENTS_SCRIPT = "MEDS_transform-filter_patients"
 
     # Transforms
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT = "MEDS_transform-add_time_derived_measurements"

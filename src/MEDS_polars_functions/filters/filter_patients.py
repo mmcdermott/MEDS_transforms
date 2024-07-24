@@ -100,11 +100,11 @@ def filter_patients_by_num_events(df: pl.LazyFrame, min_events_per_patient: int)
 
     Examples:
         >>> df = pl.DataFrame({
-        ...     "patient_id": [1, 1, 1, 2, 2, 2, 3, 3, 3],
-        ...     "timestamp": [1, 1, 1, 1, 2, 1, 1, 2, 3],
+        ...     "patient_id": [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4],
+        ...     "timestamp": [1, 1, 1, 1, 2, 1, 1, 2, 3, None, None, 1, 2, 3],
         ... })
         >>> filter_patients_by_num_events(df, 1)
-        shape: (9, 2)
+        shape: (14, 2)
         ┌────────────┬───────────┐
         │ patient_id ┆ timestamp │
         │ ---        ┆ ---       │
@@ -119,9 +119,14 @@ def filter_patients_by_num_events(df: pl.LazyFrame, min_events_per_patient: int)
         │ 3          ┆ 1         │
         │ 3          ┆ 2         │
         │ 3          ┆ 3         │
+        │ 4          ┆ null      │
+        │ 4          ┆ null      │
+        │ 4          ┆ 1         │
+        │ 4          ┆ 2         │
+        │ 4          ┆ 3         │
         └────────────┴───────────┘
         >>> filter_patients_by_num_events(df, 2)
-        shape: (6, 2)
+        shape: (11, 2)
         ┌────────────┬───────────┐
         │ patient_id ┆ timestamp │
         │ ---        ┆ ---       │
@@ -133,9 +138,14 @@ def filter_patients_by_num_events(df: pl.LazyFrame, min_events_per_patient: int)
         │ 3          ┆ 1         │
         │ 3          ┆ 2         │
         │ 3          ┆ 3         │
+        │ 4          ┆ null      │
+        │ 4          ┆ null      │
+        │ 4          ┆ 1         │
+        │ 4          ┆ 2         │
+        │ 4          ┆ 3         │
         └────────────┴───────────┘
         >>> filter_patients_by_num_events(df, 3)
-        shape: (3, 2)
+        shape: (8, 2)
         ┌────────────┬───────────┐
         │ patient_id ┆ timestamp │
         │ ---        ┆ ---       │
@@ -144,8 +154,26 @@ def filter_patients_by_num_events(df: pl.LazyFrame, min_events_per_patient: int)
         │ 3          ┆ 1         │
         │ 3          ┆ 2         │
         │ 3          ┆ 3         │
+        │ 4          ┆ null      │
+        │ 4          ┆ null      │
+        │ 4          ┆ 1         │
+        │ 4          ┆ 2         │
+        │ 4          ┆ 3         │
         └────────────┴───────────┘
         >>> filter_patients_by_num_events(df, 4)
+        shape: (5, 2)
+        ┌────────────┬───────────┐
+        │ patient_id ┆ timestamp │
+        │ ---        ┆ ---       │
+        │ i64        ┆ i64       │
+        ╞════════════╪═══════════╡
+        │ 4          ┆ null      │
+        │ 4          ┆ null      │
+        │ 4          ┆ 1         │
+        │ 4          ┆ 2         │
+        │ 4          ┆ 3         │
+        └────────────┴───────────┘
+        >>> filter_patients_by_num_events(df, 5)
         shape: (0, 2)
         ┌────────────┬───────────┐
         │ patient_id ┆ timestamp │
