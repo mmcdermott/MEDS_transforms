@@ -182,6 +182,8 @@ MEDS_CODE_METADATA = pl.read_csv(StringIO(MEDS_CODE_METADATA_CSV), schema=MEDS_C
 def check_output(
     output_fp: Path,
     want_df: pl.DataFrame,
+    stderr: str,
+    stdout: str,
     check_column_order: bool = False,
     check_row_order: bool = True,
     **kwargs,
@@ -192,7 +194,11 @@ def check_output(
     assert_df_equal(
         want_df,
         got_df,
-        f"Expected the dataframe at {output_fp} to be equal to the target.",
+        (
+            f"Expected the dataframe at {output_fp} to be equal to the target.\n"
+            f"Script stdout:\n{stdout}\n"
+            f"Script stderr:\n{stderr}"
+        ),
         check_column_order=check_column_order,
         check_row_order=check_row_order,
         **kwargs,
@@ -249,7 +255,7 @@ def single_stage_transform_tester(
         # Check the output
         if isinstance(want_outputs, pl.DataFrame):
             # The want output is a code_metadata file in the root directory in this case.
-            check_output(cohort_dir / "code_metadata.parquet", want_outputs)
+            check_output(cohort_dir / "code_metadata.parquet", want_outputs, stderr, stdout)
         else:
             for shard_name, want_df in want_outputs.items():
-                check_output(cohort_dir / stage_name / f"{shard_name}.parquet", want_df)
+                check_output(cohort_dir / stage_name / f"{shard_name}.parquet", want_df, stderr, stdout)

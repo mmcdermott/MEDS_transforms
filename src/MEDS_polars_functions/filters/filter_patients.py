@@ -222,6 +222,8 @@ def filter_patients_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.L
             data = compute_fn(data)
         return data
 
+    return fn
+
 
 @hydra.main(
     version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
