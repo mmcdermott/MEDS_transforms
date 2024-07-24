@@ -13,7 +13,7 @@ from MEDS_polars_functions.mapreduce.mapper import map_over
 pl.enable_string_cache()
 
 
-def filter_codes_fntr(
+def filter_measurements_fntr(
     stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifier_columns: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Returns a function that filters patient events to only encompass those with a set of permissible codes.
@@ -38,7 +38,7 @@ def filter_codes_fntr(
         ...     "modifier1":      [1,   1,   2,   2],
         ... }).lazy()
         >>> stage_cfg = DictConfig({"min_patients_per_code": 2, "min_occurrences_per_code": 3})
-        >>> fn = filter_codes_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (2, 3)
         ┌────────────┬──────┬───────────┐
@@ -50,7 +50,7 @@ def filter_codes_fntr(
         │ 1          ┆ B    ┆ 1         │
         └────────────┴──────┴───────────┘
         >>> stage_cfg = DictConfig({"min_patients_per_code": 1, "min_occurrences_per_code": 4})
-        >>> fn = filter_codes_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (2, 3)
         ┌────────────┬──────┬───────────┐
@@ -62,7 +62,7 @@ def filter_codes_fntr(
         │ 2          ┆ A    ┆ 2         │
         └────────────┴──────┴───────────┘
         >>> stage_cfg = DictConfig({"min_patients_per_code": 1})
-        >>> fn = filter_codes_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (4, 3)
         ┌────────────┬──────┬───────────┐
@@ -76,7 +76,7 @@ def filter_codes_fntr(
         │ 2          ┆ C    ┆ 2         │
         └────────────┴──────┴───────────┘
         >>> stage_cfg = DictConfig({"min_patients_per_code": None, "min_occurrences_per_code": None})
-        >>> fn = filter_codes_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (4, 3)
         ┌────────────┬──────┬───────────┐
@@ -90,7 +90,7 @@ def filter_codes_fntr(
         │ 2          ┆ C    ┆ 2         │
         └────────────┴──────┴───────────┘
         >>> stage_cfg = DictConfig({"min_occurrences_per_code": 5})
-        >>> fn = filter_codes_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (1, 3)
         ┌────────────┬──────┬───────────┐
@@ -120,7 +120,7 @@ def filter_codes_fntr(
 
     allowed_code_metadata = (code_metadata.filter(pl.all_horizontal(filter_exprs)).select(join_cols)).lazy()
 
-    def filter_codes_fn(df: pl.LazyFrame) -> pl.LazyFrame:
+    def filter_measurements_fn(df: pl.LazyFrame) -> pl.LazyFrame:
         f"""Filters patient events to only encompass those with a set of permissible codes.
 
         In particular, this function filters the DataFrame to only include (code, modifier) pairs that have
@@ -139,7 +139,7 @@ def filter_codes_fntr(
             .drop(idx_col)
         )
 
-    return filter_codes_fn
+    return filter_measurements_fn
 
 
 @hydra.main(
@@ -151,7 +151,7 @@ def main(cfg: DictConfig):
     code_metadata = pl.read_parquet(
         Path(cfg.stage_cfg.metadata_input_dir) / "code_metadata.parquet", use_pyarrow=True
     )
-    compute_fn = filter_codes_fntr(cfg.stage_cfg, code_metadata)
+    compute_fn = filter_measurements_fntr(cfg.stage_cfg, code_metadata)
 
     map_over(cfg, compute_fn=compute_fn)
 

@@ -1,8 +1,41 @@
 import subprocess
+from io import StringIO
 from pathlib import Path
 
 import polars as pl
 from polars.testing import assert_frame_equal
+
+DEFAULT_CSV_TS_FORMAT = "%m/%d/%Y, %H:%M:%S"
+
+# TODO: Make use meds library
+MEDS_PL_SCHEMA = {
+    "patient_id": pl.UInt32,
+    "timestamp": pl.Datetime("us"),
+    "code": pl.Categorical,
+    "numerical_value": pl.Float32,
+}
+
+
+def parse_meds_csvs(
+    csvs: str | dict[str, str], schema: dict[str, pl.DataType] = MEDS_PL_SCHEMA
+) -> pl.DataFrame | dict[str, pl.DataFrame]:
+    """Converts a string or dict of named strings to a MEDS DataFrame by interpreting them as CSVs.
+
+    TODO: doctests.
+    """
+
+    read_schema = {**schema}
+    read_schema["timestamp"] = pl.Utf8
+
+    def reader(csv_str: str) -> pl.DataFrame:
+        return pl.read_csv(StringIO(csv_str), schema=read_schema).with_columns(
+            pl.col("timestamp").str.strptime(MEDS_PL_SCHEMA["timestamp"], DEFAULT_CSV_TS_FORMAT)
+        )
+
+    if isinstance(csvs, str):
+        return reader(csvs)
+    else:
+        return {k: reader(v) for k, v in csvs.items()}
 
 
 def dict_to_hydra_kwargs(d: dict[str, str]) -> str:

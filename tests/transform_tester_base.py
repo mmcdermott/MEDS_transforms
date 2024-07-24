@@ -4,9 +4,16 @@ Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, ra
 scripts.
 """
 
+import json
 import os
+import tempfile
+from io import StringIO
+from pathlib import Path
 
+import polars as pl
 import rootutils
+
+from .utils import assert_df_equal, parse_meds_csvs, run_command
 
 root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
@@ -43,17 +50,16 @@ else:
     TENSORIZE_SCRIPT = "MEDS_transform-tensorize"
     TOKENIZE_SCRIPT = "MEDS_transform-tokenize"
 
-import tempfile
-from io import StringIO
-from pathlib import Path
-
-import polars as pl
-
-from .utils import assert_df_equal, run_command
-
 pl.enable_string_cache()
 
 # Test MEDS data (inputs)
+
+SPLITS = {
+    "train/0": [239684, 1195293],
+    "train/1": [68729, 814703],
+    "tuning/0": [754281],
+    "held_out/0": [1500733],
+}
 
 MEDS_TRAIN_0 = """
 patient_id,timestamp,code,numerical_value
@@ -133,31 +139,14 @@ patient_id,timestamp,code,numerical_value
 1500733,"06/03/2010, 16:44:26",DISCHARGE,
 """
 
-# TODO: Make use meds library
-MEDS_PL_SCHEMA = {
-    "patient_id": pl.UInt32,
-    "timestamp": pl.Datetime("us"),
-    "code": pl.Categorical,
-    "numerical_value": pl.Float32,
-}
-MEDS_CSV_TS_FORMAT = "%m/%d/%Y, %H:%M:%S"
-
-
-def parse_meds_csv(csv_str: str) -> pl.DataFrame:
-    read_schema = {**MEDS_PL_SCHEMA}
-    read_schema["timestamp"] = pl.Utf8
-
-    return pl.read_csv(StringIO(csv_str), schema=read_schema).with_columns(
-        pl.col("timestamp").str.strptime(MEDS_PL_SCHEMA["timestamp"], MEDS_CSV_TS_FORMAT)
-    )
-
-
-MEDS_SHARDS = {
-    "train/0": parse_meds_csv(MEDS_TRAIN_0),
-    "train/1": parse_meds_csv(MEDS_TRAIN_1),
-    "tuning/0": parse_meds_csv(MEDS_TUNING_0),
-    "held_out/0": parse_meds_csv(MEDS_HELD_OUT_0),
-}
+MEDS_SHARDS = parse_meds_csvs(
+    {
+        "train/0": MEDS_TRAIN_0,
+        "train/1": MEDS_TRAIN_1,
+        "tuning/0": MEDS_TUNING_0,
+        "held_out/0": MEDS_HELD_OUT_0,
+    }
+)
 
 
 MEDS_CODE_METADATA_CSV = """
@@ -224,6 +213,10 @@ def single_stage_transform_tester(
         # Create the directories
         MEDS_dir.mkdir()
         cohort_dir.mkdir()
+
+        # Write the splits
+        splits_fp = MEDS_dir / "splits.json"
+        splits_fp.write_text(json.dumps(SPLITS))
 
         # Write the shards
         for shard_name, df in MEDS_SHARDS.items():
