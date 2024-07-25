@@ -10,7 +10,7 @@ import rootutils
 
 root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
-code_root = root / "src" / "MEDS_polars_functions"
+code_root = root / "src" / "MEDS_transforms"
 extraction_root = code_root / "extract"
 
 if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":

@@ -14,10 +14,10 @@ from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 from omegaconf.listconfig import ListConfig
 
-from MEDS_polars_functions.extract import CONFIG_YAML
-from MEDS_polars_functions.extract.shard_events import META_KEYS
-from MEDS_polars_functions.mapreduce.mapper import rwlock_wrap
-from MEDS_polars_functions.utils import (
+from MEDS_transforms.extract import CONFIG_YAML
+from MEDS_transforms.extract.shard_events import META_KEYS
+from MEDS_transforms.mapreduce.mapper import rwlock_wrap
+from MEDS_transforms.utils import (
     is_col_field,
     parse_col_field,
     stage_init,

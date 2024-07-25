@@ -14,9 +14,9 @@ import polars.selectors as cs
 from loguru import logger
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
-from MEDS_polars_functions import PREPROCESS_CONFIG_YAML
-from MEDS_polars_functions.mapreduce.mapper import map_over
-from MEDS_polars_functions.utils import write_lazyframe
+from MEDS_transforms import PREPROCESS_CONFIG_YAML
+from MEDS_transforms.mapreduce.mapper import map_over
+from MEDS_transforms.utils import write_lazyframe
 
 pl.enable_string_cache()
 

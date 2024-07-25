@@ -11,9 +11,9 @@ import polars as pl
 from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 from omegaconf import DictConfig
 
-from MEDS_polars_functions import PREPROCESS_CONFIG_YAML
-from MEDS_polars_functions.mapreduce.mapper import map_over
-from MEDS_polars_functions.mapreduce.utils import shard_iterator
+from MEDS_transforms import PREPROCESS_CONFIG_YAML
+from MEDS_transforms.mapreduce.mapper import map_over
+from MEDS_transforms.mapreduce.utils import shard_iterator
 
 
 def convert_to_NRT(tokenized_df: pl.LazyFrame) -> JointNestedRaggedTensorDict:

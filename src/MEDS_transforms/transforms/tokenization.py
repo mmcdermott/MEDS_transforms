@@ -18,9 +18,9 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_polars_functions import PREPROCESS_CONFIG_YAML
-from MEDS_polars_functions.mapreduce.mapper import rwlock_wrap
-from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
+from MEDS_transforms import PREPROCESS_CONFIG_YAML
+from MEDS_transforms.mapreduce.mapper import rwlock_wrap
+from MEDS_transforms.utils import hydra_loguru_init, write_lazyframe
 
 SECONDS_PER_MINUTE = 60.0
 SECONDS_PER_HOUR = SECONDS_PER_MINUTE * 60.0

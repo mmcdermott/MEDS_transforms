@@ -29,8 +29,8 @@ up from this one).
 Download this repository and install the requirements:
 
 ```bash
-git clone git@github.com:mmcdermott/MEDS_polars_functions.git
-cd MEDS_polars_functions
+git clone git@github.com:mmcdermott/MEDS_transforms.git
+cd MEDS_transforms
 conda create -n MEDS python=3.12
 conda activate MEDS
 pip install .[examples]

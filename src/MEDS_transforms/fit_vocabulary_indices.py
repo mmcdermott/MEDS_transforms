@@ -9,8 +9,8 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_polars_functions import PREPROCESS_CONFIG_YAML
-from MEDS_polars_functions.utils import hydra_loguru_init
+from MEDS_transforms import PREPROCESS_CONFIG_YAML
+from MEDS_transforms.utils import hydra_loguru_init
 
 
 class VOCABULARY_ORDERING(StrEnum):

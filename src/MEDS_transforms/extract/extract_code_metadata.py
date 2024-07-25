@@ -13,12 +13,12 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_polars_functions.extract import CONFIG_YAML
-from MEDS_polars_functions.extract.convert_to_sharded_events import get_code_expr
-from MEDS_polars_functions.extract.parser import cfg_to_expr
-from MEDS_polars_functions.extract.utils import get_supported_fp
-from MEDS_polars_functions.mapreduce.mapper import rwlock_wrap
-from MEDS_polars_functions.utils import stage_init, write_lazyframe
+from MEDS_transforms.extract import CONFIG_YAML
+from MEDS_transforms.extract.convert_to_sharded_events import get_code_expr
+from MEDS_transforms.extract.parser import cfg_to_expr
+from MEDS_transforms.extract.utils import get_supported_fp
+from MEDS_transforms.mapreduce.mapper import rwlock_wrap
+from MEDS_transforms.utils import stage_init, write_lazyframe
 
 
 def extract_metadata(

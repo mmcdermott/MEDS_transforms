@@ -1,4 +1,4 @@
-# MEDS polars functions
+# MEDS Transforms
 
 This repository contains a set of functions and scripts for extraction to and transformation/pre-processing of
 MEDS-formatted data.
@@ -428,6 +428,6 @@ options (the `--cfg job --resolve` is just to make hydra show the induced, resol
 to run anything):
 
 ```bash
-MEDS_polars_functions on  reusable_interface [$⇡] is 󰏗 v0.0.1 via  v3.12.4 via  MEDS_fns
-❯ ./src/MEDS_polars_functions/scripts/preprocessing/normalize.py input_dir=foo cohort_dir=bar 'stages=["normalize", "tensorize"]' --cfg job --resolve
+MEDS_transforms on  reusable_interface [$⇡] is 󰏗 v0.0.1 via  v3.12.4 via  MEDS_fns
+❯ ./src/MEDS_transforms/scripts/preprocessing/normalize.py input_dir=foo cohort_dir=bar 'stages=["normalize", "tensorize"]' --cfg job --resolve
 ```

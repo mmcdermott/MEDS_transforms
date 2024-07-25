@@ -1,7 +1,7 @@
 from importlib.metadata import PackageNotFoundError, version
 from importlib.resources import files
 
-__package_name__ = "MEDS_polars_functions"
+__package_name__ = "MEDS_transforms"
 try:
     __version__ = version(__package_name__)
 except PackageNotFoundError:
