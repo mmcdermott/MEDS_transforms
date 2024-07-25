@@ -28,12 +28,26 @@ local_parallelism = ["hydra-joblib-launcher"]
 slurm_parallelism = ["hydra-submitit-launcher"]
 
 [project.scripts]
+# MEDS_extract
 MEDS_extract-split_and_shard_patients = "MEDS_polars_functions.extract.split_and_shard_patients:main"
 MEDS_extract-shard_events = "MEDS_polars_functions.extract.shard_events:main"
 MEDS_extract-convert_to_sharded_events = "MEDS_polars_functions.extract.convert_to_sharded_events:main"
 MEDS_extract-merge_to_MEDS_cohort = "MEDS_polars_functions.extract.merge_to_MEDS_cohort:main"
-MEDS_transform-aggregate_code_metadata = "MEDS_polars_functions.aggregate_code_metadata:main"
 MEDS_extract-extract_code_metadata = "MEDS_polars_functions.extract.extract_code_metadata:main"
+
+# MEDS_transform
+## General
+MEDS_transform-aggregate_code_metadata = "MEDS_polars_functions.aggregate_code_metadata:main"
+MEDS_transform-fit_vocabulary_indices = "MEDS_polars_functions.fit_vocabulary_indices:main"
+## Filters
+MEDS_transform-filter_measurements = "MEDS_polars_functions.filters.filter_measurements:main"
+MEDS_transform-filter_patients = "MEDS_polars_functions.filters.filter_patients:main"
+## Transforms
+MEDS_transform-add_time_derived_measurements = "MEDS_polars_functions.transforms.add_time_derived_measurements:main"
+MEDS_transform-normalization = "MEDS_polars_functions.transforms.normalization:main"
+MEDS_transform-occlude_outliers = "MEDS_polars_functions.transforms.occlude_outliers:main"
+MEDS_transform-tensorization = "MEDS_polars_functions.transforms.tensorization:main"
+MEDS_transform-tokenization = "MEDS_polars_functions.transforms.tokenization:main"
 
 [project.urls]
 Homepage = "https://github.com/mmcdermott/MEDS_polars_functions"

@@ -5,7 +5,6 @@ import time
 from collections.abc import Callable, Sequence
 from datetime import datetime
 from enum import StrEnum
-from importlib.resources import files
 from pathlib import Path
 from typing import NamedTuple
 
@@ -15,6 +14,7 @@ import polars.selectors as cs
 from loguru import logger
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
+from MEDS_polars_functions import PREPROCESS_CONFIG_YAML
 from MEDS_polars_functions.mapreduce.mapper import map_over
 from MEDS_polars_functions.utils import write_lazyframe
 
@@ -592,10 +592,9 @@ def run_map_reduce(cfg: DictConfig):
     logger.info(f"Finished reduction in {datetime.now() - start}")
 
 
-config_yaml = files("MEDS_polars_functions").joinpath("configs/preprocess.yaml")
-
-
-@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
+@hydra.main(
+    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
+)
 def main(cfg: DictConfig):
     """Computes code metadata."""
 

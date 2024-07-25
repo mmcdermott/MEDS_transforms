@@ -1,5 +1,5 @@
-from importlib.resources import files
+from MEDS_polars_functions import EXTRACT_CONFIG_YAML
 
-from MEDS_polars_functions import __package_name__
-
-CONFIG_YAML = files(__package_name__).joinpath("configs/extract.yaml")
+# We set this equality explicitly here so linting does not remove an apparently "unused" import if we just
+# rename with "as" during the import.
+CONFIG_YAML = EXTRACT_CONFIG_YAML

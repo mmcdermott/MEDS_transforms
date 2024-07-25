@@ -2,13 +2,13 @@
 """A polars-to-polars transformation function for filtering patients by sequence length."""
 from collections.abc import Callable
 from functools import partial
-from importlib.resources import files
 
 import hydra
 import polars as pl
 from loguru import logger
 from omegaconf import DictConfig
 
+from MEDS_polars_functions import PREPROCESS_CONFIG_YAML
 from MEDS_polars_functions.mapreduce.mapper import map_over
 from MEDS_polars_functions.utils import hydra_loguru_init
 
@@ -100,11 +100,11 @@ def filter_patients_by_num_events(df: pl.LazyFrame, min_events_per_patient: int)
 
     Examples:
         >>> df = pl.DataFrame({
-        ...     "patient_id": [1, 1, 1, 2, 2, 2, 3, 3, 3],
-        ...     "timestamp": [1, 1, 1, 1, 2, 1, 1, 2, 3],
+        ...     "patient_id": [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4],
+        ...     "timestamp": [1, 1, 1, 1, 2, 1, 1, 2, 3, None, None, 1, 2, 3],
         ... })
         >>> filter_patients_by_num_events(df, 1)
-        shape: (9, 2)
+        shape: (14, 2)
         ┌────────────┬───────────┐
         │ patient_id ┆ timestamp │
         │ ---        ┆ ---       │
@@ -119,9 +119,14 @@ def filter_patients_by_num_events(df: pl.LazyFrame, min_events_per_patient: int)
         │ 3          ┆ 1         │
         │ 3          ┆ 2         │
         │ 3          ┆ 3         │
+        │ 4          ┆ null      │
+        │ 4          ┆ null      │
+        │ 4          ┆ 1         │
+        │ 4          ┆ 2         │
+        │ 4          ┆ 3         │
         └────────────┴───────────┘
         >>> filter_patients_by_num_events(df, 2)
-        shape: (6, 2)
+        shape: (11, 2)
         ┌────────────┬───────────┐
         │ patient_id ┆ timestamp │
         │ ---        ┆ ---       │
@@ -133,9 +138,14 @@ def filter_patients_by_num_events(df: pl.LazyFrame, min_events_per_patient: int)
         │ 3          ┆ 1         │
         │ 3          ┆ 2         │
         │ 3          ┆ 3         │
+        │ 4          ┆ null      │
+        │ 4          ┆ null      │
+        │ 4          ┆ 1         │
+        │ 4          ┆ 2         │
+        │ 4          ┆ 3         │
         └────────────┴───────────┘
         >>> filter_patients_by_num_events(df, 3)
-        shape: (3, 2)
+        shape: (8, 2)
         ┌────────────┬───────────┐
         │ patient_id ┆ timestamp │
         │ ---        ┆ ---       │
@@ -144,8 +154,26 @@ def filter_patients_by_num_events(df: pl.LazyFrame, min_events_per_patient: int)
         │ 3          ┆ 1         │
         │ 3          ┆ 2         │
         │ 3          ┆ 3         │
+        │ 4          ┆ null      │
+        │ 4          ┆ null      │
+        │ 4          ┆ 1         │
+        │ 4          ┆ 2         │
+        │ 4          ┆ 3         │
         └────────────┴───────────┘
         >>> filter_patients_by_num_events(df, 4)
+        shape: (5, 2)
+        ┌────────────┬───────────┐
+        │ patient_id ┆ timestamp │
+        │ ---        ┆ ---       │
+        │ i64        ┆ i64       │
+        ╞════════════╪═══════════╡
+        │ 4          ┆ null      │
+        │ 4          ┆ null      │
+        │ 4          ┆ 1         │
+        │ 4          ┆ 2         │
+        │ 4          ┆ 3         │
+        └────────────┴───────────┘
+        >>> filter_patients_by_num_events(df, 5)
         shape: (0, 2)
         ┌────────────┬───────────┐
         │ patient_id ┆ timestamp │
@@ -194,11 +222,12 @@ def filter_patients_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.L
             data = compute_fn(data)
         return data
 
+    return fn
 
-config_yaml = files("MEDS_polars_functions").joinpath("configs/preprocess.yaml")
 
-
-@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
+@hydra.main(
+    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
+)
 def main(cfg: DictConfig):
     """TODO."""
 
