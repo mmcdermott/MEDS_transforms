@@ -19,7 +19,7 @@ from .utils import assert_df_equal, parse_meds_csvs, run_command
 
 root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
-code_root = root / "src" / "MEDS_polars_functions"
+code_root = root / "src" / "MEDS_transforms"
 transforms_root = code_root / "transforms"
 filters_root = code_root / "filters"
 

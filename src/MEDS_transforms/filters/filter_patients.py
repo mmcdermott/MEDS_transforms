@@ -8,9 +8,9 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig
 
-from MEDS_polars_functions import PREPROCESS_CONFIG_YAML
-from MEDS_polars_functions.mapreduce.mapper import map_over
-from MEDS_polars_functions.utils import hydra_loguru_init
+from MEDS_transforms import PREPROCESS_CONFIG_YAML
+from MEDS_transforms.mapreduce.mapper import map_over
+from MEDS_transforms.utils import hydra_loguru_init
 
 
 def filter_patients_by_num_measurements(df: pl.LazyFrame, min_measurements_per_patient: int) -> pl.LazyFrame:

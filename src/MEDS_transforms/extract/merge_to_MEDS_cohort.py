@@ -7,8 +7,8 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig
 
-from MEDS_polars_functions.extract import CONFIG_YAML
-from MEDS_polars_functions.mapreduce.mapper import map_over, shard_iterator
+from MEDS_transforms.extract import CONFIG_YAML
+from MEDS_transforms.mapreduce.mapper import map_over, shard_iterator
 
 pl.enable_string_cache()
 
