@@ -206,6 +206,8 @@ patient_id,timestamp,code,numerical_value
 1500733,"06/03/2010, 16:44:26",4,
 """
 
+NORMALIZED_MEDS_SCHEMA = {**MEDS_PL_SCHEMA, "code": pl.UInt8}
+
 WANT_SHARDS = parse_meds_csvs(
     {
         "train/0": WANT_TRAIN_0,
@@ -213,10 +215,7 @@ WANT_SHARDS = parse_meds_csvs(
         "tuning/0": WANT_TUNING_0,
         "held_out/0": WANT_HELD_OUT_0,
     },
-    schema={
-        **MEDS_PL_SCHEMA,
-        "code": pl.UInt8,
-    },
+    schema=NORMALIZED_MEDS_SCHEMA,
 )
 
 

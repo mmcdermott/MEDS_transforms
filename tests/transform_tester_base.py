@@ -33,8 +33,8 @@ if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT = transforms_root / "add_time_derived_measurements.py"
     NORMALIZATION_SCRIPT = transforms_root / "normalization.py"
     OCCLUDE_OUTLIERS_SCRIPT = transforms_root / "occlude_outliers.py"
-    TENSORIZE_SCRIPT = transforms_root / "tensorize.py"
-    TOKENIZE_SCRIPT = transforms_root / "tokenize.py"
+    TENSORIZATION_SCRIPT = transforms_root / "tensorization.py"
+    TOKENIZATION_SCRIPT = transforms_root / "tokenization.py"
 else:
     # Root Source
     FIT_VOCABULARY_INDICES_SCRIPT = "MEDS_transform-fit_vocabulary_indices"
@@ -47,8 +47,8 @@ else:
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT = "MEDS_transform-add_time_derived_measurements"
     NORMALIZATION_SCRIPT = "MEDS_transform-normalization"
     OCCLUDE_OUTLIERS_SCRIPT = "MEDS_transform-occlude_outliers"
-    TENSORIZE_SCRIPT = "MEDS_transform-tensorize"
-    TOKENIZE_SCRIPT = "MEDS_transform-tokenize"
+    TENSORIZATION_SCRIPT = "MEDS_transform-tensorization"
+    TOKENIZATION_SCRIPT = "MEDS_transform-tokenization"
 
 pl.enable_string_cache()
 
@@ -219,6 +219,7 @@ def single_stage_transform_tester(
     transform_stage_kwargs: dict[str, str] | None,
     want_outputs: pl.DataFrame | dict[str, pl.DataFrame],
     code_metadata: pl.DataFrame | str | None = None,
+    input_shards: dict[str, pl.DataFrame] | None = None,
     do_pass_stage_name: bool = False,
 ):
     with tempfile.TemporaryDirectory() as d:
@@ -233,8 +234,11 @@ def single_stage_transform_tester(
         splits_fp = MEDS_dir / "splits.json"
         splits_fp.write_text(json.dumps(SPLITS))
 
+        if input_shards is None:
+            input_shards = MEDS_SHARDS
+
         # Write the shards
-        for shard_name, df in MEDS_SHARDS.items():
+        for shard_name, df in input_shards.items():
             fp = MEDS_dir / f"{shard_name}.parquet"
             fp.parent.mkdir(parents=True, exist_ok=True)
             df.write_parquet(fp, use_pyarrow=True)
