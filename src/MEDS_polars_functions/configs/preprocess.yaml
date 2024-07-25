@@ -6,7 +6,7 @@ defaults:
       - count_code_occurrences
       - filter_measurements
       - fit_outlier_detection
-      - filter_outliers
+      - occlude_outliers
       - fit_normalization
       - fit_vocabulary_indices
   - _self_
@@ -28,7 +28,7 @@ stages:
   - preliminary_counts
   - filter_measurements
   - fit_outlier_detection
-  - filter_outliers
+  - occlude_outliers
   - fit_normalization
   - fit_vocabulary_indices
   - normalization
