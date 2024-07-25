@@ -104,7 +104,7 @@ def main(cfg: DictConfig):
     map_over(
         cfg,
         compute_fn=convert_to_NRT,
-        output_fn=JointNestedRaggedTensorDict.save,
+        write_fn=JointNestedRaggedTensorDict.save,
         shard_iterator_fntr=partial(shard_iterator, in_prefix="event_seqs/", out_suffix=".nrt"),
     )
 

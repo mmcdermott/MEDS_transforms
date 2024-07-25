@@ -10,8 +10,10 @@ import tempfile
 from io import StringIO
 from pathlib import Path
 
+import numpy as np
 import polars as pl
 import rootutils
+from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 
 from .utils import assert_df_equal, parse_meds_csvs, run_command
 
@@ -187,7 +189,74 @@ def parse_code_metadata_csv(csv_str: str) -> pl.DataFrame:
 MEDS_CODE_METADATA = parse_code_metadata_csv(MEDS_CODE_METADATA_CSV)
 
 
-def check_output(
+def check_NRT_output(
+    output_fp: Path,
+    want_nrt: JointNestedRaggedTensorDict,
+    stderr: str,
+    stdout: str,
+):
+    assert output_fp.is_file(), f"Expected {output_fp} to exist."
+
+    got_nrt = JointNestedRaggedTensorDict.load(output_fp)
+
+    # assert got_nrt.schema == want_nrt.schema, (
+    #    f"Expected the schema of the NRT at {output_fp} to be equal to the target.\n"
+    #    f"Script stdout:\n{stdout}\n"
+    #    f"Script stderr:\n{stderr}\n"
+    #    f"Wanted:\n{want_nrt.schema}\n"
+    #    f"Got:\n{got_nrt.schema}"
+    # )
+
+    want_tensors = want_nrt.tensors
+    got_tensors = got_nrt.tensors
+
+    assert got_tensors.keys() == want_tensors.keys(), (
+        f"Expected the keys of the NRT at {output_fp} to be equal to the target.\n"
+        f"Script stdout:\n{stdout}\n"
+        f"Script stderr:\n{stderr}\n"
+        f"Wanted:\n{list(want_tensors.keys())}\n"
+        f"Got:\n{list(got_tensors.keys())}"
+    )
+
+    for k in want_tensors.keys():
+        want_v = want_tensors[k]
+        got_v = got_tensors[k]
+
+        assert type(want_v) is type(got_v), (
+            f"Expected tensor {k} of the NRT at {output_fp} to be of the same type as the target.\n"
+            f"Script stdout:\n{stdout}\n"
+            f"Script stderr:\n{stderr}\n"
+            f"Wanted:\n{type(want_v)}\n"
+            f"Got:\n{type(got_v)}"
+        )
+
+        if isinstance(want_v, list):
+            assert len(want_v) == len(got_v), (
+                f"Expected list {k} of the NRT at {output_fp} to be of the same length as the target.\n"
+                f"Script stdout:\n{stdout}\n"
+                f"Script stderr:\n{stderr}\n"
+                f"Wanted:\n{len(want_v)}\n"
+                f"Got:\n{len(got_v)}"
+            )
+            for i, (want_i, got_i) in enumerate(zip(want_v, got_v)):
+                assert np.array_equal(want_i, got_i, equal_nan=True), (
+                    f"Expected tensor {k}[{i}] of the NRT at {output_fp} to be equal to the target.\n"
+                    f"Script stdout:\n{stdout}\n"
+                    f"Script stderr:\n{stderr}\n"
+                    f"Wanted:\n{want_i}\n"
+                    f"Got:\n{got_i}"
+                )
+        else:
+            assert np.array_equal(want_v, got_v, equal_nan=True), (
+                f"Expected tensor {k} of the NRT at {output_fp} to be equal to the target.\n"
+                f"Script stdout:\n{stdout}\n"
+                f"Script stderr:\n{stderr}\n"
+                f"Wanted:\n{want_v}\n"
+                f"Got:\n{got_v}"
+            )
+
+
+def check_df_output(
     output_fp: Path,
     want_df: pl.DataFrame,
     stderr: str,
@@ -221,6 +290,7 @@ def single_stage_transform_tester(
     code_metadata: pl.DataFrame | str | None = None,
     input_shards: dict[str, pl.DataFrame] | None = None,
     do_pass_stage_name: bool = False,
+    file_suffix: str = ".parquet",
 ):
     with tempfile.TemporaryDirectory() as d:
         MEDS_dir = Path(d) / "MEDS_cohort"
@@ -272,7 +342,13 @@ def single_stage_transform_tester(
         # Check the output
         if isinstance(want_outputs, pl.DataFrame):
             # The want output is a code_metadata file in the root directory in this case.
-            check_output(cohort_dir / "code_metadata.parquet", want_outputs, stderr, stdout)
+            check_df_output(cohort_dir / "code_metadata.parquet", want_outputs, stderr, stdout)
         else:
-            for shard_name, want_df in want_outputs.items():
-                check_output(cohort_dir / stage_name / f"{shard_name}.parquet", want_df, stderr, stdout)
+            for shard_name, want in want_outputs.items():
+                output_fp = cohort_dir / stage_name / f"{shard_name}{file_suffix}"
+                if file_suffix == ".parquet":
+                    check_df_output(output_fp, want, stderr, stdout)
+                elif file_suffix == ".nrt":
+                    check_NRT_output(output_fp, want, stderr, stdout)
+                else:
+                    raise ValueError(f"Unknown file suffix: {file_suffix}")
