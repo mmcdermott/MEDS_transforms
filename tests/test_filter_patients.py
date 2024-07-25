@@ -77,7 +77,7 @@ WANT_SHARDS = parse_meds_csvs(
 )
 
 
-def test_filter_measurements():
+def test_filter_patients():
     single_stage_transform_tester(
         transform_script=FILTER_PATIENTS_SCRIPT,
         stage_name="filter_patients",

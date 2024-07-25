@@ -238,7 +238,7 @@ WANT_SHARDS = parse_meds_csvs(
 )
 
 
-def test_filter_measurements():
+def test_add_time_derived_measurements():
     single_stage_transform_tester(
         transform_script=ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT,
         stage_name="add_time_derived_measurements",

@@ -31,7 +31,7 @@ if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
 
     # Transforms
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT = transforms_root / "add_time_derived_measurements.py"
-    NORMALIZATION_SCRIPT = transforms_root / "normalize_measurements.py"
+    NORMALIZATION_SCRIPT = transforms_root / "normalization.py"
     OCCLUDE_OUTLIERS_SCRIPT = transforms_root / "occlude_outliers.py"
     TENSORIZE_SCRIPT = transforms_root / "tensorize.py"
     TOKENIZE_SCRIPT = transforms_root / "tokenize.py"
@@ -45,7 +45,7 @@ else:
 
     # Transforms
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT = "MEDS_transform-add_time_derived_measurements"
-    NORMALIZATION_SCRIPT = "MEDS_transform-normalize_measurements"
+    NORMALIZATION_SCRIPT = "MEDS_transform-normalization"
     OCCLUDE_OUTLIERS_SCRIPT = "MEDS_transform-occlude_outliers"
     TENSORIZE_SCRIPT = "MEDS_transform-tensorize"
     TOKENIZE_SCRIPT = "MEDS_transform-tokenize"
@@ -174,9 +174,17 @@ MEDS_CODE_METADATA_SCHEMA = {
     "values/sum_sqd": pl.Float32,
     "description": pl.Utf8,
     "parent_code": pl.Utf8,
+    "code/vocab_index": pl.UInt8,
 }
 
-MEDS_CODE_METADATA = pl.read_csv(StringIO(MEDS_CODE_METADATA_CSV), schema=MEDS_CODE_METADATA_SCHEMA)
+
+def parse_code_metadata_csv(csv_str: str) -> pl.DataFrame:
+    cols = csv_str.strip().split("\n")[0].split(",")
+    schema = {col: dt for col, dt in MEDS_CODE_METADATA_SCHEMA.items() if col in cols}
+    return pl.read_csv(StringIO(csv_str), schema=schema)
+
+
+MEDS_CODE_METADATA = parse_code_metadata_csv(MEDS_CODE_METADATA_CSV)
 
 
 def check_output(
@@ -210,6 +218,7 @@ def single_stage_transform_tester(
     stage_name: str,
     transform_stage_kwargs: dict[str, str] | None,
     want_outputs: pl.DataFrame | dict[str, pl.DataFrame],
+    code_metadata: pl.DataFrame | str | None = None,
     do_pass_stage_name: bool = False,
 ):
     with tempfile.TemporaryDirectory() as d:
@@ -231,7 +240,11 @@ def single_stage_transform_tester(
             df.write_parquet(fp, use_pyarrow=True)
 
         code_metadata_fp = MEDS_dir / "code_metadata.parquet"
-        MEDS_CODE_METADATA.write_parquet(code_metadata_fp, use_pyarrow=True)
+        if code_metadata is None:
+            code_metadata = MEDS_CODE_METADATA
+        elif isinstance(code_metadata, str):
+            code_metadata = parse_code_metadata_csv(code_metadata)
+        code_metadata.write_parquet(code_metadata_fp, use_pyarrow=True)
 
         pipeline_config_kwargs = {
             "input_dir": str(MEDS_dir.resolve()),

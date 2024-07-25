@@ -188,16 +188,30 @@ def normalize(
     else:
         cols_to_select.append(stddev_col.alias("values/std"))
 
-    return df.join(
-        code_metadata.select(cols_to_select),
-        on=["code"] + code_modifiers,
-        how="inner",
-        join_nulls=True,
-    ).select(
-        "patient_id",
-        "timestamp",
-        pl.col("code/vocab_index").alias("code"),
-        ((pl.col("numerical_value") - pl.col("values/mean")) / pl.col("values/std")).alias("numerical_value"),
+    idx_col = "_row_idx"
+    df_cols = df.collect_schema().names()
+    while idx_col in df_cols:
+        idx_col = f"_{idx_col}"
+
+    return (
+        df.with_row_index(idx_col)
+        .join(
+            code_metadata.select(cols_to_select),
+            on=["code"] + code_modifiers,
+            how="inner",
+            join_nulls=True,
+        )
+        .select(
+            idx_col,
+            "patient_id",
+            "timestamp",
+            pl.col("code/vocab_index").alias("code"),
+            ((pl.col("numerical_value") - pl.col("values/mean")) / pl.col("values/std")).alias(
+                "numerical_value"
+            ),
+        )
+        .sort(idx_col)
+        .drop(idx_col)
     )
 
 
