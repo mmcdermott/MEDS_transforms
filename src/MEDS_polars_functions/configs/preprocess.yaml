@@ -31,6 +31,6 @@ stages:
   - filter_outliers
   - fit_normalization
   - fit_vocabulary_indices
-  - normalize
+  - normalization
   - tokenization
-  - tensorize
+  - tensorization
