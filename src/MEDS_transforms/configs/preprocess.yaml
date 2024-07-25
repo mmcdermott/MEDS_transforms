@@ -4,9 +4,9 @@ defaults:
       - filter_patients
       - add_time_derived_measurements
       - count_code_occurrences
-      - filter_codes
+      - filter_measurements
       - fit_outlier_detection
-      - filter_outliers
+      - occlude_outliers
       - fit_normalization
       - fit_vocabulary_indices
   - _self_
@@ -26,11 +26,11 @@ stages:
   - filter_patients
   - add_time_derived_measurements
   - preliminary_counts
-  - filter_codes
+  - filter_measurements
   - fit_outlier_detection
-  - filter_outliers
+  - occlude_outliers
   - fit_normalization
   - fit_vocabulary_indices
-  - normalize
+  - normalization
   - tokenization
-  - tensorize
+  - tensorization

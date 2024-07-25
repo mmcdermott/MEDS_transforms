@@ -10,8 +10,8 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_polars_functions import __package_name__ as package_name
-from MEDS_polars_functions import __version__ as package_version
+from MEDS_transforms import __package_name__ as package_name
+from MEDS_transforms import __version__ as package_version
 
 pl.enable_string_cache()
 

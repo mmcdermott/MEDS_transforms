@@ -2,14 +2,14 @@
 """Transformations for normalizing MEDS datasets, across both categorical and continuous dimensions."""
 
 from functools import partial
-from importlib.resources import files
 from pathlib import Path
 
 import hydra
 import polars as pl
 from omegaconf import DictConfig
 
-from MEDS_polars_functions.mapreduce.mapper import map_over
+from MEDS_transforms import PREPROCESS_CONFIG_YAML
+from MEDS_transforms.mapreduce.mapper import map_over
 
 
 def normalize(
@@ -188,23 +188,36 @@ def normalize(
     else:
         cols_to_select.append(stddev_col.alias("values/std"))
 
-    return df.join(
-        code_metadata.select(cols_to_select),
-        on=["code"] + code_modifiers,
-        how="inner",
-        join_nulls=True,
-    ).select(
-        "patient_id",
-        "timestamp",
-        pl.col("code/vocab_index").alias("code"),
-        ((pl.col("numerical_value") - pl.col("values/mean")) / pl.col("values/std")).alias("numerical_value"),
+    idx_col = "_row_idx"
+    df_cols = df.collect_schema().names()
+    while idx_col in df_cols:
+        idx_col = f"_{idx_col}"
+
+    return (
+        df.with_row_index(idx_col)
+        .join(
+            code_metadata.select(cols_to_select),
+            on=["code"] + code_modifiers,
+            how="inner",
+            join_nulls=True,
+        )
+        .select(
+            idx_col,
+            "patient_id",
+            "timestamp",
+            pl.col("code/vocab_index").alias("code"),
+            ((pl.col("numerical_value") - pl.col("values/mean")) / pl.col("values/std")).alias(
+                "numerical_value"
+            ),
+        )
+        .sort(idx_col)
+        .drop(idx_col)
     )
 
 
-config_yaml = files("MEDS_polars_functions").joinpath("configs/preprocess.yaml")
-
-
-@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
+@hydra.main(
+    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
+)
 def main(cfg: DictConfig):
     """TODO."""
 

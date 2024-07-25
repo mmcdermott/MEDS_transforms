@@ -3,7 +3,7 @@ requires = ["setuptools>=64", "setuptools-scm>=8.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "MEDS_polars_functions"
+name = "MEDS_transforms"
 dynamic = ["version"]
 authors = [
   { name="Matthew McDermott", email="mattmcdermott8@gmail.com" },
@@ -28,13 +28,27 @@ local_parallelism = ["hydra-joblib-launcher"]
 slurm_parallelism = ["hydra-submitit-launcher"]
 
 [project.scripts]
-MEDS_extract-split_and_shard_patients = "MEDS_polars_functions.extract.split_and_shard_patients:main"
-MEDS_extract-shard_events = "MEDS_polars_functions.extract.shard_events:main"
-MEDS_extract-convert_to_sharded_events = "MEDS_polars_functions.extract.convert_to_sharded_events:main"
-MEDS_extract-merge_to_MEDS_cohort = "MEDS_polars_functions.extract.merge_to_MEDS_cohort:main"
-MEDS_transform-aggregate_code_metadata = "MEDS_polars_functions.aggregate_code_metadata:main"
-MEDS_extract-extract_code_metadata = "MEDS_polars_functions.extract.extract_code_metadata:main"
+# MEDS_extract
+MEDS_extract-split_and_shard_patients = "MEDS_transforms.extract.split_and_shard_patients:main"
+MEDS_extract-shard_events = "MEDS_transforms.extract.shard_events:main"
+MEDS_extract-convert_to_sharded_events = "MEDS_transforms.extract.convert_to_sharded_events:main"
+MEDS_extract-merge_to_MEDS_cohort = "MEDS_transforms.extract.merge_to_MEDS_cohort:main"
+MEDS_extract-extract_code_metadata = "MEDS_transforms.extract.extract_code_metadata:main"
+
+# MEDS_transform
+## General
+MEDS_transform-aggregate_code_metadata = "MEDS_transforms.aggregate_code_metadata:main"
+MEDS_transform-fit_vocabulary_indices = "MEDS_transforms.fit_vocabulary_indices:main"
+## Filters
+MEDS_transform-filter_measurements = "MEDS_transforms.filters.filter_measurements:main"
+MEDS_transform-filter_patients = "MEDS_transforms.filters.filter_patients:main"
+## Transforms
+MEDS_transform-add_time_derived_measurements = "MEDS_transforms.transforms.add_time_derived_measurements:main"
+MEDS_transform-normalization = "MEDS_transforms.transforms.normalization:main"
+MEDS_transform-occlude_outliers = "MEDS_transforms.transforms.occlude_outliers:main"
+MEDS_transform-tensorization = "MEDS_transforms.transforms.tensorization:main"
+MEDS_transform-tokenization = "MEDS_transforms.transforms.tokenization:main"
 
 [project.urls]
-Homepage = "https://github.com/mmcdermott/MEDS_polars_functions"
-Issues = "https://github.com/mmcdermott/MEDS_polars_functions/issues"
+Homepage = "https://github.com/mmcdermott/MEDS_transforms"
+Issues = "https://github.com/mmcdermott/MEDS_transforms/issues"

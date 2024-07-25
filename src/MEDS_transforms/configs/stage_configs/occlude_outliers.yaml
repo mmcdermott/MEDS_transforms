@@ -1,2 +1,2 @@
-filter_outliers:
+occlude_outliers:
   stddev_cutoff: 4.5

@@ -10,7 +10,7 @@ import rootutils
 
 root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
-code_root = root / "src" / "MEDS_polars_functions"
+code_root = root / "src" / "MEDS_transforms"
 extraction_root = code_root / "extract"
 
 if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
@@ -29,13 +29,13 @@ else:
     EXTRACT_CODE_METADATA_SCRIPT = "MEDS_extract-extract_code_metadata"
 
 import json
-import subprocess
 import tempfile
 from io import StringIO
 from pathlib import Path
 
 import polars as pl
-from polars.testing import assert_frame_equal
+
+from .utils import assert_df_equal, run_command
 
 pl.enable_string_cache()
 
@@ -309,37 +309,6 @@ MEDS_OUTPUTS = {
     "tuning/0": [MEDS_OUTPUT_TUNING_0_SUBJECTS, MEDS_OUTPUT_TUNING_0_ADMIT_VITALS],
     "held_out/0": [MEDS_OUTPUT_HELD_OUT_0_SUBJECTS, MEDS_OUTPUT_HELD_OUT_0_ADMIT_VITALS],
 }
-
-
-def run_command(
-    script: Path | str, hydra_kwargs: dict[str, str], test_name: str, config_name: str | None = None
-):
-    script = ["python", str(script.resolve())] if isinstance(script, Path) else [script]
-    command_parts = script
-    if config_name is not None:
-        command_parts.append(f"--config-name={config_name}")
-    command_parts.extend([f"{k}={v}" for k, v in hydra_kwargs.items()])
-
-    full_cmd = " ".join(command_parts)
-    command_out = subprocess.run(full_cmd, shell=True, capture_output=True)
-
-    stderr = command_out.stderr.decode()
-    stdout = command_out.stdout.decode()
-    if command_out.returncode != 0:
-        raise AssertionError(f"{test_name} failed!\ncommand:{full_cmd}\nstdout:\n{stdout}\nstderr:\n{stderr}")
-    return stderr, stdout
-
-
-def assert_df_equal(want: pl.DataFrame, got: pl.DataFrame, msg: str = None, **kwargs):
-    try:
-        assert_frame_equal(want, got, **kwargs)
-    except AssertionError as e:
-        pl.Config.set_tbl_rows(-1)
-        print(f"DFs are not equal: {msg}\nwant:")
-        print(want)
-        print("got:")
-        print(got)
-        raise AssertionError(f"{msg}\n{e}") from e
 
 
 def test_extraction():

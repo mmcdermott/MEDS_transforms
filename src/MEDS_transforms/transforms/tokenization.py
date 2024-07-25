@@ -11,7 +11,6 @@ columns of concern here thus are `patient_id`, `timestamp`, `code`, `numerical_v
 
 import json
 import random
-from importlib.resources import files
 from pathlib import Path
 
 import hydra
@@ -19,8 +18,9 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_polars_functions.mapreduce.mapper import rwlock_wrap
-from MEDS_polars_functions.utils import hydra_loguru_init, write_lazyframe
+from MEDS_transforms import PREPROCESS_CONFIG_YAML
+from MEDS_transforms.mapreduce.mapper import rwlock_wrap
+from MEDS_transforms.utils import hydra_loguru_init, write_lazyframe
 
 SECONDS_PER_MINUTE = 60.0
 SECONDS_PER_HOUR = SECONDS_PER_MINUTE * 60.0
@@ -216,10 +216,9 @@ def extract_seq_of_patient_events(df: pl.LazyFrame) -> pl.LazyFrame:
     )
 
 
-config_yaml = files("MEDS_polars_functions").joinpath("configs/preprocess.yaml")
-
-
-@hydra.main(version_base=None, config_path=str(config_yaml.parent), config_name=config_yaml.stem)
+@hydra.main(
+    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
+)
 def main(cfg: DictConfig):
     """TODO."""
 

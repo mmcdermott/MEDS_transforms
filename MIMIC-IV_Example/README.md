@@ -31,8 +31,8 @@ up from this one).
 Download this repository and install the requirements:
 
 ```bash
-git clone git@github.com:mmcdermott/MEDS_polars_functions.git
-cd MEDS_polars_functions
+git clone git@github.com:mmcdermott/MEDS_transforms.git
+cd MEDS_transforms
 conda create -n MEDS python=3.12
 conda activate MEDS
 pip install .[examples]
@@ -117,14 +117,14 @@ To run the pre-processing steps for a model, consider the sample script provided
 1. Filter patients to only those with at least 32 events (unique timepoints):
 
 ```bash
-mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines
+mbm47 in  compute-a-17-72 in MEDS_transforms on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines
 ❯ ./scripts/preprocessing/filter_patients.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null stage_configs.filter_patients.min_events_per_patient=32
 ```
 
 2. Add time-derived measurements (age and time-of-day):
 
 ```bash
-mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 3s
+mbm47 in  compute-a-17-72 in MEDS_transforms on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 3s
 ❯ ./scripts/preprocessing/add_time_derived_measurements.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DI
 R/test" code_modifier_columns=null stage_configs.add_time_derived_measurements.age.DOB_code="DOB"
 ```
@@ -132,14 +132,14 @@ R/test" code_modifier_columns=null stage_configs.add_time_derived_measurements.a
 3. Get preliminary counts for code filtering:
 
 ```bash
-mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines
+mbm47 in  compute-a-17-72 in MEDS_transforms on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines
 ❯ ./scripts/preprocessing/collect_code_metadata.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null stage="preliminary_counts"
 ```
 
 4. Filter codes:
 
 ```bash
-mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 4s
+mbm47 in  compute-a-17-72 in MEDS_transforms on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 4s
 ❯ ./scripts/preprocessing/filter_codes.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modi
 fier_columns=null stage_configs.filter_codes.min_patients_per_code=128 stage_configs.filter_codes.min_occurrences_per_code=256
 ```
@@ -147,35 +147,35 @@ fier_columns=null stage_configs.filter_codes.min_patients_per_code=128 stage_con
 5. Get outlier detection params:
 
 ```bash
-mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 19m57s
+mbm47 in  compute-a-17-72 in MEDS_transforms on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 19m57s
 ❯ ./scripts/preprocessing/collect_code_metadata.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null stage=fit_outlier_detection
 ```
 
 6. Filter outliers:
 
 ```bash
-mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 5m14s
+mbm47 in  compute-a-17-72 in MEDS_transforms on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 5m14s
 ❯ ./scripts/preprocessing/filter_outliers.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null
 ```
 
 7. Fit normalization parameters:
 
 ```bash
-mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 16m25s
+mbm47 in  compute-a-17-72 in MEDS_transforms on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 16m25s
 ❯ ./scripts/preprocessing/collect_code_metadata.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null stage=fit_normalization
 ```
 
 8. Fit vocabulary:
 
 ```bash
-mbm47 in  compute-e-16-230 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 2s
+mbm47 in  compute-e-16-230 in MEDS_transforms on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 2s
 ❯ ./scripts/preprocessing/fit_vocabulary_indices.py input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null
 ```
 
 9. Normalize:
 
 ```bash
-mbm47 in  compute-e-16-230 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 4s
+mbm47 in  compute-e-16-230 in MEDS_transforms on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 4s
 ❯ ./scripts/preprocessing/normalize.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifie
 r_columns=null
 ```

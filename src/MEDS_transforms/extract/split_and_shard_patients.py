@@ -9,8 +9,8 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_polars_functions.extract import CONFIG_YAML
-from MEDS_polars_functions.utils import stage_init
+from MEDS_transforms.extract import CONFIG_YAML
+from MEDS_transforms.utils import stage_init
 
 
 def shard_patients[
