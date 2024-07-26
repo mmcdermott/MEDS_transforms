@@ -23,6 +23,8 @@ def merge_subdirs_and_sort(
 
     Args:
         sp_dir: The directory containing the subdirs with parquet files to be merged.
+        event_subsets: The list of event table paths passed to maintain the order in event_configs.yaml
+            while merging the events.
         unique_by: The list of columns that should be ensured to be unique after the dataframes are merged. If
             `None`, this is ignored. If `*`, all columns are used. If a list of strings, only the columns in
             the list are used. If a column is not found in the dataframe, it is omitted from the unique-by, a
