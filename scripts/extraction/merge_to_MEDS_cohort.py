@@ -49,7 +49,7 @@ def read_fn(sp_dir: Path, event_subsets: list[str], unique_by: list[str] | str |
         case _:
             raise ValueError(f"Invalid unique_by value: {unique_by}")
 
-    return df.sort(by=["patient_id", "timestamp"], maintain_order=True)
+    return df.sort(by=["patient_id", "timestamp"], maintain_order=True, multithreaded=False)
 
 
 def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
