@@ -14,11 +14,7 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig
 
-from MEDS_polars_functions.utils import (
-    get_shard_prefix,
-    hydra_loguru_init,
-    write_lazyframe,
-)
+from MEDS_transforms.utils import get_shard_prefix, hydra_loguru_init, write_lazyframe
 
 
 def load_raw_mimic_file(fp: Path, **kwargs) -> pl.LazyFrame:

@@ -5,7 +5,7 @@ from pathlib import Path
 import hydra
 import polars as pl
 from loguru import logger
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms.extract import CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over, shard_iterator
@@ -14,7 +14,10 @@ pl.enable_string_cache()
 
 
 def merge_subdirs_and_sort(
-    sp_dir: Path, unique_by: list[str] | str | None, additional_sort_by: list[str] | None = None
+    sp_dir: Path,
+    event_subsets: list[str],
+    unique_by: list[str] | str | None,
+    additional_sort_by: list[str] | None = None,
 ) -> pl.LazyFrame:
     """This function reads all parquet files in subdirs of `sp_dir` and merges them into a single dataframe.
 
@@ -147,11 +150,15 @@ def merge_subdirs_and_sort(
         │ 3          ┆ 8         ┆ E    │
         └────────────┴───────────┴──────┘
     """
-
-    files_to_read = list(sp_dir.glob("**/*.parquet"))
-
+    files_to_read = [fp for es in event_subsets for fp in (sp_dir / es).glob("*.parquet")]
     if not files_to_read:
-        raise FileNotFoundError(f"No files found in {sp_dir}/**/*.parquet.")
+        raise FileNotFoundError(f"No parquet files found in {sp_dir}/**/*.parquet.")
+
+    if len(dirs_to_read := {fp.parent for fp in files_to_read}) != len(event_subsets):
+        raise RuntimeError(
+            "Number of found subsets ({}) does not match "
+            "number of subsets in event_config ({}): {}".format(len(dirs_to_read), len(event_subsets), sp_dir)
+        )
 
     file_strs = "\n".join(f"  - {str(fp.resolve())}" for fp in files_to_read)
     logger.info(f"Reading {len(files_to_read)} files:\n{file_strs}")
@@ -185,7 +192,7 @@ def merge_subdirs_and_sort(
             else:
                 logger.warning(f"Column {s} not found in dataframe. Omitting from sort-by list.")
 
-    return df.sort(by=sort_by, multithreaded=False)
+    return df.sort(by=sort_by, maintain_order=True, multithreaded=False)
 
 
 @hydra.main(version_base=None, config_path=str(CONFIG_YAML.parent), config_name=CONFIG_YAML.stem)
@@ -214,9 +221,12 @@ def main(cfg: DictConfig):
     Returns:
         Writes the merged dataframes to the shard-specific output filepath in the `cfg.stage_cfg.output_dir`.
     """
+    event_conversion_cfg = OmegaConf.load(cfg.event_conversion_config_fp)
+    event_conversion_cfg.pop("patient_id_col", None)
 
     read_fn = partial(
         merge_subdirs_and_sort,
+        event_subsets=list(event_conversion_cfg.keys()),
         unique_by=cfg.stage_cfg.get("unique_by", None),
         additional_sort_by=cfg.stage_cfg.get("additional_sort_by", None),
     )
