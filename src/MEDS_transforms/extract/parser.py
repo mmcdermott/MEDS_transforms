@@ -296,7 +296,7 @@ def parse_col_expr(cfg: str | list | dict[str, str] | ListConfig | DictConfig) -
             return {"str": cfg}
         case str():
             return {"col": cfg}
-        case list() | ListConfig() if all(isinstance(x, (str, dict)) for x in cfg):
+        case list() | ListConfig() if all(isinstance(x, (str, dict, DictConfig)) for x in cfg):
             return [parse_col_expr(x) for x in cfg]
         case list() | ListConfig():
             raise ValueError(

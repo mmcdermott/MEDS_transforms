@@ -26,6 +26,9 @@ up from this one).
   - [ ] Debug and remove rows with null codes! (there are a lot of them)
   - [ ] Detailed validation
 
+Note: If you use the slurm system and you launch the hydra submitit jobs from an interactive slurm node, you
+may need to run `unset SLURM_CPU_BIND` in your terminal first to avoid errors.
+
 ## Step 0: Installation
 
 Download this repository and install the requirements:
@@ -44,6 +47,21 @@ Download the MIMIC-IV dataset from https://physionet.org/content/mimiciv/2.2/ fo
 that page. You will need the raw `.csv.gz` files for this example. We will use `$MIMICIV_RAW_DIR` to denote
 the root directory of where the resulting _core data files_ are stored -- e.g., there should be a `hosp` and
 `icu` subdirectory of `$MIMICIV_RAW_DIR`.
+
+## Step 1.5: Download MIMIC-IV Metadata files
+```bash
+cd $MIMIC_RAW_DIR
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/d_labitems_to_loinc.csv
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/inputevents_to_rxnorm.csv
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/lab_itemid_to_loinc.csv
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/meas_chartevents_main.csv
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/meas_chartevents_value.csv
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/numerics-summary.csv
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/outputevents_to_loinc.csv
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/proc_datetimeevents.csv
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/proc_itemid.csv
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/waveforms-summary.csv
+```
 
 ## Step 2: Run the basic MEDS ETL
 
