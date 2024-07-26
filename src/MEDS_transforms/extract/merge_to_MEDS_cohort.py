@@ -66,7 +66,7 @@ def merge_subdirs_and_sort(
         ... })
         >>> with TemporaryDirectory() as tmpdir:
         ...     sp_dir = Path(tmpdir)
-        ...     merge_subdirs_and_sort(sp_dir, unique_by=None)
+        ...     merge_subdirs_and_sort(sp_dir, event_subsets=[], unique_by=None)
         Traceback (most recent call last):
             ...
         FileNotFoundError: No files found in ...
