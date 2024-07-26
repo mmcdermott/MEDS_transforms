@@ -161,7 +161,7 @@ def extract_metadata(
     code_expr, _, needed_code_cols = get_code_expr(event_cfg.pop("code"))
 
     columns = metadata_df.collect_schema().names()
-    missing_cols = (needed_cols | needed_code_cols) - set(columns)
+    missing_cols = (needed_cols | needed_code_cols) - set(columns) - set(final_cols)
     if missing_cols:
         raise KeyError(f"Columns {missing_cols} not found in metadata columns: {columns}")
 
@@ -241,6 +241,7 @@ def get_events_and_metadata_by_metadata_fp(event_configs: dict | DictConfig) -> 
 
     Examples:
         >>> event_configs = {
+        ...     "patient_id_col": "MRN",
         ...     "icu/procedureevents": {
         ...         "patient_id_col": "subject_id",
         ...         "start": {
@@ -293,7 +294,10 @@ def get_events_and_metadata_by_metadata_fp(event_configs: dict | DictConfig) -> 
 
     out = {}
 
-    for event_cfgs_for_pfx in event_configs.values():
+    for file_pfx, event_cfgs_for_pfx in event_configs.items():
+        if file_pfx == "patient_id_col":
+            continue
+
         for event_key, event_cfg in event_cfgs_for_pfx.items():
             if event_key == "patient_id_col":
                 continue
@@ -342,6 +346,8 @@ def main(cfg: DictConfig):
         event_metadata_cfgs = copy.deepcopy(event_metadata_cfgs)
 
         metadata_fp, read_fn = get_supported_fp(raw_input_dir, input_prefix)
+        if metadata_fp.suffix != ".parquet":
+            read_fn = partial(read_fn, infer_schema_length=999999999)
         out_fp = partial_metadata_dir / f"{input_prefix}.parquet"
         logger.info(f"Extracting metadata from {metadata_fp} and saving to {out_fp}")
 
@@ -358,8 +364,9 @@ def main(cfg: DictConfig):
 
     logger.info("Starting reduction process")
 
-    while not all(fp.is_file() for fp in all_out_fps):
-        logger.info("Waiting to begin reduction for all files to be written...")
+    while not all(fp.exists() for fp in all_out_fps):
+        missing_files_str = "\n".join(f"  - {str(fp.resolve())}" for fp in all_out_fps if not fp.exists())
+        logger.info("Waiting to begin reduction for all files to be written...\n" f"{missing_files_str}")
         time.sleep(cfg.polling_time)
 
     start = datetime.now()
