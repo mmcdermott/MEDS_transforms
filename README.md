@@ -1,4 +1,4 @@
-# MEDS polars functions
+# MEDS Transforms
 
 This repository contains a set of functions and scripts for extraction to and transformation/pre-processing of
 MEDS-formatted data.
@@ -6,26 +6,25 @@ MEDS-formatted data.
 Completed functions include scripts and utilities for extraction of various forms of raw data into the MEDS
 format in a scalable, parallelizable manner, as well as general configuration management utilities for complex
 pipelines over MEDS data. In progress functions include more model-specific pre-processing steps for MEDS
-data. See the "Roadmap" section below and [this google
-doc](https://docs.google.com/document/d/14NKaIPAMKC1bXWV_IVJ7nQfMo09PpUQCRrqqVY6qVT4/edit?usp=sharing) for
-more information.
+data.
 
-Examples of these capabilities in action can be seen in the `MIMIC-IV_Example` and `eICU_Example` directories,
-which contain working, end-to-end examples to extract MEDS formatted data from MIMIC-IV v2.2 and eICU v2.0.
-These directories also have `README.md` files with more detailed information on how to run the scripts in
-those directories.
+Examples of these capabilities in action can be seen in the `MIMIC-IV_Example` directory,
+which contains a working, end-to-end examples to extract MEDS formatted data from MIMIC-IV v2.2. A working
+example for eICU v2.0 is also present, though needs to be adapted to recent interface improvements. These
+directories also have `README.md` files with more detailed information on how to run the scripts in those
+directories.
 
 ## Installation
 
 - For a base installation, clone this repository and run `pip install .` from the repository root.
 - For running the MIMIC-IV example, install the optional MIMIC dependencies as well with
-  `pip install .[mimic]`.
+  `pip install .[examples]`.
 - To support same-machine, process-based parallelism, install the optional joblib dependencies with `pip install .[local_parallelism]`.
 - To support cluster-based parallelism, install the optional submitit dependencies with
   `pip install .[slurm_parallelism]`.
 - For working on development, install the optional development dependencies with `pip install .[dev,tests]`.
 - Optional dependencies can be mutually installed by combining the optional dependency names with commas in
-  the square brackets, e.g., `pip install .[mimic,local_parallelism]`.
+  the square brackets, e.g., `pip install .[examples,local_parallelism]`.
 
 ## Design Philosophy
 
@@ -117,7 +116,7 @@ run with the `--help` flag, provide a detailed description of the script's purpo
 E.g.,
 
 ```bash
-❯ ./scripts/extraction/shard_events.py --help
+❯  MEDS_extract-shard_events --help
 == MEDS/shard_events ==
 MEDS/shard_events is a command line tool that provides an interface for running MEDS pipelines.
 
@@ -139,6 +138,25 @@ This stage shards the raw input events into smaller files for easier processing.
   - `infer_schema_length`: The number of rows to read in to infer the schema (only used if the source
     files are csvs)
 ```
+
+Note that these stage scripts can be used for either a full pipeline or just as a component of a larger,
+user-defined process -- it is up to the user to decide how to leverage these scripts in their own work.
+
+### As an importable library
+
+To use this repository as an importable library, the user should follow these steps:
+
+1. Install the repository as a package.
+2. Design your own transform function in your own codebase and leverage `MEDS_transform` utilities such as
+   `MEDS_transform.mapreduce.mapper.map_over` to easily apply your transform over a sharded MEDS dataset.
+3. Leverage the `MEDS_transforms` configuration schema to enable easy configuration of your pipeline, by
+   importing the MEDS transforms configs via your hydra search path and using them as a base for your own
+   configuration files, enabling you to intermix your new stage configuration with the existing MEDS
+   transform stages.
+4. Note that, if your transformations are sufficiently general, you can also submit a PR to add new
+   transformations to this repository, enabling others to leverage your work as well.
+   See [this example](https://github.com/mmcdermott/MEDS_transforms/pull/48) for an (in progress) example of
+   how to do this.
 
 ### As a template
 
@@ -420,3 +438,14 @@ To use either of these, you need to install additional optional dependencies:
    files. Similar to task configuration files, but for models.
 2. Figure out how to ensure that each pre-processing step reads from the right prior files. Likely need some
    kind of a "prior stage name" config variable.
+
+## Notes:
+
+You can overwrite the `stages` parameter on the command line to run a dynamic pipeline with just a subset of
+options (the `--cfg job --resolve` is just to make hydra show the induced, resolved config instead of trying
+to run anything):
+
+```bash
+MEDS_transforms on  reusable_interface [$⇡] is 󰏗 v0.0.1 via  v3.12.4 via  MEDS_fns
+❯ MEDS_transform-normalization input_dir=foo cohort_dir=bar 'stages=["normalization", "tensorization"]' --cfg job --resolve
+```

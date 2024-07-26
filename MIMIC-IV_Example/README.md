@@ -4,38 +4,16 @@ This is an example of how to extract a MEDS dataset from MIMIC-IV. All scripts i
 be run **not** from this directory but from the root directory of this entire repository (e.g., one directory
 up from this one).
 
-**Status**: This is a work in progress. The code is not yet functional. Remaining work includes:
-
-- [x] Implementing the pre-MEDS processing step.
-  - [x] Implement the joining of discharge times.
-  - [x] Implement the conversion of the DOB to a more usable format.
-  - [x] Implement the joining of death times.
-- [ ] Testing the pre-MEDS processing step on live MIMIC-IV.
-  - [x] Test that it runs at all.
-  - [ ] Test that the output is as expected.
-- [ ] Check the installation instructions on a fresh client.
-- [x] Testing the `configs/event_configs.yaml` configuration on MIMIC-IV
-- [x] Testing the MEDS extraction ETL runs on MIMIC-IV (this should be expected to work, but needs
-  live testing).
-  - [x] Sub-sharding
-  - [x] Patient split gathering
-  - [x] Event extraction
-  - [x] Merging
-- [ ] Validating the output MEDS cohort
-  - [x] Basic validation (even though file sizes are weird, the number of rows looks consistent).
-  - [ ] Debug and remove rows with null codes! (there are a lot of them)
-  - [ ] Detailed validation
-
 ## Step 0: Installation
 
 Download this repository and install the requirements:
 
 ```bash
-git clone git@github.com:mmcdermott/MEDS_polars_functions.git
-cd MEDS_polars_functions
+git clone git@github.com:mmcdermott/MEDS_transforms.git
+cd MEDS_transforms
 conda create -n MEDS python=3.12
 conda activate MEDS
-pip install .[examples]
+pip install .[examples,local_parallelism]
 ```
 
 ## Step 1: Download MIMIC-IV
@@ -44,6 +22,22 @@ Download the MIMIC-IV dataset from https://physionet.org/content/mimiciv/2.2/ fo
 that page. You will need the raw `.csv.gz` files for this example. We will use `$MIMICIV_RAW_DIR` to denote
 the root directory of where the resulting _core data files_ are stored -- e.g., there should be a `hosp` and
 `icu` subdirectory of `$MIMICIV_RAW_DIR`.
+
+## Step 1.5: Download MIMIC-IV Metadata files
+
+```bash
+cd $MIMIC_RAW_DIR
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/d_labitems_to_loinc.csv
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/inputevents_to_rxnorm.csv
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/lab_itemid_to_loinc.csv
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/meas_chartevents_main.csv
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/meas_chartevents_value.csv
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/numerics-summary.csv
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/outputevents_to_loinc.csv
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/proc_datetimeevents.csv
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/proc_itemid.csv
+wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/waveforms-summary.csv
+```
 
 ## Step 2: Run the basic MEDS ETL
 
@@ -110,76 +104,6 @@ This is a step in 4 parts:
 5. (Optional) Generate preliminary code statistics and merge to external metadata. This is not performed
    currently in the `joint_script*.sh` scripts.
 
-## Pre-processing for a model
-
-To run the pre-processing steps for a model, consider the sample script provided here:
-
-1. Filter patients to only those with at least 32 events (unique timepoints):
-
-```bash
-mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines
-❯ ./scripts/preprocessing/filter_patients.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null stage_configs.filter_patients.min_events_per_patient=32
-```
-
-2. Add time-derived measurements (age and time-of-day):
-
-```bash
-mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 3s
-❯ ./scripts/preprocessing/add_time_derived_measurements.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DI
-R/test" code_modifier_columns=null stage_configs.add_time_derived_measurements.age.DOB_code="DOB"
-```
-
-3. Get preliminary counts for code filtering:
-
-```bash
-mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines
-❯ ./scripts/preprocessing/collect_code_metadata.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null stage="preliminary_counts"
-```
-
-4. Filter codes:
-
-```bash
-mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 4s
-❯ ./scripts/preprocessing/filter_codes.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modi
-fier_columns=null stage_configs.filter_codes.min_patients_per_code=128 stage_configs.filter_codes.min_occurrences_per_code=256
-```
-
-5. Get outlier detection params:
-
-```bash
-mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 19m57s
-❯ ./scripts/preprocessing/collect_code_metadata.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null stage=fit_outlier_detection
-```
-
-6. Filter outliers:
-
-```bash
-mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 5m14s
-❯ ./scripts/preprocessing/filter_outliers.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null
-```
-
-7. Fit normalization parameters:
-
-```bash
-mbm47 in  compute-a-17-72 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 16m25s
-❯ ./scripts/preprocessing/collect_code_metadata.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null stage=fit_normalization
-```
-
-8. Fit vocabulary:
-
-```bash
-mbm47 in  compute-e-16-230 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 2s
-❯ ./scripts/preprocessing/fit_vocabulary_indices.py input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifier_columns=null
-```
-
-9. Normalize:
-
-```bash
-mbm47 in  compute-e-16-230 in MEDS_polars_functions on  preprocessing_steps [$] is 󰏗 v0.0.1 via  v3.12.3 via  MEDS_pipelines took 4s
-❯ ./scripts/preprocessing/normalize.py --multirun worker="range(0,3)" hydra/launcher=joblib input_dir="$MIMICIV_MEDS_DIR/3workers_slurm" cohort_dir="$MIMICIV_MEDS_PROC_DIR/test" code_modifie
-r_columns=null
-```
-
 ## Limitations / TO-DOs:
 
 Currently, some tables are ignored, including:
@@ -198,6 +122,11 @@ Other questions:
 
 1. How to handle merging the deathtimes between the hosp table and the patients table?
 2. How to handle the dob nonsense MIMIC has?
+
+## Notes
+
+Note: If you use the slurm system and you launch the hydra submitit jobs from an interactive slurm node, you
+may need to run `unset SLURM_CPU_BIND` in your terminal first to avoid errors.
 
 ## Future Work
 

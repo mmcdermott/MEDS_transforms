@@ -1,5 +1,7 @@
 # eICU-CRD Example
 
+## TODO -- This is not yet adapted to the 0.0.1 interface, but will be incorporated soon!
+
 This is an example of how to extract a MEDS dataset from [eICU-CRD
 v2.0](https://physionet.org/content/eicu-crd/2.0/). All scripts in this README are assumed to
 be run **not** from this directory but from the root directory of this entire repository (e.g., one directory
@@ -29,8 +31,8 @@ up from this one).
 Download this repository and install the requirements:
 
 ```bash
-git clone git@github.com:mmcdermott/MEDS_polars_functions.git
-cd MEDS_polars_functions
+git clone git@github.com:mmcdermott/MEDS_transforms.git
+cd MEDS_transforms
 conda create -n MEDS python=3.12
 conda activate MEDS
 pip install .[examples]

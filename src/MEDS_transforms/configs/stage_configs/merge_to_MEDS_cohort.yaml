@@ -1,0 +1,4 @@
+merge_to_MEDS_cohort:
+  output_dir: ${cohort_dir}/final_cohort
+  unique_by: "*"
+  additional_sort_by: null
