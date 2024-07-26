@@ -101,21 +101,10 @@ with the most local taking precedent. If no patient ID column is specified, the 
 be stored in a `patient_id` column. If the patient ID column is not found, an error will be raised.
 
 Second, you can also specify how to link the codes constructed for each event block to code-specific metadata
-in these blocks. This is done by specifying a `_metadata` block in the event block, has the following format:
-
-```yaml
-relative_table_file_stem:
-  event_name:
-    code: list[str | col(COLUMN_NAME)] | str | col(COLUMN_NAME)
-    ...
-    _metadata:
-      metadata_table_file_stem:
-        _code_name_map: null | dict[str, str]
-        metadata_column_name_1: input_column_name_1 (str)
-        ...
-  ...
-...
-```
+in these blocks. This is done by specifying a `_metadata` block in the event block. The format of this block
+is detailed in the `parser.py` file in this directory; see there for more details. You can also see
+configuration options for this block in the `tests/test_extract.py` file and in the
+`MIMIC-IV_Example/configs/event_config.yaml` file.
 
 This block tells the system to read the file `$INPUT_DIR/metadata_table_file_stem.$SUFFIX`, to collect the
 columns necessary to construct the `code` field for `event_name`, potentially renaming columns according to
