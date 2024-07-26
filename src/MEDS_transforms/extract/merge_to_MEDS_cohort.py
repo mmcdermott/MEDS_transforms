@@ -79,6 +79,7 @@ def merge_subdirs_and_sort(
         ...     df3.write_parquet(sp_dir / "subdir2" / "df.parquet")
         ...     merge_subdirs_and_sort(
         ...         sp_dir,
+        ...         event_subsets=["subdir1", "subdir2"],
         ...         unique_by=None,
         ...         additional_sort_by=["code", "numerical_value", "missing_col_will_not_error"]
         ...     ).collect()
@@ -106,6 +107,7 @@ def merge_subdirs_and_sort(
         ...     df3.write_parquet(sp_dir / "subdir2" / "df.parquet")
         ...     merge_subdirs_and_sort(
         ...         sp_dir,
+        ...         event_subsets=["subdir1", "subdir2"],
         ...         unique_by="*",
         ...         additional_sort_by=["code", "numerical_value"]
         ...     ).collect()
@@ -135,6 +137,7 @@ def merge_subdirs_and_sort(
         ...     # the unique-by constraint.
         ...     merge_subdirs_and_sort(
         ...         sp_dir,
+        ...         event_subsets=["subdir1", "subdir2"],
         ...         unique_by=["patient_id", "timestamp", "code"],
         ...         additional_sort_by=["code", "numerical_value"]
         ...     ).select("patient_id", "timestamp", "code").collect()
