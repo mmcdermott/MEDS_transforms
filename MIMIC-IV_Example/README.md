@@ -26,6 +26,9 @@ up from this one).
   - [ ] Debug and remove rows with null codes! (there are a lot of them)
   - [ ] Detailed validation
 
+Note: If you use the slurm system and you launch the hydra submitit jobs from an interactive slurm node, you
+may need to run `unset SLURM_CPU_BIND` in your terminal first to avoid errors.
+
 ## Step 0: Installation
 
 Download this repository and install the requirements:
