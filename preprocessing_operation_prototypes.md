@@ -57,7 +57,7 @@ Individual functions are supported, but the operation as a prototypical paradigm
 
 Functions:
 
-1. Assign vocabulary indices to codes. See `src/MEDS_polars_functions/get_vocabulary.py`
+1. Assign vocabulary indices to codes. See `src/MEDS_transforms/get_vocabulary.py`
 
 ### Collect metadata about code realizations in patient data
 
@@ -94,7 +94,7 @@ Patient Filters: **None**
 
 Functions:
 
-1. Various aggregation functions; see `src/MEDS_polars_functions/code_metadata.py` for a list of supported
+1. Various aggregation functions; see `src/MEDS_transforms/code_metadata.py` for a list of supported
    functions.
 
 ##### Planned Future Operations
@@ -131,7 +131,7 @@ compute the number of unique timepoints per patient and impose a minimum thresho
 ##### Status
 
 This operation is only implemented through two concrete functions, not a generalizable prototype in
-`src/MEDS_polars_functions/filter_patients_by_length.py`.
+`src/MEDS_transforms/filter_patients_by_length.py`.
 
 ##### Currently supported operations
 
@@ -162,7 +162,7 @@ via a `code_metadata.parquet` file.
 ##### Status
 
 This operation is supported as a partial prototype, through the
-`src/MEDS_polars_functions/filter_measurements.py` file. It needs extension to reach a full prototype status,
+`src/MEDS_transforms/filter_measurements.py` file. It needs extension to reach a full prototype status,
 but supports such extension relatively natively.
 
 ##### Currently supported operations
@@ -214,7 +214,7 @@ are added and this function is not reversible.
 ##### Status
 
 This operation is only supported through the single `filter_outliers_fntr` function in
-`src/MEDS_polars_functions/filter_measurements.py`. It is not yet a general prototype.
+`src/MEDS_transforms/filter_measurements.py`. It is not yet a general prototype.
 
 ##### Currently supported operations
 
