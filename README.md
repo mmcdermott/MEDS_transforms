@@ -16,15 +16,18 @@ directories.
 
 ## Installation
 
-- For a base installation, clone this repository and run `pip install .` from the repository root.
+- For a pypi installation, install with `pip install MEDS-transforms`.
+- For a local installation, clone this repository and run `pip install .` from the repository root.
 - For running the MIMIC-IV example, install the optional MIMIC dependencies as well with
-  `pip install .[examples]`.
-- To support same-machine, process-based parallelism, install the optional joblib dependencies with `pip install .[local_parallelism]`.
+  `pip install MEDS-transforms[examples]`.
+- To support same-machine, process-based parallelism, install the optional joblib dependencies with
+  `pip install MEDS-transforms[local_parallelism]`.
 - To support cluster-based parallelism, install the optional submitit dependencies with
-  `pip install .[slurm_parallelism]`.
-- For working on development, install the optional development dependencies with `pip install .[dev,tests]`.
+  `pip install MEDS-transforms[slurm_parallelism]`.
+- For working on development, install the optional development dependencies with
+  `pip install .[dev,tests]`.
 - Optional dependencies can be mutually installed by combining the optional dependency names with commas in
-  the square brackets, e.g., `pip install .[examples,local_parallelism]`.
+  the square brackets, e.g., `pip install MEDS-transforms[examples,local_parallelism]`.
 
 ## Design Philosophy
 

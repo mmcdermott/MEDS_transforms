@@ -7,6 +7,25 @@ up from this one).
 ## Step 0: Installation
 
 Download this repository and install the requirements:
+If you want to install via pypi, (note that for now, you still need to copy some files locally even with a
+pypi installation, which is covered below, so make sure you are in a suitable directory) use:
+
+```bash
+conda create -n MEDS python=3.12
+conda activate MEDS
+pip install MEDS_transforms[examples,local_parallelism]
+mkdir MIMIC-IV_Example
+cd MIMIC-IV_Example
+wget https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/main/MIMIC-IV_Example/joint_script.sh
+wget https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/main/MIMIC-IV_Example/joint_script_slurm.sh
+wget https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/main/MIMIC-IV_Example/pre_MEDS.py
+chmod +x joint_script.sh
+chmod +x joint_script_slurm.sh
+chmod +x pre_MEDS.py
+cd ..
+```
+
+If you want to install locally, use:
 
 ```bash
 git clone git@github.com:mmcdermott/MEDS_transforms.git
