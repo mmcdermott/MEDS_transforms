@@ -365,11 +365,8 @@ def main(cfg: DictConfig):
     logger.info("Starting reduction process")
 
     while not all(fp.exists() for fp in all_out_fps):
-        missing_files_str = "\n".join((f"  - {str(fp.resolve())}" for fp in all_out_fps if not fp.exists()))
-        logger.info(
-            "Waiting to begin reduction for all files to be written...\n"
-            f"{missing_files_str}"
-        )
+        missing_files_str = "\n".join(f"  - {str(fp.resolve())}" for fp in all_out_fps if not fp.exists())
+        logger.info("Waiting to begin reduction for all files to be written...\n" f"{missing_files_str}")
         time.sleep(cfg.polling_time)
 
     start = datetime.now()

@@ -49,6 +49,7 @@ the root directory of where the resulting _core data files_ are stored -- e.g., 
 `icu` subdirectory of `$MIMICIV_RAW_DIR`.
 
 ## Step 1.5: Download MIMIC-IV Metadata files
+
 ```bash
 cd $MIMIC_RAW_DIR
 wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/d_labitems_to_loinc.csv

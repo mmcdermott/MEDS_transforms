@@ -276,7 +276,8 @@ icu/inputevents:
     icustay_id: stay_id
     order_id: orderid
     link_order_id: linkorderid
-    numerical_value: rate
+    numerical_value:
+      rate
       #_metadata:
       # TODO: get this working with null columns
       #inputevents_to_rxnorm:
@@ -297,7 +298,8 @@ icu/inputevents:
     icustay_id: stay_id
     order_id: orderid
     link_order_id: linkorderid
-    numerical_value: amount
+    numerical_value:
+      amount
       #_metadata:
       #  inputevents_to_rxnorm:
       #    description: ["omop_concept_name", "label"] # List of strings are columns to be collated

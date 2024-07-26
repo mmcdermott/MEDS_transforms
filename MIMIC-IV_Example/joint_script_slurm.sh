@@ -128,7 +128,7 @@ MEDS_transform-aggregate_code_metadata \
 
 # TODO -- make this the pre-meds dir and have the pre-meds script symlink
 echo "Collecting code metadata with $N_PARALLEL_WORKERS workers in parallel"
-MEDS_extract-extract_code_metadata
+MEDS_extract-extract_code_metadata \
     --multirun \
     worker="range(0,$N_PARALLEL_WORKERS)" \
     hydra/launcher=submitit_slurm \
