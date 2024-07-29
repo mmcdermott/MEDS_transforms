@@ -62,6 +62,7 @@ class METADATA_FN(StrEnum):
             the code
         "values/min": Collects the minimum non-null, non-nan numerical_value value for the code & modifiers
         "values/max": Collects the maximum non-null, non-nan numerical_value value for the code & modifiers
+        "values/quantiles": TODO
     """
 
     CODE_N_PATIENTS = "code/n_patients"
@@ -73,6 +74,7 @@ class METADATA_FN(StrEnum):
     VALUES_SUM_SQD = "values/sum_sqd"
     VALUES_MIN = "values/min"
     VALUES_MAX = "values/max"
+    VALUES_QUANTILES = "values/quantiles"  # TODO: Figure out parametrizing number of quantiles
 
 
 class MapReducePair(NamedTuple):
@@ -97,6 +99,18 @@ class MapReducePair(NamedTuple):
 
     mapper: pl.Expr
     reducer: Callable[[pl.Expr | Sequence[pl.Expr] | cs._selector_proxy_], pl.Expr]
+
+
+def quantile_reducer(cols: cs._selector_proxy_) -> pl.Expr:
+    """TODO."""
+
+    vals = pl.concat_list(cols).explode()
+
+    quantile_keys = [0.25, 0.5, 0.75]
+    quantile_cols = [f"values/quantile/{key}" for key in quantile_keys]
+    quantiles = {col: vals.quantile(key).alias(col) for col, key in zip(quantile_cols, quantile_keys)}
+
+    return pl.struct(**quantiles)
 
 
 VAL_PRESENT: pl.Expr = pl.col("numerical_value").is_not_null() & pl.col("numerical_value").is_not_nan()
@@ -125,6 +139,10 @@ CODE_METADATA_AGGREGATIONS: dict[METADATA_FN, MapReducePair] = {
     ),
     METADATA_FN.VALUES_MAX: MapReducePair(
         pl.col("numerical_value").filter(VAL_PRESENT).max(), pl.max_horizontal
+    ),
+    METADATA_FN.VALUES_QUANTILES: MapReducePair(
+        pl.col("numerical_value").filter(VAL_PRESENT),
+        quantile_reducer,
     ),
 }
 
@@ -163,7 +181,7 @@ def validate_args_and_get_code_cols(
             ...
         ValueError: Metadata aggregation function INVALID not found in METADATA_FN enumeration. Values are:
             code/n_patients, code/n_occurrences, values/n_patients, values/n_occurrences, values/n_ints,
-            values/sum, values/sum_sqd, values/min, values/max
+            values/sum, values/sum_sqd, values/min, values/max, values/quantiles
         >>> valid_cfg = DictConfig({"aggregations": ["code/n_patients", "values/n_ints"]})
         >>> validate_args_and_get_code_cols(valid_cfg, 33)
         Traceback (most recent call last):
@@ -365,6 +383,21 @@ def mapper_fntr(
         │ C    ┆ 1         ┆ 81.25          ┆ 5.0        ┆ 7.5        │
         │ D    ┆ null      ┆ 0.0            ┆ null       ┆ null       │
         └──────┴───────────┴────────────────┴────────────┴────────────┘
+        >>> stage_cfg = DictConfig({"aggregations": ["values/quantiles"]})
+        >>> mapper = mapper_fntr(stage_cfg, code_modifier_columns)
+        >>> mapper(df.lazy()).collect().select("code", "modifier1", pl.col("values/quantiles"))
+        shape: (5, 3)
+        ┌──────┬───────────┬──────────────────┐
+        │ code ┆ modifier1 ┆ values/quantiles │
+        │ ---  ┆ ---       ┆ ---              │
+        │ cat  ┆ i64       ┆ list[f64]        │
+        ╞══════╪═══════════╪══════════════════╡
+        │ A    ┆ 1         ┆ [1.1, 1.1]       │
+        │ A    ┆ 2         ┆ [6.0]            │
+        │ B    ┆ 2         ┆ [2.0, 4.0]       │
+        │ C    ┆ 1         ┆ [5.0, 7.5]       │
+        │ D    ┆ null      ┆ []               │
+        └──────┴───────────┴──────────────────┘
     """
 
     code_key_columns = validate_args_and_get_code_cols(stage_cfg, code_modifier_columns)
@@ -426,6 +459,7 @@ def reducer_fntr(
         ...     "values/sum_sqd": [21.3, 2.42, 36.0, 84.0, 81.25],
         ...     "values/min": [-1, 0, -1, 2, 2],
         ...     "values/max": [8.0, 1.1, 6.0, 8.0, 7.5],
+        ...     "values/quantiles": [[1.1, 1.1], [6.0], [6.0], [5.0, 7.5], []],
         ... })
         >>> df_2 = pl.DataFrame({
         ...     "code": pl.Series(["A", "A", "B", "C"], dtype=pl.Categorical),
@@ -439,6 +473,7 @@ def reducer_fntr(
         ...     "values/sum_sqd": [0., 103.2, 84.0, 81.25],
         ...     "values/min": [None, -1., 0.2, -2.],
         ...     "values/max": [None, 6.2, 1.0, 1.5],
+        ...     "values/quantiles": [[1.3, -1.1, 2.0], [6.0, 1.2], [3.0, 2.5], [11.1, 12.]],
         ... })
         >>> df_3 = pl.DataFrame({
         ...     "code": pl.Series(["D"], dtype=pl.Categorical),
@@ -452,6 +487,7 @@ def reducer_fntr(
         ...     "values/sum_sqd": [4],
         ...     "values/min": [0],
         ...     "values/max": [2],
+        ...     "values/quantiles": [[]],
         ... })
         >>> code_modifier_columns = ["modifier1"]
         >>> stage_cfg = DictConfig({"aggregations": ["code/n_patients", "values/n_ints"]})
@@ -532,6 +568,9 @@ def reducer_fntr(
         │ C    ┆ 2         ┆ 81.25          ┆ 2.0        ┆ 7.5        │
         │ D    ┆ 1         ┆ 4.0            ┆ 0.0        ┆ 2.0        │
         └──────┴───────────┴────────────────┴────────────┴────────────┘
+        >>> stage_cfg = DictConfig({"aggregations": ["values/quantiles"]})
+        >>> reducer = reducer_fntr(stage_cfg, code_modifier_columns)
+        >>> reducer(df_1, df_2, df_3)
         >>> reducer(df_1.drop("values/min"), df_2, df_3)
         Traceback (most recent call last):
             ...
