@@ -36,14 +36,19 @@ MIMICIV_RAW_DIR="$1"
 MIMICIV_PREMEDS_DIR="$2"
 MIMICIV_MEDS_DIR="$3"
 N_PARALLEL_WORKERS="$4"
+DO_UNZIP="${5:-do_unzip=false}"  # Default to 'do_unzip=false' if not provided, this uses more disk space but reduces memory usage
 
 shift 4
 
+if [ "$DO_UNZIP" = "do_unzip=true" ]; then
+  echo "Unzipping gunzip csv files."
+    for file in "${MIMICIV_RAW_DIR}"/*/*.csv.gz; do gzip -d --force "$file"; done
+else
+  echo "Skipping unzipping."
+fi
+
 echo "Running pre-MEDS conversion."
 ./MIMIC-IV_Example/pre_MEDS.py raw_cohort_dir="$MIMICIV_RAW_DIR" output_dir="$MIMICIV_PREMEDS_DIR"
-
-echo "Unzipping the pre-MEDS gunzip csv files."
-for file in ${MIMICIV_PREMEDS_DIR}/*/*.csv.gz; do gzip -d --force "$file"; done
 
 echo "Running shard_events.py with $N_PARALLEL_WORKERS workers in parallel"
 MEDS_extract-shard_events \
