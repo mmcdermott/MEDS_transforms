@@ -40,7 +40,7 @@ DO_UNZIP="${5:-do_unzip=false}"  # Default to 'do_unzip=false' if not provided, 
 
 shift 4
 
-if [ "$DO_UNZIP" = "do_unzip=true" ]; then
+if [ "$DO_UNZIP" == "do_unzip=true" ]; then
   echo "Unzipping gunzip csv files."
     for file in "${MIMICIV_RAW_DIR}"/*/*.csv.gz; do gzip -d --force "$file"; done
 else
