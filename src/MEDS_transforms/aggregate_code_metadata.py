@@ -62,7 +62,8 @@ class METADATA_FN(StrEnum):
             the code
         "values/min": Collects the minimum non-null, non-nan numerical_value value for the code & modifiers
         "values/max": Collects the maximum non-null, non-nan numerical_value value for the code & modifiers
-        "values/quantiles": TODO
+        "values/quantiles": Collects the quantiles of the non-null, non-nan numerical_value value for the
+            code & modifiers
     """
 
     CODE_N_PATIENTS = "code/n_patients"
@@ -101,16 +102,23 @@ class MapReducePair(NamedTuple):
     reducer: Callable[[pl.Expr | Sequence[pl.Expr] | cs._selector_proxy_], pl.Expr]
 
 
-def quantile_reducer(cols: cs._selector_proxy_) -> pl.Expr:
-    """TODO."""
-
-    vals = pl.concat_list(cols).explode()
-
+def quantile_reducer(df: pl.LazyFrame) -> pl.Expr:
+    agg = "values/quantiles"
+    cols = cs.matches(f"{agg}/shard_\\d+")
+    quantile_df = df.select(~cols, pl.concat_list(cols.fill_null([])).alias(agg)).explode(agg).unnest(agg)
+    quantile_df = (
+        quantile_df.with_columns(pl.col("numerical_value").repeat_by("count"))
+        .explode("numerical_value")
+        .drop("count")
+    )
     quantile_keys = [0.25, 0.5, 0.75]
     quantile_cols = [f"values/quantile/{key}" for key in quantile_keys]
-    quantiles = {col: vals.quantile(key).alias(col) for col, key in zip(quantile_cols, quantile_keys)}
-
-    return pl.struct(**quantiles)
+    quantiles = {
+        col: pl.col("numerical_value").quantile(key).alias(col)
+        for col, key in zip(quantile_cols, quantile_keys)
+    }
+    quantile_df = quantile_df.group_by("code", "modifier1").agg(**quantiles)
+    return quantile_df
 
 
 VAL_PRESENT: pl.Expr = pl.col("numerical_value").is_not_null() & pl.col("numerical_value").is_not_nan()
@@ -141,8 +149,8 @@ CODE_METADATA_AGGREGATIONS: dict[METADATA_FN, MapReducePair] = {
         pl.col("numerical_value").filter(VAL_PRESENT).max(), pl.max_horizontal
     ),
     METADATA_FN.VALUES_QUANTILES: MapReducePair(
-        pl.col("numerical_value").filter(VAL_PRESENT),
-        quantile_reducer,
+        pl.col("numerical_value").filter(VAL_PRESENT).value_counts(),
+        None,
     ),
 }
 
@@ -222,7 +230,9 @@ def validate_args_and_get_code_cols(
 
 
 def mapper_fntr(
-    stage_cfg: DictConfig, code_modifier_columns: list[str] | None
+    stage_cfg: DictConfig,
+    code_modifier_columns: list[str] | None,
+    test=False,
 ) -> Callable[[pl.DataFrame], pl.DataFrame]:
     """Returns a function that extracts code metadata from a MEDS cohort shard.
 
@@ -384,20 +394,20 @@ def mapper_fntr(
         │ D    ┆ null      ┆ 0.0            ┆ null       ┆ null       │
         └──────┴───────────┴────────────────┴────────────┴────────────┘
         >>> stage_cfg = DictConfig({"aggregations": ["values/quantiles"]})
-        >>> mapper = mapper_fntr(stage_cfg, code_modifier_columns)
-        >>> mapper(df.lazy()).collect().select("code", "modifier1", pl.col("values/quantiles"))
+        >>> mapper = mapper_fntr(stage_cfg, code_modifier_columns, True)
+        >>> mapper(df.lazy()).collect().sort("code", "modifier1")
         shape: (5, 3)
-        ┌──────┬───────────┬──────────────────┐
-        │ code ┆ modifier1 ┆ values/quantiles │
-        │ ---  ┆ ---       ┆ ---              │
-        │ cat  ┆ i64       ┆ list[f64]        │
-        ╞══════╪═══════════╪══════════════════╡
-        │ A    ┆ 1         ┆ [1.1, 1.1]       │
-        │ A    ┆ 2         ┆ [6.0]            │
-        │ B    ┆ 2         ┆ [2.0, 4.0]       │
-        │ C    ┆ 1         ┆ [5.0, 7.5]       │
-        │ D    ┆ null      ┆ []               │
-        └──────┴───────────┴──────────────────┘
+        ┌──────┬───────────┬────────────────────┐
+        │ code ┆ modifier1 ┆ values/quantiles   │
+        │ ---  ┆ ---       ┆ ---                │
+        │ cat  ┆ i64       ┆ list[struct[2]]    │
+        ╞══════╪═══════════╪════════════════════╡
+        │ A    ┆ 1         ┆ [{1.1,2}]          │
+        │ A    ┆ 2         ┆ [{6.0,1}]          │
+        │ B    ┆ 2         ┆ [{...,1}, {...,1}] │
+        │ C    ┆ 1         ┆ [{...,1}, {...,1}] │
+        │ D    ┆ null      ┆ []                 │
+        └──────┴───────────┴────────────────────┘
     """
 
     code_key_columns = validate_args_and_get_code_cols(stage_cfg, code_modifier_columns)
@@ -427,161 +437,197 @@ def mapper_fntr(
 
 
 def reducer_fntr(
-    stage_cfg: DictConfig, code_modifier_columns: list[str] | None = None
+    stage_cfg: DictConfig, code_modifier_columns: list[str] | None = None, test=False
 ) -> Callable[[Sequence[pl.DataFrame]], pl.DataFrame]:
     """Returns a function that merges different code metadata files together into an aggregated total.
 
-    Args:
-        stage_cfg: The configuration object for this stage. It must contain an `aggregations` field that has a
-            list of aggregations that should be applied in this stage. Each aggregation must be a string in
-            the `METADATA_FN` enumeration, and the reduction function is specified in the
-            `CODE_METADATA_AGGREGATIONS` dictionary.
-        code_modifier_columns: A list of column names that should be used in addition to the core `code`
-            column to group the data before applying the aggregations. If None, only the `code` column will be
-            used.
+        Args:
+            stage_cfg: The configuration object for this stage. It must contain an `aggregations` field that
+                has a list of aggregations that should be applied in this stage. Each aggregation must be a
+                string in the `METADATA_FN` enumeration, and the reduction function is specified in the
+                `CODE_METADATA_AGGREGATIONS` dictionary.
+            code_modifier_columns: A list of column names that should be used in addition to the core `code`
+                column to group the data before applying the aggregations. If None, only the `code` column
+                will be used.
 
-    Returns:
-        A function that aggregates the specified metadata columns from different extracted metadata shards
-        into a total view.
+        Returns:
+            A function that aggregates the specified metadata columns from different extracted metadata shards
+            into a total view.
 
-    Raises: See `validate_args_and_get_code_cols`.
-
-    Examples:
-        >>> df_1 = pl.DataFrame({
-        ...     "code": pl.Series([None, "A", "A", "B", "C"], dtype=pl.Categorical),
-        ...     "modifier1": [None, 1, 2, 1, 2],
-        ...     "code/n_patients":  [10, 1, 1, 2, 2],
-        ...     "code/n_occurrences": [13, 2, 1, 3, 2],
-        ...     "values/n_patients":  [8, 1, 1, 2, 2],
-        ...     "values/n_occurrences": [12, 2, 1, 3, 2],
-        ...     "values/n_ints": [4, 0, 1, 3, 1],
-        ...     "values/sum": [13.2, 2.2, 6.0, 14.0, 12.5],
-        ...     "values/sum_sqd": [21.3, 2.42, 36.0, 84.0, 81.25],
-        ...     "values/min": [-1, 0, -1, 2, 2],
-        ...     "values/max": [8.0, 1.1, 6.0, 8.0, 7.5],
-        ...     "values/quantiles": [[1.1, 1.1], [6.0], [6.0], [5.0, 7.5], []],
-        ... })
-        >>> df_2 = pl.DataFrame({
-        ...     "code": pl.Series(["A", "A", "B", "C"], dtype=pl.Categorical),
-        ...     "modifier1": [1, 2, 1, None],
-        ...     "code/n_patients":  [3, 3, 4, 4],
-        ...     "code/n_occurrences": [10, 11, 8, 11],
-        ...     "values/n_patients":  [0, 1, 2, 2],
-        ...     "values/n_occurrences": [0, 4, 3, 2],
-        ...     "values/n_ints": [0, 1, 3, 1],
-        ...     "values/sum": [0., 7.0, 14.0, 12.5],
-        ...     "values/sum_sqd": [0., 103.2, 84.0, 81.25],
-        ...     "values/min": [None, -1., 0.2, -2.],
-        ...     "values/max": [None, 6.2, 1.0, 1.5],
-        ...     "values/quantiles": [[1.3, -1.1, 2.0], [6.0, 1.2], [3.0, 2.5], [11.1, 12.]],
-        ... })
-        >>> df_3 = pl.DataFrame({
-        ...     "code": pl.Series(["D"], dtype=pl.Categorical),
-        ...     "modifier1": [1],
-        ...     "code/n_patients": [2],
-        ...     "code/n_occurrences": [2],
-        ...     "values/n_patients": [1],
-        ...     "values/n_occurrences": [3],
-        ...     "values/n_ints": [3],
-        ...     "values/sum": [2],
-        ...     "values/sum_sqd": [4],
-        ...     "values/min": [0],
-        ...     "values/max": [2],
-        ...     "values/quantiles": [[]],
-        ... })
-        >>> code_modifier_columns = ["modifier1"]
-        >>> stage_cfg = DictConfig({"aggregations": ["code/n_patients", "values/n_ints"]})
-        >>> reducer = reducer_fntr(stage_cfg, code_modifier_columns)
-        >>> reducer(df_1, df_2, df_3)
-        shape: (7, 4)
-        ┌──────┬───────────┬─────────────────┬───────────────┐
-        │ code ┆ modifier1 ┆ code/n_patients ┆ values/n_ints │
-        │ ---  ┆ ---       ┆ ---             ┆ ---           │
-        │ cat  ┆ i64       ┆ i64             ┆ i64           │
-        ╞══════╪═══════════╪═════════════════╪═══════════════╡
-        │ null ┆ null      ┆ 10              ┆ 4             │
-        │ A    ┆ 1         ┆ 4               ┆ 0             │
-        │ A    ┆ 2         ┆ 4               ┆ 2             │
-        │ B    ┆ 1         ┆ 6               ┆ 6             │
-        │ C    ┆ null      ┆ 4               ┆ 1             │
-        │ C    ┆ 2         ┆ 2               ┆ 1             │
-        │ D    ┆ 1         ┆ 2               ┆ 3             │
-        └──────┴───────────┴─────────────────┴───────────────┘
-        >>> cfg = DictConfig({
-        ...     "code_modifier_columns": ["modifier1"],
-        ...     "code_processing_stages": {
-        ...         "stage1": ["code/n_patients", "values/n_ints"],
-        ...         "stage2": ["code/n_occurrences", "values/sum"],
-        ...         "stage3.A": ["values/n_patients", "values/n_occurrences"],
-        ...         "stage3.B": ["values/sum_sqd", "values/min", "values/max"],
-        ...         "stage4": ["INVALID"],
-        ...     }
-        ... })
-        >>> stage_cfg = DictConfig({"aggregations": ["code/n_occurrences", "values/sum"]})
-        >>> reducer = reducer_fntr(stage_cfg, code_modifier_columns)
-        >>> reducer(df_1, df_2, df_3)
-        shape: (7, 4)
-        ┌──────┬───────────┬────────────────────┬────────────┐
-        │ code ┆ modifier1 ┆ code/n_occurrences ┆ values/sum │
-        │ ---  ┆ ---       ┆ ---                ┆ ---        │
-        │ cat  ┆ i64       ┆ i64                ┆ f64        │
-        ╞══════╪═══════════╪════════════════════╪════════════╡
-        │ null ┆ null      ┆ 13                 ┆ 13.2       │
-        │ A    ┆ 1         ┆ 12                 ┆ 2.2        │
-        │ A    ┆ 2         ┆ 12                 ┆ 13.0       │
-        │ B    ┆ 1         ┆ 11                 ┆ 28.0       │
-        │ C    ┆ null      ┆ 11                 ┆ 12.5       │
-        │ C    ┆ 2         ┆ 2                  ┆ 12.5       │
-        │ D    ┆ 1         ┆ 2                  ┆ 2.0        │
-        └──────┴───────────┴────────────────────┴────────────┘
-        >>> stage_cfg = DictConfig({"aggregations": ["values/n_patients", "values/n_occurrences"]})
-        >>> reducer = reducer_fntr(stage_cfg, code_modifier_columns)
-        >>> reducer(df_1, df_2, df_3)
-        shape: (7, 4)
-        ┌──────┬───────────┬───────────────────┬──────────────────────┐
-        │ code ┆ modifier1 ┆ values/n_patients ┆ values/n_occurrences │
-        │ ---  ┆ ---       ┆ ---               ┆ ---                  │
-        │ cat  ┆ i64       ┆ i64               ┆ i64                  │
-        ╞══════╪═══════════╪═══════════════════╪══════════════════════╡
-        │ null ┆ null      ┆ 8                 ┆ 12                   │
-        │ A    ┆ 1         ┆ 1                 ┆ 2                    │
-        │ A    ┆ 2         ┆ 2                 ┆ 5                    │
-        │ B    ┆ 1         ┆ 4                 ┆ 6                    │
-        │ C    ┆ null      ┆ 2                 ┆ 2                    │
-        │ C    ┆ 2         ┆ 2                 ┆ 2                    │
-        │ D    ┆ 1         ┆ 1                 ┆ 3                    │
-        └──────┴───────────┴───────────────────┴──────────────────────┘
-        >>> stage_cfg = DictConfig({"aggregations": ["values/sum_sqd", "values/min", "values/max"]})
-        >>> reducer = reducer_fntr(stage_cfg, code_modifier_columns)
-        >>> reducer(df_1, df_2, df_3)
-        shape: (7, 5)
-        ┌──────┬───────────┬────────────────┬────────────┬────────────┐
-        │ code ┆ modifier1 ┆ values/sum_sqd ┆ values/min ┆ values/max │
-        │ ---  ┆ ---       ┆ ---            ┆ ---        ┆ ---        │
-        │ cat  ┆ i64       ┆ f64            ┆ f64        ┆ f64        │
-        ╞══════╪═══════════╪════════════════╪════════════╪════════════╡
-        │ null ┆ null      ┆ 21.3           ┆ -1.0       ┆ 8.0        │
-        │ A    ┆ 1         ┆ 2.42           ┆ 0.0        ┆ 1.1        │
-        │ A    ┆ 2         ┆ 139.2          ┆ -1.0       ┆ 6.2        │
-        │ B    ┆ 1         ┆ 168.0          ┆ 0.2        ┆ 8.0        │
-        │ C    ┆ null      ┆ 81.25          ┆ -2.0       ┆ 1.5        │
-        │ C    ┆ 2         ┆ 81.25          ┆ 2.0        ┆ 7.5        │
-        │ D    ┆ 1         ┆ 4.0            ┆ 0.0        ┆ 2.0        │
-        └──────┴───────────┴────────────────┴────────────┴────────────┘
-        >>> stage_cfg = DictConfig({"aggregations": ["values/quantiles"]})
-        >>> reducer = reducer_fntr(stage_cfg, code_modifier_columns)
-        >>> reducer(df_1, df_2, df_3)
-        >>> reducer(df_1.drop("values/min"), df_2, df_3)
-        Traceback (most recent call last):
-            ...
-        KeyError: 'Column values/min not found in DataFrame 0 for reduction.'
+        Raises: See `validate_args_and_get_code_cols`.
+    [
+            [{'value': 1.1, 'quantile': 2}],
+            [{'value': 6.0, 'quantile': 1}],
+            [{'value': 2.0, 'quantile': 1}, {'value': 4.0, 'quantile': 1}],
+            [{'value': 7.5, 'quantile': 1}, {'value': 5.0, 'quantile': 1}],
+            []
+        ]
+        Examples:
+            >>> df_1 = pl.DataFrame({
+            ...     "code": pl.Series([None, "A", "A", "B", "C"], dtype=pl.Categorical),
+            ...     "modifier1": [None, 1, 2, 1, 2],
+            ...     "code/n_patients":  [10, 1, 1, 2, 2],
+            ...     "code/n_occurrences": [13, 2, 1, 3, 2],
+            ...     "values/n_patients":  [8, 1, 1, 2, 2],
+            ...     "values/n_occurrences": [12, 2, 1, 3, 2],
+            ...     "values/n_ints": [4, 0, 1, 3, 1],
+            ...     "values/sum": [13.2, 2.2, 6.0, 14.0, 12.5],
+            ...     "values/sum_sqd": [21.3, 2.42, 36.0, 84.0, 81.25],
+            ...     "values/min": [-1, 0, -1, 2, 2],
+            ...     "values/max": [8.0, 1.1, 6.0, 8.0, 7.5],
+            ...     "values/quantiles": [
+            ...        [{"numerical_value": 1.1, "count": 1}],
+            ...        [{"numerical_value": 6.0, "count": 2}],
+            ...        [{"numerical_value": 6.0, "count": 1}],
+            ...        [{"numerical_value": 7.5, "count": 1}, {"numerical_value": 5.0, "count": 1}],
+            ...        []],
+            ... })
+            >>> df_2 = pl.DataFrame({
+            ...     "code": pl.Series(["A", "A", "B", "C"], dtype=pl.Categorical),
+            ...     "modifier1": [1, 2, 1, None],
+            ...     "code/n_patients":  [3, 3, 4, 4],
+            ...     "code/n_occurrences": [10, 11, 8, 11],
+            ...     "values/n_patients":  [0, 1, 2, 2],
+            ...     "values/n_occurrences": [0, 4, 3, 2],
+            ...     "values/n_ints": [0, 1, 3, 1],
+            ...     "values/sum": [0., 7.0, 14.0, 12.5],
+            ...     "values/sum_sqd": [0., 103.2, 84.0, 81.25],
+            ...     "values/min": [None, -1., 0.2, -2.],
+            ...     "values/max": [None, 6.2, 1.0, 1.5],
+            ...     "values/quantiles": [
+            ...         [{"numerical_value": 1.3, "count": 1}, {"numerical_value": -1.1, "count": 1},
+            ...             {"numerical_value": 2.0, "count": 1}],
+            ...         [{"numerical_value": 6.0, "count": 1}, {"numerical_value": 1.2, "count": 1}],
+            ...         [{"numerical_value": 3.0, "count": 1}, {"numerical_value": 2.5, "count": 1}],
+            ...         [{"numerical_value": 11.1, "count": 1}, {"numerical_value": 12.0, "count": 1}]
+            ...     ],
+            ... })
+            >>> df_3 = pl.DataFrame({
+            ...     "code": pl.Series(["D"], dtype=pl.Categorical),
+            ...     "modifier1": [1],
+            ...     "code/n_patients": [2],
+            ...     "code/n_occurrences": [2],
+            ...     "values/n_patients": [1],
+            ...     "values/n_occurrences": [3],
+            ...     "values/n_ints": [3],
+            ...     "values/sum": [2],
+            ...     "values/sum_sqd": [4],
+            ...     "values/min": [0],
+            ...     "values/max": [2],
+            ...     "values/quantiles": pl.Series(
+            ...         "values/quantiles", [[]],
+            ...         dtype=pl.List(pl.Struct({"numerical_value": pl.Float64, "count": pl.Int64}))
+            ...     ),
+            ... })
+            >>> code_modifier_columns = ["modifier1"]
+            >>> stage_cfg = DictConfig({"aggregations": ["code/n_patients", "values/n_ints"]})
+            >>> reducer = reducer_fntr(stage_cfg, code_modifier_columns)
+            >>> reducer(df_1, df_2, df_3)
+            shape: (7, 4)
+            ┌──────┬───────────┬─────────────────┬───────────────┐
+            │ code ┆ modifier1 ┆ code/n_patients ┆ values/n_ints │
+            │ ---  ┆ ---       ┆ ---             ┆ ---           │
+            │ cat  ┆ i64       ┆ i64             ┆ i64           │
+            ╞══════╪═══════════╪═════════════════╪═══════════════╡
+            │ null ┆ null      ┆ 10              ┆ 4             │
+            │ A    ┆ 1         ┆ 4               ┆ 0             │
+            │ A    ┆ 2         ┆ 4               ┆ 2             │
+            │ B    ┆ 1         ┆ 6               ┆ 6             │
+            │ C    ┆ null      ┆ 4               ┆ 1             │
+            │ C    ┆ 2         ┆ 2               ┆ 1             │
+            │ D    ┆ 1         ┆ 2               ┆ 3             │
+            └──────┴───────────┴─────────────────┴───────────────┘
+            >>> cfg = DictConfig({
+            ...     "code_modifier_columns": ["modifier1"],
+            ...     "code_processing_stages": {
+            ...         "stage1": ["code/n_patients", "values/n_ints"],
+            ...         "stage2": ["code/n_occurrences", "values/sum"],
+            ...         "stage3.A": ["values/n_patients", "values/n_occurrences"],
+            ...         "stage3.B": ["values/sum_sqd", "values/min", "values/max"],
+            ...         "stage4": ["INVALID"],
+            ...     }
+            ... })
+            >>> stage_cfg = DictConfig({"aggregations": ["code/n_occurrences", "values/sum"]})
+            >>> reducer = reducer_fntr(stage_cfg, code_modifier_columns)
+            >>> reducer(df_1, df_2, df_3)
+            shape: (7, 4)
+            ┌──────┬───────────┬────────────────────┬────────────┐
+            │ code ┆ modifier1 ┆ code/n_occurrences ┆ values/sum │
+            │ ---  ┆ ---       ┆ ---                ┆ ---        │
+            │ cat  ┆ i64       ┆ i64                ┆ f64        │
+            ╞══════╪═══════════╪════════════════════╪════════════╡
+            │ null ┆ null      ┆ 13                 ┆ 13.2       │
+            │ A    ┆ 1         ┆ 12                 ┆ 2.2        │
+            │ A    ┆ 2         ┆ 12                 ┆ 13.0       │
+            │ B    ┆ 1         ┆ 11                 ┆ 28.0       │
+            │ C    ┆ null      ┆ 11                 ┆ 12.5       │
+            │ C    ┆ 2         ┆ 2                  ┆ 12.5       │
+            │ D    ┆ 1         ┆ 2                  ┆ 2.0        │
+            └──────┴───────────┴────────────────────┴────────────┘
+            >>> stage_cfg = DictConfig({"aggregations": ["values/n_patients", "values/n_occurrences"]})
+            >>> reducer = reducer_fntr(stage_cfg, code_modifier_columns)
+            >>> reducer(df_1, df_2, df_3)
+            shape: (7, 4)
+            ┌──────┬───────────┬───────────────────┬──────────────────────┐
+            │ code ┆ modifier1 ┆ values/n_patients ┆ values/n_occurrences │
+            │ ---  ┆ ---       ┆ ---               ┆ ---                  │
+            │ cat  ┆ i64       ┆ i64               ┆ i64                  │
+            ╞══════╪═══════════╪═══════════════════╪══════════════════════╡
+            │ null ┆ null      ┆ 8                 ┆ 12                   │
+            │ A    ┆ 1         ┆ 1                 ┆ 2                    │
+            │ A    ┆ 2         ┆ 2                 ┆ 5                    │
+            │ B    ┆ 1         ┆ 4                 ┆ 6                    │
+            │ C    ┆ null      ┆ 2                 ┆ 2                    │
+            │ C    ┆ 2         ┆ 2                 ┆ 2                    │
+            │ D    ┆ 1         ┆ 1                 ┆ 3                    │
+            └──────┴───────────┴───────────────────┴──────────────────────┘
+            >>> stage_cfg = DictConfig({"aggregations": ["values/sum_sqd", "values/min", "values/max"]})
+            >>> reducer = reducer_fntr(stage_cfg, code_modifier_columns)
+            >>> reducer(df_1, df_2, df_3)
+            shape: (7, 5)
+            ┌──────┬───────────┬────────────────┬────────────┬────────────┐
+            │ code ┆ modifier1 ┆ values/sum_sqd ┆ values/min ┆ values/max │
+            │ ---  ┆ ---       ┆ ---            ┆ ---        ┆ ---        │
+            │ cat  ┆ i64       ┆ f64            ┆ f64        ┆ f64        │
+            ╞══════╪═══════════╪════════════════╪════════════╪════════════╡
+            │ null ┆ null      ┆ 21.3           ┆ -1.0       ┆ 8.0        │
+            │ A    ┆ 1         ┆ 2.42           ┆ 0.0        ┆ 1.1        │
+            │ A    ┆ 2         ┆ 139.2          ┆ -1.0       ┆ 6.2        │
+            │ B    ┆ 1         ┆ 168.0          ┆ 0.2        ┆ 8.0        │
+            │ C    ┆ null      ┆ 81.25          ┆ -2.0       ┆ 1.5        │
+            │ C    ┆ 2         ┆ 81.25          ┆ 2.0        ┆ 7.5        │
+            │ D    ┆ 1         ┆ 4.0            ┆ 0.0        ┆ 2.0        │
+            └──────┴───────────┴────────────────┴────────────┴────────────┘
+            >>> reducer(df_1.drop("values/min"), df_2, df_3)
+            Traceback (most recent call last):
+                ...
+            KeyError: 'Column values/min not found in DataFrame 0 for reduction.'
+            >>> stage_cfg = DictConfig({"aggregations": ["values/quantiles"]})
+            >>> reducer = reducer_fntr(stage_cfg, code_modifier_columns)
+            >>> reducer(df_1, df_2, df_3)
+            shape: (7, 5)
+            ┌──────┬───────────┬──────────────────────┬─────────────────────┬──────────────────────┐
+            │ code ┆ modifier1 ┆ values/quantile/0.25 ┆ values/quantile/0.5 ┆ values/quantile/0.75 │
+            │ ---  ┆ ---       ┆ ---                  ┆ ---                 ┆ ---                  │
+            │ cat  ┆ i64       ┆ f64                  ┆ f64                 ┆ f64                  │
+            ╞══════╪═══════════╪══════════════════════╪═════════════════════╪══════════════════════╡
+            │ null ┆ null      ┆ null                 ┆ null                ┆ null                 │
+            │ A    ┆ 1         ┆ 1.3                  ┆ 2.0                 ┆ 6.0                  │
+            │ A    ┆ 2         ┆ 6.0                  ┆ 6.0                 ┆ 6.0                  │
+            │ B    ┆ 1         ┆ 3.0                  ┆ 5.0                 ┆ 5.0                  │
+            │ C    ┆ null      ┆ null                 ┆ null                ┆ null                 │
+            │ C    ┆ 2         ┆ null                 ┆ null                ┆ null                 │
+            │ D    ┆ 1         ┆ null                 ┆ null                ┆ null                 │
+            └──────┴───────────┴──────────────────────┴─────────────────────┴──────────────────────┘
     """
 
     code_key_columns = validate_args_and_get_code_cols(stage_cfg, code_modifier_columns)
     aggregations = stage_cfg.aggregations
 
     agg_operations = {
-        agg: CODE_METADATA_AGGREGATIONS[agg].reducer(cs.matches(f"{agg}/shard_\\d+")) for agg in aggregations
+        agg: CODE_METADATA_AGGREGATIONS[agg].reducer(cs.matches(f"{agg}/shard_\\d+"))
+        for agg in aggregations
+        if agg != "values/quantiles"
     }
 
     def reducer(*dfs: Sequence[pl.LazyFrame]) -> pl.LazyFrame:
@@ -599,7 +645,16 @@ def reducer_fntr(
         for rdf in renamed_dfs[1:]:
             df = df.join(rdf, on=code_key_columns, how="full", join_nulls=True, coalesce=True)
 
-        return df.select(*code_key_columns, **agg_operations).sort(code_key_columns)
+        if "values/quantiles" in aggregations:
+            quantile_df = quantile_reducer(df)
+            output_df = (
+                df.select(*code_key_columns, **agg_operations)
+                .join(quantile_df, on=code_key_columns, how="left")
+                .sort(code_key_columns)
+            )
+        else:
+            output_df = df.select(*code_key_columns, **agg_operations).sort(code_key_columns)
+        return output_df
 
     return reducer
 
