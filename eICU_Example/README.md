@@ -1,5 +1,7 @@
 # eICU-CRD Example
 
+## TODO -- This is not yet adapted to the 0.0.1 interface, but will be incorporated soon!
+
 This is an example of how to extract a MEDS dataset from [eICU-CRD
 v2.0](https://physionet.org/content/eicu-crd/2.0/). All scripts in this README are assumed to
 be run **not** from this directory but from the root directory of this entire repository (e.g., one directory

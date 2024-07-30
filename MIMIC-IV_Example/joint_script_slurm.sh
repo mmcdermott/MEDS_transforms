@@ -47,7 +47,7 @@ shift 4
 echo "Running pre-MEDS conversion on one worker."
 ./MIMIC-IV_Example/pre_MEDS.py \
   --multirun \
-  worker="range(0,1)" \
+  +worker="range(0,1)" \
   hydra/launcher=submitit_slurm \
   hydra.launcher.timeout_min=60 \
   hydra.launcher.cpus_per_task=10 \
@@ -58,7 +58,7 @@ echo "Running pre-MEDS conversion on one worker."
 
 echo "Trying submitit launching with $N_PARALLEL_WORKERS jobs."
 
-./scripts/extraction/shard_events.py \
+MEDS_extract-shard_events \
     --multirun \
     worker="range(0,$N_PARALLEL_WORKERS)" \
     hydra/launcher=submitit_slurm \
@@ -73,7 +73,7 @@ echo "Trying submitit launching with $N_PARALLEL_WORKERS jobs."
     stage=shard_events
 
 echo "Splitting patients on one worker"
-./scripts/extraction/split_and_shard_patients.py \
+MEDS_extract-split_and_shard_patients \
     --multirun \
     worker="range(0,1)" \
     hydra/launcher=submitit_slurm \
@@ -86,7 +86,7 @@ echo "Splitting patients on one worker"
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
 
 echo "Converting to sharded events with $N_PARALLEL_WORKERS workers in parallel"
-./scripts/extraction/convert_to_sharded_events.py \
+MEDS_extract-convert_to_sharded_events \
     --multirun \
     worker="range(0,$N_PARALLEL_WORKERS)" \
     hydra/launcher=submitit_slurm \
@@ -99,7 +99,7 @@ echo "Converting to sharded events with $N_PARALLEL_WORKERS workers in parallel"
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
 
 echo "Merging to a MEDS cohort with $N_PARALLEL_WORKERS workers in parallel"
-./scripts/extraction/merge_to_MEDS_cohort.py \
+MEDS_extract-merge_to_MEDS_cohort \
     --multirun \
     worker="range(0,$N_PARALLEL_WORKERS)" \
     hydra/launcher=submitit_slurm \
@@ -108,5 +108,34 @@ echo "Merging to a MEDS cohort with $N_PARALLEL_WORKERS workers in parallel"
     hydra.launcher.mem_gb=50 \
     hydra.launcher.partition="short" \
     input_dir="$MIMICIV_PREMEDS_DIR" \
+    cohort_dir="$MIMICIV_MEDS_DIR" \
+    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
+
+echo "Aggregating initial code stats with $N_PARALLEL_WORKERS workers in parallel"
+MEDS_transform-aggregate_code_metadata \
+    --config-name="extract" \
+    --multirun \
+    worker="range(0,$N_PARALLEL_WORKERS)" \
+    hydra/launcher=submitit_slurm \
+    hydra.launcher.timeout_min=60 \
+    hydra.launcher.cpus_per_task=10 \
+    hydra.launcher.mem_gb=50 \
+    hydra.launcher.partition="short" \
+    input_dir="$MIMICIV_PREMEDS_DIR" \
+    cohort_dir="$MIMICIV_MEDS_DIR" \
+    stage="aggregate_code_metadata"
+    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
+
+# TODO -- make this the pre-meds dir and have the pre-meds script symlink
+echo "Collecting code metadata with $N_PARALLEL_WORKERS workers in parallel"
+MEDS_extract-extract_code_metadata \
+    --multirun \
+    worker="range(0,$N_PARALLEL_WORKERS)" \
+    hydra/launcher=submitit_slurm \
+    hydra.launcher.timeout_min=60 \
+    hydra.launcher.cpus_per_task=10 \
+    hydra.launcher.mem_gb=50 \
+    hydra.launcher.partition="short" \
+    input_dir="$MIMICIV_RAW_DIR" \
     cohort_dir="$MIMICIV_MEDS_DIR" \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"

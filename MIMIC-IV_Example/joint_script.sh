@@ -43,34 +43,58 @@ echo "Running pre-MEDS conversion."
 ./MIMIC-IV_Example/pre_MEDS.py raw_cohort_dir="$MIMICIV_RAW_DIR" output_dir="$MIMICIV_PREMEDS_DIR"
 
 echo "Running shard_events.py with $N_PARALLEL_WORKERS workers in parallel"
-./scripts/extraction/shard_events.py \
+MEDS_extract-shard_events \
     --multirun \
     worker="range(0,$N_PARALLEL_WORKERS)" \
     hydra/launcher=joblib \
     input_dir="$MIMICIV_PREMEDS_DIR" \
     cohort_dir="$MIMICIV_MEDS_DIR" \
+    stage="shard_events" \
+    stage_configs.shard_events.infer_schema_length=999999999 \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
 
 echo "Splitting patients in serial"
-./scripts/extraction/split_and_shard_patients.py \
+MEDS_extract-split_and_shard_patients \
     input_dir="$MIMICIV_PREMEDS_DIR" \
     cohort_dir="$MIMICIV_MEDS_DIR" \
+    stage="split_and_shard_patients" \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
 
 echo "Converting to sharded events with $N_PARALLEL_WORKERS workers in parallel"
-./scripts/extraction/convert_to_sharded_events.py \
+MEDS_extract-convert_to_sharded_events \
     --multirun \
     worker="range(0,$N_PARALLEL_WORKERS)" \
     hydra/launcher=joblib \
     input_dir="$MIMICIV_PREMEDS_DIR" \
     cohort_dir="$MIMICIV_MEDS_DIR" \
+    stage="convert_to_sharded_events" \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
 
 echo "Merging to a MEDS cohort with $N_PARALLEL_WORKERS workers in parallel"
-./scripts/extraction/merge_to_MEDS_cohort.py \
+MEDS_extract-merge_to_MEDS_cohort \
     --multirun \
     worker="range(0,$N_PARALLEL_WORKERS)" \
     hydra/launcher=joblib \
     input_dir="$MIMICIV_PREMEDS_DIR" \
     cohort_dir="$MIMICIV_MEDS_DIR" \
+    stage="merge_to_MEDS_cohort"
+    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
+
+echo "Aggregating initial code stats with $N_PARALLEL_WORKERS workers in parallel"
+MEDS_transform-aggregate_code_metadata \
+    --config-name="extract" \
+    --multirun \
+    worker="range(0,$N_PARALLEL_WORKERS)" \
+    hydra/launcher=joblib \
+    input_dir="$MIMICIV_PREMEDS_DIR" \
+    cohort_dir="$MIMICIV_MEDS_DIR" \
+    stage="aggregate_code_metadata"
+    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
+
+# TODO -- make this the pre-meds dir and have the pre-meds script symlink
+echo "Collecting code metadata with $N_PARALLEL_WORKERS workers in parallel"
+MEDS_extract-extract_code_metadata \
+    input_dir="$MIMICIV_RAW_DIR" \
+    cohort_dir="$MIMICIV_MEDS_DIR" \
+    stage="extract_code_metadata" \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"

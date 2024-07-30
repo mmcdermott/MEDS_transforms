@@ -116,8 +116,8 @@ def get_supported_fp(root_dir: Path, file_prefix: str | Path) -> tuple[Path, Cal
         ...     get_supported_fp(tmpdir, "test") # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
-        FileNotFoundError: No files found with prefix: test and allowed suffixes:
-            ['.parquet', '.csv.gz', '.csv']
+        FileNotFoundError: No files found with prefix: test and allowed suffixes
+            ['.parquet', '.csv.gz', '.csv']...
     """
 
     for suffix in list(SupportedFileFormats):
@@ -126,6 +126,6 @@ def get_supported_fp(root_dir: Path, file_prefix: str | Path) -> tuple[Path, Cal
             logger.debug(f"Found file: {str(fp.resolve())}")
             return fp, READERS[suffix]
     raise FileNotFoundError(
-        f"No files found with prefix: {file_prefix} and allowed suffixes: "
-        f"{[x.value for x in SupportedFileFormats]}"
+        f"No files found with prefix: {file_prefix} and allowed suffixes "
+        f"{[x.value for x in SupportedFileFormats]} in root dir {str(root_dir.resolve())}"
     )
