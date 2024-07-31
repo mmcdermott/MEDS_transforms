@@ -52,8 +52,6 @@ else:
     TENSORIZATION_SCRIPT = "MEDS_transform-tensorization"
     TOKENIZATION_SCRIPT = "MEDS_transform-tokenization"
 
-pl.enable_string_cache()
-
 # Test MEDS data (inputs)
 
 SPLITS = {
@@ -168,7 +166,7 @@ TEMP,12,4,12,1181.4999999999998,116373.38999999998,"Body Temperature",LOINC/8310
 """
 
 MEDS_CODE_METADATA_SCHEMA = {
-    "code": pl.Categorical,
+    "code": pl.Utf8,
     "code/n_occurrences": pl.UInt8,
     "code/n_patients": pl.UInt8,
     "values/n_occurrences": pl.UInt8,

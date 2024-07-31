@@ -72,7 +72,7 @@ def extract_metadata(
         ┌───────────┬──────────┐
         │ code      ┆ desc     │
         │ ---       ┆ ---      │
-        │ cat       ┆ str      │
+        │ str       ┆ str      │
         ╞═══════════╪══════════╡
         │ FOO//A//1 ┆ Code A-1 │
         │ FOO//B//2 ┆ B-2      │
@@ -84,7 +84,7 @@ def extract_metadata(
         ┌───────────┬──────────┐
         │ code      ┆ desc     │
         │ ---       ┆ ---      │
-        │ cat       ┆ str      │
+        │ str       ┆ str      │
         ╞═══════════╪══════════╡
         │ FOO//A//1 ┆ Code A-1 │
         │ FOO//C//3 ┆ C with 3 │
@@ -125,7 +125,7 @@ def extract_metadata(
         ┌───────────┬───────┬─────────────────┐
         │ code      ┆ desc  ┆ parent_code     │
         │ ---       ┆ ---   ┆ ---             │
-        │ cat       ┆ str   ┆ str             │
+        │ str       ┆ str   ┆ str             │
         ╞═══════════╪═══════╪═════════════════╡
         │ FOO//A//1 ┆ used  ┆ null            │
         │ FOO//A//1 ┆ A-1-2 ┆ OUT_VAL/1/2     │
@@ -215,7 +215,7 @@ def extract_all_metadata(
         ┌───────────┬──────────┬───────┐
         │ code      ┆ desc     ┆ desc2 │
         │ ---       ┆ ---      ┆ ---   │
-        │ cat       ┆ str      ┆ str   │
+        │ str       ┆ str      ┆ str   │
         ╞═══════════╪══════════╪═══════╡
         │ FOO//A//1 ┆ Code A-1 ┆ null  │
         │ BAR//B//2 ┆ null     ┆ B-2   │

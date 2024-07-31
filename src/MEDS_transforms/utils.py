@@ -13,8 +13,6 @@ from omegaconf import DictConfig, OmegaConf
 from MEDS_transforms import __package_name__ as package_name
 from MEDS_transforms import __version__ as package_version
 
-pl.enable_string_cache()
-
 
 def write_lazyframe(df: pl.LazyFrame, out_fp: Path) -> None:
     if isinstance(df, pl.LazyFrame):

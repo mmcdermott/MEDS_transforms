@@ -18,8 +18,6 @@ from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over
 from MEDS_transforms.utils import write_lazyframe
 
-pl.enable_string_cache()
-
 
 class METADATA_FN(StrEnum):
     """Enumeration of metadata functions that can be applied to a group of codes.
@@ -230,7 +228,7 @@ def mapper_fntr(
     Examples:
         >>> import numpy as np
         >>> df = pl.DataFrame({
-        ...     "code":   pl.Series(["A", "B", "A", "B", "C", "A", "C", "B",    "D"], dtype=pl.Categorical),
+        ...     "code":             ["A", "B", "A", "B", "C", "A", "C", "B",          "D"],
         ...     "modifier1":        [1,   2,   1,   2,   1,   2,   1,   2,            None],
         ...     "modifier_ignored": [3,   3,   4,   4,   5,   5,   6,   6,            7],
         ...     "patient_id":       [1,   2,   1,   3,   1,   2,   2,   2,            1],
@@ -241,7 +239,7 @@ def mapper_fntr(
         ┌──────┬───────────┬──────────────────┬────────────┬─────────────────┐
         │ code ┆ modifier1 ┆ modifier_ignored ┆ patient_id ┆ numerical_value │
         │ ---  ┆ ---       ┆ ---              ┆ ---        ┆ ---             │
-        │ cat  ┆ i64       ┆ i64              ┆ i64        ┆ f64             │
+        │ str  ┆ i64       ┆ i64              ┆ i64        ┆ f64             │
         ╞══════╪═══════════╪══════════════════╪════════════╪═════════════════╡
         │ A    ┆ 1         ┆ 3                ┆ 1          ┆ 1.1             │
         │ B    ┆ 2         ┆ 3                ┆ 2          ┆ 2.0             │
@@ -263,7 +261,7 @@ def mapper_fntr(
         ┌──────┬─────────────────┬───────────────┐
         │ code ┆ code/n_patients ┆ values/n_ints │
         │ ---  ┆ ---             ┆ ---           │
-        │ cat  ┆ u32             ┆ u32           │
+        │ str  ┆ u32             ┆ u32           │
         ╞══════╪═════════════════╪═══════════════╡
         │ null ┆ 3               ┆ 4             │
         │ A    ┆ 2               ┆ 1             │
@@ -278,7 +276,7 @@ def mapper_fntr(
         ┌──────┬─────────────────┬───────────────┐
         │ code ┆ code/n_patients ┆ values/n_ints │
         │ ---  ┆ ---             ┆ ---           │
-        │ cat  ┆ u32             ┆ u32           │
+        │ str  ┆ u32             ┆ u32           │
         ╞══════╪═════════════════╪═══════════════╡
         │ A    ┆ 2               ┆ 1             │
         │ B    ┆ 2               ┆ 2             │
@@ -293,7 +291,7 @@ def mapper_fntr(
         ┌──────┬───────────┬─────────────────┬───────────────┐
         │ code ┆ modifier1 ┆ code/n_patients ┆ values/n_ints │
         │ ---  ┆ ---       ┆ ---             ┆ ---           │
-        │ cat  ┆ i64       ┆ u32             ┆ u32           │
+        │ str  ┆ i64       ┆ u32             ┆ u32           │
         ╞══════╪═══════════╪═════════════════╪═══════════════╡
         │ A    ┆ 1         ┆ 1               ┆ 0             │
         │ A    ┆ 2         ┆ 1               ┆ 1             │
@@ -308,7 +306,7 @@ def mapper_fntr(
         ┌──────┬───────────┬────────────────────┬────────────┐
         │ code ┆ modifier1 ┆ code/n_occurrences ┆ values/sum │
         │ ---  ┆ ---       ┆ ---                ┆ ---        │
-        │ cat  ┆ i64       ┆ u32                ┆ f64        │
+        │ str  ┆ i64       ┆ u32                ┆ f64        │
         ╞══════╪═══════════╪════════════════════╪════════════╡
         │ A    ┆ 1         ┆ 2                  ┆ 2.2        │
         │ A    ┆ 2         ┆ 1                  ┆ 6.0        │
@@ -326,7 +324,7 @@ def mapper_fntr(
         ┌──────┬───────────┬────────────────────┬────────────┐
         │ code ┆ modifier1 ┆ code/n_occurrences ┆ values/sum │
         │ ---  ┆ ---       ┆ ---                ┆ ---        │
-        │ cat  ┆ i64       ┆ u32                ┆ f64        │
+        │ str  ┆ i64       ┆ u32                ┆ f64        │
         ╞══════╪═══════════╪════════════════════╪════════════╡
         │ null ┆ null      ┆ 9                  ┆ 26.7       │
         │ A    ┆ 1         ┆ 2                  ┆ 2.2        │
@@ -342,7 +340,7 @@ def mapper_fntr(
         ┌──────┬───────────┬───────────────────┬──────────────────────┐
         │ code ┆ modifier1 ┆ values/n_patients ┆ values/n_occurrences │
         │ ---  ┆ ---       ┆ ---               ┆ ---                  │
-        │ cat  ┆ i64       ┆ u32               ┆ u32                  │
+        │ str  ┆ i64       ┆ u32               ┆ u32                  │
         ╞══════╪═══════════╪═══════════════════╪══════════════════════╡
         │ A    ┆ 1         ┆ 1                 ┆ 2                    │
         │ A    ┆ 2         ┆ 1                 ┆ 1                    │
@@ -357,7 +355,7 @@ def mapper_fntr(
         ┌──────┬───────────┬────────────────┬────────────┬────────────┐
         │ code ┆ modifier1 ┆ values/sum_sqd ┆ values/min ┆ values/max │
         │ ---  ┆ ---       ┆ ---            ┆ ---        ┆ ---        │
-        │ cat  ┆ i64       ┆ f64            ┆ f64        ┆ f64        │
+        │ str  ┆ i64       ┆ f64            ┆ f64        ┆ f64        │
         ╞══════╪═══════════╪════════════════╪════════════╪════════════╡
         │ A    ┆ 1         ┆ 2.42           ┆ 1.1        ┆ 1.1        │
         │ A    ┆ 2         ┆ 36.0           ┆ 6.0        ┆ 6.0        │
@@ -415,7 +413,7 @@ def reducer_fntr(
 
     Examples:
         >>> df_1 = pl.DataFrame({
-        ...     "code": pl.Series([None, "A", "A", "B", "C"], dtype=pl.Categorical),
+        ...     "code": [None, "A", "A", "B", "C"],
         ...     "modifier1": [None, 1, 2, 1, 2],
         ...     "code/n_patients":  [10, 1, 1, 2, 2],
         ...     "code/n_occurrences": [13, 2, 1, 3, 2],
@@ -428,7 +426,7 @@ def reducer_fntr(
         ...     "values/max": [8.0, 1.1, 6.0, 8.0, 7.5],
         ... })
         >>> df_2 = pl.DataFrame({
-        ...     "code": pl.Series(["A", "A", "B", "C"], dtype=pl.Categorical),
+        ...     "code": ["A", "A", "B", "C"],
         ...     "modifier1": [1, 2, 1, None],
         ...     "code/n_patients":  [3, 3, 4, 4],
         ...     "code/n_occurrences": [10, 11, 8, 11],
@@ -441,7 +439,7 @@ def reducer_fntr(
         ...     "values/max": [None, 6.2, 1.0, 1.5],
         ... })
         >>> df_3 = pl.DataFrame({
-        ...     "code": pl.Series(["D"], dtype=pl.Categorical),
+        ...     "code": ["D"],
         ...     "modifier1": [1],
         ...     "code/n_patients": [2],
         ...     "code/n_occurrences": [2],
@@ -461,7 +459,7 @@ def reducer_fntr(
         ┌──────┬───────────┬─────────────────┬───────────────┐
         │ code ┆ modifier1 ┆ code/n_patients ┆ values/n_ints │
         │ ---  ┆ ---       ┆ ---             ┆ ---           │
-        │ cat  ┆ i64       ┆ i64             ┆ i64           │
+        │ str  ┆ i64       ┆ i64             ┆ i64           │
         ╞══════╪═══════════╪═════════════════╪═══════════════╡
         │ null ┆ null      ┆ 10              ┆ 4             │
         │ A    ┆ 1         ┆ 4               ┆ 0             │
@@ -488,7 +486,7 @@ def reducer_fntr(
         ┌──────┬───────────┬────────────────────┬────────────┐
         │ code ┆ modifier1 ┆ code/n_occurrences ┆ values/sum │
         │ ---  ┆ ---       ┆ ---                ┆ ---        │
-        │ cat  ┆ i64       ┆ i64                ┆ f64        │
+        │ str  ┆ i64       ┆ i64                ┆ f64        │
         ╞══════╪═══════════╪════════════════════╪════════════╡
         │ null ┆ null      ┆ 13                 ┆ 13.2       │
         │ A    ┆ 1         ┆ 12                 ┆ 2.2        │
@@ -505,7 +503,7 @@ def reducer_fntr(
         ┌──────┬───────────┬───────────────────┬──────────────────────┐
         │ code ┆ modifier1 ┆ values/n_patients ┆ values/n_occurrences │
         │ ---  ┆ ---       ┆ ---               ┆ ---                  │
-        │ cat  ┆ i64       ┆ i64               ┆ i64                  │
+        │ str  ┆ i64       ┆ i64               ┆ i64                  │
         ╞══════╪═══════════╪═══════════════════╪══════════════════════╡
         │ null ┆ null      ┆ 8                 ┆ 12                   │
         │ A    ┆ 1         ┆ 1                 ┆ 2                    │
@@ -522,7 +520,7 @@ def reducer_fntr(
         ┌──────┬───────────┬────────────────┬────────────┬────────────┐
         │ code ┆ modifier1 ┆ values/sum_sqd ┆ values/min ┆ values/max │
         │ ---  ┆ ---       ┆ ---            ┆ ---        ┆ ---        │
-        │ cat  ┆ i64       ┆ f64            ┆ f64        ┆ f64        │
+        │ str  ┆ i64       ┆ f64            ┆ f64        ┆ f64        │
         ╞══════╪═══════════╪════════════════╪════════════╪════════════╡
         │ null ┆ null      ┆ 21.3           ┆ -1.0       ┆ 8.0        │
         │ A    ┆ 1         ┆ 2.42           ┆ 0.0        ┆ 1.1        │

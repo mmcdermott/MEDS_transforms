@@ -80,7 +80,7 @@ def normalize(
         ...     schema = {
         ...         "patient_id": pl.UInt32,
         ...         "timestamp": pl.Datetime,
-        ...         "code": pl.Categorical(ordering='physical'),
+        ...         "code": pl.Utf8,
         ...         "numerical_value": pl.Float64,
         ...         "unit": pl.Utf8,
         ...    },
@@ -93,7 +93,7 @@ def normalize(
         ...         "values/std": [0.5, None, None, None, 0.2],
         ...     },
         ...     schema = {
-        ...         "code": pl.Categorical(ordering='physical'),
+        ...         "code": pl.Utf8,
         ...         "code/vocab_index": pl.UInt32,
         ...         "values/mean": pl.Float64,
         ...         "values/std": pl.Float64,
@@ -132,7 +132,7 @@ def normalize(
         ...     schema = {
         ...         "patient_id": pl.UInt32,
         ...         "timestamp": pl.Datetime,
-        ...         "code": pl.Categorical(ordering='physical'),
+        ...         "code": pl.Utf8,
         ...         "numerical_value": pl.Float64,
         ...         "unit": pl.Utf8,
         ...    },
@@ -146,7 +146,7 @@ def normalize(
         ...         "values/std": [0.5, 2.0, None, None, None, 0.2],
         ...     },
         ...     schema = {
-        ...         "code": pl.Categorical(ordering='physical'),
+        ...         "code": pl.Utf8,
         ...         "unit": pl.Utf8,
         ...         "code/vocab_index": pl.UInt32,
         ...         "values/mean": pl.Float64,

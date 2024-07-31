@@ -11,8 +11,6 @@ from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over
 from MEDS_transforms.utils import hydra_loguru_init
 
-pl.enable_string_cache()
-
 
 def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[[pl.DataFrame], pl.DataFrame]:
     """Creates a "meta" functor that computes the input functor on a MEDS shard then combines both dataframes.
@@ -41,14 +39,14 @@ def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[
         ...         ],
         ...         "code": ["static", "DOB", "lab//A", "lab//B", "DOB", "lab//A", "lab//B", "dx//1"],
         ...     },
-        ...     schema={"patient_id": pl.UInt32, "timestamp": pl.Datetime, "code": pl.Categorical},
+        ...     schema={"patient_id": pl.UInt32, "timestamp": pl.Datetime, "code": pl.Utf8},
         ... )
         >>> df
         shape: (8, 3)
         ┌────────────┬─────────────────────┬────────┐
         │ patient_id ┆ timestamp           ┆ code   │
         │ ---        ┆ ---                 ┆ ---    │
-        │ u32        ┆ datetime[μs]        ┆ cat    │
+        │ u32        ┆ datetime[μs]        ┆ str    │
         ╞════════════╪═════════════════════╪════════╡
         │ 1          ┆ null                ┆ static │
         │ 1          ┆ 1990-01-01 00:00:00 ┆ DOB    │
@@ -67,7 +65,7 @@ def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[
         ┌────────────┬─────────────────────┬──────┬─────────────────┐
         │ patient_id ┆ timestamp           ┆ code ┆ numerical_value │
         │ ---        ┆ ---                 ┆ ---  ┆ ---             │
-        │ u32        ┆ datetime[μs]        ┆ cat  ┆ f64             │
+        │ u32        ┆ datetime[μs]        ┆ str  ┆ f64             │
         ╞════════════╪═════════════════════╪══════╪═════════════════╡
         │ 1          ┆ 2021-01-01 00:00:00 ┆ AGE  ┆ 31.001347       │
         │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE  ┆ 35.00417        │
@@ -79,7 +77,7 @@ def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[
         ┌────────────┬─────────────────────┬────────┬─────────────────┐
         │ patient_id ┆ timestamp           ┆ code   ┆ numerical_value │
         │ ---        ┆ ---                 ┆ ---    ┆ ---             │
-        │ u32        ┆ datetime[μs]        ┆ cat    ┆ f64             │
+        │ u32        ┆ datetime[μs]        ┆ str    ┆ f64             │
         ╞════════════╪═════════════════════╪════════╪═════════════════╡
         │ 1          ┆ null                ┆ static ┆ null            │
         │ 1          ┆ 1990-01-01 00:00:00 ┆ DOB    ┆ null            │
@@ -209,14 +207,14 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         ...         ],
         ...         "code": ["static", "DOB", "lab//A", "lab//B", "rx", "DOB", "lab//A", "lab//B", "dx//1"],
         ...     },
-        ...     schema={"patient_id": pl.UInt32, "timestamp": pl.Datetime, "code": pl.Categorical},
+        ...     schema={"patient_id": pl.UInt32, "timestamp": pl.Datetime, "code": pl.Utf8},
         ... )
         >>> df
         shape: (9, 3)
         ┌────────────┬─────────────────────┬────────┐
         │ patient_id ┆ timestamp           ┆ code   │
         │ ---        ┆ ---                 ┆ ---    │
-        │ u32        ┆ datetime[μs]        ┆ cat    │
+        │ u32        ┆ datetime[μs]        ┆ str    │
         ╞════════════╪═════════════════════╪════════╡
         │ 1          ┆ null                ┆ static │
         │ 1          ┆ 1990-01-01 00:00:00 ┆ DOB    │
@@ -235,7 +233,7 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         ┌────────────┬─────────────────────┬──────┬─────────────────┐
         │ patient_id ┆ timestamp           ┆ code ┆ numerical_value │
         │ ---        ┆ ---                 ┆ ---  ┆ ---             │
-        │ u32        ┆ datetime[μs]        ┆ cat  ┆ f64             │
+        │ u32        ┆ datetime[μs]        ┆ str  ┆ f64             │
         ╞════════════╪═════════════════════╪══════╪═════════════════╡
         │ 1          ┆ 2021-01-01 00:00:00 ┆ AGE  ┆ 31.001347       │
         │ 1          ┆ 2021-01-02 00:00:00 ┆ AGE  ┆ 31.004084       │
@@ -300,14 +298,14 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         ...         ],
         ...         "code": ["static", "DOB", "lab//A", "lab//B", "DOB", "lab//A", "lab//B", "dx//1"],
         ...     },
-        ...     schema={"patient_id": pl.UInt32, "timestamp": pl.Datetime, "code": pl.Categorical},
+        ...     schema={"patient_id": pl.UInt32, "timestamp": pl.Datetime, "code": pl.Utf8},
         ... )
         >>> df
         shape: (8, 3)
         ┌────────────┬─────────────────────┬────────┐
         │ patient_id ┆ timestamp           ┆ code   │
         │ ---        ┆ ---                 ┆ ---    │
-        │ u32        ┆ datetime[μs]        ┆ cat    │
+        │ u32        ┆ datetime[μs]        ┆ str    │
         ╞════════════╪═════════════════════╪════════╡
         │ 1          ┆ null                ┆ static │
         │ 1          ┆ 1990-01-01 01:00:00 ┆ DOB    │
@@ -325,7 +323,7 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         ┌────────────┬─────────────────────┬──────────────────────┐
         │ patient_id ┆ timestamp           ┆ code                 │
         │ ---        ┆ ---                 ┆ ---                  │
-        │ u32        ┆ datetime[μs]        ┆ cat                  │
+        │ u32        ┆ datetime[μs]        ┆ str                  │
         ╞════════════╪═════════════════════╪══════════════════════╡
         │ 1          ┆ 1990-01-01 01:00:00 ┆ time_of_day//[00,06) │
         │ 1          ┆ 2021-01-01 12:00:00 ┆ time_of_day//[12,18) │

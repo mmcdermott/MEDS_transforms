@@ -10,8 +10,6 @@ from omegaconf import DictConfig
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over
 
-pl.enable_string_cache()
-
 
 def occlude_outliers_fntr(
     stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifier_columns: list[str] | None = None
@@ -27,7 +25,7 @@ def occlude_outliers_fntr(
 
     Examples:
         >>> code_metadata_df = pl.DataFrame({
-        ...     "code":       pl.Series(["A",  "A",  "B",  "C"], dtype=pl.Categorical),
+        ...     "code":                 ["A",  "A",  "B",  "C"],
         ...     "modifier1":            [1,    2,    1,    2],
         ...     "values/n_occurrences": [3,    1,    3,    2],
         ...     "values/sum":           [0.0,  4.0,  12.0, 2.0],
@@ -37,7 +35,7 @@ def occlude_outliers_fntr(
         ... })
         >>> data = pl.DataFrame({
         ...     "patient_id":      [1,   1,   2,   2],
-        ...     "code":  pl.Series(["A", "B", "A", "C"], dtype=pl.Categorical),
+        ...     "code":            ["A", "B", "A", "C"],
         ...     "modifier1":       [1,   1,   2,   2],
         ... # for clarity: mean    [0.0, 4.0, 4.0, 1.0]
         ... # for clarity: stddev  [3.0, 3.0, 0.0, 1.0]
@@ -50,7 +48,7 @@ def occlude_outliers_fntr(
         ┌────────────┬──────┬───────────┬─────────────────┬───────────────────────────┐
         │ patient_id ┆ code ┆ modifier1 ┆ numerical_value ┆ numerical_value/is_inlier │
         │ ---        ┆ ---  ┆ ---       ┆ ---             ┆ ---                       │
-        │ i64        ┆ cat  ┆ i64       ┆ f64             ┆ bool                      │
+        │ i64        ┆ str  ┆ i64       ┆ f64             ┆ bool                      │
         ╞════════════╪══════╪═══════════╪═════════════════╪═══════════════════════════╡
         │ 1          ┆ A    ┆ 1         ┆ null            ┆ false                     │
         │ 1          ┆ B    ┆ 1         ┆ 16.0            ┆ true                      │
