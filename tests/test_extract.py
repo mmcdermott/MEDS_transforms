@@ -503,7 +503,7 @@ def test_extraction():
         full_stdout = "\n".join(all_stdouts)
 
         # Check the final output
-        output_folder = MEDS_cohort_dir / "final_cohort"
+        output_folder = MEDS_cohort_dir / "data"
         try:
             for split, expected_df_L in MEDS_OUTPUTS.items():
                 if not isinstance(expected_df_L, list):

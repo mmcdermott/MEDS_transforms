@@ -153,10 +153,10 @@ def populate_stage(
         ... })
         >>> args = [root_config[k] for k in ["input_dir", "cohort_dir", "stages", "stage_configs"]]
         >>> populate_stage("stage1", *args) # doctest: +NORMALIZE_WHITESPACE
-        {'is_metadata': False, 'data_input_dir': '/a/b', 'metadata_input_dir': '/a/b',
+        {'is_metadata': False, 'data_input_dir': '/a/b/data', 'metadata_input_dir': '/a/b/metadata',
          'output_dir': '/c/d/stage1'}
         >>> populate_stage("stage2", *args) # doctest: +NORMALIZE_WHITESPACE
-        {'is_metadata': True, 'data_input_dir': '/c/d/stage1', 'metadata_input_dir': '/a/b',
+        {'is_metadata': True, 'data_input_dir': '/c/d/stage1', 'metadata_input_dir': '/a/b/metadata',
          'output_dir': '/c/d/stage2'}
         >>> populate_stage("stage3", *args) # doctest: +NORMALIZE_WHITESPACE
         {'is_metadata': False, 'data_input_dir': '/c/d/stage1',
@@ -212,13 +212,22 @@ def populate_stage(
         else:
             prior_data_stage = s_resolved
 
+    is_first_data_stage = prior_data_stage is None
+    is_first_metadata_stage = prior_metadata_stage is None
+
+    input_dir = Path(input_dir)
+    cohort_dir = Path(cohort_dir)
+
+    pipeline_input_data_dir = str(input_dir / "data")
+    pipeline_input_metadata_dir = str(input_dir / "metadata")
+
     inferred_keys = {
         "is_metadata": "aggregations" in stage,
-        "data_input_dir": input_dir if prior_data_stage is None else prior_data_stage["output_dir"],
+        "data_input_dir": pipeline_input_data_dir if is_first_data_stage else prior_data_stage["output_dir"],
         "metadata_input_dir": (
-            input_dir if prior_metadata_stage is None else prior_metadata_stage["output_dir"]
+            pipeline_input_metadata_dir if is_first_metadata_stage else prior_metadata_stage["output_dir"]
         ),
-        "output_dir": os.path.join(cohort_dir, stage_name),
+        "output_dir": cohort_dir / stage_name,
     }
 
     if "is_metadata" in stage and not isinstance(stage["is_metadata"], (bool, type(None))):

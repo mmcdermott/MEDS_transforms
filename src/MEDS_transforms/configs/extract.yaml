@@ -38,6 +38,8 @@ stages:
   - extract_code_metadata
 
 stage_configs:
+  shard_events:
+    data_input_dir: "${input_dir}"
   aggregate_code_metadata:
     description: |-
       This stage collects some descriptive metadata about the codes in the cohort.
