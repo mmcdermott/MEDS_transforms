@@ -104,7 +104,7 @@ class MapReducePair(NamedTuple):
 def quantile_reducer(cols: cs._selector_proxy_) -> pl.Expr:
     """TODO."""
 
-    vals = pl.concat_list(cols).explode()
+    vals = pl.concat_list(cols.fill_null([])).explode()
 
     quantile_keys = [0.25, 0.5, 0.75]
     quantile_cols = [f"values/quantile/{key}" for key in quantile_keys]
@@ -570,7 +570,21 @@ def reducer_fntr(
         └──────┴───────────┴────────────────┴────────────┴────────────┘
         >>> stage_cfg = DictConfig({"aggregations": ["values/quantiles"]})
         >>> reducer = reducer_fntr(stage_cfg, code_modifier_columns)
-        >>> reducer(df_1, df_2, df_3)
+        >>> reducer(df_1, df_2, df_3).unnest("values/quantiles")
+        shape: (7, 5)
+        ┌──────┬───────────┬──────────────────────┬─────────────────────┬──────────────────────┐
+        │ code ┆ modifier1 ┆ values/quantile/0.25 ┆ values/quantile/0.5 ┆ values/quantile/0.75 │
+        │ ---  ┆ ---       ┆ ---                  ┆ ---                 ┆ ---                  │
+        │ cat  ┆ i64       ┆ f64                  ┆ f64                 ┆ f64                  │
+        ╞══════╪═══════════╪══════════════════════╪═════════════════════╪══════════════════════╡
+        │ null ┆ null      ┆ 1.1                  ┆ 1.1                 ┆ 1.1                  │
+        │ A    ┆ 1         ┆ 1.3                  ┆ 2.0                 ┆ 2.0                  │
+        │ A    ┆ 2         ┆ 6.0                  ┆ 6.0                 ┆ 6.0                  │
+        │ B    ┆ 1         ┆ 3.0                  ┆ 5.0                 ┆ 5.0                  │
+        │ C    ┆ null      ┆ 11.1                 ┆ 12.0                ┆ 12.0                 │
+        │ C    ┆ 2         ┆ null                 ┆ null                ┆ null                 │
+        │ D    ┆ 1         ┆ null                 ┆ null                ┆ null                 │
+        └──────┴───────────┴──────────────────────┴─────────────────────┴──────────────────────┘
         >>> reducer(df_1.drop("values/min"), df_2, df_3)
         Traceback (most recent call last):
             ...
@@ -581,7 +595,8 @@ def reducer_fntr(
     aggregations = stage_cfg.aggregations
 
     agg_operations = {
-        agg: CODE_METADATA_AGGREGATIONS[agg].reducer(cs.matches(f"{agg}/shard_\\d+")) for agg in aggregations
+        agg: CODE_METADATA_AGGREGATIONS[agg].reducer(cs.matches(f"{agg}/shard_\\d+")).over(*code_key_columns)
+        for agg in aggregations
     }
 
     def reducer(*dfs: Sequence[pl.LazyFrame]) -> pl.LazyFrame:
