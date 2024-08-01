@@ -121,7 +121,7 @@ admit_vitals:
     _metadata:
       input_metadata:
         description: {"title": {"lab_code": "HR"}}
-        parent_code: {"LOINC/{loinc}": {"lab_code": "HR"}}
+        parent_codes: {"LOINC/{loinc}": {"lab_code": "HR"}}
   temp:
     code: TEMP
     timestamp: col(vitals_date)
@@ -130,7 +130,7 @@ admit_vitals:
     _metadata:
       input_metadata:
         description: {"title": {"lab_code": "temp"}}
-        parent_code: {"LOINC/{loinc}": {"lab_code": "temp"}}
+        parent_codes: {"LOINC/{loinc}": {"lab_code": "temp"}}
 """
 
 # Test data (expected outputs) -- ALL OF THIS MAY CHANGE IF THE SEED OR DATA CHANGES
@@ -266,7 +266,7 @@ TEMP,12,4,12,1181.4999999999998,116373.38999999998
 """
 
 MEDS_OUTPUT_CODE_METADATA_FILE_WITH_DESC = """
-code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,description,parent_code
+code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,description,parent_codes
 ,44,4,28,3198.8389005974336,382968.28937288234,,
 ADMISSION//CARDIAC,2,2,0,,,,
 ADMISSION//ORTHOPEDIC,1,1,0,,,,
@@ -592,7 +592,12 @@ def test_extraction():
             pl.col("values/n_occurrences").cast(pl.UInt8),
             pl.col("values/sum").cast(pl.Float32).fill_null(0),
             pl.col("values/sum_sqd").cast(pl.Float32).fill_null(0),
+            pl.col("parent_codes").cast(pl.List(pl.Utf8)),
         )
+
+        # We collapse the list type as it throws an error in the assert_df_equal otherwise
+        got_df = got_df.with_columns(pl.col("parent_codes").list.join("||"))
+        want_df = want_df.with_columns(pl.col("parent_codes").list.join("||"))
 
         assert_df_equal(
             want=want_df,
