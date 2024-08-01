@@ -207,9 +207,9 @@ def main(cfg: DictConfig):
     )
 
     metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
-    output_dir = Path(cfg.stage_cfg.output_dir)
+    output_dir = Path(cfg.stage_cfg.reducer_output_dir)
 
-    code_metadata = pl.read_parquet(metadata_input_dir / "code_metadata.parquet", use_pyarrow=True)
+    code_metadata = pl.read_parquet(metadata_input_dir / "codes.parquet", use_pyarrow=True)
 
     ordering_method = cfg.stage_cfg.get("ordering_method", VOCABULARY_ORDERING.LEXICOGRAPHIC)
 
@@ -228,7 +228,8 @@ def main(cfg: DictConfig):
 
     code_metadata = ordering_fn(code_metadata, code_modifiers)
 
-    output_fp = output_dir / "code_metadata.parquet"
+    output_fp = output_dir / "codes.parquet"
+    output_fp.parent.mkdir(parents=True, exist_ok=True)
     logger.info(f"Indices assigned. Writing to {output_fp}")
 
     code_metadata.write_parquet(output_fp, use_pyarrow=True)

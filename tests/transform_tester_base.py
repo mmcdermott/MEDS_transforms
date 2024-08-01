@@ -296,9 +296,14 @@ def single_stage_transform_tester(
         MEDS_dir = Path(d) / "MEDS_cohort"
         cohort_dir = Path(d) / "output_cohort"
 
+        MEDS_data_dir = MEDS_dir / "data"
+        MEDS_metadata_dir = MEDS_dir / "metadata"
+        cohort_metadata_dir = cohort_dir / "metadata"
+
         # Create the directories
-        MEDS_dir.mkdir()
-        cohort_dir.mkdir()
+        MEDS_data_dir.mkdir(parents=True)
+        MEDS_metadata_dir.mkdir(parents=True)
+        cohort_dir.mkdir(parents=True)
 
         # Write the splits
         splits_fp = MEDS_dir / "splits.json"
@@ -309,11 +314,11 @@ def single_stage_transform_tester(
 
         # Write the shards
         for shard_name, df in input_shards.items():
-            fp = MEDS_dir / f"{shard_name}.parquet"
+            fp = MEDS_data_dir / f"{shard_name}.parquet"
             fp.parent.mkdir(parents=True, exist_ok=True)
             df.write_parquet(fp, use_pyarrow=True)
 
-        code_metadata_fp = MEDS_dir / "code_metadata.parquet"
+        code_metadata_fp = MEDS_metadata_dir / "codes.parquet"
         if code_metadata is None:
             code_metadata = MEDS_CODE_METADATA
         elif isinstance(code_metadata, str):
@@ -342,10 +347,10 @@ def single_stage_transform_tester(
         # Check the output
         if isinstance(want_outputs, pl.DataFrame):
             # The want output is a code_metadata file in the root directory in this case.
-            check_df_output(cohort_dir / "code_metadata.parquet", want_outputs, stderr, stdout)
+            check_df_output(cohort_metadata_dir / "codes.parquet", want_outputs, stderr, stdout)
         else:
             for shard_name, want in want_outputs.items():
-                output_fp = cohort_dir / stage_name / f"{shard_name}{file_suffix}"
+                output_fp = cohort_dir / "data" / f"{shard_name}{file_suffix}"
                 if file_suffix == ".parquet":
                     check_df_output(output_fp, want, stderr, stdout)
                 elif file_suffix == ".nrt":

@@ -388,13 +388,16 @@ def main(cfg: DictConfig):
     else:
         reduced = reduced.collect()
 
-    reducer_fp = Path(cfg.cohort_dir) / "code_metadata.parquet"
+    metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
+    old_metadata_fp = metadata_input_dir / "codes.parquet"
 
-    if reducer_fp.exists():
-        logger.info(f"Joining to existing code metadata at {str(reducer_fp.resolve())}")
-        existing = pl.read_parquet(reducer_fp, use_pyarrow=True)
+    if old_metadata_fp.exists():
+        logger.info(f"Joining to existing code metadata at {str(old_metadata_fp.resolve())}")
+        existing = pl.read_parquet(old_metadata_fp, use_pyarrow=True)
         reduced = existing.join(reduced, on=join_cols, how="full", coalesce=True)
 
+    reducer_fp = Path(cfg.stage_cfg.reducer_output_dir) / "codes.parquet"
+    reducer_fp.parent.mkdir(parents=True, exist_ok=True)
     reduced.write_parquet(reducer_fp, use_pyarrow=True)
     logger.info(f"Finished reduction in {datetime.now() - start}")
 

@@ -582,13 +582,15 @@ def run_map_reduce(cfg: DictConfig):
 
     start = datetime.now()
     logger.info("All map shards complete! Starting code metadata reduction computation.")
-    reducer_fn = reducer_fntr(cfg.stage_cfg, cfg.get("code_modifier_columns", None))
+    reducer_fp = Path(cfg.stage_cfg.reducer_output_dir) / "codes.parquet"
+    reducer_fp.parent.mkdir(parents=True, exist_ok=True)
 
+    reducer_fn = reducer_fntr(cfg.stage_cfg, cfg.get("code_modifier_columns", None))
     reduced = reducer_fn(*[pl.scan_parquet(fp, glob=False) for fp in all_out_fps]).with_columns(
         cs.numeric().shrink_dtype().name.keep()
     )
-    logger.debug("For an extraction task specifically, we write out specifically to the cohort dir")
-    write_lazyframe(reduced, Path(cfg.cohort_dir) / "code_metadata.parquet")
+
+    write_lazyframe(reduced, reducer_fp)
     logger.info(f"Finished reduction in {datetime.now() - start}")
 
 
