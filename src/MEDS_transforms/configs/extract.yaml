@@ -5,6 +5,7 @@ defaults:
       - split_and_shard_patients
       - merge_to_MEDS_cohort
       - extract_code_metadata
+      - finalize_MEDS_metadata
       # There is no configuration beyond the global "event_conversion_config_fp" for the
       # convert_to_sharded_events stage, so it doesn't have a stage config block here or below.
   - _self_
@@ -37,6 +38,7 @@ stages:
   - merge_to_MEDS_cohort
   - aggregate_code_metadata
   - extract_code_metadata
+  - finalize_MEDS_metadata
 
 stage_configs:
   shard_events:

@@ -25,6 +25,8 @@ stage_cfg: ${oc.create:${populate_stage:${stage}, ${input_dir}, ${cohort_dir}, $
 # Pipeline
 etl_metadata:
   pipeline_name: ???
+  dataset_name: ???
+  dataset_version: ???
   package_name: ${get_package_name}
   package_version: ${get_package_version}
 

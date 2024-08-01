@@ -682,7 +682,6 @@ def main(cfg: DictConfig):
     directly on the command line, but can be overwritten implicitly by overwriting components of the
     `stage_configs.convert_to_sharded_events` key.
 
-
     This stage has no stage-specific configuration arguments. It does, naturally, require the global,
     `event_conversion_config_fp` configuration argument to be set to the path of the event conversion yaml
     file.
