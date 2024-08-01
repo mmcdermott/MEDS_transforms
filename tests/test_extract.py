@@ -37,8 +37,6 @@ import polars as pl
 
 from .utils import assert_df_equal, run_command
 
-pl.enable_string_cache()
-
 # Test data (inputs)
 
 SUBJECTS_CSV = """
@@ -150,7 +148,7 @@ def get_expected_output(df: str) -> pl.DataFrame:
         .select(
             "patient_id",
             pl.col("timestamp").str.strptime(pl.Datetime, "%m/%d/%Y, %H:%M:%S").alias("timestamp"),
-            pl.col("code").cast(pl.Categorical),
+            pl.col("code"),
             "numerical_value",
         )
         .sort(by=["patient_id", "timestamp"])
@@ -555,7 +553,7 @@ def test_extraction():
         got_df = pl.read_parquet(output_file, glob=False)
 
         want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE)).with_columns(
-            pl.col("code").cast(pl.Categorical),
+            pl.col("code"),
             pl.col("code/n_occurrences").cast(pl.UInt8),
             pl.col("code/n_patients").cast(pl.UInt8),
             pl.col("values/n_occurrences").cast(pl.UInt8),
@@ -588,7 +586,7 @@ def test_extraction():
         got_df = pl.read_parquet(output_file, glob=False)
 
         want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE_WITH_DESC)).with_columns(
-            pl.col("code").cast(pl.Categorical),
+            pl.col("code"),
             pl.col("code/n_occurrences").cast(pl.UInt8),
             pl.col("code/n_patients").cast(pl.UInt8),
             pl.col("values/n_occurrences").cast(pl.UInt8),

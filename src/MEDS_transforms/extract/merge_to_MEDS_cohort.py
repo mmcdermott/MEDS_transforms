@@ -10,8 +10,6 @@ from omegaconf import DictConfig, OmegaConf
 from MEDS_transforms.extract import CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over, shard_iterator
 
-pl.enable_string_cache()
-
 
 def merge_subdirs_and_sort(
     sp_dir: Path,

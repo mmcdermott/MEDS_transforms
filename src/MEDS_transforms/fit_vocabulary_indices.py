@@ -47,25 +47,25 @@ def validate_code_metadata(code_metadata: pl.DataFrame, code_modifiers: list[str
 
     Examples:
         >>> code_metadata = pl.DataFrame({
-        ...     "code": pl.Series(["A", "B",   "A",  "A"], dtype=pl.Categorical),
-        ...     "modifier1":      ["X", "D",   "Z",  "Z"],
-        ...     "modifier2":      [None, None, None, 3],
+        ...     "code":      ["A", "B",   "A",  "A"],
+        ...     "modifier1": ["X", "D",   "Z",  "Z"],
+        ...     "modifier2": [None, None, None, 3],
         ... })
         >>> validate_code_metadata(code_metadata, ["modifier1", "modifier2"])
         >>> # This returns None in the absence of an exception.
         >>> code_metadata = pl.DataFrame({
-        ...     "code": pl.Series(["A", "B",   "A",  "A"], dtype=pl.Categorical),
-        ...     "modifier1":      ["X", "D",   "Z",  "Z"],
-        ...     "modifier2":      [None, None, None, 3],
+        ...     "code":      ["A", "B",   "A",  "A"],
+        ...     "modifier1": ["X", "D",   "Z",  "Z"],
+        ...     "modifier2": [None, None, None, 3],
         ... })
         >>> validate_code_metadata(code_metadata, ["modifier1", "modifier2", "missing_modifier"])
         Traceback (most recent call last):
             ...
         KeyError: "The following columns are not present in the code metadata: 'missing_modifier'."
         >>> code_metadata = pl.DataFrame({
-        ...     "code": pl.Series(["A", "B",   "A",  "A", "B", "B"], dtype=pl.Categorical),
-        ...     "modifier1":      ["X", "D",   "Z",  "Z", "Y", "Y"],
-        ...     "modifier2":      [None, None, None, None, 2,  1],
+        ...     "code":      ["A", "B",   "A",  "A", "B", "B"],
+        ...     "modifier1": ["X", "D",   "Z",  "Z", "Y", "Y"],
+        ...     "modifier2": [None, None, None, None, 2,  1],
         ... })
         >>> validate_code_metadata(code_metadata, ["modifier1", "modifier2"])
         Traceback (most recent call last):
@@ -75,7 +75,7 @@ def validate_code_metadata(code_metadata: pl.DataFrame, code_modifiers: list[str
         ┌──────┬───────────┬───────────┬───────┐
         │ code ┆ modifier1 ┆ modifier2 ┆ count │
         │ ---  ┆ ---       ┆ ---       ┆ ---   │
-        │ cat  ┆ str       ┆ i64       ┆ u32   │
+        │ str  ┆ str       ┆ i64       ┆ u32   │
         ╞══════╪═══════════╪═══════════╪═══════╡
         │ A    ┆ Z         ┆ null      ┆ 2     │
         └──────┴───────────┴───────────┴───────┘
@@ -130,9 +130,9 @@ def lexicographic_indices(code_metadata: pl.DataFrame, code_modifiers: list[str]
 
     Examples:
         >>> code_metadata = pl.DataFrame({
-        ...     "code": pl.Series(["A", "B",   "A",  "A",  "B", "B"], dtype=pl.Categorical),
-        ...     "modifier1":      ["X", "D",   None, "Z",  "Y", "Y"],
-        ...     "modifier2":      [None, None, None, None, 2,   1],
+        ...     "code":      ["A", "B",   "A",  "A",  "B", "B"],
+        ...     "modifier1": ["X", "D",   None, "Z",  "Y", "Y"],
+        ...     "modifier2": [None, None, None, None, 2,   1],
         ... })
         >>> code_modifiers = ["modifier1", "modifier2"]
         >>> expr = lexicographic_indices(code_metadata, code_modifiers)
@@ -141,7 +141,7 @@ def lexicographic_indices(code_metadata: pl.DataFrame, code_modifiers: list[str]
         ┌──────┬───────────┬───────────┬──────────────────┐
         │ code ┆ modifier1 ┆ modifier2 ┆ code/vocab_index │
         │ ---  ┆ ---       ┆ ---       ┆ ---              │
-        │ cat  ┆ str       ┆ i64       ┆ u8               │
+        │ str  ┆ str       ┆ i64       ┆ u8               │
         ╞══════╪═══════════╪═══════════╪══════════════════╡
         │ A    ┆ X         ┆ null      ┆ 2                │
         │ B    ┆ D         ┆ null      ┆ 4                │

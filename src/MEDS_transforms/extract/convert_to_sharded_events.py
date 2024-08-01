@@ -45,17 +45,13 @@ def get_code_expr(code_field: str | list | ListConfig) -> tuple[pl.Expr, pl.Expr
         ValueError: If the code field is not a valid type.
 
     Examples:
-        >>> print(*get_code_expr("A")) # doctest: +NORMALIZE_WHITESPACE
-        String(A).strict_cast(String).strict_cast(Categorical(None, Physical))
-        None
-        set()
+        >>> print(*get_code_expr("A"))
+        String(A).strict_cast(String) None set()
         >>> print(*get_code_expr("col(B)")) # doctest: +NORMALIZE_WHITESPACE
-        col("B").strict_cast(String).fill_null([String(UNK)]).strict_cast(Categorical(None, Physical))
-        col("B").is_not_null()
-        {'B'}
+        col("B").strict_cast(String).fill_null([String(UNK)]) col("B").is_not_null() {'B'}
         >>> print(*get_code_expr(["col(A)", "B"])) # doctest: +NORMALIZE_WHITESPACE
         [([(col("A").strict_cast(String).fill_null([String(UNK)])) + (String(//))]) +
-           (String(B).strict_cast(String))].strict_cast(Categorical(None, Physical))
+           (String(B).strict_cast(String))]
         col("A").is_not_null()
         {'A'}
         >>> get_code_expr(34)
@@ -71,7 +67,7 @@ def get_code_expr(code_field: str | list | ListConfig) -> tuple[pl.Expr, pl.Expr
         >>> expr, null_filter, cols = get_code_expr(["col(A)", "col(c)"])
         >>> print(expr) # doctest: +NORMALIZE_WHITESPACE
         [([(col("A").strict_cast(String).fill_null([String(UNK)])) + (String(//))]) +
-           (col("c").strict_cast(String).fill_null([String(UNK)]))].strict_cast(Categorical(None, Physical))
+           (col("c").strict_cast(String).fill_null([String(UNK)]))]
         >>> print(null_filter)
         col("A").is_not_null()
         >>> print(sorted(cols))
@@ -97,7 +93,7 @@ def get_code_expr(code_field: str | list | ListConfig) -> tuple[pl.Expr, pl.Expr
                 code_exprs.append(pl.lit(code, dtype=pl.Utf8))
             case _:
                 raise ValueError(f"Invalid code literal: {code}")
-    code_expr = reduce(lambda a, b: a + pl.lit("//") + b, code_exprs).cast(pl.Categorical)
+    code_expr = reduce(lambda a, b: a + pl.lit("//") + b, code_exprs)
 
     return code_expr, code_null_filter_expr, needed_cols
 
@@ -171,7 +167,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         ┌────────────┬───────────┬─────────────────────┬─────────────────┐
         │ patient_id ┆ code      ┆ timestamp           ┆ numerical_value │
         │ ---        ┆ ---       ┆ ---                 ┆ ---             │
-        │ i64        ┆ cat       ┆ datetime[μs]        ┆ i64             │
+        │ i64        ┆ str       ┆ datetime[μs]        ┆ i64             │
         ╞════════════╪═══════════╪═════════════════════╪═════════════════╡
         │ 1          ┆ FOO//A//1 ┆ 2021-01-01 00:00:00 ┆ 1               │
         │ 1          ┆ FOO//B//2 ┆ 2021-01-02 00:00:00 ┆ 2               │
@@ -196,7 +192,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         ┌────────────┬────────┬─────────────────────┬─────────────────┐
         │ patient_id ┆ code   ┆ timestamp           ┆ numerical_value │
         │ ---        ┆ ---    ┆ ---                 ┆ ---             │
-        │ i64        ┆ cat    ┆ datetime[μs]        ┆ i64             │
+        │ i64        ┆ str    ┆ datetime[μs]        ┆ i64             │
         ╞════════════╪════════╪═════════════════════╪═════════════════╡
         │ 2          ┆ C//3   ┆ 2021-01-03 00:00:00 ┆ 3               │
         │ 2          ┆ D//UNK ┆ 2021-01-04 00:00:00 ┆ 4               │
@@ -288,7 +284,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         ┌────────────┬──────────────┬─────────────────────┬─────────────────┐
         │ patient_id ┆ code         ┆ timestamp           ┆ numerical_value │
         │ ---        ┆ ---          ┆ ---                 ┆ ---             │
-        │ u8         ┆ cat          ┆ datetime[μs]        ┆ f64             │
+        │ u8         ┆ str          ┆ datetime[μs]        ┆ f64             │
         ╞════════════╪══════════════╪═════════════════════╪═════════════════╡
         │ 1          ┆ ADMISSION//A ┆ 2021-01-01 00:00:00 ┆ 1.0             │
         │ 1          ┆ ADMISSION//B ┆ 2021-01-02 00:00:00 ┆ 2.0             │
@@ -305,7 +301,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         ┌────────────┬──────────────┬─────────────────────┬─────────────────┐
         │ patient_id ┆ code         ┆ timestamp           ┆ numerical_value │
         │ ---        ┆ ---          ┆ ---                 ┆ ---             │
-        │ u8         ┆ cat          ┆ datetime[μs]        ┆ f64             │
+        │ u8         ┆ str          ┆ datetime[μs]        ┆ f64             │
         ╞════════════╪══════════════╪═════════════════════╪═════════════════╡
         │ 1          ┆ ADMISSION//A ┆ 2021-01-01 00:00:00 ┆ 1.0             │
         │ 1          ┆ ADMISSION//B ┆ 2021-01-02 00:00:00 ┆ 2.0             │
@@ -322,7 +318,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         ┌────────────┬──────────────┬─────────────────────┬─────────────────┐
         │ patient_id ┆ code         ┆ timestamp           ┆ numerical_value │
         │ ---        ┆ ---          ┆ ---                 ┆ ---             │
-        │ u8         ┆ cat          ┆ datetime[μs]        ┆ f64             │
+        │ u8         ┆ str          ┆ datetime[μs]        ┆ f64             │
         ╞════════════╪══════════════╪═════════════════════╪═════════════════╡
         │ 1          ┆ ADMISSION//A ┆ 2021-01-01 00:00:00 ┆ 1.0             │
         │ 1          ┆ ADMISSION//B ┆ 2021-01-02 00:00:00 ┆ 2.0             │
@@ -336,7 +332,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         ┌────────────┬─────────────────┬─────────────────────┬───────────────────┬────────────┐
         │ patient_id ┆ code            ┆ timestamp           ┆ categorical_value ┆ text_value │
         │ ---        ┆ ---             ┆ ---                 ┆ ---               ┆ ---        │
-        │ u8         ┆ cat             ┆ datetime[μs]        ┆ cat               ┆ str        │
+        │ u8         ┆ str             ┆ datetime[μs]        ┆ cat               ┆ str        │
         ╞════════════╪═════════════════╪═════════════════════╪═══════════════════╪════════════╡
         │ 1          ┆ DISCHARGE//Home ┆ 2021-01-01 11:23:45 ┆ AOx4              ┆ Home       │
         │ 1          ┆ DISCHARGE//SNF  ┆ 2021-01-02 12:34:56 ┆ AO                ┆ SNF        │
@@ -350,7 +346,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         ┌────────────┬───────┬─────────────────────┐
         │ patient_id ┆ code  ┆ timestamp           │
         │ ---        ┆ ---   ┆ ---                 │
-        │ u8         ┆ cat   ┆ datetime[μs]        │
+        │ u8         ┆ str   ┆ datetime[μs]        │
         ╞════════════╪═══════╪═════════════════════╡
         │ 1          ┆ DEATH ┆ 2023-01-01 00:00:00 │
         │ 2          ┆ DEATH ┆ 2023-01-04 00:00:00 │
@@ -362,7 +358,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         ┌────────────┬──────────────────┬──────────────┐
         │ patient_id ┆ code             ┆ timestamp    │
         │ ---        ┆ ---              ┆ ---          │
-        │ u8         ┆ cat              ┆ datetime[μs] │
+        │ u8         ┆ str              ┆ datetime[μs] │
         ╞════════════╪══════════════════╪══════════════╡
         │ 1          ┆ EYE_COLOR//blue  ┆ null         │
         │ 2          ┆ EYE_COLOR//green ┆ null         │
@@ -629,7 +625,7 @@ def convert_to_events(
         ┌────────────┬───────────┬─────────────────────┬────────────────┬───────────────────────┬────────────────────┬───────────┐
         │ patient_id ┆ code      ┆ timestamp           ┆ admission_type ┆ severity_on_admission ┆ discharge_location ┆ eye_color │
         │ ---        ┆ ---       ┆ ---                 ┆ ---            ┆ ---                   ┆ ---                ┆ ---       │
-        │ u8         ┆ cat       ┆ datetime[μs]        ┆ cat            ┆ f64                   ┆ cat                ┆ cat       │
+        │ u8         ┆ str       ┆ datetime[μs]        ┆ cat            ┆ f64                   ┆ cat                ┆ cat       │
         ╞════════════╪═══════════╪═════════════════════╪════════════════╪═══════════════════════╪════════════════════╪═══════════╡
         │ 1          ┆ ADMISSION ┆ 2021-01-01 00:00:00 ┆ A              ┆ 1.0                   ┆ null               ┆ null      │
         │ 1          ┆ ADMISSION ┆ 2021-01-02 00:00:00 ┆ B              ┆ 2.0                   ┆ null               ┆ null      │
