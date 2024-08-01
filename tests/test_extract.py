@@ -20,7 +20,7 @@ if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
     MERGE_TO_MEDS_COHORT_SCRIPT = extraction_root / "merge_to_MEDS_cohort.py"
     AGGREGATE_CODE_METADATA_SCRIPT = code_root / "aggregate_code_metadata.py"
     EXTRACT_CODE_METADATA_SCRIPT = extraction_root / "extract_code_metadata.py"
-    FINALIZE_METADATA_SCRIPT = code_root / "finalize_MEDS_metadata.py"
+    FINALIZE_METADATA_SCRIPT = extraction_root / "finalize_MEDS_metadata.py"
 else:
     SHARD_EVENTS_SCRIPT = "MEDS_extract-shard_events"
     SPLIT_AND_SHARD_SCRIPT = "MEDS_extract-split_and_shard_patients"
