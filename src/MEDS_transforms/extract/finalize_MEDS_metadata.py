@@ -98,6 +98,10 @@ def get_and_validate_code_metadata_schema(code_metadata: pl.DataFrame, do_retype
     if additional_cols:
         extra_schema = code_metadata.head(1).select(additional_cols).to_arrow().schema
         code_metadata_properties = list(zip(extra_schema.names, extra_schema.types))
+        code_metadata = code_metadata.select(
+            *MEDS_METADATA_MANDATORY_TYPES.keys(),
+            *additional_cols,
+        )
     else:
         code_metadata_properties = []
 
@@ -138,7 +142,7 @@ def main(cfg: DictConfig):
         logger.info("Non-zero worker found in reduce-only stage. Exiting")
         return
 
-    _, input_metadata_dir, _, shards_map_fp = stage_init(cfg)
+    _, _, input_metadata_dir, shards_map_fp = stage_init(cfg)
     output_metadata_dir = Path(cfg.stage_cfg.reducer_output_dir)
 
     output_code_metadata_fp = output_metadata_dir / "codes.parquet"
@@ -156,12 +160,13 @@ def main(cfg: DictConfig):
     logger.info("Validating code metadata")
     input_code_metadata_fp = input_metadata_dir / "codes.parquet"
     if input_code_metadata_fp.exists():
+        logger.info(f"Reading code metadata from {str(input_code_metadata_fp.resolve())}")
         code_metadata = pl.read_parquet(input_code_metadata_fp, use_pyarrow=True)
         final_metadata_tbl = get_and_validate_code_metadata_schema(
-            code_metadata, do_rtype=cfg.stage_cfg.do_retype_code_metadata
+            code_metadata, do_retype=cfg.stage_cfg.do_retype_code_metadata
         )
     else:
-        logger.info("No code metadata found. Making empty metadata file.")
+        logger.info(f"No code metadata found at {str(input_code_metadata_fp)}. Making empty metadata file.")
         codes_schema = code_metadata_schema()
         final_metadata_tbl = pa.Table.from_pylist([], schema=codes_schema)
 

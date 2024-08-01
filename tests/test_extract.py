@@ -293,7 +293,7 @@ TEMP,12,4,12,1181.4999999999998,116373.38999999998,"Body Temperature",LOINC/8310
 
 MEDS_OUTPUT_DATASET_METADATA_JSON = {
     "dataset_name": "TEST",
-    "dataest_version": "1.0",
+    "dataset_version": "1.0",
     "etl_name": "MEDS_transforms",
     # "etl_version": None,  # We don't test this as it changes with the commits.
     "meds_version": MEDS_VERSION,
@@ -661,7 +661,7 @@ def test_extraction():
         assert_df_equal(
             want=want_df,
             got=got_df,
-            msg="Code metadata with descriptions differs!",
+            msg=f"Finalized code metadata differs:\nstderr:\n{stderr}\nstdout:\n{stdout}",
             check_column_order=False,
             check_row_order=False,
         )
