@@ -327,6 +327,7 @@ OmegaConf.register_new_resolver("get_script_docstring", get_script_docstring, re
 OmegaConf.register_new_resolver("current_script_name", current_script_name, replace=False)
 OmegaConf.register_new_resolver("populate_stage", populate_stage, replace=False)
 OmegaConf.register_new_resolver("get_package_version", get_package_version, replace=False)
+OmegaConf.register_new_resolver("get_package_name", get_package_name, replace=False)
 
 
 def hydra_loguru_init() -> None:

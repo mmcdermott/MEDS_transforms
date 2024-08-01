@@ -20,6 +20,7 @@ if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
     MERGE_TO_MEDS_COHORT_SCRIPT = extraction_root / "merge_to_MEDS_cohort.py"
     AGGREGATE_CODE_METADATA_SCRIPT = code_root / "aggregate_code_metadata.py"
     EXTRACT_CODE_METADATA_SCRIPT = extraction_root / "extract_code_metadata.py"
+    FINALIZE_METADATA_SCRIPT = extraction_root / "finalize_MEDS_metadata.py"
 else:
     SHARD_EVENTS_SCRIPT = "MEDS_extract-shard_events"
     SPLIT_AND_SHARD_SCRIPT = "MEDS_extract-split_and_shard_patients"
@@ -27,6 +28,7 @@ else:
     MERGE_TO_MEDS_COHORT_SCRIPT = "MEDS_extract-merge_to_MEDS_cohort"
     AGGREGATE_CODE_METADATA_SCRIPT = "MEDS_transform-aggregate_code_metadata"
     EXTRACT_CODE_METADATA_SCRIPT = "MEDS_extract-extract_code_metadata"
+    FINALIZE_METADATA_SCRIPT = "MEDS_extract-finalize_MEDS_metadata"
 
 import json
 import tempfile
@@ -34,6 +36,7 @@ from io import StringIO
 from pathlib import Path
 
 import polars as pl
+from meds import __version__ as MEDS_VERSION
 
 from .utils import assert_df_equal, run_command
 
@@ -140,6 +143,13 @@ EXPECTED_SPLITS = {
     "tuning/0": [754281],
     "held_out/0": [1500733],
 }
+
+PATIENT_SPLITS_DF = pl.DataFrame(
+    {
+        "patient_id": [239684, 1195293, 68729, 814703, 754281, 1500733],
+        "split": ["train", "train", "train", "train", "tuning", "held_out"],
+    }
+)
 
 
 def get_expected_output(df: str) -> pl.DataFrame:
@@ -281,6 +291,14 @@ HR,12,4,12,1360.5000000000002,158538.77,"Heart Rate",LOINC/8867-4
 TEMP,12,4,12,1181.4999999999998,116373.38999999998,"Body Temperature",LOINC/8310-5
 """
 
+MEDS_OUTPUT_DATASET_METADATA_JSON = {
+    "dataset_name": "TEST",
+    "dataset_version": "1.0",
+    "etl_name": "MEDS_transforms",
+    # "etl_version": None,  # We don't test this as it changes with the commits.
+    "meds_version": MEDS_VERSION,
+}
+
 SUB_SHARDED_OUTPUTS = {
     "train/0": {
         "subjects": MEDS_OUTPUT_TRAIN_0_SUBJECTS,
@@ -357,6 +375,8 @@ def test_extraction():
             "stage_configs.shard_events.row_chunksize": 10,
             "stage_configs.split_and_shard_patients.n_patients_per_shard": 2,
             "hydra.verbose": True,
+            "etl_metadata.dataset_name": "TEST",
+            "etl_metadata.dataset_version": "1.0",
         }
 
         all_stderrs = []
@@ -580,7 +600,7 @@ def test_extraction():
         full_stderr = "\n".join(all_stderrs)
         full_stdout = "\n".join(all_stdouts)
 
-        output_file = MEDS_cohort_dir / "metadata" / "codes.parquet"
+        output_file = MEDS_cohort_dir / "extract_code_metadata" / "codes.parquet"
         assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
 
         got_df = pl.read_parquet(output_file, glob=False)
@@ -603,6 +623,67 @@ def test_extraction():
             want=want_df,
             got=got_df,
             msg="Code metadata with descriptions differs!",
+            check_column_order=False,
+            check_row_order=False,
+        )
+
+        stderr, stdout = run_command(
+            FINALIZE_METADATA_SCRIPT,
+            extraction_config_kwargs,
+            "finalize_metadata",
+        )
+        all_stderrs.append(stderr)
+        all_stdouts.append(stdout)
+
+        full_stderr = "\n".join(all_stderrs)
+        full_stdout = "\n".join(all_stdouts)
+
+        # Check code metadata
+        output_file = MEDS_cohort_dir / "metadata" / "codes.parquet"
+        assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
+
+        got_df = pl.read_parquet(output_file, glob=False, use_pyarrow=True)
+
+        want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE_WITH_DESC)).with_columns(
+            pl.col("code"),
+            pl.col("code/n_occurrences").cast(pl.UInt8),
+            pl.col("code/n_patients").cast(pl.UInt8),
+            pl.col("values/n_occurrences").cast(pl.UInt8),
+            pl.col("values/sum").cast(pl.Float32).fill_null(0),
+            pl.col("values/sum_sqd").cast(pl.Float32).fill_null(0),
+            pl.col("parent_codes").cast(pl.List(pl.Utf8)),
+        )
+
+        # We collapse the list type as it throws an error in the assert_df_equal otherwise
+        got_df = got_df.with_columns(pl.col("parent_codes").list.join("||"))
+        want_df = want_df.with_columns(pl.col("parent_codes").list.join("||"))
+
+        assert_df_equal(
+            want=want_df,
+            got=got_df,
+            msg=f"Finalized code metadata differs:\nstderr:\n{stderr}\nstdout:\n{stdout}",
+            check_column_order=False,
+            check_row_order=False,
+        )
+
+        # Check dataset metadata
+        output_file = MEDS_cohort_dir / "metadata" / "dataset.json"
+        assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
+
+        got_json = json.loads(output_file.read_text())
+        assert "etl_version" in got_json, "Expected 'etl_version' to be in the dataset metadata."
+        got_json.pop("etl_version")  # We don't test this as it changes with the commits.
+        assert got_json == MEDS_OUTPUT_DATASET_METADATA_JSON, f"Dataset metadata differs: {got_json}"
+
+        # Check the splits parquet
+        output_file = MEDS_cohort_dir / "metadata" / "patient_splits.parquet"
+        assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
+
+        got_df = pl.read_parquet(output_file, glob=False, use_pyarrow=True)
+        assert_df_equal(
+            PATIENT_SPLITS_DF,
+            got_df,
+            "Patient splits should be equal to the expected splits.",
             check_column_order=False,
             check_row_order=False,
         )
