@@ -172,10 +172,10 @@ def main(cfg: DictConfig):
     logger.info("Creating dataset metadata")
 
     dataset_metadata = {
-        "dataset_name": cfg.dataset_name,
-        "dataset_version": cfg.dataset_version,
-        "etl_name": f"{cfg.etl_metadata.package_name}/{cfg.etl_metadata.pipeline_name}",
-        "etl_version": cfg.etl_metadata.package_version,
+        "dataset_name": cfg.etl_metadata.dataset_name,
+        "dataset_version": str(cfg.etl_metadata.dataset_version),
+        "etl_name": cfg.etl_metadata.package_name,
+        "etl_version": str(cfg.etl_metadata.package_version),
         "meds_version": MEDS_VERSION,
     }
     jsonschema.validate(instance=dataset_metadata, schema=dataset_metadata_schema)

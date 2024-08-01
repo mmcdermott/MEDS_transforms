@@ -27,8 +27,8 @@ etl_metadata:
   pipeline_name: ???
   dataset_name: ???
   dataset_version: ???
-  package_name: ${get_package_name}
-  package_version: ${get_package_version}
+  package_name: ${get_package_name:}
+  package_version: ${get_package_version:}
 
 # Hydra
 hydra:

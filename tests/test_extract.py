@@ -295,7 +295,7 @@ MEDS_OUTPUT_DATASET_METADATA_JSON = {
     "dataset_name": "TEST",
     "dataest_version": "1.0",
     "etl_name": "MEDS_transforms",
-    "etl_version": None,  # We don't test this as it changes with the commits.
+    # "etl_version": None,  # We don't test this as it changes with the commits.
     "meds_version": MEDS_VERSION,
 }
 
@@ -671,6 +671,8 @@ def test_extraction():
         assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
 
         got_json = json.loads(output_file.read_text())
+        assert "etl_version" in got_json, "Expected 'etl_version' to be in the dataset metadata."
+        got_json.pop("etl_version")  # We don't test this as it changes with the commits.
         assert got_json == MEDS_OUTPUT_DATASET_METADATA_JSON, f"Dataset metadata differs: {got_json}"
 
         # Check the splits parquet
