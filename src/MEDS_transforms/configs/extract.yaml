@@ -59,4 +59,3 @@ stage_configs:
       - "values/sum"
       - "values/sum_sqd"
     do_summarize_over_all_codes: true # This indicates we should include overall, code-independent counts
-    process_shard_prefix: "train/" # we only want to summarize over the training set
