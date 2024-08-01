@@ -31,21 +31,21 @@ Suppose you have a pipeline with an input directory of `$INPUT_DIR` and a cohort
 Each of these stages will read and write their output datasets in the following manner.
 
 1. `stage_1`:
-   \* As there is no preceeding data stage, this stage will read the data in from `$INPUT_DIR/data`
-   (the `data` suffix is the default data directory for MEDS datasets).
-   \* This stage will, in its mapping stage, write the partial extracted metadata files to the
-   `$COHORT_DIR/stage_1/$SHARD_NAME.parquet` directory.
-   \* This stage will read in the prior joint metadata file from the `$INPUT_DIR/metadata/codes.parquet`
-   directory to join with the new metadata.
-   \* This stage will join all its metadata shards, join any prior columns from the old metadata, and
-   write the final, joined metadata file to the `$COHORT_DIR/stage_1/codes.parquet` directory.
+   * As there is no preceeding data stage, this stage will read the data in from `$INPUT_DIR/data`
+     (the `data` suffix is the default data directory for MEDS datasets).
+   * This stage will, in its mapping stage, write the partial extracted metadata files to the
+     `$COHORT_DIR/stage_1/$SHARD_NAME.parquet` directory.
+   * This stage will read in the prior joint metadata file from the `$INPUT_DIR/metadata/codes.parquet`
+     directory to join with the new metadata.
+   * This stage will join all its metadata shards, join any prior columns from the old metadata, and
+     write the final, joined metadata file to the `$COHORT_DIR/stage_1/codes.parquet` directory.
 2. `stage_2`:
-   \* This stage will read in the metadata from the `$COHORT_DIR/stage_1/codes.parquet` directory.
-   \* This stage will write the filtered metadata to the `$COHORT_DIR/stage_2/codes.parquet` directory.
+   * This stage will read in the metadata from the `$COHORT_DIR/stage_1/codes.parquet` directory.
+   * This stage will write the filtered metadata to the `$COHORT_DIR/stage_2/codes.parquet` directory.
 3. `stage_3`:
-   \* This stage will read in the data from the `$INPUT_DIR/data` directory as there has still been no
-   prior data processing stage. Individual shards will be read from the
-   `$INPUT_DIR/data/$SHARD_NAME.parquet` files.
-   \* This stage will read in the metadata from the `$COHORT_DIR/stage_2/codes.parquet` directory.
-   \* This stage will write the filtered shards to the `$COHORT_DIR/stage_3/$SHARD_NAME.parquet` files.
+   * This stage will read in the data from the `$INPUT_DIR/data` directory as there has still been no
+     prior data processing stage. Individual shards will be read from the
+     `$INPUT_DIR/data/$SHARD_NAME.parquet` files.
+   * This stage will read in the metadata from the `$COHORT_DIR/stage_2/codes.parquet` directory.
+   * This stage will write the filtered shards to the `$COHORT_DIR/stage_3/$SHARD_NAME.parquet` files.
 4. `stage_4`: ... TODO
