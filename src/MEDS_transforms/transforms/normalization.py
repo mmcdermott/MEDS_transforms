@@ -222,7 +222,7 @@ def main(cfg: DictConfig):
     """TODO."""
 
     code_metadata = pl.read_parquet(
-        Path(cfg.stage_cfg.metadata_input_dir) / "code_metadata.parquet", use_pyarrow=True
+        Path(cfg.stage_cfg.metadata_input_dir) / "codes.parquet", use_pyarrow=True
     ).lazy()
     code_modifiers = cfg.get("code_modifier_columns", None)
     compute_fn = partial(normalize, code_metadata=code_metadata, code_modifiers=code_modifiers)

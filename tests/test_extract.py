@@ -501,7 +501,7 @@ def test_extraction():
         full_stdout = "\n".join(all_stdouts)
 
         # Check the final output
-        output_folder = MEDS_cohort_dir / "final_cohort"
+        output_folder = MEDS_cohort_dir / "data"
         try:
             for split, expected_df_L in MEDS_OUTPUTS.items():
                 if not isinstance(expected_df_L, list):
@@ -547,7 +547,7 @@ def test_extraction():
         full_stderr = "\n".join(all_stderrs)
         full_stdout = "\n".join(all_stdouts)
 
-        output_file = MEDS_cohort_dir / "code_metadata.parquet"
+        output_file = MEDS_cohort_dir / "aggregate_code_metadata" / "codes.parquet"
         assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
 
         got_df = pl.read_parquet(output_file, glob=False)
@@ -580,7 +580,7 @@ def test_extraction():
         full_stderr = "\n".join(all_stderrs)
         full_stdout = "\n".join(all_stdouts)
 
-        output_file = MEDS_cohort_dir / "code_metadata.parquet"
+        output_file = MEDS_cohort_dir / "metadata" / "codes.parquet"
         assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
 
         got_df = pl.read_parquet(output_file, glob=False)

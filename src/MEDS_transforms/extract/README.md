@@ -109,7 +109,7 @@ configuration options for this block in the `tests/test_extract.py` file and in 
 This block tells the system to read the file `$INPUT_DIR/metadata_table_file_stem.$SUFFIX`, to collect the
 columns necessary to construct the `code` field for `event_name`, potentially renaming columns according to
 `_code_name_map` first, alongside any input columns specified in the block, then to construct a
-`code_metadata.parquet` dataframe which links the metadata columns to the realized codes for the dataset. See
+`metadata/codes.parquet` dataframe which links the metadata columns to the realized codes for the dataset. See
 the [Partial MIMIC-IV Example](#partial-mimic-iv-example) below for an example of this in action.
 
 #### Examples

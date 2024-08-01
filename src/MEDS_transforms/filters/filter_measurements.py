@@ -147,7 +147,7 @@ def main(cfg: DictConfig):
     """TODO."""
 
     code_metadata = pl.read_parquet(
-        Path(cfg.stage_cfg.metadata_input_dir) / "code_metadata.parquet", use_pyarrow=True
+        Path(cfg.stage_cfg.metadata_input_dir) / "codes.parquet", use_pyarrow=True
     )
     compute_fn = filter_measurements_fntr(cfg.stage_cfg, code_metadata)
 
