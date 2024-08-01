@@ -48,7 +48,7 @@ hosp/diagnoses_icd:
     _metadata:
       hosp/d_icd_diagnoses:
         description: "long_title"
-        parent_code: "ICD{icd_version}CM/{icd_code}" # Single strings are templates of columns.
+        parent_codes: "ICD{icd_version}CM/{icd_code}" # Single strings are templates of columns.
 
 hosp/drgcodes:
   drg:
@@ -105,7 +105,7 @@ hosp/labevents:
       d_labitems_to_loinc:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
-        parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
 
 hosp/omr:
   omr:
@@ -169,7 +169,7 @@ hosp/procedures_icd:
     _metadata:
       hosp/d_icd_procedures:
         description: "long_title"
-        parent_code: # List of objects are string labels mapping to filters to be evaluated.
+        parent_codes: # List of objects are string labels mapping to filters to be evaluated.
           - "ICD{icd_version}Proc/{icd_code}": { icd_version: 9 }
           - "ICD{icd_version}PCS/{icd_code}": { icd_version: 10 }
 
@@ -218,12 +218,12 @@ icu/chartevents:
       #meas_chartevents_main:
       #  description: ["omop_concept_name", "label"] # List of strings are columns to be collated
       #  itemid: "itemid (omop_source_code)"
-      #  parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
+      #  parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
       # TODO: I don't know if this is necessary...
       d_labitems_to_loinc:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
-        parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
 
 icu/procedureevents:
   start:
@@ -239,11 +239,11 @@ icu/procedureevents:
       proc_datetimeevents:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
-        parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
       proc_itemid:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
-        parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
   end:
     code:
       - PROCEDURE
@@ -257,11 +257,11 @@ icu/procedureevents:
       proc_datetimeevents:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
-        parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
       proc_itemid:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
-        parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
 
 icu/inputevents:
   input_start:
@@ -283,7 +283,7 @@ icu/inputevents:
       #inputevents_to_rxnorm:
       #  description: ["omop_concept_name", "label"] # List of strings are columns to be collated
       #  itemid: "itemid (omop_source_code)"
-      #  parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
+      #  parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
       #  rateuom: null # A null column means this column is needed in pulling from the metadata.
   input_end:
     code:
@@ -304,7 +304,7 @@ icu/inputevents:
       #  inputevents_to_rxnorm:
       #    description: ["omop_concept_name", "label"] # List of strings are columns to be collated
       #    itemid: "itemid (omop_source_code)"
-      #    parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
+      #    parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
       #    statusdescription: null
       #    amountuom: null
   patient_weight:
@@ -331,4 +331,4 @@ icu/outputevents:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
         valueuom: "unitname"
-        parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
