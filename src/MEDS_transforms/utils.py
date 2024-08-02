@@ -4,16 +4,16 @@ import inspect
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 import hydra
 import polars as pl
 from loguru import logger
+from meds import train_split
 from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms import __package_name__ as package_name
 from MEDS_transforms import __version__ as package_version
-
-pl.enable_string_cache()
 
 
 def get_smallest_valid_uint_type(num: int | float | pl.Expr) -> pl.DataType:
@@ -138,6 +138,48 @@ def current_script_name() -> str:
     return Path(sys.argv[0]).stem
 
 
+def is_metadata_stage(stage: dict[str, Any] | DictConfig) -> bool:
+    """Determines if a stage is a metadata stage either by explicit argument or via the "aggregations" key.
+
+    Args:
+        stage: The stage configuration dictionary.
+
+    Returns:
+        bool: True if the stage is a metadata stage, False otherwise.
+
+    Raises:
+        TypeError: If the "is_metadata" key is present but not a boolean or `None`.
+
+    Examples:
+        >>> is_metadata_stage({"aggregations": ["foo"]})
+        True
+        >>> is_metadata_stage({"is_metadata": True})
+        True
+        >>> is_metadata_stage({"is_metadata": False})
+        False
+        >>> is_metadata_stage({"is_metadata": None})
+        False
+        >>> is_metadata_stage({"output_dir": "/a/b/metadata"})
+        False
+        >>> is_metadata_stage({})
+        False
+        >>> is_metadata_stage(DictConfig({"aggregations": ["foo"]}))
+        True
+        >>> is_metadata_stage(DictConfig({"is_metadata": 32}))
+        Traceback (most recent call last):
+            ...
+        TypeError: If specified manually, is_metadata must be a boolean. Got 32
+    """
+    if "is_metadata" in stage:
+        if not isinstance(stage["is_metadata"], (bool, type(None))):
+            raise TypeError(
+                f"If specified manually, is_metadata must be a boolean. Got {stage['is_metadata']}"
+            )
+        return bool(stage["is_metadata"])
+    else:
+        return "aggregations" in stage
+
+
 def populate_stage(
     stage_name: str,
     input_dir: str,
@@ -182,30 +224,31 @@ def populate_stage(
         ...     "stages": ["stage1", "stage2", "stage3", "stage4", "stage5", "stage6"],
         ...     "stage_configs": {
         ...         "stage2": {"is_metadata": True},
-        ...         "stage3": {"is_metadata": None},
-        ...         "stage4": {"data_input_dir": "/e/f", "output_dir": "/g/h"},
-        ...         "stage5": {"aggregations": ["foo"]},
+        ...         "stage3": {"is_metadata": None, "output_dir": "/g/h"},
+        ...         "stage4": {"data_input_dir": "/e/f"},
+        ...         "stage5": {"aggregations": ["foo"], "process_split": None},
         ...     },
         ... })
         >>> args = [root_config[k] for k in ["input_dir", "cohort_dir", "stages", "stage_configs"]]
         >>> populate_stage("stage1", *args) # doctest: +NORMALIZE_WHITESPACE
-        {'is_metadata': False, 'data_input_dir': '/a/b', 'metadata_input_dir': '/a/b',
-         'output_dir': '/c/d/stage1'}
+        {'is_metadata': False, 'data_input_dir': '/a/b/data', 'metadata_input_dir': '/a/b/metadata',
+         'output_dir': '/c/d/stage1', 'reducer_output_dir': None}
         >>> populate_stage("stage2", *args) # doctest: +NORMALIZE_WHITESPACE
-        {'is_metadata': True, 'data_input_dir': '/c/d/stage1', 'metadata_input_dir': '/a/b',
-         'output_dir': '/c/d/stage2'}
+        {'is_metadata': True, 'data_input_dir': '/c/d/stage1', 'metadata_input_dir': '/a/b/metadata',
+         'output_dir': '/c/d/stage2', 'reducer_output_dir': '/c/d/stage2', 'process_split': 'train'}
         >>> populate_stage("stage3", *args) # doctest: +NORMALIZE_WHITESPACE
-        {'is_metadata': False, 'data_input_dir': '/c/d/stage1',
-         'metadata_input_dir': '/c/d/stage2', 'output_dir': '/c/d/stage3'}
+        {'is_metadata': None, 'output_dir': '/g/h', 'data_input_dir': '/c/d/stage1',
+         'metadata_input_dir': '/c/d/stage2', 'reducer_output_dir': None}
         >>> populate_stage("stage4", *args) # doctest: +NORMALIZE_WHITESPACE
-        {'data_input_dir': '/e/f', 'output_dir': '/g/h', 'is_metadata': False,
-         'metadata_input_dir': '/c/d/stage2'}
+        {'data_input_dir': '/e/f', 'is_metadata': False,
+         'metadata_input_dir': '/c/d/stage2', 'output_dir': '/c/d/stage4', 'reducer_output_dir': None}
         >>> populate_stage("stage5", *args) # doctest: +NORMALIZE_WHITESPACE
-        {'aggregations': ['foo'], 'is_metadata': True, 'data_input_dir': '/g/h',
-         'metadata_input_dir': '/c/d/stage2', 'output_dir': '/c/d/stage5'}
+        {'aggregations': ['foo'], 'process_split': None, 'is_metadata': True, 'data_input_dir': '/c/d/stage4',
+         'metadata_input_dir': '/c/d/stage2', 'output_dir': '/c/d/stage5',
+         'reducer_output_dir': '/c/d/metadata'}
         >>> populate_stage("stage6", *args) # doctest: +NORMALIZE_WHITESPACE
-        {'is_metadata': False, 'data_input_dir': '/g/h',
-         'metadata_input_dir': '/c/d/stage5', 'output_dir': '/c/d/stage6'}
+        {'is_metadata': False, 'data_input_dir': '/c/d/stage4',
+         'metadata_input_dir': '/c/d/stage5', 'output_dir': '/c/d/data', 'reducer_output_dir': None}
         >>> populate_stage("stage7", *args) # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
@@ -248,21 +291,73 @@ def populate_stage(
         else:
             prior_data_stage = s_resolved
 
+    # First, we set the stage's input directories. It needs to be able to read both data shards and reduced
+    # metadata files. These will either be pulled from the overall pipeline input directories or from the
+    # relevant preceding stage's output directories, as appropriate.
+    is_first_data_stage = prior_data_stage is None
+    is_first_metadata_stage = prior_metadata_stage is None
+
+    pipeline_input_data_dir = str(Path(input_dir) / "data")
+    pipeline_input_metadata_dir = str(Path(input_dir) / "metadata")
+
+    if is_first_data_stage:
+        default_data_input_dir = pipeline_input_data_dir
+    else:
+        default_data_input_dir = prior_data_stage["output_dir"]
+
+    if is_first_metadata_stage:
+        default_metadata_input_dir = pipeline_input_metadata_dir
+    else:
+        default_metadata_input_dir = prior_metadata_stage["output_dir"]
+
+    # Now, we need to set output directories. The output directory for the stage will either be a stage
+    # specific output directory, or, for the last data or metadata stages, respectively, will be the global
+    # pipeline output data shard or metadata directories, as appropriate.
+    is_metadata = is_metadata_stage(stage)
+
+    stage_index = stages.index(stage_name)
+
+    is_later_data_stage = False
+    is_later_metadata_stage = False
+    for i in range(stage_index + 1, len(stages)):
+        stage_i = stage_configs.get(stages[i], {})
+        if is_metadata_stage(stage_i):
+            is_later_metadata_stage = True
+        else:
+            is_later_data_stage = True
+
+    is_last_data_stage = (not is_later_data_stage) and (not is_metadata)
+    is_last_metadata_stage = (not is_later_metadata_stage) and is_metadata
+
+    cohort_dir = Path(cohort_dir)
+
+    if is_last_data_stage:
+        default_mapper_output_dir = str(cohort_dir / "data")
+        default_reducer_output_dir = None
+    elif is_last_metadata_stage:
+        default_mapper_output_dir = str(cohort_dir / stage_name)
+        default_reducer_output_dir = str(cohort_dir / "metadata")
+    elif is_metadata:
+        default_mapper_output_dir = str(cohort_dir / stage_name)
+        default_reducer_output_dir = str(cohort_dir / stage_name)
+    else:
+        default_mapper_output_dir = str(cohort_dir / stage_name)
+        default_reducer_output_dir = None
+
     inferred_keys = {
-        "is_metadata": "aggregations" in stage,
-        "data_input_dir": input_dir if prior_data_stage is None else prior_data_stage["output_dir"],
-        "metadata_input_dir": (
-            input_dir if prior_metadata_stage is None else prior_metadata_stage["output_dir"]
-        ),
-        "output_dir": os.path.join(cohort_dir, stage_name),
+        "is_metadata": is_metadata,
+        "data_input_dir": default_data_input_dir,
+        "metadata_input_dir": default_metadata_input_dir,
+        "output_dir": default_mapper_output_dir,
+        "reducer_output_dir": default_reducer_output_dir,
     }
 
-    if "is_metadata" in stage and not isinstance(stage["is_metadata"], (bool, type(None))):
-        raise TypeError(f"If specified manually, is_metadata must be a boolean. Got {stage['is_metadata']}")
+    if is_metadata:
+        inferred_keys["process_split"] = train_split
 
     out = {**stage}
     for key, val in inferred_keys.items():
-        if key not in out or out[key] is None:
+        if key not in out:
             out[key] = val
 
     return out
@@ -272,6 +367,7 @@ OmegaConf.register_new_resolver("get_script_docstring", get_script_docstring, re
 OmegaConf.register_new_resolver("current_script_name", current_script_name, replace=False)
 OmegaConf.register_new_resolver("populate_stage", populate_stage, replace=False)
 OmegaConf.register_new_resolver("get_package_version", get_package_version, replace=False)
+OmegaConf.register_new_resolver("get_package_name", get_package_name, replace=False)
 
 
 def hydra_loguru_init() -> None:

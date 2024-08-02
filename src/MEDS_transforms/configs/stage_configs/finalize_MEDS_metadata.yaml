@@ -1,0 +1,3 @@
+finalize_MEDS_metadata:
+  is_metadata: True
+  do_retype: True
