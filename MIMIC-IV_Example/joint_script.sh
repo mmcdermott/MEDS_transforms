@@ -99,6 +99,16 @@ MEDS_extract-extract_code_metadata \
     stage="extract_code_metadata" \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
 
+echo "Finalizing MEDS data with $N_PARALLEL_WORKERS workers in parallel"
+MEDS_extract-finalize_MEDS_data \
+    --multirun \
+    worker="range(0,$N_PARALLEL_WORKERS)" \
+    hydra/launcher=joblib \
+    input_dir="$MIMICIV_RAW_DIR" \
+    cohort_dir="$MIMICIV_MEDS_DIR" \
+    stage="finalize_MEDS_data" \
+    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
+
 echo "Finalizing MEDS metadata in serial."
 MEDS_extract-finalize_MEDS_metadata \
     input_dir="$MIMICIV_RAW_DIR" \

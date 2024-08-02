@@ -97,11 +97,9 @@ def get_and_validate_code_metadata_schema(code_metadata: pl.DataFrame, do_retype
     if additional_cols:
         extra_schema = code_metadata.head(1).select(additional_cols).to_arrow().schema
         code_metadata_properties = list(zip(extra_schema.names, extra_schema.types))
-        code_metadata = code_metadata.select(
-            *MEDS_METADATA_MANDATORY_TYPES.keys(),
-            *additional_cols,
-        )
+        code_metadata = code_metadata.select(*MEDS_METADATA_MANDATORY_TYPES.keys(), *additional_cols)
     else:
+        code_metadata = code_metadata.select(*MEDS_METADATA_MANDATORY_TYPES.keys())
         code_metadata_properties = []
 
     validated_schema = code_metadata_schema(code_metadata_properties)

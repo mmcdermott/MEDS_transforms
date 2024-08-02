@@ -42,7 +42,7 @@ def get_and_validate_data_schema(data: pl.LazyFrame, do_retype: bool = True) -> 
                     MEDS Data DataFrame must have a 'time' column of type
                         Datetime(time_unit='us', time_zone=None).
                     MEDS Data DataFrame must have a 'code' column of type String.
-                    MEDS Data DataFrame must have a 'numeric_value' column of type Float64.
+                    MEDS Data DataFrame must have a 'numeric_value' column of type Float32.
         >>> get_and_validate_data_schema(df.lazy()) # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
@@ -58,6 +58,7 @@ def get_and_validate_data_schema(data: pl.LazyFrame, do_retype: bool = True) -> 
         Traceback (most recent call last):
             ...
         ValueError: MEDS Data 'patient_id' column must be of type Int64. Got UInt32.
+                    MEDS Data 'numeric_value' column must be of type Float32. Got Float64.
         >>> get_and_validate_data_schema(df.lazy())
         pyarrow.Table
         patient_id: int64
@@ -95,11 +96,9 @@ def get_and_validate_data_schema(data: pl.LazyFrame, do_retype: bool = True) -> 
     if additional_cols:
         extra_schema = data.head(0).select(additional_cols).collect().to_arrow().schema
         measurement_properties = list(zip(extra_schema.names, extra_schema.types))
-        data = data.select(
-            *MEDS_DATA_MANDATORY_TYPES.keys(),
-            *additional_cols,
-        )
+        data = data.select(*MEDS_DATA_MANDATORY_TYPES.keys(), *additional_cols)
     else:
+        data = data.select(*MEDS_DATA_MANDATORY_TYPES.keys())
         measurement_properties = []
 
     validated_schema = data_schema(measurement_properties)
@@ -114,7 +113,7 @@ def main(cfg: DictConfig):
       - `patient_id` (Int64)
       - `time` (DateTime)
       - `code` (String)
-      - `numeric_value` (Float64)
+      - `numeric_value` (Float32)
 
     This stage *_should almost always be the last data stage in an extraction pipeline._*
 

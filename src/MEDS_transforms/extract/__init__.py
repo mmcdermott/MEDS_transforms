@@ -17,5 +17,5 @@ MEDS_DATA_MANDATORY_TYPES = {
     "patient_id": pl.Int64,
     "time": pl.Datetime("us"),
     "code": pl.String,
-    "numeric_value": pl.Float64,
+    "numeric_value": pl.Float32,
 }

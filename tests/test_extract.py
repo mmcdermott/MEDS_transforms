@@ -642,7 +642,9 @@ def test_extraction():
                 if not isinstance(expected_df_L, list):
                     expected_df_L = [expected_df_L]
 
-                expected_df = pl.concat([get_expected_output(df) for df in expected_df_L])
+                expected_df = pl.concat([get_expected_output(df) for df in expected_df_L]).with_columns(
+                    pl.col("numeric_value").cast(pl.Float32)
+                )
 
                 fp = output_folder / f"{split}.parquet"
                 assert fp.is_file(), f"Expected {fp} to exist."
