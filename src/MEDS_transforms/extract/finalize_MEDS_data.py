@@ -74,7 +74,7 @@ def get_and_validate_data_schema(data: pl.LazyFrame, do_retype: bool = True) -> 
         text_value: [["1",null]]
     """
 
-    schema = data.schema
+    schema = data.collect_schema()
     errors = []
     for col, dtype in MEDS_DATA_MANDATORY_TYPES.items():
         if col in schema and schema[col] != dtype:
