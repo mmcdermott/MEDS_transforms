@@ -2,7 +2,6 @@
 
 import json
 import random
-import shutil
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -91,9 +90,7 @@ def rwlock_wrap[
     out_fp: Path,
     read_fn: Callable[[Path], DF_T],
     write_fn: Callable[[DF_T, Path], None],
-    *transform_fns: Callable[[DF_T], DF_T],
-    cache_intermediate: bool = True,
-    clear_cache_on_completion: bool = True,
+    compute_fn: Callable[[DF_T], DF_T],
     do_overwrite: bool = False,
     do_return: bool = False,
 ) -> tuple[bool, DF_T | None]:
@@ -111,21 +108,8 @@ def rwlock_wrap[
             loading to further accelerate unnecessary reads when resuming from intermediate cached steps.
         write_fn: Function that writes the dataframe to a file. This must take as input a dataframe of
             (generic) type DF_T and a Path object, and will write the dataframe to that file.
-        transform_fns: A series of functions that transform the dataframe. Each function must take as input
-            a dataframe of (generic) type DF_T and return a dataframe of (generic) type DF_T. The functions
-            will be applied in the passed order.
-        cache_intermediate: If True, intermediate outputs of the transformations will be cached in a hidden
-            directory in the same parent directory as `out_fp` of the form
-            `{out_fp.parent}/.{out_fp.stem}_cache`. This can be useful for debugging and resuming from
-            intermediate steps when nontrivial transformations are composed. Cached files will be named
-            `step_{i}.output` where `i` is the index of the transformation function in `transform_fns`. **Note
-            that if you change the order of the transformations, the cache will be no longer valid but the
-            system will _not_ automatically delete the cache!**. This is `True` by default.
-            If `do_overwrite=True`, any prior individual cache files that are detected during the run will be
-            deleted before their corresponding step is run. If `do_overwrite=False` and a cache file exists,
-            that step of the transformation will be skipped and the cache file will be read directly.
-        clear_cache_on_completion: If True, the cache directory will be deleted after the final output is
-            written. This is `True` by default.
+        compute_fn: A function that transform the dataframe, which must take as input a dataframe of (generic)
+            type DF_T and return a dataframe of (generic) type DF_T.
         do_overwrite: If True, the output file will be overwritten if it already exists. This is `False` by
             default.
         do_return: If True, the final dataframe will be returned. This is `False` by default.
@@ -147,11 +131,8 @@ def rwlock_wrap[
         >>> in_df.write_csv(in_fp)
         >>> read_fn = pl.read_csv
         >>> write_fn = pl.DataFrame.write_csv
-        >>> transform_fns = [
-        ...     lambda df: df.with_columns(pl.col("c") * 2),
-        ...     lambda df: df.filter(pl.col("c") > 4)
-        ... ]
-        >>> result_computed = rwlock_wrap(in_fp, out_fp, read_fn, write_fn, *transform_fns, do_return=False)
+        >>> compute_fn = lambda df: df.with_columns(pl.col("c") * 2).filter(pl.col("c") > 4)
+        >>> result_computed = rwlock_wrap(in_fp, out_fp, read_fn, write_fn, compute_fn, do_return=False)
         >>> assert result_computed
         >>> print(out_fp.read_text())
         a,b,c
@@ -159,30 +140,13 @@ def rwlock_wrap[
         3,5,12
         <BLANKLINE>
         >>> out_fp.unlink()
-        >>> cache_directory = root / f".output_cache"
-        >>> assert not cache_directory.is_dir()
-        >>> transform_fns = [
-        ...     lambda df: df.with_columns(pl.col("c") * 2),
-        ...     lambda df: df.filter(pl.col("d") > 4)
-        ... ]
-        >>> rwlock_wrap(in_fp, out_fp, read_fn, write_fn, *transform_fns)
+        >>> compute_fn = lambda df: df.with_columns(pl.col("c") * 2).filter(pl.col("d") > 4)
+        >>> rwlock_wrap(in_fp, out_fp, read_fn, write_fn, compute_fn)
         Traceback (most recent call last):
             ...
         polars.exceptions.ColumnNotFoundError: unable to find column "d"; valid columns: ["a", "b", "c"]
-        >>> assert cache_directory.is_dir()
-        >>> cache_fp = cache_directory / "step_0.output"
-        >>> pl.read_csv(cache_fp)
-        shape: (3, 3)
-        ┌─────┬─────┬─────┐
-        │ a   ┆ b   ┆ c   │
-        │ --- ┆ --- ┆ --- │
-        │ i64 ┆ i64 ┆ i64 │
-        ╞═════╪═════╪═════╡
-        │ 1   ┆ 2   ┆ 6   │
-        │ 3   ┆ 4   ┆ -2  │
-        │ 3   ┆ 5   ┆ 12  │
-        └─────┴─────┴─────┘
-        >>> shutil.rmtree(cache_directory)
+        >>> cache_directory = root / f".output_cache"
+        >>> if cache_directory.is_dir(): shutil.rmtree(cache_directory)
         >>> lock_dir = cache_directory / "locks"
         >>> assert not lock_dir.exists()
         >>> def lock_dir_checker_fn(df: pl.DataFrame) -> pl.DataFrame:
@@ -240,40 +204,18 @@ def rwlock_wrap[
     logger.info("Read dataset")
 
     try:
-        for i, transform_fn in enumerate(transform_fns):
-            cache_fp = cache_directory / f"step_{i}.output"
-
-            st_time_step = datetime.now()
-            if cache_fp.is_file():
-                if do_overwrite:
-                    logger.info(
-                        f"Deleting existing cached output for step {i} " f"as do_overwrite={do_overwrite}"
-                    )
-                    cache_fp.unlink()
-                else:
-                    logger.info(f"Reading cached output for step {i}")
-                    df = read_fn(cache_fp)
-            else:
-                df = transform_fn(df)
-
-            if cache_intermediate and i < len(transform_fns) - 1:
-                logger.info(f"Writing intermediate output for step {i} to {cache_fp}")
-                write_fn(df, cache_fp)
-            logger.info(f"Completed step {i} in {datetime.now() - st_time_step}")
-
+        df = compute_fn(df)
         logger.info(f"Writing final output to {out_fp}")
         write_fn(df, out_fp)
         logger.info(f"Succeeded in {datetime.now() - st_time}")
-        if clear_cache_on_completion:
-            logger.info(f"Clearing cache directory {cache_directory}")
-            shutil.rmtree(cache_directory)
-        else:
-            logger.info(f"Leaving cache directory {cache_directory}, but clearing lock at {lock_fp}")
-            lock_fp.unlink()
+        logger.info(f"Leaving cache directory {cache_directory}, but clearing lock at {lock_fp}")
+        lock_fp.unlink()
+
         if do_return:
             return True, df
         else:
             return True
+
     except Exception as e:
         logger.warning(f"Clearing lock due to Exception {e} at {lock_fp} after {datetime.now() - st_time}")
         lock_fp.unlink()
