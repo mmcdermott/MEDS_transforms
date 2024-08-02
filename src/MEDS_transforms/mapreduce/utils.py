@@ -146,16 +146,15 @@ def rwlock_wrap[
             ...
         polars.exceptions.ColumnNotFoundError: unable to find column "d"; valid columns: ["a", "b", "c"]
         >>> cache_directory = root / f".output_cache"
-        >>> if cache_directory.is_dir(): shutil.rmtree(cache_directory)
         >>> lock_dir = cache_directory / "locks"
-        >>> assert not lock_dir.exists()
+        >>> assert not list(lock_dir.iterdir())
         >>> def lock_dir_checker_fn(df: pl.DataFrame) -> pl.DataFrame:
-        ...     print(f"Lock dir exists? {lock_dir.exists()}")
+        ...     print(f"Lock dir empty? {not (list(lock_dir.iterdir()))}")
         ...     return df
         >>> result_computed, out_df = rwlock_wrap(
         ...     in_fp, out_fp, read_fn, write_fn, lock_dir_checker_fn, do_return=True
         ... )
-        Lock dir exists? True
+        Lock dir empty? False
         >>> assert result_computed
         >>> out_df
         shape: (3, 3)
