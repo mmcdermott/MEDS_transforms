@@ -2,7 +2,7 @@
 
 from collections.abc import Callable, Generator
 from datetime import datetime
-from functools import partial
+from functools import partial, wraps
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -10,6 +10,7 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig
 
+from ..extract.parser import is_matcher, matcher_to_expr
 from ..utils import stage_init, write_lazyframe
 from .utils import rwlock_wrap, shard_iterator
 
@@ -24,12 +25,65 @@ def identity_fn(df: Any) -> Any:
     return df
 
 
-def read_and_filter_fntr(patients: list[int], read_fn: Callable[[Path], DF_T]) -> Callable[[Path], DF_T]:
+def read_and_filter_fntr(filter_expr: pl.Expr, read_fn: Callable[[Path], DF_T]) -> Callable[[Path], DF_T]:
     def read_and_filter(in_fp: Path) -> DF_T:
-        df = read_fn(in_fp)
-        return df.filter(pl.col("patient_id").isin(patients))
+        return read_fn(in_fp).filter(filter_expr)
 
     return read_and_filter
+
+
+MATCH_REVISE_KEY = "_match_revise"
+MATCHER_KEY = "_matcher"
+
+
+def is_match_revise(stage_cfg: DictConfig) -> bool:
+    return stage_cfg.get(MATCH_REVISE_KEY, False)
+
+
+def validate_match_revise(stage_cfg: DictConfig):
+    match_revise_options = stage_cfg[MATCH_REVISE_KEY]
+    if not isinstance(match_revise_options, (list, ListConfig)):
+        raise ValueError(f"Match revise options must be a list, got {type(match_revise_options)}")
+
+    for match_revise_cfg in match_revise_options:
+        if not isinstance(match_revise_cfg, (dict, DictConfig)):
+            raise ValueError(f"Match revise config must be a dict, got {type(match_revise_cfg)}")
+
+        if MATCHER_KEY not in match_revise_cfg:
+            raise ValueError(f"Match revise config must contain a {MATCHER_KEY} key")
+
+        if not is_matcher(match_revise_cfg[MATCHER_KEY]):
+            raise ValueError(f"Match revise config must contain a valid matcher in {MATCHER_KEY}")
+
+
+def match_revise_fntr(matcher_expr: pl.Expr, compute_fn: Callable[[DF_T], DF_T]) -> Callable[[DF_T], DF_T]:
+    @wraps(compute_fn)
+    def match_revise_fn(df: DF_T) -> DF_T:
+        cols = df.collect_schema().names
+        idx_col = "_row_idx"
+        while idx_col in cols:
+            idx_col = f"_{idx_col}"
+
+        df = df.with_row_index(idx_col)
+
+        matches = df.filter(matcher_expr)
+        revised = compute_fn(matches)
+        return compute_fn(df.filter(matcher_expr))
+
+    return match_revise_fn
+
+
+def get_match_revise_compute_fn(stage_cfg: DictConfig, compute_fn: MAP_FN_T) -> MAP_FN_T:
+    if not is_match_revise(stage_cfg):
+        return compute_fn
+
+    validate_match_revise(stage_cfg)
+
+    match_revise_options = stage_cfg[MATCH_REVISE_KEY]
+    out_compute_fn = []
+    for match_revise_cfg in match_revise_options:
+        matcher = matcher_to_expr(match_revise_cfg[MATCHER_KEY])
+        compute_fn = (partial(pl.filter, matcher),) + compute_fn
 
 
 def map_over(
@@ -60,7 +114,7 @@ def map_over(
             .collect()
             .to_list()
         )
-        read_fn = read_and_filter_fntr(split_patients, read_fn)
+        read_fn = read_and_filter_fntr(pl.col("patient_id").isin(split_patients), read_fn)
     elif process_split and shards_map_fp and shards_map_fp.exists():
         logger.warning(
             f"Split {process_split} requested, but no patient split file found at {str(split_fp)}. "
