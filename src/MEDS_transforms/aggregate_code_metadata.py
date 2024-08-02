@@ -18,8 +18,6 @@ from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over
 from MEDS_transforms.utils import write_lazyframe
 
-pl.enable_string_cache()
-
 
 class METADATA_FN(StrEnum):
     """Enumeration of metadata functions that can be applied to a group of codes.
@@ -32,7 +30,7 @@ class METADATA_FN(StrEnum):
     shards into a single file.
 
     Note that, by design, these aggregations are all those that permit simple, single-variable reductions.
-    E.g., rather than tracking the mean and standard deviation of a numerical value, we track the sum of the
+    E.g., rather than tracking the mean and standard deviation of a numeric value, we track the sum of the
     values and the sum of the squares of the values. This is because the mean and standard deviation can be
     trivially calculated from these two values, but ``sum`` and ``sum_sqd`` both can be reduced with a simple
     summation operation across shards, whereas the mean and standard deviation would require a more complex
@@ -51,18 +49,21 @@ class METADATA_FN(StrEnum):
         "code/n_occurrences": Collects the total number of occurrences of the code & modifiers group across
             all observations for all patients.
         "values/n_patients": Collects the number of unique patients who have a non-null, non-nan
-            numerical_value field for the code & modifiers group.
-        "values/n_occurrences": Collects the total number of non-null, non-nan numerical_value occurrences for
+            numeric_value field for the code & modifiers group.
+        "values/n_occurrences": Collects the total number of non-null, non-nan numeric_value occurrences for
             the code & modifiers group across all observations for all patients.
-        "values/n_ints": Collects the number of times the observed, non-null numerical_value for the code &
+        "values/n_ints": Collects the number of times the observed, non-null numeric_value for the code &
             modifiers group is an integral value (i.e., a whole number, not an integral type).
-        "values/sum": Collects the sum of the non-null, non-nan numerical_value values for the code &
+        "values/sum": Collects the sum of the non-null, non-nan numeric_value values for the code &
             modifiers group.
-        "values/sum_sqd": Collects the sum of the squares of the non-null, non-nan numerical_value values for
+        "values/sum_sqd": Collects the sum of the squares of the non-null, non-nan numeric_value values for
             the code
-        "values/min": Collects the minimum non-null, non-nan numerical_value value for the code & modifiers
-        "values/max": Collects the maximum non-null, non-nan numerical_value value for the code & modifiers
-        "values/quantiles": TODO
+        "values/min": Collects the minimum non-null, non-nan numeric_value value for the code & modifiers
+        "values/max": Collects the maximum non-null, non-nan numeric_value value for the code & modifiers
+        "values/quantiles": Collects the specified quantiles over all observed numeric values for the code &
+            modifiers group. The quantiles are specified in the output as a polars struct field, with the
+            quantile as the key and the value as the quantile value. The desired quantiles are specified in
+            the configuration file using the dictionary syntax for the aggregation.
     """
 
     CODE_N_PATIENTS = "code/n_patients"
@@ -74,7 +75,7 @@ class METADATA_FN(StrEnum):
     VALUES_SUM_SQD = "values/sum_sqd"
     VALUES_MIN = "values/min"
     VALUES_MAX = "values/max"
-    VALUES_QUANTILES = "values/quantiles"  # TODO: Figure out parametrizing number of quantiles
+    VALUES_QUANTILES = "values/quantiles"
 
 
 class MapReducePair(NamedTuple):
@@ -113,8 +114,10 @@ def quantile_reducer(cols: cs._selector_proxy_) -> pl.Expr:
     return pl.struct(**quantiles)
 
 
-VAL_PRESENT: pl.Expr = pl.col("numerical_value").is_not_null() & pl.col("numerical_value").is_not_nan()
-IS_INT: pl.Expr = pl.col("numerical_value").round() == pl.col("numerical_value")
+VAL = pl.col("numeric_value")
+VAL_PRESENT: pl.Expr = VAL.is_not_null() & VAL.is_not_nan()
+IS_INT: pl.Expr = VAL.round() == VAL
+PRESENT_VALS = VAL.filter(VAL_PRESENT)
 
 CODE_METADATA_AGGREGATIONS: dict[METADATA_FN, MapReducePair] = {
     METADATA_FN.CODE_N_PATIENTS: MapReducePair(pl.col("patient_id").n_unique(), pl.sum_horizontal),
@@ -122,28 +125,13 @@ CODE_METADATA_AGGREGATIONS: dict[METADATA_FN, MapReducePair] = {
     METADATA_FN.VALUES_N_PATIENTS: MapReducePair(
         pl.col("patient_id").filter(VAL_PRESENT).n_unique(), pl.sum_horizontal
     ),
-    METADATA_FN.VALUES_N_OCCURRENCES: MapReducePair(
-        pl.col("numerical_value").filter(VAL_PRESENT).len(), pl.sum_horizontal
-    ),
-    METADATA_FN.VALUES_N_INTS: MapReducePair(
-        pl.col("numerical_value").filter(VAL_PRESENT & IS_INT).len(), pl.sum_horizontal
-    ),
-    METADATA_FN.VALUES_SUM: MapReducePair(
-        pl.col("numerical_value").filter(VAL_PRESENT).sum(), pl.sum_horizontal
-    ),
-    METADATA_FN.VALUES_SUM_SQD: MapReducePair(
-        (pl.col("numerical_value").filter(VAL_PRESENT) ** 2).sum(), pl.sum_horizontal
-    ),
-    METADATA_FN.VALUES_MIN: MapReducePair(
-        pl.col("numerical_value").filter(VAL_PRESENT).min(), pl.min_horizontal
-    ),
-    METADATA_FN.VALUES_MAX: MapReducePair(
-        pl.col("numerical_value").filter(VAL_PRESENT).max(), pl.max_horizontal
-    ),
-    METADATA_FN.VALUES_QUANTILES: MapReducePair(
-        pl.col("numerical_value").filter(VAL_PRESENT),
-        quantile_reducer,
-    ),
+    METADATA_FN.VALUES_N_OCCURRENCES: MapReducePair(PRESENT_VALS.len(), pl.sum_horizontal),
+    METADATA_FN.VALUES_N_INTS: MapReducePair(VAL.filter(VAL_PRESENT & IS_INT).len(), pl.sum_horizontal),
+    METADATA_FN.VALUES_SUM: MapReducePair(PRESENT_VALS.sum(), pl.sum_horizontal),
+    METADATA_FN.VALUES_SUM_SQD: MapReducePair((PRESENT_VALS**2).sum(), pl.sum_horizontal),
+    METADATA_FN.VALUES_MIN: MapReducePair(PRESENT_VALS.min(), pl.min_horizontal),
+    METADATA_FN.VALUES_MAX: MapReducePair(PRESENT_VALS.max(), pl.max_horizontal),
+    METADATA_FN.VALUES_QUANTILES: MapReducePair(PRESENT_VALS, quantile_reducer),
 }
 
 
@@ -248,29 +236,29 @@ def mapper_fntr(
     Examples:
         >>> import numpy as np
         >>> df = pl.DataFrame({
-        ...     "code":   pl.Series(["A", "B", "A", "B", "C", "A", "C", "B",    "D"], dtype=pl.Categorical),
+        ...     "code":             ["A", "B", "A", "B", "C", "A", "C", "B",          "D"],
         ...     "modifier1":        [1,   2,   1,   2,   1,   2,   1,   2,            None],
         ...     "modifier_ignored": [3,   3,   4,   4,   5,   5,   6,   6,            7],
         ...     "patient_id":       [1,   2,   1,   3,   1,   2,   2,   2,            1],
-        ...     "numerical_value":  [1.1, 2.,  1.1, 4.,  5.,  6.,  7.5, float('nan'), None],
+        ...     "numeric_value":    [1.1, 2.,  1.1, 4.,  5.,  6.,  7.5, float('nan'), None],
         ... })
         >>> df
         shape: (9, 5)
-        ┌──────┬───────────┬──────────────────┬────────────┬─────────────────┐
-        │ code ┆ modifier1 ┆ modifier_ignored ┆ patient_id ┆ numerical_value │
-        │ ---  ┆ ---       ┆ ---              ┆ ---        ┆ ---             │
-        │ cat  ┆ i64       ┆ i64              ┆ i64        ┆ f64             │
-        ╞══════╪═══════════╪══════════════════╪════════════╪═════════════════╡
-        │ A    ┆ 1         ┆ 3                ┆ 1          ┆ 1.1             │
-        │ B    ┆ 2         ┆ 3                ┆ 2          ┆ 2.0             │
-        │ A    ┆ 1         ┆ 4                ┆ 1          ┆ 1.1             │
-        │ B    ┆ 2         ┆ 4                ┆ 3          ┆ 4.0             │
-        │ C    ┆ 1         ┆ 5                ┆ 1          ┆ 5.0             │
-        │ A    ┆ 2         ┆ 5                ┆ 2          ┆ 6.0             │
-        │ C    ┆ 1         ┆ 6                ┆ 2          ┆ 7.5             │
-        │ B    ┆ 2         ┆ 6                ┆ 2          ┆ NaN             │
-        │ D    ┆ null      ┆ 7                ┆ 1          ┆ null            │
-        └──────┴───────────┴──────────────────┴────────────┴─────────────────┘
+        ┌──────┬───────────┬──────────────────┬────────────┬───────────────┐
+        │ code ┆ modifier1 ┆ modifier_ignored ┆ patient_id ┆ numeric_value │
+        │ ---  ┆ ---       ┆ ---              ┆ ---        ┆ ---           │
+        │ str  ┆ i64       ┆ i64              ┆ i64        ┆ f64           │
+        ╞══════╪═══════════╪══════════════════╪════════════╪═══════════════╡
+        │ A    ┆ 1         ┆ 3                ┆ 1          ┆ 1.1           │
+        │ B    ┆ 2         ┆ 3                ┆ 2          ┆ 2.0           │
+        │ A    ┆ 1         ┆ 4                ┆ 1          ┆ 1.1           │
+        │ B    ┆ 2         ┆ 4                ┆ 3          ┆ 4.0           │
+        │ C    ┆ 1         ┆ 5                ┆ 1          ┆ 5.0           │
+        │ A    ┆ 2         ┆ 5                ┆ 2          ┆ 6.0           │
+        │ C    ┆ 1         ┆ 6                ┆ 2          ┆ 7.5           │
+        │ B    ┆ 2         ┆ 6                ┆ 2          ┆ NaN           │
+        │ D    ┆ null      ┆ 7                ┆ 1          ┆ null          │
+        └──────┴───────────┴──────────────────┴────────────┴───────────────┘
         >>> stage_cfg = DictConfig({
         ...     "aggregations": ["code/n_patients", "values/n_ints"],
         ...     "do_summarize_over_all_codes": True
@@ -281,7 +269,7 @@ def mapper_fntr(
         ┌──────┬─────────────────┬───────────────┐
         │ code ┆ code/n_patients ┆ values/n_ints │
         │ ---  ┆ ---             ┆ ---           │
-        │ cat  ┆ u32             ┆ u32           │
+        │ str  ┆ u32             ┆ u32           │
         ╞══════╪═════════════════╪═══════════════╡
         │ null ┆ 3               ┆ 4             │
         │ A    ┆ 2               ┆ 1             │
@@ -296,7 +284,7 @@ def mapper_fntr(
         ┌──────┬─────────────────┬───────────────┐
         │ code ┆ code/n_patients ┆ values/n_ints │
         │ ---  ┆ ---             ┆ ---           │
-        │ cat  ┆ u32             ┆ u32           │
+        │ str  ┆ u32             ┆ u32           │
         ╞══════╪═════════════════╪═══════════════╡
         │ A    ┆ 2               ┆ 1             │
         │ B    ┆ 2               ┆ 2             │
@@ -311,7 +299,7 @@ def mapper_fntr(
         ┌──────┬───────────┬─────────────────┬───────────────┐
         │ code ┆ modifier1 ┆ code/n_patients ┆ values/n_ints │
         │ ---  ┆ ---       ┆ ---             ┆ ---           │
-        │ cat  ┆ i64       ┆ u32             ┆ u32           │
+        │ str  ┆ i64       ┆ u32             ┆ u32           │
         ╞══════╪═══════════╪═════════════════╪═══════════════╡
         │ A    ┆ 1         ┆ 1               ┆ 0             │
         │ A    ┆ 2         ┆ 1               ┆ 1             │
@@ -326,7 +314,7 @@ def mapper_fntr(
         ┌──────┬───────────┬────────────────────┬────────────┐
         │ code ┆ modifier1 ┆ code/n_occurrences ┆ values/sum │
         │ ---  ┆ ---       ┆ ---                ┆ ---        │
-        │ cat  ┆ i64       ┆ u32                ┆ f64        │
+        │ str  ┆ i64       ┆ u32                ┆ f64        │
         ╞══════╪═══════════╪════════════════════╪════════════╡
         │ A    ┆ 1         ┆ 2                  ┆ 2.2        │
         │ A    ┆ 2         ┆ 1                  ┆ 6.0        │
@@ -344,7 +332,7 @@ def mapper_fntr(
         ┌──────┬───────────┬────────────────────┬────────────┐
         │ code ┆ modifier1 ┆ code/n_occurrences ┆ values/sum │
         │ ---  ┆ ---       ┆ ---                ┆ ---        │
-        │ cat  ┆ i64       ┆ u32                ┆ f64        │
+        │ str  ┆ i64       ┆ u32                ┆ f64        │
         ╞══════╪═══════════╪════════════════════╪════════════╡
         │ null ┆ null      ┆ 9                  ┆ 26.7       │
         │ A    ┆ 1         ┆ 2                  ┆ 2.2        │
@@ -360,7 +348,7 @@ def mapper_fntr(
         ┌──────┬───────────┬───────────────────┬──────────────────────┐
         │ code ┆ modifier1 ┆ values/n_patients ┆ values/n_occurrences │
         │ ---  ┆ ---       ┆ ---               ┆ ---                  │
-        │ cat  ┆ i64       ┆ u32               ┆ u32                  │
+        │ str  ┆ i64       ┆ u32               ┆ u32                  │
         ╞══════╪═══════════╪═══════════════════╪══════════════════════╡
         │ A    ┆ 1         ┆ 1                 ┆ 2                    │
         │ A    ┆ 2         ┆ 1                 ┆ 1                    │
@@ -375,7 +363,7 @@ def mapper_fntr(
         ┌──────┬───────────┬────────────────┬────────────┬────────────┐
         │ code ┆ modifier1 ┆ values/sum_sqd ┆ values/min ┆ values/max │
         │ ---  ┆ ---       ┆ ---            ┆ ---        ┆ ---        │
-        │ cat  ┆ i64       ┆ f64            ┆ f64        ┆ f64        │
+        │ str  ┆ i64       ┆ f64            ┆ f64        ┆ f64        │
         ╞══════╪═══════════╪════════════════╪════════════╪════════════╡
         │ A    ┆ 1         ┆ 2.42           ┆ 1.1        ┆ 1.1        │
         │ A    ┆ 2         ┆ 36.0           ┆ 6.0        ┆ 6.0        │
@@ -448,7 +436,7 @@ def reducer_fntr(
 
     Examples:
         >>> df_1 = pl.DataFrame({
-        ...     "code": pl.Series([None, "A", "A", "B", "C"], dtype=pl.Categorical),
+        ...     "code": [None, "A", "A", "B", "C"],
         ...     "modifier1": [None, 1, 2, 1, 2],
         ...     "code/n_patients":  [10, 1, 1, 2, 2],
         ...     "code/n_occurrences": [13, 2, 1, 3, 2],
@@ -462,7 +450,7 @@ def reducer_fntr(
         ...     "values/quantiles": [[1.1, 1.1], [6.0], [6.0], [5.0, 7.5], []],
         ... })
         >>> df_2 = pl.DataFrame({
-        ...     "code": pl.Series(["A", "A", "B", "C"], dtype=pl.Categorical),
+        ...     "code": ["A", "A", "B", "C"],
         ...     "modifier1": [1, 2, 1, None],
         ...     "code/n_patients":  [3, 3, 4, 4],
         ...     "code/n_occurrences": [10, 11, 8, 11],
@@ -476,7 +464,7 @@ def reducer_fntr(
         ...     "values/quantiles": [[1.3, -1.1, 2.0], [6.0, 1.2], [3.0, 2.5], [11.1, 12.]],
         ... })
         >>> df_3 = pl.DataFrame({
-        ...     "code": pl.Series(["D"], dtype=pl.Categorical),
+        ...     "code": ["D"],
         ...     "modifier1": [1],
         ...     "code/n_patients": [2],
         ...     "code/n_occurrences": [2],
@@ -497,7 +485,7 @@ def reducer_fntr(
         ┌──────┬───────────┬─────────────────┬───────────────┐
         │ code ┆ modifier1 ┆ code/n_patients ┆ values/n_ints │
         │ ---  ┆ ---       ┆ ---             ┆ ---           │
-        │ cat  ┆ i64       ┆ i64             ┆ i64           │
+        │ str  ┆ i64       ┆ i64             ┆ i64           │
         ╞══════╪═══════════╪═════════════════╪═══════════════╡
         │ null ┆ null      ┆ 10              ┆ 4             │
         │ A    ┆ 1         ┆ 4               ┆ 0             │
@@ -524,7 +512,7 @@ def reducer_fntr(
         ┌──────┬───────────┬────────────────────┬────────────┐
         │ code ┆ modifier1 ┆ code/n_occurrences ┆ values/sum │
         │ ---  ┆ ---       ┆ ---                ┆ ---        │
-        │ cat  ┆ i64       ┆ i64                ┆ f64        │
+        │ str  ┆ i64       ┆ i64                ┆ f64        │
         ╞══════╪═══════════╪════════════════════╪════════════╡
         │ null ┆ null      ┆ 13                 ┆ 13.2       │
         │ A    ┆ 1         ┆ 12                 ┆ 2.2        │
@@ -541,7 +529,7 @@ def reducer_fntr(
         ┌──────┬───────────┬───────────────────┬──────────────────────┐
         │ code ┆ modifier1 ┆ values/n_patients ┆ values/n_occurrences │
         │ ---  ┆ ---       ┆ ---               ┆ ---                  │
-        │ cat  ┆ i64       ┆ i64               ┆ i64                  │
+        │ str  ┆ i64       ┆ i64               ┆ i64                  │
         ╞══════╪═══════════╪═══════════════════╪══════════════════════╡
         │ null ┆ null      ┆ 8                 ┆ 12                   │
         │ A    ┆ 1         ┆ 1                 ┆ 2                    │
@@ -558,7 +546,7 @@ def reducer_fntr(
         ┌──────┬───────────┬────────────────┬────────────┬────────────┐
         │ code ┆ modifier1 ┆ values/sum_sqd ┆ values/min ┆ values/max │
         │ ---  ┆ ---       ┆ ---            ┆ ---        ┆ ---        │
-        │ cat  ┆ i64       ┆ f64            ┆ f64        ┆ f64        │
+        │ str  ┆ i64       ┆ f64            ┆ f64        ┆ f64        │
         ╞══════╪═══════════╪════════════════╪════════════╪════════════╡
         │ null ┆ null      ┆ 21.3           ┆ -1.0       ┆ 8.0        │
         │ A    ┆ 1         ┆ 2.42           ┆ 0.0        ┆ 1.1        │
@@ -636,13 +624,15 @@ def run_map_reduce(cfg: DictConfig):
 
     start = datetime.now()
     logger.info("All map shards complete! Starting code metadata reduction computation.")
-    reducer_fn = reducer_fntr(cfg.stage_cfg, cfg.get("code_modifier_columns", None))
+    reducer_fp = Path(cfg.stage_cfg.reducer_output_dir) / "codes.parquet"
+    reducer_fp.parent.mkdir(parents=True, exist_ok=True)
 
+    reducer_fn = reducer_fntr(cfg.stage_cfg, cfg.get("code_modifier_columns", None))
     reduced = reducer_fn(*[pl.scan_parquet(fp, glob=False) for fp in all_out_fps]).with_columns(
         cs.numeric().shrink_dtype().name.keep()
     )
-    logger.debug("For an extraction task specifically, we write out specifically to the cohort dir")
-    write_lazyframe(reduced, Path(cfg.cohort_dir) / "code_metadata.parquet")
+
+    write_lazyframe(reduced, reducer_fp)
     logger.info(f"Finished reduction in {datetime.now() - start}")
 
 

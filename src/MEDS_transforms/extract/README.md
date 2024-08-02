@@ -6,7 +6,7 @@ dataset is:
 1. Arranged in a series of files on disk of an allowed format (e.g., `.csv`, `.csv.gz`, `.parquet`)...
 2. Such that each file stores a dataframe containing data about patients such that each row of any given
    table corresponds to zero or more observations about a patient at a given time...
-3. And you can configure how to extract those observations in the timestamp, code, and numerical value
+3. And you can configure how to extract those observations in the time, code, and numeric value
    format of MEDS in the event conversion `yaml` file format specified below, then...
    this tool can automatically extract your raw data into a MEDS dataset for you in an efficient, reproducible,
    and communicable way.
@@ -53,16 +53,16 @@ step](#step-0-pre-meds) and the [Data Cleaning step](#step-3-data-cleanup), for 
 ### Event Conversion Configuration
 
 The event conversion configuration file tells MEDS Extract how to convert each row of a file among your raw
-data files into one or more MEDS measurements (meaning a tuple of a patient ID, a timestamp, a categorical
-code, and/or various other value or properties columns, most commonly a numerical value). This file is written
+data files into one or more MEDS measurements (meaning a tuple of a patient ID, a time, a categorical
+code, and/or various other value or properties columns, most commonly a numeric value). This file is written
 in yaml and has the following format:
 
 ```yaml
 relative_table_file_stem:
   event_name:
     code: list[str | col(COLUMN_NAME)] | str | col(COLUMN_NAME)
-    timestamp: null | col(COLUMN_NAME)
-    timestamp_format: null | str | list[str]
+    time: null | col(COLUMN_NAME)
+    time_format: null | str | list[str]
     output_column_name_1: input_column_name_1 (str)
     ...
   ...
@@ -84,11 +84,10 @@ each row of the file will be converted into a MEDS event according to the logic 
    value present in the input column. If an input column is missing in the file, an error will be raised. If
    a row has a null value for a specified input column, that field will be converted to the string `"UNK"`
    in the output code.
-2. The timestamp of the output MEDS observation will either be `null` (corresponding to static events) or
-   will be read from the column specified via the input. Timestamp columns must either be in a datetime or
-   date format in the input data, or a string format that can be converted to a timestamp via the optional
-   `timestamp_format` key, which is either a string literal format or a list of formats to try in priority
-   order.
+2. The time of the output MEDS observation will either be `null` (corresponding to static events) or
+   will be read from the column specified via the input. Time columns must either be in a datetime or date
+   format in the input data, or a string format that can be converted to a time via the optional `time_format`
+   key, which is either a string literal format or a list of formats to try in priority order.
 3. All subsequent keys and values in the event conversion block will be extracted as MEDS output column
    names by directly copying from the input data columns given. There is no need to use a `col(...)` syntax
    here, as string literals _cannot_ be used for these columns.
@@ -109,7 +108,7 @@ configuration options for this block in the `tests/test_extract.py` file and in 
 This block tells the system to read the file `$INPUT_DIR/metadata_table_file_stem.$SUFFIX`, to collect the
 columns necessary to construct the `code` field for `event_name`, potentially renaming columns according to
 `_code_name_map` first, alongside any input columns specified in the block, then to construct a
-`code_metadata.parquet` dataframe which links the metadata columns to the realized codes for the dataset. See
+`metadata/codes.parquet` dataframe which links the metadata columns to the realized codes for the dataset. See
 the [Partial MIMIC-IV Example](#partial-mimic-iv-example) below for an example of this in action.
 
 #### Examples
@@ -123,23 +122,23 @@ subjects:
     code:
       - EYE_COLOR
       - col(eye_color)
-    timestamp:
+    time:
   dob:
     code: DOB
-    timestamp: col(dob)
-    timestamp_format: '%m/%d/%Y'
+    time: col(dob)
+    time_format: '%m/%d/%Y'
 admit_vitals:
   admissions:
     code:
       - ADMISSION
       - col(department)
-    timestamp: col(admit_date)
-    timestamp_format: '%m/%d/%Y, %H:%M:%S'
+    time: col(admit_date)
+    time_format: '%m/%d/%Y, %H:%M:%S'
   HR:
     code: HR
-    timestamp: col(vitals_date)
-    timestamp_format: '%m/%d/%Y, %H:%M:%S'
-    numerical_value: HR
+    time: col(vitals_date)
+    time_format: '%m/%d/%Y, %H:%M:%S'
+    numeric_value: HR
 ```
 
 ##### Partial MIMIC-IV Example
@@ -152,8 +151,8 @@ hosp/admissions:
       - HOSPITAL_ADMISSION
       - col(admission_type)
       - col(admission_location)
-    timestamp: col(admittime)
-    timestamp_format: '%Y-%m-%d %H:%M:%S'
+    time: col(admittime)
+    time_format: '%Y-%m-%d %H:%M:%S'
     insurance: insurance
     language: language
     marital_status: marital_status
@@ -163,8 +162,8 @@ hosp/admissions:
     code:
       - HOSPITAL_DISCHARGE
       - col(discharge_location)
-    timestamp: col(dischtime)
-    timestamp_format: '%Y-%m-%d %H:%M:%S'
+    time: col(dischtime)
+    time_format: '%Y-%m-%d %H:%M:%S'
     hadm_id: hadm_id
 
 hosp/diagnoses_icd:
@@ -175,8 +174,8 @@ hosp/diagnoses_icd:
       - col(icd_version)
       - col(icd_code)
     hadm_id: hadm_id
-    timestamp: col(hadm_discharge_time)
-    timestamp_format: '%Y-%m-%d %H:%M:%S'
+    time: col(hadm_discharge_time)
+    time_format: '%Y-%m-%d %H:%M:%S'
 
 hosp/labevents:
   lab:
@@ -185,9 +184,9 @@ hosp/labevents:
       - col(itemid)
       - col(valueuom)
     hadm_id: hadm_id
-    timestamp: col(charttime)
-    timestamp_format: '%Y-%m-%d %H:%M:%S'
-    numerical_value: valuenum
+    time: col(charttime)
+    time_format: '%Y-%m-%d %H:%M:%S'
+    numeric_value: valuenum
     text_value: value
     priority: priority
 ```
@@ -216,7 +215,7 @@ cleaning transformations on multiple different datasets and leverage the full ME
 perform these data cleaning steps effectively and efficiently. Examples of possible data cleaning steps
 include:
 
-1. Extracting numerical values from free-text values in the dataset.
+1. Extracting numeric values from free-text values in the dataset.
 2. Splitting compound measurements into their constituent parts (e.g., splitting a "blood pressure"
    measurement that is recorded in the raw data as "120/80" into separate "systolic" and "diastolic" blood
    pressure measurements).
@@ -260,4 +259,4 @@ Note that this tool is _not_:
 TODO: Add issues for all of these.
 
 1. Single event blocks for files should be specifiable directly, without an event block name.
-2. Timestamp format should be specifiable at the file or global level, like patient ID.
+2. Time format should be specifiable at the file or global level, like patient ID.

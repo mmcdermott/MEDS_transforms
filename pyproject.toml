@@ -16,7 +16,9 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-dependencies = ["polars~=1.1.0", "pyarrow", "nested_ragged_tensors", "loguru", "hydra-core", "numpy"]
+dependencies = [
+  "polars~=1.1.0", "pyarrow", "nested_ragged_tensors", "loguru", "hydra-core", "numpy", "meds==0.3",
+]
 
 [tool.setuptools_scm]
 
@@ -34,6 +36,8 @@ MEDS_extract-shard_events = "MEDS_transforms.extract.shard_events:main"
 MEDS_extract-convert_to_sharded_events = "MEDS_transforms.extract.convert_to_sharded_events:main"
 MEDS_extract-merge_to_MEDS_cohort = "MEDS_transforms.extract.merge_to_MEDS_cohort:main"
 MEDS_extract-extract_code_metadata = "MEDS_transforms.extract.extract_code_metadata:main"
+MEDS_extract-finalize_MEDS_metadata = "MEDS_transforms.extract.finalize_MEDS_metadata:main"
+MEDS_extract-finalize_MEDS_data = "MEDS_transforms.extract.finalize_MEDS_data:main"
 
 # MEDS_transform
 ## General

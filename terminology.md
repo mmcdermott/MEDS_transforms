@@ -21,23 +21,23 @@ schema.
 
 #### An _event_ or _patient event_
 
-All observations about a patient that occur at a unique timestamp (within the level of temporal granularity in
+All observations about a patient that occur at a unique time (within the level of temporal granularity in
 the MEDS dataset).
 
 #### An _event index_
 
-For a given patient, when the set of unique timestamps (including the null timestamp, which corresponds to all
-static observations) are sorted in ascending order, the event index is the integer index of the timestamp in
+For a given patient, when the set of unique times (including the null time, which corresponds to all
+static observations) are sorted in ascending order, the event index is the integer index of the time in
 this sorted list.
 
 #### A _static measurement_
 
-A _static_ measurement is one that occurs without a source timestamp being recorded in the raw dataset **and**
+A _static_ measurement is one that occurs without a source time being recorded in the raw dataset **and**
 that can be interpreted as being applicable to the patient at any point in time during their care.
 
 #### A _time-derived measurement_
 
-Measurements that are time-varying, but can be computed deterministically in advance using only the timestamp
+Measurements that are time-varying, but can be computed deterministically in advance using only the time
 at which a measurement occurs and the patient's static or historical data, such as the patient's age or the
 season of the year in which a measurement occurs. These measurements warrant special consideration as they are
 often valuable covariates but not targets of prediction in ML use cases.

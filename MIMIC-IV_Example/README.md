@@ -71,7 +71,7 @@ several steps:
 
 This is a step in a few parts:
 
-1. Join a few tables by `hadm_id` to get the right timestamps in the right rows for processing. In
+1. Join a few tables by `hadm_id` to get the right times in the right rows for processing. In
    particular, we need to join:
    - the `hosp/diagnoses_icd` table with the `hosp/admissions` table to get the `dischtime` for each
      `hadm_id`.
@@ -133,7 +133,7 @@ Currently, some tables are ignored, including:
 4. `icu/datetimeevents`
 5. `icu/ingredientevents`
 
-Lots of questions remain about how to appropriately handle timestamps of the data -- e.g., things like HCPCS
+Lots of questions remain about how to appropriately handle times of the data -- e.g., things like HCPCS
 events are stored at the level of the _date_, not the _datetime_. How should those be slotted into the
 timeline which is otherwise stored at the _datetime_ resolution?
 

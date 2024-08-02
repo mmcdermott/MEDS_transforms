@@ -295,7 +295,7 @@ def shard_iterator(
             - ``stage_cfg.data_input_dir`` (mandatory): The directory containing the input data.
             - ``stage_cfg.output_dir`` (mandatory): The directory to write the output data.
             - ``shards_map_fp`` (mandatory): The file path to the shards map JSON file.
-            - ``stage_cfg.process_shard_prefix`` (optional): The prefix of the shards to process (e.g.,
+            - ``stage_cfg.process_split`` (optional): The prefix of the shards to process (e.g.,
               ``"train/"``). If not provided, all shards will be processed.
             - ``worker`` (optional): The worker ID for the MR worker; this is also used to seed the
               randomization process. If not provided, the randomization process is unseeded.
@@ -317,8 +317,7 @@ def shard_iterator(
         ...     _ = Path(tmp.name).write_text(json.dumps(shards))
         ...     cfg = DictConfig({
         ...         "stage_cfg": {"data_input_dir": "data/", "output_dir": "output/"},
-        ...         "shards_map_fp": tmp.name,
-        ...         "worker": 1,
+        ...         "shards_map_fp": tmp.name, "worker": 1,
         ...     })
         ...     gen = shard_iterator(cfg)
         ...     list(gen) # doctest: +NORMALIZE_WHITESPACE
@@ -330,8 +329,7 @@ def shard_iterator(
         ...     _ = Path(tmp.name).write_text(json.dumps(shards))
         ...     cfg = DictConfig({
         ...         "stage_cfg": {"data_input_dir": "data/", "output_dir": "output/"},
-        ...         "shards_map_fp": tmp.name,
-        ...         "worker": 1,
+        ...         "shards_map_fp": tmp.name, "worker": 1,
         ...     })
         ...     gen = shard_iterator(cfg, in_suffix="", out_suffix=".csv", in_prefix="a/", out_prefix="b/")
         ...     list(gen) # doctest: +NORMALIZE_WHITESPACE
@@ -343,7 +341,7 @@ def shard_iterator(
         ...     _ = Path(tmp.name).write_text(json.dumps(shards))
         ...     cfg = DictConfig({
         ...         "stage_cfg": {
-        ...             "data_input_dir": "data/", "output_dir": "output/", "process_shard_prefix": "train/"
+        ...             "data_input_dir": "data/", "output_dir": "output/", "process_split": "train/"
         ...         },
         ...         "shards_map_fp": tmp.name,
         ...         "worker": 1,
@@ -352,19 +350,44 @@ def shard_iterator(
         ...     list(gen) # doctest: +NORMALIZE_WHITESPACE
         [(PosixPath('data/train/1.parquet'),  PosixPath('output/train/1.parquet')),
          (PosixPath('data/train/0.parquet'),  PosixPath('output/train/0.parquet'))]
+
+    Note that if you ask it to process a split that isn't a valid prefix of the shards, it will return all
+    shards and assume that is covered via a `patient_splits.parquet` file:
+        >>> with NamedTemporaryFile() as tmp:
+        ...     _ = Path(tmp.name).write_text(json.dumps(shards))
+        ...     cfg = DictConfig({
+        ...         "stage_cfg": {"data_input_dir": "data/", "output_dir": "output/"},
+        ...         "shards_map_fp": tmp.name, "process_split": "nonexisting", "worker": 1,
+        ...     })
+        ...     gen = shard_iterator(cfg)
+        ...     list(gen) # doctest: +NORMALIZE_WHITESPACE
+        [(PosixPath('data/foo.parquet'),      PosixPath('output/foo.parquet')),
+         (PosixPath('data/train/0.parquet'),  PosixPath('output/train/0.parquet')),
+         (PosixPath('data/held_out.parquet'), PosixPath('output/held_out.parquet')),
+         (PosixPath('data/train/1.parquet'),  PosixPath('output/train/1.parquet'))]
     """
 
     input_dir = Path(cfg.stage_cfg.data_input_dir)
     output_dir = Path(cfg.stage_cfg.output_dir)
-    shards_map_fn = Path(cfg.shards_map_fp)
+    shards_map_fp = Path(cfg.shards_map_fp) if "shards_map_fp" in cfg else None
 
-    shards = json.loads(shards_map_fn.read_text())
+    if shards_map_fp and shards_map_fp.is_file():
+        shards = json.loads(shards_map_fp.read_text())
 
-    if "process_shard_prefix" in cfg.stage_cfg:
-        logger.info(f'Processing shards with prefix "{cfg.stage_cfg.process_shard_prefix}"')
-        shards = {k: v for k, v in shards.items() if k.startswith(cfg.stage_cfg.process_shard_prefix)}
+        if "process_split" in cfg.stage_cfg:
+            if any(k.startswith(cfg.stage_cfg.process_split) for k in shards):
+                logger.info(f'Processing shards with prefix "{cfg.stage_cfg.process_split}"')
+                shards = {k: v for k, v in shards.items() if k.startswith(cfg.stage_cfg.process_split)}
+        shards = list(shards.keys())
+    else:
+        shards = []
+        for p in input_dir.glob(f"{in_prefix}*{in_suffix}"):
+            relative_path = p.relative_to(input_dir)
+            shard_name = str(relative_path)
+            shard_name = shard_name[len(in_prefix) :] if in_prefix else shard_name
+            shard_name = shard_name[: -len(in_suffix)] if in_suffix else shard_name
+            shards.append(shard_name)
 
-    shards = list(shards.keys())
     if "worker" in cfg:
         random.seed(cfg.worker)
     random.shuffle(shards)
