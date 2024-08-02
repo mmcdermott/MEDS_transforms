@@ -11,19 +11,6 @@ from .transform_tester_base import (
 )
 from .utils import parse_meds_csvs
 
-# In addition to the ages, the code/vocab_index by code is:
-#     ADMISSION//CARDIAC: 1
-#     ADMISSION//ORTHOPEDIC: 2
-#     ADMISSION//PULMONARY: 3
-#     DISCHARGE: 4
-#     DOB: 5
-#     EYE_COLOR//BLUE: 6
-#     EYE_COLOR//BROWN: 7
-#     EYE_COLOR//HAZEL: 8
-#     HEIGHT: 9
-#     HR: 10
-#     TEMP: 11
-
 ORDERED_CODE_PATTERNS = [
     "ADMISSION.*",
     "TEMP",
