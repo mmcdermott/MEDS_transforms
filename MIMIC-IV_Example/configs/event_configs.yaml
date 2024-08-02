@@ -261,46 +261,43 @@ icu/inputevents:
   input_start:
     code:
       - INFUSION_START
-      - col(ordercategorydescription)
       - col(itemid)
-      - col(rateuom)
     time: col(starttime)
     time_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
     icustay_id: stay_id
     order_id: orderid
     link_order_id: linkorderid
-    numeric_value:
-      rate
-      #_metadata:
-      # TODO: get this working with null columns
-      #inputevents_to_rxnorm:
-      #  description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-      #  itemid: "itemid (omop_source_code)"
-      #  parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
-      #  rateuom: null # A null column means this column is needed in pulling from the metadata.
+    numeric_value: rate
+    unit: rateuom
+    ordercategorydescription: ordercategorydescription
+    _metadata:
+      inputevents_to_rxnorm:
+        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
+        itemid: "itemid (omop_source_code)"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        rateuom: null # A null column means this column is needed in pulling from the metadata.
   input_end:
     code:
       - INFUSION_END
-      - col(ordercategorydescription)
       - col(itemid)
-      - col(amountuom)
-      - col(statusdescription)
     time: col(endtime)
     time_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
     icustay_id: stay_id
     order_id: orderid
     link_order_id: linkorderid
-    numeric_value:
-      amount
-      #_metadata:
-      #  inputevents_to_rxnorm:
-      #    description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-      #    itemid: "itemid (omop_source_code)"
-      #    parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
-      #    statusdescription: null
-      #    amountuom: null
+    numeric_value: amount
+    ordercategorydescription: ordercategorydescription
+    statusdescription: statusdescription
+    unit: amountuom
+    _metadata:
+      inputevents_to_rxnorm:
+        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
+        itemid: "itemid (omop_source_code)"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        statusdescription: null
+        amountuom: null
   patient_weight:
     code:
       - PATIENT_WEIGHT_AT_INFUSION
