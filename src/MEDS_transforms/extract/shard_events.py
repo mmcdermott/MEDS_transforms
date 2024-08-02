@@ -24,7 +24,7 @@ from MEDS_transforms.utils import (
 )
 
 ROW_IDX_NAME = "__row_idx__"
-META_KEYS = {"timestamp_format", "_metadata"}
+META_KEYS = {"time_format", "_metadata"}
 
 
 def kwargs_strs(kwargs: dict) -> str:
@@ -170,7 +170,7 @@ def retrieve_columns(event_conversion_cfg: DictConfig) -> dict[str, list[str]]:
     stem (filename without the extension). It compiles a list of column names
     needed for each file from the configuration, which includes both general
     columns like row index and patient ID, as well as specific columns defined
-    for medical events and timestamps formatted in a special 'col(column_name)' syntax.
+    for medical events and times formatted in a special 'col(column_name)' syntax.
 
     Args:
         event_conversion_cfg (DictConfig): A dictionary configuration where
@@ -188,27 +188,27 @@ def retrieve_columns(event_conversion_cfg: DictConfig) -> dict[str, list[str]]:
         ...     "patient_id_col": "patient_id_global",
         ...     "hosp/patients": {
         ...         "eye_color": {
-        ...             "code": ["EYE_COLOR", "col(eye_color)"], "timestamp": None, "mod": "mod_col"
+        ...             "code": ["EYE_COLOR", "col(eye_color)"], "time": None, "mod": "mod_col"
         ...         },
         ...         "height": {
-        ...             "code": "HEIGHT", "timestamp": None, "numerical_value": "height"
+        ...             "code": "HEIGHT", "time": None, "numerical_value": "height"
         ...         }
         ...     },
         ...     "icu/chartevents": {
         ...         "patient_id_col": "patient_id_icu",
         ...         "heart_rate": {
-        ...             "code": "HEART_RATE", "timestamp": "charttime", "numerical_value": "HR"
+        ...             "code": "HEART_RATE", "time": "charttime", "numerical_value": "HR"
         ...         },
         ...         "lab": {
         ...             "code": ["col(itemid)", "col(valueuom)"],
-        ...             "timestamp": "charttime",
+        ...             "time": "charttime",
         ...             "numerical_value": "valuenum",
         ...             "text_value": "value",
         ...             "mod": "mod_lab",
         ...         }
         ...     },
         ...     "icu/meds": {
-        ...         "med": {"code": "col(medication)", "timestamp": "medtime"}
+        ...         "med": {"code": "col(medication)", "time": "medtime"}
         ...     }
         ... })
         >>> retrieve_columns(cfg) # doctest: +NORMALIZE_WHITESPACE
@@ -219,9 +219,9 @@ def retrieve_columns(event_conversion_cfg: DictConfig) -> dict[str, list[str]]:
         >>> cfg = DictConfig({
         ...     "subjects": {
         ...         "patient_id_col": "MRN",
-        ...         "eye_color": {"code": ["col(eye_color)"], "timestamp": None},
+        ...         "eye_color": {"code": ["col(eye_color)"], "time": None},
         ...     },
-        ...     "labs": {"lab": {"code": "col(labtest)", "timestamp": "charttime"}},
+        ...     "labs": {"lab": {"code": "col(labtest)", "time": "charttime"}},
         ... })
         >>> retrieve_columns(cfg)
         {'subjects': ['MRN', 'eye_color'], 'labs': ['charttime', 'labtest', 'patient_id']}
@@ -245,7 +245,7 @@ def retrieve_columns(event_conversion_cfg: DictConfig) -> dict[str, list[str]]:
                     continue
 
                 if value is None:
-                    # None can be used to indicate a null timestamp, which has no associated column.
+                    # None can be used to indicate a null time, which has no associated column.
                     continue
 
                 if isinstance(value, str):

@@ -95,33 +95,33 @@ subjects:
     code:
       - EYE_COLOR
       - col(eye_color)
-    timestamp: null
+    time: null
     _metadata:
       demo_metadata:
         description: description
   height:
     code: HEIGHT
-    timestamp: null
+    time: null
     numerical_value: height
   dob:
     code: DOB
-    timestamp: col(dob)
-    timestamp_format: "%m/%d/%Y"
+    time: col(dob)
+    time_format: "%m/%d/%Y"
 admit_vitals:
   admissions:
     code:
       - ADMISSION
       - col(department)
-    timestamp: col(admit_date)
-    timestamp_format: "%m/%d/%Y, %H:%M:%S"
+    time: col(admit_date)
+    time_format: "%m/%d/%Y, %H:%M:%S"
   discharge:
     code: DISCHARGE
-    timestamp: col(disch_date)
-    timestamp_format: "%m/%d/%Y, %H:%M:%S"
+    time: col(disch_date)
+    time_format: "%m/%d/%Y, %H:%M:%S"
   HR:
     code: HR
-    timestamp: col(vitals_date)
-    timestamp_format: "%m/%d/%Y, %H:%M:%S"
+    time: col(vitals_date)
+    time_format: "%m/%d/%Y, %H:%M:%S"
     numerical_value: HR
     _metadata:
       input_metadata:
@@ -129,8 +129,8 @@ admit_vitals:
         parent_codes: {"LOINC/{loinc}": {"lab_code": "HR"}}
   temp:
     code: TEMP
-    timestamp: col(vitals_date)
-    timestamp_format: "%m/%d/%Y, %H:%M:%S"
+    time: col(vitals_date)
+    time_format: "%m/%d/%Y, %H:%M:%S"
     numerical_value: temp
     _metadata:
       input_metadata:
@@ -159,16 +159,16 @@ def get_expected_output(df: str) -> pl.DataFrame:
         pl.read_csv(source=StringIO(df))
         .select(
             "patient_id",
-            pl.col("timestamp").str.strptime(pl.Datetime, "%m/%d/%Y, %H:%M:%S").alias("timestamp"),
+            pl.col("time").str.strptime(pl.Datetime, "%m/%d/%Y, %H:%M:%S").alias("time"),
             pl.col("code"),
             "numerical_value",
         )
-        .sort(by=["patient_id", "timestamp"])
+        .sort(by=["patient_id", "time"])
     )
 
 
 MEDS_OUTPUT_TRAIN_0_SUBJECTS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numerical_value
 239684,,EYE_COLOR//BROWN,
 239684,,HEIGHT,175.271115221764
 239684,"12/28/1980, 00:00:00",DOB,
@@ -178,7 +178,7 @@ patient_id,timestamp,code,numerical_value
 """
 
 MEDS_OUTPUT_TRAIN_0_ADMIT_VITALS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numerical_value
 239684,"05/11/2010, 17:41:51",ADMISSION//CARDIAC,
 239684,"05/11/2010, 17:41:51",HR,102.6
 239684,"05/11/2010, 17:41:51",TEMP,96.0
@@ -206,7 +206,7 @@ patient_id,timestamp,code,numerical_value
 """
 
 MEDS_OUTPUT_TRAIN_1_SUBJECTS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numerical_value
 68729,,EYE_COLOR//HAZEL,
 68729,,HEIGHT,160.3953106166676
 68729,"03/09/1978, 00:00:00",DOB,
@@ -216,7 +216,7 @@ patient_id,timestamp,code,numerical_value
 """
 
 MEDS_OUTPUT_TRAIN_1_ADMIT_VITALS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numerical_value
 68729,"05/26/2010, 02:30:56",ADMISSION//PULMONARY,
 68729,"05/26/2010, 02:30:56",HR,86.0
 68729,"05/26/2010, 02:30:56",TEMP,97.8
@@ -228,14 +228,14 @@ patient_id,timestamp,code,numerical_value
 """
 
 MEDS_OUTPUT_TUNING_0_SUBJECTS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numerical_value
 754281,,EYE_COLOR//BROWN,
 754281,,HEIGHT,166.22261567137025
 754281,"12/19/1988, 00:00:00",DOB,
 """
 
 MEDS_OUTPUT_TUNING_0_ADMIT_VITALS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numerical_value
 754281,"01/03/2010, 06:27:59",ADMISSION//PULMONARY,
 754281,"01/03/2010, 06:27:59",HR,142.0
 754281,"01/03/2010, 06:27:59",TEMP,99.8
@@ -243,14 +243,14 @@ patient_id,timestamp,code,numerical_value
 """
 
 MEDS_OUTPUT_HELD_OUT_0_SUBJECTS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numerical_value
 1500733,,EYE_COLOR//BROWN,
 1500733,,HEIGHT,158.60131573580904
 1500733,"07/20/1986, 00:00:00",DOB,
 """
 
 MEDS_OUTPUT_HELD_OUT_0_ADMIT_VITALS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numerical_value
 1500733,"06/03/2010, 14:54:38",ADMISSION//ORTHOPEDIC,
 1500733,"06/03/2010, 14:54:38",HR,91.4
 1500733,"06/03/2010, 14:54:38",TEMP,100.0
@@ -540,8 +540,8 @@ def test_extraction():
                 for subj in splits[split]:
                     got_df_subj = got_df.filter(pl.col("patient_id") == subj)
                     assert got_df_subj[
-                        "timestamp"
-                    ].is_sorted(), f"Timestamps should be sorted for patient {subj} in split {split}."
+                        "time"
+                    ].is_sorted(), f"Times should be sorted for patient {subj} in split {split}."
 
         except AssertionError as e:
             print(f"Failed on split {split}")
@@ -660,8 +660,8 @@ def test_extraction():
                 for subj in splits[split]:
                     got_df_subj = got_df.filter(pl.col("patient_id") == subj)
                     assert got_df_subj[
-                        "timestamp"
-                    ].is_sorted(), f"Timestamps should be sorted for patient {subj} in split {split}."
+                        "time"
+                    ].is_sorted(), f"Times should be sorted for patient {subj} in split {split}."
 
         except AssertionError as e:
             print(f"Failed on split {split}")

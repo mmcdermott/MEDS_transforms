@@ -34,10 +34,10 @@ directories.
 The fundamental design philosophy of this repository can be summarized as follows:
 
 1. _(The MEDS Assumption)_: All structured electronic health record (EHR) data can be represented as a
-   series of events, each of which is associated with a patient, a timestamp, and a set of codes and
+   series of events, each of which is associated with a patient, a time, and a set of codes and
    numerical values. This representation is the Medical Event Data Standard (MEDS) format, and in this
    repository we use it in the "flat" format, where data is organized as rows of `patient_id`,
-   `timestamp`, `code`, `numerical_value` columns.
+   `time`, `code`, `numerical_value` columns.
 2. _Easy Efficiency through Sharding_: MEDS datasets in this repository are sharded into smaller, more
    manageable pieces (organized as separate files) at the patient level (and, during the raw-data extraction
    process, the event level). This enables users to scale up their processing capabilities ad nauseum by
@@ -249,7 +249,7 @@ $INPUT_FILE_STEM:
           - $CODE_PART_1
           - $CODE_PART_2
           ... # These will be combined with "//" to form the final code.
-        timestamp: $TIMESTAMP
+        time: $TIME
         $MEDS_COLUMN_NAME: $RAW_COLUMN_NAME
         ...
     ...
@@ -259,8 +259,8 @@ $INPUT_FILE_STEM:
 In this structure, `$INPUT_FILE_STEM` is the stem of the input file name, `$EVENT_NAME` is the name of a
 particular kind of event that can be extracted from the input file, `$CODE` is the code for the event, either
 as a constant string or (with the syntax `"col($COLUMN)"` the name of the column in the raw data to be read to
-get the code), and `$TIMESTAMP` is the timestamp for the event, either as `null` to indicate the event has a
-null timestamp (e.g., a static measurement) or with the `"col($COLUMN)"` syntax refenced above, and all
+get the code), and `$TIME` is the time for the event, either as `null` to indicate the event has a
+null time (e.g., a static measurement) or with the `"col($COLUMN)"` syntax refenced above, and all
 subsequent key-value pairs are mappings from the MEDS column name to the raw column name in the input data.
 Here, these mappings can _only_ point to columns in the input data, not constant values, and the input data
 columns must be either string or categorical types (in which case they will be converted to categorical) or
@@ -299,7 +299,7 @@ broken down into the following steps:
 
 1. Filtering the dataset by criteria that do not require cross-patient analyses, e.g.,
 
-   - Filtering patients by the number of events or unique timestamps they have.
+   - Filtering patients by the number of events or unique times they have.
    - Removing numerical values that fall outside of pre-specified, per-code ranges (e.g., for outlier
      removal).
 

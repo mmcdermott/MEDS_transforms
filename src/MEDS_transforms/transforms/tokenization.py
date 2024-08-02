@@ -6,7 +6,7 @@ continuous time sequence into a temporal sequence at the level that will be cons
 
 All these functions take in _normalized_ data -- meaning data where there are _no longer_ any code modifiers,
 as those have been normalized alongside codes into integer indices (in the output code column). The only
-columns of concern here thus are `patient_id`, `timestamp`, `code`, `numerical_value`.
+columns of concern here thus are `patient_id`, `time`, `code`, `numerical_value`.
 """
 
 import json
@@ -59,7 +59,7 @@ def fill_to_nans(col: str | pl.Expr) -> pl.Expr:
 def split_static_and_dynamic(df: pl.LazyFrame) -> tuple[pl.LazyFrame, pl.LazyFrame]:
     """This function splits the input data into static and dynamic data.
 
-    Static data is data that has a null timestamp, and dynamic data is everything else.
+    Static data is data that has a null time, and dynamic data is everything else.
 
     Args:
         df: The input data.
@@ -72,7 +72,7 @@ def split_static_and_dynamic(df: pl.LazyFrame) -> tuple[pl.LazyFrame, pl.LazyFra
         >>> from datetime import datetime
         >>> df = pl.DataFrame({
         ...     "patient_id": [1, 1, 2, 2],
-        ...     "timestamp": [None, datetime(2021, 1, 1), None, datetime(2021, 1, 2)],
+        ...     "time": [None, datetime(2021, 1, 1), None, datetime(2021, 1, 2)],
         ...     "code": [100, 101, 200, 201],
         ...     "numerical_value": [1.0, 2.0, 3.0, 4.0]
         ... }).lazy()
@@ -90,7 +90,7 @@ def split_static_and_dynamic(df: pl.LazyFrame) -> tuple[pl.LazyFrame, pl.LazyFra
         >>> dynamic.collect()
         shape: (2, 4)
         ┌────────────┬─────────────────────┬──────┬─────────────────┐
-        │ patient_id ┆ timestamp           ┆ code ┆ numerical_value │
+        │ patient_id ┆ time                ┆ code ┆ numerical_value │
         │ ---        ┆ ---                 ┆ ---  ┆ ---             │
         │ i64        ┆ datetime[μs]        ┆ i64  ┆ f64             │
         ╞════════════╪═════════════════════╪══════╪═════════════════╡
@@ -99,33 +99,33 @@ def split_static_and_dynamic(df: pl.LazyFrame) -> tuple[pl.LazyFrame, pl.LazyFra
         └────────────┴─────────────────────┴──────┴─────────────────┘
     """
 
-    static = df.filter(pl.col("timestamp").is_null()).drop("timestamp")
-    dynamic = df.filter(pl.col("timestamp").is_not_null())
+    static = df.filter(pl.col("time").is_null()).drop("time")
+    dynamic = df.filter(pl.col("time").is_not_null())
     return static, dynamic
 
 
 def extract_statics_and_schema(df: pl.LazyFrame) -> pl.LazyFrame:
-    """This function extracts static data and schema information (sequence of patient unique timestamps).
+    """This function extracts static data and schema information (sequence of patient unique times).
 
     Args:
         df: The input data.
 
     Returns:
-        A `pl.LazyFrame` object containing the static data and the unique timestamps of the patient, grouped
+        A `pl.LazyFrame` object containing the static data and the unique times of the patient, grouped
         by patient as lists, in the same order as the patient IDs occurred in the original file.
 
     Examples:
         >>> from datetime import datetime
         >>> df = pl.DataFrame({
         ...     "patient_id": [1, 1, 1, 1, 2, 2, 2],
-        ...     "timestamp": [
+        ...     "time": [
         ...         None, datetime(2021, 1, 1), datetime(2021, 1, 1), datetime(2021, 1, 13),
         ...         None, datetime(2021, 1, 2), datetime(2021, 1, 2)],
         ...     "code": [100, 101, 102, 103, 200, 201, 202],
         ...     "numerical_value": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
         ... }).lazy()
         >>> df = extract_statics_and_schema(df).collect()
-        >>> df.drop("timestamp")
+        >>> df.drop("time")
         shape: (2, 4)
         ┌────────────┬───────────┬─────────────────┬─────────────────────┐
         │ patient_id ┆ code      ┆ numerical_value ┆ start_time          │
@@ -135,10 +135,10 @@ def extract_statics_and_schema(df: pl.LazyFrame) -> pl.LazyFrame:
         │ 1          ┆ [100]     ┆ [1.0]           ┆ 2021-01-01 00:00:00 │
         │ 2          ┆ [200]     ┆ [5.0]           ┆ 2021-01-02 00:00:00 │
         └────────────┴───────────┴─────────────────┴─────────────────────┘
-        >>> df.select("patient_id", "timestamp").explode("timestamp")
+        >>> df.select("patient_id", "time").explode("time")
         shape: (3, 2)
         ┌────────────┬─────────────────────┐
-        │ patient_id ┆ timestamp           │
+        │ patient_id ┆ time                │
         │ ---        ┆ ---                 │
         │ i64        ┆ datetime[μs]        │
         ╞════════════╪═════════════════════╡
@@ -153,9 +153,9 @@ def extract_statics_and_schema(df: pl.LazyFrame) -> pl.LazyFrame:
     # This collects static data by patient ID and stores only (as a list) the codes and numerical values.
     static_by_patient = static.group_by("patient_id", maintain_order=True).agg("code", "numerical_value")
 
-    # This collects the unique timestamps for each patient.
+    # This collects the unique times for each patient.
     schema_by_patient = dynamic.group_by("patient_id", maintain_order=True).agg(
-        pl.col("timestamp").min().alias("start_time"), pl.col("timestamp").unique(maintain_order=True)
+        pl.col("time").min().alias("start_time"), pl.col("time").unique(maintain_order=True)
     )
 
     # TODO(mmd): Consider tracking patient offset explicitly here.
@@ -182,7 +182,7 @@ def extract_seq_of_patient_events(df: pl.LazyFrame) -> pl.LazyFrame:
         >>> from datetime import datetime
         >>> df = pl.DataFrame({
         ...     "patient_id": [1, 1, 1, 1, 2, 2, 2],
-        ...     "timestamp": [
+        ...     "time": [
         ...         None, datetime(2021, 1, 1), datetime(2021, 1, 1), datetime(2021, 1, 13),
         ...         None, datetime(2021, 1, 2), datetime(2021, 1, 2)],
         ...     "code": [100, 101, 102, 103, 200, 201, 202],
@@ -202,10 +202,10 @@ def extract_seq_of_patient_events(df: pl.LazyFrame) -> pl.LazyFrame:
 
     _, dynamic = split_static_and_dynamic(df)
 
-    time_delta_days_expr = (pl.col("timestamp").diff().dt.total_seconds() / SECONDS_PER_DAY).cast(pl.Float64)
+    time_delta_days_expr = (pl.col("time").diff().dt.total_seconds() / SECONDS_PER_DAY).cast(pl.Float64)
 
     return (
-        dynamic.group_by("patient_id", "timestamp", maintain_order=True)
+        dynamic.group_by("patient_id", "time", maintain_order=True)
         .agg(fill_to_nans("code").name.keep(), fill_to_nans("numerical_value").name.keep())
         .group_by("patient_id", maintain_order=True)
         .agg(

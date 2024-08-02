@@ -129,7 +129,7 @@ Code: HEIGHT
 #     TEMP: 11
 
 WANT_TRAIN_0 = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numerical_value
 239684,,7,
 239684,,9,1.5770289975852931
 239684,"12/28/1980, 00:00:00",5,
@@ -163,7 +163,7 @@ patient_id,timestamp,code,numerical_value
 """
 
 WANT_TRAIN_1 = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numerical_value
 68729,,8,
 68729,,9,-0.543824685211534
 68729,"03/09/1978, 00:00:00",5,
@@ -181,7 +181,7 @@ patient_id,timestamp,code,numerical_value
 """
 
 WANT_TUNING_0 = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numerical_value
 754281,,7,
 754281,,9,0.28697820001946645
 754281,"12/19/1988, 00:00:00",5,
@@ -192,7 +192,7 @@ patient_id,timestamp,code,numerical_value
 """
 
 WANT_HELD_OUT_0 = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numerical_value
 1500733,,7,
 1500733,,9,-0.7995957679188177
 1500733,"07/20/1986, 00:00:00",5,

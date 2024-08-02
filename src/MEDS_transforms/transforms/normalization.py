@@ -19,7 +19,7 @@ def normalize(
 
     This function expects a MEDS dataset in flattened form, with columns for:
       - `patient_id`
-      - `timestamp`
+      - `time`
       - `code`
       - `numerical_value`
 
@@ -64,7 +64,7 @@ def normalize(
         >>> MEDS_df = pl.DataFrame(
         ...     {
         ...         "patient_id": [1, 1, 1, 2, 2, 2, 3],
-        ...         "timestamp": [
+        ...         "time": [
         ...             datetime(2021, 1, 1),
         ...             datetime(2021, 1, 1),
         ...             datetime(2021, 1, 2),
@@ -79,7 +79,7 @@ def normalize(
         ...     },
         ...     schema = {
         ...         "patient_id": pl.UInt32,
-        ...         "timestamp": pl.Datetime,
+        ...         "time": pl.Datetime,
         ...         "code": pl.Utf8,
         ...         "numerical_value": pl.Float64,
         ...         "unit": pl.Utf8,
@@ -102,7 +102,7 @@ def normalize(
         >>> normalize(MEDS_df.lazy(), code_metadata.lazy()).collect()
         shape: (6, 4)
         ┌────────────┬─────────────────────┬──────┬─────────────────┐
-        │ patient_id ┆ timestamp           ┆ code ┆ numerical_value │
+        │ patient_id ┆ time                ┆ code ┆ numerical_value │
         │ ---        ┆ ---                 ┆ ---  ┆ ---             │
         │ u32        ┆ datetime[μs]        ┆ u32  ┆ f64             │
         ╞════════════╪═════════════════════╪══════╪═════════════════╡
@@ -116,7 +116,7 @@ def normalize(
         >>> MEDS_df = pl.DataFrame(
         ...     {
         ...         "patient_id": [1, 1, 1, 2, 2, 2, 3],
-        ...         "timestamp": [
+        ...         "time": [
         ...             datetime(2021, 1, 1),
         ...             datetime(2021, 1, 1),
         ...             datetime(2021, 1, 2),
@@ -131,7 +131,7 @@ def normalize(
         ...     },
         ...     schema = {
         ...         "patient_id": pl.UInt32,
-        ...         "timestamp": pl.Datetime,
+        ...         "time": pl.Datetime,
         ...         "code": pl.Utf8,
         ...         "numerical_value": pl.Float64,
         ...         "unit": pl.Utf8,
@@ -156,7 +156,7 @@ def normalize(
         >>> normalize(MEDS_df.lazy(), code_metadata.lazy(), ["unit"]).collect()
         shape: (6, 4)
         ┌────────────┬─────────────────────┬──────┬─────────────────┐
-        │ patient_id ┆ timestamp           ┆ code ┆ numerical_value │
+        │ patient_id ┆ time                ┆ code ┆ numerical_value │
         │ ---        ┆ ---                 ┆ ---  ┆ ---             │
         │ u32        ┆ datetime[μs]        ┆ u32  ┆ f64             │
         ╞════════════╪═════════════════════╪══════╪═════════════════╡
@@ -204,7 +204,7 @@ def normalize(
         .select(
             idx_col,
             "patient_id",
-            "timestamp",
+            "time",
             pl.col("code/vocab_index").alias("code"),
             ((pl.col("numerical_value") - pl.col("values/mean")) / pl.col("values/std")).alias(
                 "numerical_value"
