@@ -20,6 +20,7 @@ if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
     MERGE_TO_MEDS_COHORT_SCRIPT = extraction_root / "merge_to_MEDS_cohort.py"
     AGGREGATE_CODE_METADATA_SCRIPT = code_root / "aggregate_code_metadata.py"
     EXTRACT_CODE_METADATA_SCRIPT = extraction_root / "extract_code_metadata.py"
+    FINALIZE_DATA_SCRIPT = extraction_root / "finalize_MEDS_data.py"
     FINALIZE_METADATA_SCRIPT = extraction_root / "finalize_MEDS_metadata.py"
 else:
     SHARD_EVENTS_SCRIPT = "MEDS_extract-shard_events"
@@ -28,6 +29,7 @@ else:
     MERGE_TO_MEDS_COHORT_SCRIPT = "MEDS_extract-merge_to_MEDS_cohort"
     AGGREGATE_CODE_METADATA_SCRIPT = "MEDS_transform-aggregate_code_metadata"
     EXTRACT_CODE_METADATA_SCRIPT = "MEDS_extract-extract_code_metadata"
+    FINALIZE_DATA_SCRIPT = "MEDS_extract-finalize_MEDS_data"
     FINALIZE_METADATA_SCRIPT = "MEDS_extract-finalize_MEDS_metadata"
 
 import json
@@ -93,43 +95,43 @@ subjects:
     code:
       - EYE_COLOR
       - col(eye_color)
-    timestamp: null
+    time: null
     _metadata:
       demo_metadata:
         description: description
   height:
     code: HEIGHT
-    timestamp: null
-    numerical_value: height
+    time: null
+    numeric_value: height
   dob:
     code: DOB
-    timestamp: col(dob)
-    timestamp_format: "%m/%d/%Y"
+    time: col(dob)
+    time_format: "%m/%d/%Y"
 admit_vitals:
   admissions:
     code:
       - ADMISSION
       - col(department)
-    timestamp: col(admit_date)
-    timestamp_format: "%m/%d/%Y, %H:%M:%S"
+    time: col(admit_date)
+    time_format: "%m/%d/%Y, %H:%M:%S"
   discharge:
     code: DISCHARGE
-    timestamp: col(disch_date)
-    timestamp_format: "%m/%d/%Y, %H:%M:%S"
+    time: col(disch_date)
+    time_format: "%m/%d/%Y, %H:%M:%S"
   HR:
     code: HR
-    timestamp: col(vitals_date)
-    timestamp_format: "%m/%d/%Y, %H:%M:%S"
-    numerical_value: HR
+    time: col(vitals_date)
+    time_format: "%m/%d/%Y, %H:%M:%S"
+    numeric_value: HR
     _metadata:
       input_metadata:
         description: {"title": {"lab_code": "HR"}}
         parent_codes: {"LOINC/{loinc}": {"lab_code": "HR"}}
   temp:
     code: TEMP
-    timestamp: col(vitals_date)
-    timestamp_format: "%m/%d/%Y, %H:%M:%S"
-    numerical_value: temp
+    time: col(vitals_date)
+    time_format: "%m/%d/%Y, %H:%M:%S"
+    numeric_value: temp
     _metadata:
       input_metadata:
         description: {"title": {"lab_code": "temp"}}
@@ -157,16 +159,16 @@ def get_expected_output(df: str) -> pl.DataFrame:
         pl.read_csv(source=StringIO(df))
         .select(
             "patient_id",
-            pl.col("timestamp").str.strptime(pl.Datetime, "%m/%d/%Y, %H:%M:%S").alias("timestamp"),
+            pl.col("time").str.strptime(pl.Datetime, "%m/%d/%Y, %H:%M:%S").alias("time"),
             pl.col("code"),
-            "numerical_value",
+            "numeric_value",
         )
-        .sort(by=["patient_id", "timestamp"])
+        .sort(by=["patient_id", "time"])
     )
 
 
 MEDS_OUTPUT_TRAIN_0_SUBJECTS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 239684,,EYE_COLOR//BROWN,
 239684,,HEIGHT,175.271115221764
 239684,"12/28/1980, 00:00:00",DOB,
@@ -176,7 +178,7 @@ patient_id,timestamp,code,numerical_value
 """
 
 MEDS_OUTPUT_TRAIN_0_ADMIT_VITALS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 239684,"05/11/2010, 17:41:51",ADMISSION//CARDIAC,
 239684,"05/11/2010, 17:41:51",HR,102.6
 239684,"05/11/2010, 17:41:51",TEMP,96.0
@@ -204,7 +206,7 @@ patient_id,timestamp,code,numerical_value
 """
 
 MEDS_OUTPUT_TRAIN_1_SUBJECTS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 68729,,EYE_COLOR//HAZEL,
 68729,,HEIGHT,160.3953106166676
 68729,"03/09/1978, 00:00:00",DOB,
@@ -214,7 +216,7 @@ patient_id,timestamp,code,numerical_value
 """
 
 MEDS_OUTPUT_TRAIN_1_ADMIT_VITALS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 68729,"05/26/2010, 02:30:56",ADMISSION//PULMONARY,
 68729,"05/26/2010, 02:30:56",HR,86.0
 68729,"05/26/2010, 02:30:56",TEMP,97.8
@@ -226,14 +228,14 @@ patient_id,timestamp,code,numerical_value
 """
 
 MEDS_OUTPUT_TUNING_0_SUBJECTS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 754281,,EYE_COLOR//BROWN,
 754281,,HEIGHT,166.22261567137025
 754281,"12/19/1988, 00:00:00",DOB,
 """
 
 MEDS_OUTPUT_TUNING_0_ADMIT_VITALS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 754281,"01/03/2010, 06:27:59",ADMISSION//PULMONARY,
 754281,"01/03/2010, 06:27:59",HR,142.0
 754281,"01/03/2010, 06:27:59",TEMP,99.8
@@ -241,14 +243,14 @@ patient_id,timestamp,code,numerical_value
 """
 
 MEDS_OUTPUT_HELD_OUT_0_SUBJECTS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 1500733,,EYE_COLOR//BROWN,
 1500733,,HEIGHT,158.60131573580904
 1500733,"07/20/1986, 00:00:00",DOB,
 """
 
 MEDS_OUTPUT_HELD_OUT_0_ADMIT_VITALS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 1500733,"06/03/2010, 14:54:38",ADMISSION//ORTHOPEDIC,
 1500733,"06/03/2010, 14:54:38",HR,91.4
 1500733,"06/03/2010, 14:54:38",TEMP,100.0
@@ -382,7 +384,7 @@ def test_extraction():
         all_stderrs = []
         all_stdouts = []
 
-        # Step 1: Sub-shard the data
+        # Stage 1: Sub-shard the data
         stderr, stdout = run_command(SHARD_EVENTS_SCRIPT, extraction_config_kwargs, "shard_events")
 
         all_stderrs.append(stderr)
@@ -428,14 +430,7 @@ def test_extraction():
             check_row_order=False,
         )
 
-        # Step 2: Collect the patient splits
-        # stderr, stdout = run_command(
-        #     "MEDS_extract_shard_patients",
-        #     {**extraction_config_kwargs, "stage":"split_and_shard_patients"},
-        #     "split_and_shard_patients",
-        # )
-
-        # Step 2: Collect the patient splits
+        # Stage 2: Collect the patient splits
         stderr, stdout = run_command(
             SPLIT_AND_SHARD_SCRIPT,
             extraction_config_kwargs,
@@ -470,7 +465,7 @@ def test_extraction():
             print(f"stdout:\n{stdout}")
             raise e
 
-        # Step 3: Extract the events and sub-shard by patient
+        # Stage 3: Extract the events and sub-shard by patient
         stderr, stdout = run_command(
             CONVERT_TO_SHARDED_EVENTS_SCRIPT,
             extraction_config_kwargs,
@@ -508,11 +503,11 @@ def test_extraction():
                     print(f"stdout:\n{stdout}")
                     raise e
 
-        # Step 4: Merge to the final output
+        # Stage 4: Merge to the final output
         stderr, stdout = run_command(
             MERGE_TO_MEDS_COHORT_SCRIPT,
             extraction_config_kwargs,
-            "merge_sharded_events",
+            "merge_to_MEDS_cohort",
         )
         all_stderrs.append(stderr)
         all_stdouts.append(stdout)
@@ -521,7 +516,7 @@ def test_extraction():
         full_stdout = "\n".join(all_stdouts)
 
         # Check the final output
-        output_folder = MEDS_cohort_dir / "data"
+        output_folder = MEDS_cohort_dir / "merge_to_MEDS_cohort"
         try:
             for split, expected_df_L in MEDS_OUTPUTS.items():
                 if not isinstance(expected_df_L, list):
@@ -530,7 +525,7 @@ def test_extraction():
                 expected_df = pl.concat([get_expected_output(df) for df in expected_df_L])
 
                 fp = output_folder / f"{split}.parquet"
-                assert fp.is_file(), f"Expected {fp} to exist."
+                assert fp.is_file(), f"Expected {fp} to exist.\nstderr:\n{stderr}\nstdout:\n{stdout}"
 
                 got_df = pl.read_parquet(fp, glob=False)
                 assert_df_equal(
@@ -545,8 +540,8 @@ def test_extraction():
                 for subj in splits[split]:
                     got_df_subj = got_df.filter(pl.col("patient_id") == subj)
                     assert got_df_subj[
-                        "timestamp"
-                    ].is_sorted(), f"Timestamps should be sorted for patient {subj} in split {split}."
+                        "time"
+                    ].is_sorted(), f"Times should be sorted for patient {subj} in split {split}."
 
         except AssertionError as e:
             print(f"Failed on split {split}")
@@ -554,7 +549,7 @@ def test_extraction():
             print(f"stdout:\n{full_stdout}")
             raise e
 
-        # Step 4: Merge to the final output
+        # Stage 5: Aggregate preliminary code metadata
         stderr, stdout = run_command(
             AGGREGATE_CODE_METADATA_SCRIPT,
             extraction_config_kwargs,
@@ -589,6 +584,7 @@ def test_extraction():
             check_row_order=False,
         )
 
+        # Stage 6: Extract code metadata
         stderr, stdout = run_command(
             EXTRACT_CODE_METADATA_SCRIPT,
             extraction_config_kwargs,
@@ -627,6 +623,55 @@ def test_extraction():
             check_row_order=False,
         )
 
+        # Stage 7: Finalize the MEDS data
+        stderr, stdout = run_command(
+            FINALIZE_DATA_SCRIPT,
+            extraction_config_kwargs,
+            "finalize_MEDS_data",
+        )
+        all_stderrs.append(stderr)
+        all_stdouts.append(stdout)
+
+        full_stderr = "\n".join(all_stderrs)
+        full_stdout = "\n".join(all_stdouts)
+
+        # Check the final output
+        output_folder = MEDS_cohort_dir / "data"
+        try:
+            for split, expected_df_L in MEDS_OUTPUTS.items():
+                if not isinstance(expected_df_L, list):
+                    expected_df_L = [expected_df_L]
+
+                expected_df = pl.concat([get_expected_output(df) for df in expected_df_L]).with_columns(
+                    pl.col("numeric_value").cast(pl.Float32)
+                )
+
+                fp = output_folder / f"{split}.parquet"
+                assert fp.is_file(), f"Expected {fp} to exist."
+
+                got_df = pl.read_parquet(fp, glob=False)
+                assert_df_equal(
+                    expected_df,
+                    got_df,
+                    f"Expected output for split {split} to be equal to the expected output.",
+                    check_column_order=False,
+                    check_row_order=False,
+                )
+
+                assert got_df["patient_id"].is_sorted(), f"Patient IDs should be sorted for split {split}."
+                for subj in splits[split]:
+                    got_df_subj = got_df.filter(pl.col("patient_id") == subj)
+                    assert got_df_subj[
+                        "time"
+                    ].is_sorted(), f"Times should be sorted for patient {subj} in split {split}."
+
+        except AssertionError as e:
+            print(f"Failed on split {split}")
+            print(f"stderr:\n{full_stderr}")
+            print(f"stdout:\n{full_stdout}")
+            raise e
+
+        # Stage 8: Finalize the metadata
         stderr, stdout = run_command(
             FINALIZE_METADATA_SCRIPT,
             extraction_config_kwargs,

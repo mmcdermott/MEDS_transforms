@@ -32,8 +32,7 @@ def get_and_validate_code_metadata_schema(code_metadata: pl.DataFrame, do_retype
         code_metadata: The code metadata DataFrame to validate.
 
     Returns:
-        pa.Schema: The validated schema of the code metadata DataFrame, with custom columns.
-        pl.DataFrame: The validated code metadata DataFrame, with columns re-typed as needed.
+        pa.Table: The validated code metadata DataFrame, with columns re-typed as needed.
 
     Raises:
         ValueError: if do_retype is False and the code metadata DataFrame is not schema compliant.
@@ -98,11 +97,9 @@ def get_and_validate_code_metadata_schema(code_metadata: pl.DataFrame, do_retype
     if additional_cols:
         extra_schema = code_metadata.head(1).select(additional_cols).to_arrow().schema
         code_metadata_properties = list(zip(extra_schema.names, extra_schema.types))
-        code_metadata = code_metadata.select(
-            *MEDS_METADATA_MANDATORY_TYPES.keys(),
-            *additional_cols,
-        )
+        code_metadata = code_metadata.select(*MEDS_METADATA_MANDATORY_TYPES.keys(), *additional_cols)
     else:
+        code_metadata = code_metadata.select(*MEDS_METADATA_MANDATORY_TYPES.keys())
         code_metadata_properties = []
 
     validated_schema = code_metadata_schema(code_metadata_properties)
@@ -113,11 +110,22 @@ def get_and_validate_code_metadata_schema(code_metadata: pl.DataFrame, do_retype
 def main(cfg: DictConfig):
     """Writes out schema compliant MEDS metadata files for the extracted dataset.
 
-    In particular, this script ensures that a compliant and accurate `metadata/codes.parquet` file exists that
-    has the mandatory columns `code` (string), `description` (string), `parent_codes` (list of strings);
-    that a `metadata/dataset.json` file exists that has the keys `dataset_name`, `dataset_version`,
-    `etl_name`, `etl_version`, and `meds_version`; and that a `metadata/patient_splits.parquet` file exists
-    that uses the mandatory columns `patient_id` (Int64) and `split` (string).
+    In particular, this script ensures that
+    (1) a compliant `metadata/codes.parquet` file exists that has the mandatory columns
+      - `code` (string)
+      - `description` (string)
+      - `parent_codes` (list of strings)
+    (2) a `metadata/dataset.json` file exists that has the keys
+      - `dataset_name` (string)
+      - `dataset_version` (string)
+      - `etl_name` (string)
+      - `etl_version` (string)
+      - `meds_version` (string)
+    (3) a `metadata/patient_splits.parquet` file exists that has the mandatory columns
+      - `patient_id` (Int64)
+      - `split` (string)
+
+    This stage *_should almost always be the last metadata stage in an extraction pipeline._*
 
     All arguments are specified through the command line into the `cfg` object through Hydra.
 
@@ -126,16 +134,12 @@ def main(cfg: DictConfig):
     directly on the command line, but can be overwritten implicitly by overwriting components of the
     `stage_configs.extract_code_metadata` key.
 
-    This stage has no stage-specific configuration arguments. For setting the dataset metadata, it relies on
-    the global `etl_metadata` key in the configuration file, which sets the following by default:
-    ```yaml
-    etl_metadata:
-      pipeline_name: ???
-      dataset_name: ???
-      dataset_version: ???
-      package_name: ${get_package_name}
-      package_version: ${get_package_version}
-    ```
+    Args:
+        stage_configs.finalize_MEDS_data.do_retype: Whether the script should throw an error or attempt to
+            cast columns to the correct type if they are not already of the correct type. Defaults to `True`.
+            May not work properly with other default aspects of the MEDS_Extract pipeline if set to `False`.
+        etl_metadata.dataset_name: The name of the dataset being extracted.
+        etl_metadata.dataset_version: The version of the dataset being extracted.
     """
 
     if cfg.worker != 0:
@@ -163,7 +167,7 @@ def main(cfg: DictConfig):
         logger.info(f"Reading code metadata from {str(input_code_metadata_fp.resolve())}")
         code_metadata = pl.read_parquet(input_code_metadata_fp, use_pyarrow=True)
         final_metadata_tbl = get_and_validate_code_metadata_schema(
-            code_metadata, do_retype=cfg.stage_cfg.do_retype_code_metadata
+            code_metadata, do_retype=cfg.stage_cfg.do_retype
         )
     else:
         logger.info(f"No code metadata found at {str(input_code_metadata_fp)}. Making empty metadata file.")

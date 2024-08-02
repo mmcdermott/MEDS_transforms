@@ -30,7 +30,7 @@ class METADATA_FN(StrEnum):
     shards into a single file.
 
     Note that, by design, these aggregations are all those that permit simple, single-variable reductions.
-    E.g., rather than tracking the mean and standard deviation of a numerical value, we track the sum of the
+    E.g., rather than tracking the mean and standard deviation of a numeric value, we track the sum of the
     values and the sum of the squares of the values. This is because the mean and standard deviation can be
     trivially calculated from these two values, but ``sum`` and ``sum_sqd`` both can be reduced with a simple
     summation operation across shards, whereas the mean and standard deviation would require a more complex
@@ -49,17 +49,17 @@ class METADATA_FN(StrEnum):
         "code/n_occurrences": Collects the total number of occurrences of the code & modifiers group across
             all observations for all patients.
         "values/n_patients": Collects the number of unique patients who have a non-null, non-nan
-            numerical_value field for the code & modifiers group.
-        "values/n_occurrences": Collects the total number of non-null, non-nan numerical_value occurrences for
+            numeric_value field for the code & modifiers group.
+        "values/n_occurrences": Collects the total number of non-null, non-nan numeric_value occurrences for
             the code & modifiers group across all observations for all patients.
-        "values/n_ints": Collects the number of times the observed, non-null numerical_value for the code &
+        "values/n_ints": Collects the number of times the observed, non-null numeric_value for the code &
             modifiers group is an integral value (i.e., a whole number, not an integral type).
-        "values/sum": Collects the sum of the non-null, non-nan numerical_value values for the code &
+        "values/sum": Collects the sum of the non-null, non-nan numeric_value values for the code &
             modifiers group.
-        "values/sum_sqd": Collects the sum of the squares of the non-null, non-nan numerical_value values for
+        "values/sum_sqd": Collects the sum of the squares of the non-null, non-nan numeric_value values for
             the code
-        "values/min": Collects the minimum non-null, non-nan numerical_value value for the code & modifiers
-        "values/max": Collects the maximum non-null, non-nan numerical_value value for the code & modifiers
+        "values/min": Collects the minimum non-null, non-nan numeric_value value for the code & modifiers
+        "values/max": Collects the maximum non-null, non-nan numeric_value value for the code & modifiers
     """
 
     CODE_N_PATIENTS = "code/n_patients"
@@ -97,8 +97,9 @@ class MapReducePair(NamedTuple):
     reducer: Callable[[pl.Expr | Sequence[pl.Expr] | cs._selector_proxy_], pl.Expr]
 
 
-VAL_PRESENT: pl.Expr = pl.col("numerical_value").is_not_null() & pl.col("numerical_value").is_not_nan()
-IS_INT: pl.Expr = pl.col("numerical_value").round() == pl.col("numerical_value")
+VAL = pl.col("numeric_value")
+VAL_PRESENT: pl.Expr = VAL.is_not_null() & VAL.is_not_nan()
+IS_INT: pl.Expr = VAL.round() == VAL
 
 CODE_METADATA_AGGREGATIONS: dict[METADATA_FN, MapReducePair] = {
     METADATA_FN.CODE_N_PATIENTS: MapReducePair(pl.col("patient_id").n_unique(), pl.sum_horizontal),
@@ -106,24 +107,12 @@ CODE_METADATA_AGGREGATIONS: dict[METADATA_FN, MapReducePair] = {
     METADATA_FN.VALUES_N_PATIENTS: MapReducePair(
         pl.col("patient_id").filter(VAL_PRESENT).n_unique(), pl.sum_horizontal
     ),
-    METADATA_FN.VALUES_N_OCCURRENCES: MapReducePair(
-        pl.col("numerical_value").filter(VAL_PRESENT).len(), pl.sum_horizontal
-    ),
-    METADATA_FN.VALUES_N_INTS: MapReducePair(
-        pl.col("numerical_value").filter(VAL_PRESENT & IS_INT).len(), pl.sum_horizontal
-    ),
-    METADATA_FN.VALUES_SUM: MapReducePair(
-        pl.col("numerical_value").filter(VAL_PRESENT).sum(), pl.sum_horizontal
-    ),
-    METADATA_FN.VALUES_SUM_SQD: MapReducePair(
-        (pl.col("numerical_value").filter(VAL_PRESENT) ** 2).sum(), pl.sum_horizontal
-    ),
-    METADATA_FN.VALUES_MIN: MapReducePair(
-        pl.col("numerical_value").filter(VAL_PRESENT).min(), pl.min_horizontal
-    ),
-    METADATA_FN.VALUES_MAX: MapReducePair(
-        pl.col("numerical_value").filter(VAL_PRESENT).max(), pl.max_horizontal
-    ),
+    METADATA_FN.VALUES_N_OCCURRENCES: MapReducePair(VAL.filter(VAL_PRESENT).len(), pl.sum_horizontal),
+    METADATA_FN.VALUES_N_INTS: MapReducePair(VAL.filter(VAL_PRESENT & IS_INT).len(), pl.sum_horizontal),
+    METADATA_FN.VALUES_SUM: MapReducePair(VAL.filter(VAL_PRESENT).sum(), pl.sum_horizontal),
+    METADATA_FN.VALUES_SUM_SQD: MapReducePair((VAL.filter(VAL_PRESENT) ** 2).sum(), pl.sum_horizontal),
+    METADATA_FN.VALUES_MIN: MapReducePair(VAL.filter(VAL_PRESENT).min(), pl.min_horizontal),
+    METADATA_FN.VALUES_MAX: MapReducePair(VAL.filter(VAL_PRESENT).max(), pl.max_horizontal),
 }
 
 
@@ -232,25 +221,25 @@ def mapper_fntr(
         ...     "modifier1":        [1,   2,   1,   2,   1,   2,   1,   2,            None],
         ...     "modifier_ignored": [3,   3,   4,   4,   5,   5,   6,   6,            7],
         ...     "patient_id":       [1,   2,   1,   3,   1,   2,   2,   2,            1],
-        ...     "numerical_value":  [1.1, 2.,  1.1, 4.,  5.,  6.,  7.5, float('nan'), None],
+        ...     "numeric_value":    [1.1, 2.,  1.1, 4.,  5.,  6.,  7.5, float('nan'), None],
         ... })
         >>> df
         shape: (9, 5)
-        ┌──────┬───────────┬──────────────────┬────────────┬─────────────────┐
-        │ code ┆ modifier1 ┆ modifier_ignored ┆ patient_id ┆ numerical_value │
-        │ ---  ┆ ---       ┆ ---              ┆ ---        ┆ ---             │
-        │ str  ┆ i64       ┆ i64              ┆ i64        ┆ f64             │
-        ╞══════╪═══════════╪══════════════════╪════════════╪═════════════════╡
-        │ A    ┆ 1         ┆ 3                ┆ 1          ┆ 1.1             │
-        │ B    ┆ 2         ┆ 3                ┆ 2          ┆ 2.0             │
-        │ A    ┆ 1         ┆ 4                ┆ 1          ┆ 1.1             │
-        │ B    ┆ 2         ┆ 4                ┆ 3          ┆ 4.0             │
-        │ C    ┆ 1         ┆ 5                ┆ 1          ┆ 5.0             │
-        │ A    ┆ 2         ┆ 5                ┆ 2          ┆ 6.0             │
-        │ C    ┆ 1         ┆ 6                ┆ 2          ┆ 7.5             │
-        │ B    ┆ 2         ┆ 6                ┆ 2          ┆ NaN             │
-        │ D    ┆ null      ┆ 7                ┆ 1          ┆ null            │
-        └──────┴───────────┴──────────────────┴────────────┴─────────────────┘
+        ┌──────┬───────────┬──────────────────┬────────────┬───────────────┐
+        │ code ┆ modifier1 ┆ modifier_ignored ┆ patient_id ┆ numeric_value │
+        │ ---  ┆ ---       ┆ ---              ┆ ---        ┆ ---           │
+        │ str  ┆ i64       ┆ i64              ┆ i64        ┆ f64           │
+        ╞══════╪═══════════╪══════════════════╪════════════╪═══════════════╡
+        │ A    ┆ 1         ┆ 3                ┆ 1          ┆ 1.1           │
+        │ B    ┆ 2         ┆ 3                ┆ 2          ┆ 2.0           │
+        │ A    ┆ 1         ┆ 4                ┆ 1          ┆ 1.1           │
+        │ B    ┆ 2         ┆ 4                ┆ 3          ┆ 4.0           │
+        │ C    ┆ 1         ┆ 5                ┆ 1          ┆ 5.0           │
+        │ A    ┆ 2         ┆ 5                ┆ 2          ┆ 6.0           │
+        │ C    ┆ 1         ┆ 6                ┆ 2          ┆ 7.5           │
+        │ B    ┆ 2         ┆ 6                ┆ 2          ┆ NaN           │
+        │ D    ┆ null      ┆ 7                ┆ 1          ┆ null          │
+        └──────┴───────────┴──────────────────┴────────────┴───────────────┘
         >>> stage_cfg = DictConfig({
         ...     "aggregations": ["code/n_patients", "values/n_ints"],
         ...     "do_summarize_over_all_codes": True

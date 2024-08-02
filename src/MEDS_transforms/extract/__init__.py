@@ -8,7 +8,14 @@ CONFIG_YAML = EXTRACT_CONFIG_YAML
 
 # TODO(mmd): This should really somehow be pulled from MEDS.
 MEDS_METADATA_MANDATORY_TYPES = {
-    "code": pl.Utf8,
-    "description": pl.Utf8,
-    "parent_codes": pl.List(pl.Utf8),
+    "code": pl.String,
+    "description": pl.String,
+    "parent_codes": pl.List(pl.String),
+}
+
+MEDS_DATA_MANDATORY_TYPES = {
+    "patient_id": pl.Int64,
+    "time": pl.Datetime("us"),
+    "code": pl.String,
+    "numeric_value": pl.Float32,
 }

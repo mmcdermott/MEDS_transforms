@@ -14,7 +14,7 @@ from .transform_tester_base import TENSORIZATION_SCRIPT, single_stage_transform_
 
 WANT_NRTS = {
     k.replace("event_seqs/", ""): JointNestedRaggedTensorDict(
-        v.select("time_delta_days", "code", "numerical_value").to_dict(as_series=False)
+        v.select("time_delta_days", "code", "numeric_value").to_dict(as_series=False)
     )
     for k, v in TOKENIZED_SHARDS.items()
 }

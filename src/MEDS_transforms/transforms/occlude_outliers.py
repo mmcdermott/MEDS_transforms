@@ -39,22 +39,22 @@ def occlude_outliers_fntr(
         ...     "modifier1":       [1,   1,   2,   2],
         ... # for clarity: mean    [0.0, 4.0, 4.0, 1.0]
         ... # for clarity: stddev  [3.0, 3.0, 0.0, 1.0]
-        ...     "numerical_value": [15., 16., 3.9, 1.0],
+        ...     "numeric_value": [15., 16., 3.9, 1.0],
         ... }).lazy()
         >>> stage_cfg = DictConfig({"stddev_cutoff": 4.5})
         >>> fn = occlude_outliers_fntr(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (4, 5)
-        ┌────────────┬──────┬───────────┬─────────────────┬───────────────────────────┐
-        │ patient_id ┆ code ┆ modifier1 ┆ numerical_value ┆ numerical_value/is_inlier │
-        │ ---        ┆ ---  ┆ ---       ┆ ---             ┆ ---                       │
-        │ i64        ┆ str  ┆ i64       ┆ f64             ┆ bool                      │
-        ╞════════════╪══════╪═══════════╪═════════════════╪═══════════════════════════╡
-        │ 1          ┆ A    ┆ 1         ┆ null            ┆ false                     │
-        │ 1          ┆ B    ┆ 1         ┆ 16.0            ┆ true                      │
-        │ 2          ┆ A    ┆ 2         ┆ null            ┆ false                     │
-        │ 2          ┆ C    ┆ 2         ┆ 1.0             ┆ true                      │
-        └────────────┴──────┴───────────┴─────────────────┴───────────────────────────┘
+        ┌────────────┬──────┬───────────┬───────────────┬─────────────────────────┐
+        │ patient_id ┆ code ┆ modifier1 ┆ numeric_value ┆ numeric_value/is_inlier │
+        │ ---        ┆ ---  ┆ ---       ┆ ---           ┆ ---                     │
+        │ i64        ┆ str  ┆ i64       ┆ f64           ┆ bool                    │
+        ╞════════════╪══════╪═══════════╪═══════════════╪═════════════════════════╡
+        │ 1          ┆ A    ┆ 1         ┆ null          ┆ false                   │
+        │ 1          ┆ B    ┆ 1         ┆ 16.0          ┆ true                    │
+        │ 2          ┆ A    ┆ 2         ┆ null          ┆ false                   │
+        │ 2          ┆ C    ┆ 2         ┆ 1.0           ┆ true                    │
+        └────────────┴──────┴───────────┴───────────────┴─────────────────────────┘
     """
 
     stddev_cutoff = stage_cfg.get("stddev_cutoff", None)
@@ -79,13 +79,13 @@ def occlude_outliers_fntr(
     code_metadata = code_metadata.lazy().select(cols_to_select)
 
     def occlude_outliers_fn(df: pl.LazyFrame) -> pl.LazyFrame:
-        f"""Filters out outlier numerical values from patient events.
+        f"""Filters out outlier numeric values from patient events.
 
-        In particular, this function filters the DataFrame to only include numerical values that are within
+        In particular, this function filters the DataFrame to only include numeric values that are within
         {stddev_cutoff} standard deviations of the mean for the corresponding (code, modifier) pair.
         """
 
-        val = pl.col("numerical_value")
+        val = pl.col("numeric_value")
         mean = pl.col("values/mean")
         stddev = pl.col("values/std")
         filter_expr = (val - mean).abs() <= stddev_cutoff * stddev
@@ -93,8 +93,8 @@ def occlude_outliers_fntr(
         return (
             df.join(code_metadata, on=join_cols, how="left", coalesce=True)
             .with_columns(
-                filter_expr.alias("numerical_value/is_inlier"),
-                pl.when(filter_expr).then(pl.col("numerical_value")).alias("numerical_value"),
+                filter_expr.alias("numeric_value/is_inlier"),
+                pl.when(filter_expr).then(pl.col("numeric_value")).alias("numeric_value"),
             )
             .drop("values/mean", "values/std")
         )
