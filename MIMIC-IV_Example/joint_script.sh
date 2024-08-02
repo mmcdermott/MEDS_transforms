@@ -83,7 +83,7 @@ MEDS_extract-merge_to_MEDS_cohort \
     hydra/launcher=joblib \
     input_dir="$MIMICIV_PREMEDS_DIR" \
     cohort_dir="$MIMICIV_MEDS_DIR" \
-    stage="merge_to_MEDS_cohort"
+    stage="merge_to_MEDS_cohort" \
     etl_metadata.dataset_name="MIMIC-IV" \
     etl_metadata.dataset_version="2.2" \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
@@ -96,7 +96,7 @@ MEDS_transform-aggregate_code_metadata \
     hydra/launcher=joblib \
     input_dir="$MIMICIV_PREMEDS_DIR" \
     cohort_dir="$MIMICIV_MEDS_DIR" \
-    stage="aggregate_code_metadata"
+    stage="aggregate_code_metadata" \
     etl_metadata.dataset_name="MIMIC-IV" \
     etl_metadata.dataset_version="2.2" \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
