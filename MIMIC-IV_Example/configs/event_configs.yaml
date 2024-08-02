@@ -2,19 +2,19 @@ patient_id_col: subject_id
 hosp/admissions:
   ed_registration:
     code: ED_REGISTRATION
-    timestamp: col(edregtime)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    time: col(edregtime)
+    time_format: "%Y-%m-%d %H:%M:%S"
   ed_out:
     code: ED_OUT
-    timestamp: col(edouttime)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    time: col(edouttime)
+    time_format: "%Y-%m-%d %H:%M:%S"
   admission:
     code:
       - HOSPITAL_ADMISSION
       - col(admission_type)
       - col(admission_location)
-    timestamp: col(admittime)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    time: col(admittime)
+    time_format: "%Y-%m-%d %H:%M:%S"
     insurance: insurance
     language: language
     marital_status: marital_status
@@ -24,16 +24,10 @@ hosp/admissions:
     code:
       - HOSPITAL_DISCHARGE
       - col(discharge_location)
-    timestamp: col(dischtime)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    time: col(dischtime)
+    time_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
   # We omit the death event here as it is joined to the data in the patients table in the pre-MEDS step.
-  #death:
-  #  code: DEATH
-  #  timestamp: col(deathtime)
-  #  timestamp_format: "%Y-%m-%d %H:%M:%S"
-  #  death_location: death_location
-  #  death_type: death_type
 
 hosp/diagnoses_icd:
   diagnosis:
@@ -43,12 +37,12 @@ hosp/diagnoses_icd:
       - col(icd_version)
       - col(icd_code)
     hadm_id: hadm_id
-    timestamp: col(hadm_discharge_time)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    time: col(hadm_discharge_time)
+    time_format: "%Y-%m-%d %H:%M:%S"
     _metadata:
       hosp/d_icd_diagnoses:
         description: "long_title"
-        parent_code: "ICD{icd_version}CM/{icd_code}" # Single strings are templates of columns.
+        parent_codes: "ICD{icd_version}CM/{icd_code}" # Single strings are templates of columns.
 
 hosp/drgcodes:
   drg:
@@ -58,8 +52,8 @@ hosp/drgcodes:
       - col(drg_code)
       - col(description)
     hadm_id: hadm_id
-    timestamp: col(hadm_discharge_time)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    time: col(hadm_discharge_time)
+    time_format: "%Y-%m-%d %H:%M:%S"
     drg_severity: drg_severity
     drg_mortality: drg_mortality
 
@@ -69,8 +63,8 @@ hosp/emar:
       - MEDICATION
       - col(medication)
       - col(event_txt)
-    timestamp: col(charttime)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    time: col(charttime)
+    time_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
     emar_id: emar_id
     emar_seq: emar_seq
@@ -81,8 +75,8 @@ hosp/hcpcsevents:
       - HCPCS
       - col(short_description)
     hadm_id: hadm_id
-    timestamp: col(chartdate)
-    timestamp_format: "%Y-%m-%d"
+    time: col(chartdate)
+    time_format: "%Y-%m-%d"
     _metadata:
       # These are not all CPT codes, unfortunately
       hosp/d_hcpcs:
@@ -96,38 +90,38 @@ hosp/labevents:
       - col(itemid)
       - col(valueuom)
     hadm_id: hadm_id
-    timestamp: col(charttime)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
-    numerical_value: valuenum
+    time: col(charttime)
+    time_format: "%Y-%m-%d %H:%M:%S"
+    numeric_value: valuenum
     text_value: value
     priority: priority
     _metadata:
       d_labitems_to_loinc:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
-        parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
 
 hosp/omr:
   omr:
     code: col(result_name)
     text_value: col(result_value)
-    timestamp: col(chartdate)
-    timestamp_format: "%Y-%m-%d"
+    time: col(chartdate)
+    time_format: "%Y-%m-%d"
 
 hosp/patients:
   gender:
     code:
       - GENDER
       - col(gender)
-    timestamp: null
+    time: null
   dob:
-    code: DOB
-    timestamp: col(year_of_birth)
-    timestamp_format: "%Y"
+    code: MEDS_BIRTH # This is the MEDS official code for birth.
+    time: col(year_of_birth)
+    time_format: "%Y"
   death:
-    code: DEATH
-    timestamp: col(dod)
-    timestamp_format:
+    code: MEDS_DEATH # This is the MEDS official code for death.
+    time: col(dod)
+    time_format:
       - "%Y-%m-%d %H:%M:%S"
       - "%Y-%m-%d"
 
@@ -137,12 +131,12 @@ hosp/pharmacy:
       - MEDICATION
       - START
       - col(medication)
-    timestamp: col(starttime)
+    time: col(starttime)
     route: route
     frequency: frequency
     doses_per_24_hrs: doses_per_24_hrs
     poe_id: poe_id
-    timestamp_format:
+    time_format:
       - "%Y-%m-%d %H:%M:%S"
       - "%Y-%m-%d"
   medication_stop:
@@ -150,9 +144,9 @@ hosp/pharmacy:
       - MEDICATION
       - STOP
       - col(medication)
-    timestamp: col(stoptime)
+    time: col(stoptime)
     poe_id: poe_id
-    timestamp_format:
+    time_format:
       - "%Y-%m-%d %H:%M:%S"
       - "%Y-%m-%d"
 
@@ -164,12 +158,12 @@ hosp/procedures_icd:
       - col(icd_version)
       - col(icd_code)
     hadm_id: hadm_id
-    timestamp: col(chartdate)
-    timestamp_format: "%Y-%m-%d"
+    time: col(chartdate)
+    time_format: "%Y-%m-%d"
     _metadata:
       hosp/d_icd_procedures:
         description: "long_title"
-        parent_code: # List of objects are string labels mapping to filters to be evaluated.
+        parent_codes: # List of objects are string labels mapping to filters to be evaluated.
           - "ICD{icd_version}Proc/{icd_code}": { icd_version: 9 }
           - "ICD{icd_version}PCS/{icd_code}": { icd_version: 10 }
 
@@ -179,8 +173,8 @@ hosp/transfers:
       - TRANSFER_TO
       - col(eventtype)
       - col(careunit)
-    timestamp: col(intime)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    time: col(intime)
+    time_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
 
 icu/icustays:
@@ -188,16 +182,16 @@ icu/icustays:
     code:
       - ICU_ADMISSION
       - col(first_careunit)
-    timestamp: col(intime)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    time: col(intime)
+    time_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
     icustay_id: stay_id
   icu_discharge:
     code:
       - ICU_DISCHARGE
       - col(last_careunit)
-    timestamp: col(outtime)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    time: col(outtime)
+    time_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
     icustay_id: stay_id
 
@@ -207,9 +201,9 @@ icu/chartevents:
       - LAB
       - col(itemid)
       - col(valueuom)
-    timestamp: col(charttime)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
-    numerical_value: valuenum
+    time: col(charttime)
+    time_format: "%Y-%m-%d %H:%M:%S"
+    numeric_value: valuenum
     text_value: value
     hadm_id: hadm_id
     icustay_id: stay_id
@@ -218,12 +212,12 @@ icu/chartevents:
       #meas_chartevents_main:
       #  description: ["omop_concept_name", "label"] # List of strings are columns to be collated
       #  itemid: "itemid (omop_source_code)"
-      #  parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
+      #  parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
       # TODO: I don't know if this is necessary...
       d_labitems_to_loinc:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
-        parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
 
 icu/procedureevents:
   start:
@@ -231,89 +225,86 @@ icu/procedureevents:
       - PROCEDURE
       - START
       - col(itemid)
-    timestamp: col(starttime)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    time: col(starttime)
+    time_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
     icustay_id: stay_id
     _metadata:
       proc_datetimeevents:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
-        parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
       proc_itemid:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
-        parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
   end:
     code:
       - PROCEDURE
       - END
       - col(itemid)
-    timestamp: col(endtime)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    time: col(endtime)
+    time_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
     icustay_id: stay_id
     _metadata:
       proc_datetimeevents:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
-        parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
       proc_itemid:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
-        parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
 
 icu/inputevents:
   input_start:
     code:
       - INFUSION_START
-      - col(ordercategorydescription)
       - col(itemid)
-      - col(rateuom)
-    timestamp: col(starttime)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    time: col(starttime)
+    time_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
     icustay_id: stay_id
     order_id: orderid
     link_order_id: linkorderid
-    numerical_value:
-      rate
-      #_metadata:
-      # TODO: get this working with null columns
-      #inputevents_to_rxnorm:
-      #  description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-      #  itemid: "itemid (omop_source_code)"
-      #  parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
-      #  rateuom: null # A null column means this column is needed in pulling from the metadata.
+    numeric_value: rate
+    unit: rateuom
+    ordercategorydescription: ordercategorydescription
+    _metadata:
+      inputevents_to_rxnorm:
+        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
+        itemid: "itemid (omop_source_code)"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        rateuom: null # A null column means this column is needed in pulling from the metadata.
   input_end:
     code:
       - INFUSION_END
-      - col(ordercategorydescription)
       - col(itemid)
-      - col(amountuom)
-      - col(statusdescription)
-    timestamp: col(endtime)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    time: col(endtime)
+    time_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
     icustay_id: stay_id
     order_id: orderid
     link_order_id: linkorderid
-    numerical_value:
-      amount
-      #_metadata:
-      #  inputevents_to_rxnorm:
-      #    description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-      #    itemid: "itemid (omop_source_code)"
-      #    parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
-      #    statusdescription: null
-      #    amountuom: null
+    numeric_value: amount
+    ordercategorydescription: ordercategorydescription
+    statusdescription: statusdescription
+    unit: amountuom
+    _metadata:
+      inputevents_to_rxnorm:
+        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
+        itemid: "itemid (omop_source_code)"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        statusdescription: null
+        amountuom: null
   patient_weight:
     code:
       - PATIENT_WEIGHT_AT_INFUSION
       - KG
-    timestamp: col(starttime)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
-    numerical_value: patientweight
+    time: col(starttime)
+    time_format: "%Y-%m-%d %H:%M:%S"
+    numeric_value: patientweight
 
 icu/outputevents:
   output:
@@ -321,14 +312,14 @@ icu/outputevents:
       - PATIENT_FLUID_OUTPUT
       - col(itemid)
       - col(valueuom)
-    timestamp: col(charttime)
-    timestamp_format: "%Y-%m-%d %H:%M:%S"
+    time: col(charttime)
+    time_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
     icustay_id: stay_id
-    numerical_value: value
+    numeric_value: value
     _metadata:
       outputevents_to_loinc:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
         valueuom: "unitname"
-        parent_code: "{omop_vocabulary_id}/{omop_concept_code}"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"

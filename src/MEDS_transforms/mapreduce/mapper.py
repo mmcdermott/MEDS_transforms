@@ -24,6 +24,14 @@ def identity_fn(df: Any) -> Any:
     return df
 
 
+def read_and_filter_fntr(patients: list[int], read_fn: Callable[[Path], DF_T]) -> Callable[[Path], DF_T]:
+    def read_and_filter(in_fp: Path) -> DF_T:
+        df = read_fn(in_fp)
+        return df.filter(pl.col("patient_id").isin(patients))
+
+    return read_and_filter
+
+
 def map_over(
     cfg: DictConfig,
     compute_fn: MAP_FN_T | None = None,
@@ -40,6 +48,28 @@ def map_over(
 
     if not isinstance(compute_fn, tuple):
         compute_fn = (compute_fn,)
+
+    process_split = cfg.stage_cfg.get("process_split", None)
+    split_fp = Path(cfg.input_dir) / "metadata" / "patient_split.parquet"
+    shards_map_fp = Path(cfg.shards_map_fp) if "shards_map_fp" in cfg else None
+    if process_split and split_fp.exists():
+        split_patients = (
+            pl.scan_parquet(split_fp)
+            .filter(pl.col("split") == process_split)
+            .select(pl.col("patient_id"))
+            .collect()
+            .to_list()
+        )
+        read_fn = read_and_filter_fntr(split_patients, read_fn)
+    elif process_split and shards_map_fp and shards_map_fp.exists():
+        logger.warning(
+            f"Split {process_split} requested, but no patient split file found at {str(split_fp)}. "
+            f"Assuming this is handled through shard filtering."
+        )
+    elif process_split:
+        raise ValueError(
+            f"Split {process_split} requested, but no patient split file found at {str(split_fp)}."
+        )
 
     all_out_fps = []
     for in_fp, out_fp in shard_iterator_fntr(cfg):

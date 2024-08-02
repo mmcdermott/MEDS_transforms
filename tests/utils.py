@@ -10,9 +10,9 @@ DEFAULT_CSV_TS_FORMAT = "%m/%d/%Y, %H:%M:%S"
 # TODO: Make use meds library
 MEDS_PL_SCHEMA = {
     "patient_id": pl.UInt32,
-    "timestamp": pl.Datetime("us"),
-    "code": pl.Categorical,
-    "numerical_value": pl.Float64,
+    "time": pl.Datetime("us"),
+    "code": pl.Utf8,
+    "numeric_value": pl.Float64,
 }
 
 
@@ -25,11 +25,11 @@ def parse_meds_csvs(
     """
 
     read_schema = {**schema}
-    read_schema["timestamp"] = pl.Utf8
+    read_schema["time"] = pl.Utf8
 
     def reader(csv_str: str) -> pl.DataFrame:
         return pl.read_csv(StringIO(csv_str), schema=read_schema).with_columns(
-            pl.col("timestamp").str.strptime(MEDS_PL_SCHEMA["timestamp"], DEFAULT_CSV_TS_FORMAT)
+            pl.col("time").str.strptime(MEDS_PL_SCHEMA["time"], DEFAULT_CSV_TS_FORMAT)
         )
 
     if isinstance(csvs, str):

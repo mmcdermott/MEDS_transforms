@@ -20,6 +20,8 @@ if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
     MERGE_TO_MEDS_COHORT_SCRIPT = extraction_root / "merge_to_MEDS_cohort.py"
     AGGREGATE_CODE_METADATA_SCRIPT = code_root / "aggregate_code_metadata.py"
     EXTRACT_CODE_METADATA_SCRIPT = extraction_root / "extract_code_metadata.py"
+    FINALIZE_DATA_SCRIPT = extraction_root / "finalize_MEDS_data.py"
+    FINALIZE_METADATA_SCRIPT = extraction_root / "finalize_MEDS_metadata.py"
 else:
     SHARD_EVENTS_SCRIPT = "MEDS_extract-shard_events"
     SPLIT_AND_SHARD_SCRIPT = "MEDS_extract-split_and_shard_patients"
@@ -27,6 +29,8 @@ else:
     MERGE_TO_MEDS_COHORT_SCRIPT = "MEDS_extract-merge_to_MEDS_cohort"
     AGGREGATE_CODE_METADATA_SCRIPT = "MEDS_transform-aggregate_code_metadata"
     EXTRACT_CODE_METADATA_SCRIPT = "MEDS_extract-extract_code_metadata"
+    FINALIZE_DATA_SCRIPT = "MEDS_extract-finalize_MEDS_data"
+    FINALIZE_METADATA_SCRIPT = "MEDS_extract-finalize_MEDS_metadata"
 
 import json
 import tempfile
@@ -34,10 +38,9 @@ from io import StringIO
 from pathlib import Path
 
 import polars as pl
+from meds import __version__ as MEDS_VERSION
 
 from .utils import assert_df_equal, run_command
-
-pl.enable_string_cache()
 
 # Test data (inputs)
 
@@ -92,47 +95,47 @@ subjects:
     code:
       - EYE_COLOR
       - col(eye_color)
-    timestamp: null
+    time: null
     _metadata:
       demo_metadata:
         description: description
   height:
     code: HEIGHT
-    timestamp: null
-    numerical_value: height
+    time: null
+    numeric_value: height
   dob:
     code: DOB
-    timestamp: col(dob)
-    timestamp_format: "%m/%d/%Y"
+    time: col(dob)
+    time_format: "%m/%d/%Y"
 admit_vitals:
   admissions:
     code:
       - ADMISSION
       - col(department)
-    timestamp: col(admit_date)
-    timestamp_format: "%m/%d/%Y, %H:%M:%S"
+    time: col(admit_date)
+    time_format: "%m/%d/%Y, %H:%M:%S"
   discharge:
     code: DISCHARGE
-    timestamp: col(disch_date)
-    timestamp_format: "%m/%d/%Y, %H:%M:%S"
+    time: col(disch_date)
+    time_format: "%m/%d/%Y, %H:%M:%S"
   HR:
     code: HR
-    timestamp: col(vitals_date)
-    timestamp_format: "%m/%d/%Y, %H:%M:%S"
-    numerical_value: HR
+    time: col(vitals_date)
+    time_format: "%m/%d/%Y, %H:%M:%S"
+    numeric_value: HR
     _metadata:
       input_metadata:
         description: {"title": {"lab_code": "HR"}}
-        parent_code: {"LOINC/{loinc}": {"lab_code": "HR"}}
+        parent_codes: {"LOINC/{loinc}": {"lab_code": "HR"}}
   temp:
     code: TEMP
-    timestamp: col(vitals_date)
-    timestamp_format: "%m/%d/%Y, %H:%M:%S"
-    numerical_value: temp
+    time: col(vitals_date)
+    time_format: "%m/%d/%Y, %H:%M:%S"
+    numeric_value: temp
     _metadata:
       input_metadata:
         description: {"title": {"lab_code": "temp"}}
-        parent_code: {"LOINC/{loinc}": {"lab_code": "temp"}}
+        parent_codes: {"LOINC/{loinc}": {"lab_code": "temp"}}
 """
 
 # Test data (expected outputs) -- ALL OF THIS MAY CHANGE IF THE SEED OR DATA CHANGES
@@ -143,22 +146,29 @@ EXPECTED_SPLITS = {
     "held_out/0": [1500733],
 }
 
+PATIENT_SPLITS_DF = pl.DataFrame(
+    {
+        "patient_id": [239684, 1195293, 68729, 814703, 754281, 1500733],
+        "split": ["train", "train", "train", "train", "tuning", "held_out"],
+    }
+)
+
 
 def get_expected_output(df: str) -> pl.DataFrame:
     return (
         pl.read_csv(source=StringIO(df))
         .select(
             "patient_id",
-            pl.col("timestamp").str.strptime(pl.Datetime, "%m/%d/%Y, %H:%M:%S").alias("timestamp"),
-            pl.col("code").cast(pl.Categorical),
-            "numerical_value",
+            pl.col("time").str.strptime(pl.Datetime, "%m/%d/%Y, %H:%M:%S").alias("time"),
+            pl.col("code"),
+            "numeric_value",
         )
-        .sort(by=["patient_id", "timestamp"])
+        .sort(by=["patient_id", "time"])
     )
 
 
 MEDS_OUTPUT_TRAIN_0_SUBJECTS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 239684,,EYE_COLOR//BROWN,
 239684,,HEIGHT,175.271115221764
 239684,"12/28/1980, 00:00:00",DOB,
@@ -168,7 +178,7 @@ patient_id,timestamp,code,numerical_value
 """
 
 MEDS_OUTPUT_TRAIN_0_ADMIT_VITALS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 239684,"05/11/2010, 17:41:51",ADMISSION//CARDIAC,
 239684,"05/11/2010, 17:41:51",HR,102.6
 239684,"05/11/2010, 17:41:51",TEMP,96.0
@@ -196,7 +206,7 @@ patient_id,timestamp,code,numerical_value
 """
 
 MEDS_OUTPUT_TRAIN_1_SUBJECTS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 68729,,EYE_COLOR//HAZEL,
 68729,,HEIGHT,160.3953106166676
 68729,"03/09/1978, 00:00:00",DOB,
@@ -206,7 +216,7 @@ patient_id,timestamp,code,numerical_value
 """
 
 MEDS_OUTPUT_TRAIN_1_ADMIT_VITALS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 68729,"05/26/2010, 02:30:56",ADMISSION//PULMONARY,
 68729,"05/26/2010, 02:30:56",HR,86.0
 68729,"05/26/2010, 02:30:56",TEMP,97.8
@@ -218,14 +228,14 @@ patient_id,timestamp,code,numerical_value
 """
 
 MEDS_OUTPUT_TUNING_0_SUBJECTS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 754281,,EYE_COLOR//BROWN,
 754281,,HEIGHT,166.22261567137025
 754281,"12/19/1988, 00:00:00",DOB,
 """
 
 MEDS_OUTPUT_TUNING_0_ADMIT_VITALS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 754281,"01/03/2010, 06:27:59",ADMISSION//PULMONARY,
 754281,"01/03/2010, 06:27:59",HR,142.0
 754281,"01/03/2010, 06:27:59",TEMP,99.8
@@ -233,14 +243,14 @@ patient_id,timestamp,code,numerical_value
 """
 
 MEDS_OUTPUT_HELD_OUT_0_SUBJECTS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 1500733,,EYE_COLOR//BROWN,
 1500733,,HEIGHT,158.60131573580904
 1500733,"07/20/1986, 00:00:00",DOB,
 """
 
 MEDS_OUTPUT_HELD_OUT_0_ADMIT_VITALS = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 1500733,"06/03/2010, 14:54:38",ADMISSION//ORTHOPEDIC,
 1500733,"06/03/2010, 14:54:38",HR,91.4
 1500733,"06/03/2010, 14:54:38",TEMP,100.0
@@ -268,7 +278,7 @@ TEMP,12,4,12,1181.4999999999998,116373.38999999998
 """
 
 MEDS_OUTPUT_CODE_METADATA_FILE_WITH_DESC = """
-code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,description,parent_code
+code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,description,parent_codes
 ,44,4,28,3198.8389005974336,382968.28937288234,,
 ADMISSION//CARDIAC,2,2,0,,,,
 ADMISSION//ORTHOPEDIC,1,1,0,,,,
@@ -282,6 +292,14 @@ HEIGHT,4,4,4,656.8389005974336,108056.12937288235,,
 HR,12,4,12,1360.5000000000002,158538.77,"Heart Rate",LOINC/8867-4
 TEMP,12,4,12,1181.4999999999998,116373.38999999998,"Body Temperature",LOINC/8310-5
 """
+
+MEDS_OUTPUT_DATASET_METADATA_JSON = {
+    "dataset_name": "TEST",
+    "dataset_version": "1.0",
+    "etl_name": "MEDS_transforms",
+    # "etl_version": None,  # We don't test this as it changes with the commits.
+    "meds_version": MEDS_VERSION,
+}
 
 SUB_SHARDED_OUTPUTS = {
     "train/0": {
@@ -359,12 +377,14 @@ def test_extraction():
             "stage_configs.shard_events.row_chunksize": 10,
             "stage_configs.split_and_shard_patients.n_patients_per_shard": 2,
             "hydra.verbose": True,
+            "etl_metadata.dataset_name": "TEST",
+            "etl_metadata.dataset_version": "1.0",
         }
 
         all_stderrs = []
         all_stdouts = []
 
-        # Step 1: Sub-shard the data
+        # Stage 1: Sub-shard the data
         stderr, stdout = run_command(SHARD_EVENTS_SCRIPT, extraction_config_kwargs, "shard_events")
 
         all_stderrs.append(stderr)
@@ -410,14 +430,7 @@ def test_extraction():
             check_row_order=False,
         )
 
-        # Step 2: Collect the patient splits
-        # stderr, stdout = run_command(
-        #     "MEDS_extract_shard_patients",
-        #     {**extraction_config_kwargs, "stage":"split_and_shard_patients"},
-        #     "split_and_shard_patients",
-        # )
-
-        # Step 2: Collect the patient splits
+        # Stage 2: Collect the patient splits
         stderr, stdout = run_command(
             SPLIT_AND_SHARD_SCRIPT,
             extraction_config_kwargs,
@@ -452,7 +465,7 @@ def test_extraction():
             print(f"stdout:\n{stdout}")
             raise e
 
-        # Step 3: Extract the events and sub-shard by patient
+        # Stage 3: Extract the events and sub-shard by patient
         stderr, stdout = run_command(
             CONVERT_TO_SHARDED_EVENTS_SCRIPT,
             extraction_config_kwargs,
@@ -490,11 +503,11 @@ def test_extraction():
                     print(f"stdout:\n{stdout}")
                     raise e
 
-        # Step 4: Merge to the final output
+        # Stage 4: Merge to the final output
         stderr, stdout = run_command(
             MERGE_TO_MEDS_COHORT_SCRIPT,
             extraction_config_kwargs,
-            "merge_sharded_events",
+            "merge_to_MEDS_cohort",
         )
         all_stderrs.append(stderr)
         all_stdouts.append(stdout)
@@ -503,13 +516,135 @@ def test_extraction():
         full_stdout = "\n".join(all_stdouts)
 
         # Check the final output
-        output_folder = MEDS_cohort_dir / "final_cohort"
+        output_folder = MEDS_cohort_dir / "merge_to_MEDS_cohort"
         try:
             for split, expected_df_L in MEDS_OUTPUTS.items():
                 if not isinstance(expected_df_L, list):
                     expected_df_L = [expected_df_L]
 
                 expected_df = pl.concat([get_expected_output(df) for df in expected_df_L])
+
+                fp = output_folder / f"{split}.parquet"
+                assert fp.is_file(), f"Expected {fp} to exist.\nstderr:\n{stderr}\nstdout:\n{stdout}"
+
+                got_df = pl.read_parquet(fp, glob=False)
+                assert_df_equal(
+                    expected_df,
+                    got_df,
+                    f"Expected output for split {split} to be equal to the expected output.",
+                    check_column_order=False,
+                    check_row_order=False,
+                )
+
+                assert got_df["patient_id"].is_sorted(), f"Patient IDs should be sorted for split {split}."
+                for subj in splits[split]:
+                    got_df_subj = got_df.filter(pl.col("patient_id") == subj)
+                    assert got_df_subj[
+                        "time"
+                    ].is_sorted(), f"Times should be sorted for patient {subj} in split {split}."
+
+        except AssertionError as e:
+            print(f"Failed on split {split}")
+            print(f"stderr:\n{full_stderr}")
+            print(f"stdout:\n{full_stdout}")
+            raise e
+
+        # Stage 5: Aggregate preliminary code metadata
+        stderr, stdout = run_command(
+            AGGREGATE_CODE_METADATA_SCRIPT,
+            extraction_config_kwargs,
+            "aggregate_code_metadata",
+            config_name="extract",
+        )
+        all_stderrs.append(stderr)
+        all_stdouts.append(stdout)
+
+        full_stderr = "\n".join(all_stderrs)
+        full_stdout = "\n".join(all_stdouts)
+
+        output_file = MEDS_cohort_dir / "aggregate_code_metadata" / "codes.parquet"
+        assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
+
+        got_df = pl.read_parquet(output_file, glob=False)
+
+        want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE)).with_columns(
+            pl.col("code"),
+            pl.col("code/n_occurrences").cast(pl.UInt8),
+            pl.col("code/n_patients").cast(pl.UInt8),
+            pl.col("values/n_occurrences").cast(pl.UInt8),
+            pl.col("values/sum").cast(pl.Float32).fill_null(0),
+            pl.col("values/sum_sqd").cast(pl.Float32).fill_null(0),
+        )
+
+        assert_df_equal(
+            want=want_df,
+            got=got_df,
+            msg="Code metadata differs!",
+            check_column_order=False,
+            check_row_order=False,
+        )
+
+        # Stage 6: Extract code metadata
+        stderr, stdout = run_command(
+            EXTRACT_CODE_METADATA_SCRIPT,
+            extraction_config_kwargs,
+            "extract_code_metadata",
+        )
+        all_stderrs.append(stderr)
+        all_stdouts.append(stdout)
+
+        full_stderr = "\n".join(all_stderrs)
+        full_stdout = "\n".join(all_stdouts)
+
+        output_file = MEDS_cohort_dir / "extract_code_metadata" / "codes.parquet"
+        assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
+
+        got_df = pl.read_parquet(output_file, glob=False)
+
+        want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE_WITH_DESC)).with_columns(
+            pl.col("code"),
+            pl.col("code/n_occurrences").cast(pl.UInt8),
+            pl.col("code/n_patients").cast(pl.UInt8),
+            pl.col("values/n_occurrences").cast(pl.UInt8),
+            pl.col("values/sum").cast(pl.Float32).fill_null(0),
+            pl.col("values/sum_sqd").cast(pl.Float32).fill_null(0),
+            pl.col("parent_codes").cast(pl.List(pl.Utf8)),
+        )
+
+        # We collapse the list type as it throws an error in the assert_df_equal otherwise
+        got_df = got_df.with_columns(pl.col("parent_codes").list.join("||"))
+        want_df = want_df.with_columns(pl.col("parent_codes").list.join("||"))
+
+        assert_df_equal(
+            want=want_df,
+            got=got_df,
+            msg="Code metadata with descriptions differs!",
+            check_column_order=False,
+            check_row_order=False,
+        )
+
+        # Stage 7: Finalize the MEDS data
+        stderr, stdout = run_command(
+            FINALIZE_DATA_SCRIPT,
+            extraction_config_kwargs,
+            "finalize_MEDS_data",
+        )
+        all_stderrs.append(stderr)
+        all_stdouts.append(stdout)
+
+        full_stderr = "\n".join(all_stderrs)
+        full_stdout = "\n".join(all_stdouts)
+
+        # Check the final output
+        output_folder = MEDS_cohort_dir / "data"
+        try:
+            for split, expected_df_L in MEDS_OUTPUTS.items():
+                if not isinstance(expected_df_L, list):
+                    expected_df_L = [expected_df_L]
+
+                expected_df = pl.concat([get_expected_output(df) for df in expected_df_L]).with_columns(
+                    pl.col("numeric_value").cast(pl.Float32)
+                )
 
                 fp = output_folder / f"{split}.parquet"
                 assert fp.is_file(), f"Expected {fp} to exist."
@@ -527,8 +662,8 @@ def test_extraction():
                 for subj in splits[split]:
                     got_df_subj = got_df.filter(pl.col("patient_id") == subj)
                     assert got_df_subj[
-                        "timestamp"
-                    ].is_sorted(), f"Timestamps should be sorted for patient {subj} in split {split}."
+                        "time"
+                    ].is_sorted(), f"Times should be sorted for patient {subj} in split {split}."
 
         except AssertionError as e:
             print(f"Failed on split {split}")
@@ -536,12 +671,11 @@ def test_extraction():
             print(f"stdout:\n{full_stdout}")
             raise e
 
-        # Step 4: Merge to the final output
+        # Stage 8: Finalize the metadata
         stderr, stdout = run_command(
-            AGGREGATE_CODE_METADATA_SCRIPT,
+            FINALIZE_METADATA_SCRIPT,
             extraction_config_kwargs,
-            "aggregate_code_metadata",
-            config_name="extract",
+            "finalize_metadata",
         )
         all_stderrs.append(stderr)
         all_stdouts.append(stdout)
@@ -549,57 +683,52 @@ def test_extraction():
         full_stderr = "\n".join(all_stderrs)
         full_stdout = "\n".join(all_stdouts)
 
-        output_file = MEDS_cohort_dir / "code_metadata.parquet"
+        # Check code metadata
+        output_file = MEDS_cohort_dir / "metadata" / "codes.parquet"
         assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
 
-        got_df = pl.read_parquet(output_file, glob=False)
+        got_df = pl.read_parquet(output_file, glob=False, use_pyarrow=True)
 
-        want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE)).with_columns(
-            pl.col("code").cast(pl.Categorical),
+        want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE_WITH_DESC)).with_columns(
+            pl.col("code"),
             pl.col("code/n_occurrences").cast(pl.UInt8),
             pl.col("code/n_patients").cast(pl.UInt8),
             pl.col("values/n_occurrences").cast(pl.UInt8),
             pl.col("values/sum").cast(pl.Float32).fill_null(0),
             pl.col("values/sum_sqd").cast(pl.Float32).fill_null(0),
+            pl.col("parent_codes").cast(pl.List(pl.Utf8)),
         )
+
+        # We collapse the list type as it throws an error in the assert_df_equal otherwise
+        got_df = got_df.with_columns(pl.col("parent_codes").list.join("||"))
+        want_df = want_df.with_columns(pl.col("parent_codes").list.join("||"))
 
         assert_df_equal(
             want=want_df,
             got=got_df,
-            msg="Code metadata differs!",
+            msg=f"Finalized code metadata differs:\nstderr:\n{stderr}\nstdout:\n{stdout}",
             check_column_order=False,
             check_row_order=False,
         )
 
-        stderr, stdout = run_command(
-            EXTRACT_CODE_METADATA_SCRIPT,
-            extraction_config_kwargs,
-            "extract_code_metadata",
-        )
-        all_stderrs.append(stderr)
-        all_stdouts.append(stdout)
-
-        full_stderr = "\n".join(all_stderrs)
-        full_stdout = "\n".join(all_stdouts)
-
-        output_file = MEDS_cohort_dir / "code_metadata.parquet"
+        # Check dataset metadata
+        output_file = MEDS_cohort_dir / "metadata" / "dataset.json"
         assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
 
-        got_df = pl.read_parquet(output_file, glob=False)
+        got_json = json.loads(output_file.read_text())
+        assert "etl_version" in got_json, "Expected 'etl_version' to be in the dataset metadata."
+        got_json.pop("etl_version")  # We don't test this as it changes with the commits.
+        assert got_json == MEDS_OUTPUT_DATASET_METADATA_JSON, f"Dataset metadata differs: {got_json}"
 
-        want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE_WITH_DESC)).with_columns(
-            pl.col("code").cast(pl.Categorical),
-            pl.col("code/n_occurrences").cast(pl.UInt8),
-            pl.col("code/n_patients").cast(pl.UInt8),
-            pl.col("values/n_occurrences").cast(pl.UInt8),
-            pl.col("values/sum").cast(pl.Float32).fill_null(0),
-            pl.col("values/sum_sqd").cast(pl.Float32).fill_null(0),
-        )
+        # Check the splits parquet
+        output_file = MEDS_cohort_dir / "metadata" / "patient_splits.parquet"
+        assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
 
+        got_df = pl.read_parquet(output_file, glob=False, use_pyarrow=True)
         assert_df_equal(
-            want=want_df,
-            got=got_df,
-            msg="Code metadata with descriptions differs!",
+            PATIENT_SPLITS_DF,
+            got_df,
+            "Patient splits should be equal to the expected splits.",
             check_column_order=False,
             check_row_order=False,
         )
