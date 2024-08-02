@@ -102,16 +102,52 @@ class MapReducePair(NamedTuple):
     reducer: Callable[[pl.Expr | Sequence[pl.Expr] | cs._selector_proxy_], pl.Expr]
 
 
-def quantile_reducer(cols: cs._selector_proxy_) -> pl.Expr:
-    """TODO."""
+def quantile_reducer(cols: cs._selector_proxy_, quantiles: list[float]) -> pl.Expr:
+    """Calculates the specified quantiles for the combined set of all numerical values in `cols`.
+
+    Args:
+        cols: A polars selector that selects the column(s) containing the numerical values for which the
+            quantiles should be calculated.
+        quantiles: A list of floats specifying the quantiles that should be calculated.
+
+    Returns:
+        A polars expression that calculates the specified quantiles for the combined set of all numerical
+        values in `cols`.
+
+    Examples:
+        >>> df = pl.DataFrame({
+        ...     "key": [1, 2],
+        ...     "vals/shard1": [[1, 2, float('nan')], [None, 3]],
+        ...     "vals/shard2": [[3.0, 4], [30]],
+        ... }, strict=False)
+        >>> expr = quantile_reducer(cs.starts_with("vals/"), [0.01, 0.5, 0.75])
+        >>> df.select(expr)
+        shape: (1, 1)
+        ┌──────────────────┐
+        │ values/quantiles │
+        │ ---              │
+        │ struct[3]        │
+        ╞══════════════════╡
+        │ {1.0,3.0,30.0}   │
+        └──────────────────┘
+        >>> df.select("key", expr.over("key"))
+        shape: (2, 2)
+        ┌─────┬──────────────────┐
+        │ key ┆ values/quantiles │
+        │ --- ┆ ---              │
+        │ i64 ┆ struct[3]        │
+        ╞═════╪══════════════════╡
+        │ 1   ┆ {1.0,3.0,4.0}    │
+        │ 2   ┆ {3.0,30.0,30.0}  │
+        └─────┴──────────────────┘
+    """
 
     vals = pl.concat_list(cols.fill_null([])).explode()
 
-    quantile_keys = [0.25, 0.5, 0.75]
-    quantile_cols = [f"values/quantile/{key}" for key in quantile_keys]
-    quantiles = {col: vals.quantile(key).alias(col) for col, key in zip(quantile_cols, quantile_keys)}
+    quantile_cols = [f"values/quantile/{q}" for q in quantiles]
+    quantiles_struct = {col: vals.quantile(q).alias(col) for col, q in zip(quantile_cols, quantiles)}
 
-    return pl.struct(**quantiles)
+    return pl.struct(**quantiles_struct).alias(METADATA_FN.VALUES_QUANTILES)
 
 
 VAL = pl.col("numeric_value")
@@ -170,7 +206,7 @@ def validate_args_and_get_code_cols(
         ValueError: Metadata aggregation function INVALID not found in METADATA_FN enumeration. Values are:
             code/n_patients, code/n_occurrences, values/n_patients, values/n_occurrences, values/n_ints,
             values/sum, values/sum_sqd, values/min, values/max, values/quantiles
-        >>> valid_cfg = DictConfig({"aggregations": ["code/n_patients", "values/n_ints"]})
+        >>> valid_cfg = DictConfig({"aggregations": ["code/n_patients", {"name": "values/n_ints"}]})
         >>> validate_args_and_get_code_cols(valid_cfg, 33)
         Traceback (most recent call last):
             ...
@@ -192,6 +228,8 @@ def validate_args_and_get_code_cols(
 
     aggregations = stage_cfg.aggregations
     for agg in aggregations:
+        if isinstance(agg, (dict, DictConfig)):
+            agg = agg.get("name", None)
         if agg not in METADATA_FN:
             raise ValueError(
                 f"Metadata aggregation function {agg} not found in METADATA_FN enumeration. Values are: "
@@ -378,7 +416,7 @@ def mapper_fntr(
         ┌──────┬───────────┬──────────────────┐
         │ code ┆ modifier1 ┆ values/quantiles │
         │ ---  ┆ ---       ┆ ---              │
-        │ cat  ┆ i64       ┆ list[f64]        │
+        │ str  ┆ i64       ┆ list[f64]        │
         ╞══════╪═══════════╪══════════════════╡
         │ A    ┆ 1         ┆ [1.1, 1.1]       │
         │ A    ┆ 2         ┆ [6.0]            │
@@ -391,7 +429,10 @@ def mapper_fntr(
     code_key_columns = validate_args_and_get_code_cols(stage_cfg, code_modifier_columns)
     aggregations = stage_cfg.aggregations
 
-    agg_operations = {agg: CODE_METADATA_AGGREGATIONS[agg].mapper for agg in aggregations}
+    agg_operations = {}
+    for agg in aggregations:
+        agg_name = agg if isinstance(agg, str) else agg["name"]
+        agg_operations[agg_name] = CODE_METADATA_AGGREGATIONS[agg_name].mapper
 
     def by_code_mapper(df: pl.LazyFrame) -> pl.LazyFrame:
         return df.group_by(code_key_columns).agg(**agg_operations).sort(code_key_columns)
@@ -556,14 +597,20 @@ def reducer_fntr(
         │ C    ┆ 2         ┆ 81.25          ┆ 2.0        ┆ 7.5        │
         │ D    ┆ 1         ┆ 4.0            ┆ 0.0        ┆ 2.0        │
         └──────┴───────────┴────────────────┴────────────┴────────────┘
-        >>> stage_cfg = DictConfig({"aggregations": ["values/quantiles"]})
+        >>> reducer(df_1.drop("values/min"), df_2, df_3)
+        Traceback (most recent call last):
+            ...
+        KeyError: 'Column values/min not found in DataFrame 0 for reduction.'
+        >>> stage_cfg = DictConfig({
+        ...     "aggregations": [{"name": "values/quantiles", "quantiles": [0.25, 0.5, 0.75]}],
+        ... })
         >>> reducer = reducer_fntr(stage_cfg, code_modifier_columns)
         >>> reducer(df_1, df_2, df_3).unnest("values/quantiles")
         shape: (7, 5)
         ┌──────┬───────────┬──────────────────────┬─────────────────────┬──────────────────────┐
         │ code ┆ modifier1 ┆ values/quantile/0.25 ┆ values/quantile/0.5 ┆ values/quantile/0.75 │
         │ ---  ┆ ---       ┆ ---                  ┆ ---                 ┆ ---                  │
-        │ cat  ┆ i64       ┆ f64                  ┆ f64                 ┆ f64                  │
+        │ str  ┆ i64       ┆ f64                  ┆ f64                 ┆ f64                  │
         ╞══════╪═══════════╪══════════════════════╪═════════════════════╪══════════════════════╡
         │ null ┆ null      ┆ 1.1                  ┆ 1.1                 ┆ 1.1                  │
         │ A    ┆ 1         ┆ 1.3                  ┆ 2.0                 ┆ 2.0                  │
@@ -573,30 +620,37 @@ def reducer_fntr(
         │ C    ┆ 2         ┆ null                 ┆ null                ┆ null                 │
         │ D    ┆ 1         ┆ null                 ┆ null                ┆ null                 │
         └──────┴───────────┴──────────────────────┴─────────────────────┴──────────────────────┘
-        >>> reducer(df_1.drop("values/min"), df_2, df_3)
-        Traceback (most recent call last):
-            ...
-        KeyError: 'Column values/min not found in DataFrame 0 for reduction.'
     """
 
     code_key_columns = validate_args_and_get_code_cols(stage_cfg, code_modifier_columns)
     aggregations = stage_cfg.aggregations
 
-    agg_operations = {
-        agg: CODE_METADATA_AGGREGATIONS[agg].reducer(cs.matches(f"{agg}/shard_\\d+")).over(*code_key_columns)
-        for agg in aggregations
-    }
+    agg_operations = {}
+    for agg in aggregations:
+        if isinstance(agg, (dict, DictConfig)):
+            agg_name = agg["name"]
+            agg_kwargs = {k: v for k, v in agg.items() if k != "name"}
+        else:
+            agg_name = agg
+            agg_kwargs = {}
+        agg_operations[agg_name] = (
+            CODE_METADATA_AGGREGATIONS[agg_name]
+            .reducer(cs.matches(f"{agg_name}/shard_\\d+"), **agg_kwargs)
+            .over(*code_key_columns)
+        )
 
     def reducer(*dfs: Sequence[pl.LazyFrame]) -> pl.LazyFrame:
         renamed_dfs = []
         for i, df in enumerate(dfs):
+            agg_selectors = []
             for agg in aggregations:
+                if isinstance(agg, (dict, DictConfig)):
+                    agg = agg["name"]
                 if agg not in df.columns:
                     raise KeyError(f"Column {agg} not found in DataFrame {i} for reduction.")
+                agg_selectors.append(pl.col(agg).alias(f"{agg}/shard_{i}"))
 
-            renamed_dfs.append(
-                df.select(*code_key_columns, *[pl.col(agg).alias(f"{agg}/shard_{i}") for agg in aggregations])
-            )
+            renamed_dfs.append(df.select(*code_key_columns, *agg_selectors))
 
         df = renamed_dfs[0]
         for rdf in renamed_dfs[1:]:
