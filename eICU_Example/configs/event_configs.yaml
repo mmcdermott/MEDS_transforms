@@ -5,7 +5,7 @@ patient_id_col: patienthealthsystemstayid
 
 patient:
   dob:
-    code: "DOB"
+    code: "MEDS_BIRTH" # This is the MEDS official code for BIRTH.
     time: col(dateofbirth)
     uniquepid: "uniquepid"
   gender:

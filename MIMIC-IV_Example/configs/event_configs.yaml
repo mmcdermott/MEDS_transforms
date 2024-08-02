@@ -28,12 +28,6 @@ hosp/admissions:
     time_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
   # We omit the death event here as it is joined to the data in the patients table in the pre-MEDS step.
-  #death:
-  #  code: DEATH
-  #  time: col(deathtime)
-  #  time_format: "%Y-%m-%d %H:%M:%S"
-  #  death_location: death_location
-  #  death_type: death_type
 
 hosp/diagnoses_icd:
   diagnosis:
@@ -121,11 +115,11 @@ hosp/patients:
       - col(gender)
     time: null
   dob:
-    code: DOB
+    code: MEDS_BIRTH # This is the MEDS official code for birth.
     time: col(year_of_birth)
     time_format: "%Y"
   death:
-    code: DEATH
+    code: MEDS_DEATH # This is the MEDS official code for death.
     time: col(dod)
     time_format:
       - "%Y-%m-%d %H:%M:%S"
