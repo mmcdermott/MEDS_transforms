@@ -37,6 +37,7 @@ MEDS_extract-convert_to_sharded_events = "MEDS_transforms.extract.convert_to_sha
 MEDS_extract-merge_to_MEDS_cohort = "MEDS_transforms.extract.merge_to_MEDS_cohort:main"
 MEDS_extract-extract_code_metadata = "MEDS_transforms.extract.extract_code_metadata:main"
 MEDS_extract-finalize_MEDS_metadata = "MEDS_transforms.extract.finalize_MEDS_metadata:main"
+MEDS_extract-finalize_MEDS_data = "MEDS_transforms.extract.finalize_MEDS_data:main"
 
 # MEDS_transform
 ## General
