@@ -35,9 +35,9 @@ The fundamental design philosophy of this repository can be summarized as follow
 
 1. _(The MEDS Assumption)_: All structured electronic health record (EHR) data can be represented as a
    series of events, each of which is associated with a patient, a time, and a set of codes and
-   numerical values. This representation is the Medical Event Data Standard (MEDS) format, and in this
+   numeric values. This representation is the Medical Event Data Standard (MEDS) format, and in this
    repository we use it in the "flat" format, where data is organized as rows of `patient_id`,
-   `time`, `code`, `numerical_value` columns.
+   `time`, `code`, `numeric_value` columns.
 2. _Easy Efficiency through Sharding_: MEDS datasets in this repository are sharded into smaller, more
    manageable pieces (organized as separate files) at the patient level (and, during the raw-data extraction
    process, the event level). This enables users to scale up their processing capabilities ad nauseum by
@@ -300,7 +300,7 @@ broken down into the following steps:
 1. Filtering the dataset by criteria that do not require cross-patient analyses, e.g.,
 
    - Filtering patients by the number of events or unique times they have.
-   - Removing numerical values that fall outside of pre-specified, per-code ranges (e.g., for outlier
+   - Removing numeric values that fall outside of pre-specified, per-code ranges (e.g., for outlier
      removal).
 
 2. Adding any extra events to the records that are necessary for downstream modeling, e.g.,
@@ -313,25 +313,25 @@ broken down into the following steps:
        period.
 
 3. Iteratively (a) grouping the dataset by `code` and associated code modifier columns and collecting
-   statistics on the numerical and categorical values for each code then (b) filtering the dataset down to
+   statistics on the numeric and categorical values for each code then (b) filtering the dataset down to
    remove outliers or other undesired codes or values, e.g.,
 
-   - Computing the mean and standard deviation of the numerical values for each code.
+   - Computing the mean and standard deviation of the numeric values for each code.
    - Computing the number of times each code occurs in the dataset.
-   - Computing appropriate numerical bins for each code for value discretization.
+   - Computing appropriate numeric bins for each code for value discretization.
 
 4. Transforming the code space to appropriately include or exclude any additional measurement columns that
    should be included during code grouping and modeling operations. The goal of this step is to ensure that
    the only columns that need be processed going into the pre-processing, tokenization, and tensorization
-   stage are expressible in the `code` and `numerical_values` columns of the dataset, which helps
+   stage are expressible in the `code` and `numeric_values` columns of the dataset, which helps
    standardize further downstream use.
 
    - Standardizing the unit of measure of observed codes or adding the unit of measure to the code such that
      group-by operations over the code take the unit into account.
    - Adding categorical normal/abnormal flags to laboratory test result codes.
 
-5. Normalizing the data to convert codes to indices and numerical values to the desired form (either
-   categorical indices or normalized numerical values).
+5. Normalizing the data to convert codes to indices and numeric values to the desired form (either
+   categorical indices or normalized numeric values).
 
 6. Tokenizing the data in time to create a pre-tensorized dataset with clear delineations between patients,
    patient sequence elements, and measurements per sequence element (note that various of these delineations

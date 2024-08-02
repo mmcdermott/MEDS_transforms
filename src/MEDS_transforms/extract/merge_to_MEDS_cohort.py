@@ -54,13 +54,13 @@ def merge_subdirs_and_sort(
         ...     "patient_id":      [1,   1,    3],
         ...     "time":       [2,   1,    8],
         ...     "code":            ["C", "D",  "E"],
-        ...     "numerical_value": [None, 2.0, None],
+        ...     "numeric_value": [None, 2.0, None],
         ... })
         >>> df3 = pl.DataFrame({
         ...     "patient_id":      [1,   1,    3],
         ...     "time":       [2,   2,    8],
         ...     "code":            ["C", "D",  "E"],
-        ...     "numerical_value": [6.2, 2.0, None],
+        ...     "numeric_value": [6.2, 2.0, None],
         ... })
         >>> with TemporaryDirectory() as tmpdir:
         ...     sp_dir = Path(tmpdir)
@@ -79,23 +79,23 @@ def merge_subdirs_and_sort(
         ...         sp_dir,
         ...         event_subsets=["subdir1", "subdir2"],
         ...         unique_by=None,
-        ...         additional_sort_by=["code", "numerical_value", "missing_col_will_not_error"]
+        ...         additional_sort_by=["code", "numeric_value", "missing_col_will_not_error"]
         ...     ).collect()
         shape: (8, 4)
-        ┌────────────┬──────┬──────┬─────────────────┐
-        │ patient_id ┆ time ┆ code ┆ numerical_value │
-        │ ---        ┆ ---  ┆ ---  ┆ ---             │
-        │ i64        ┆ i64  ┆ str  ┆ f64             │
-        ╞════════════╪══════╪══════╪═════════════════╡
-        │ 1          ┆ 1    ┆ D    ┆ 2.0             │
-        │ 1          ┆ 2    ┆ C    ┆ null            │
-        │ 1          ┆ 2    ┆ C    ┆ 6.2             │
-        │ 1          ┆ 2    ┆ D    ┆ 2.0             │
-        │ 1          ┆ 10   ┆ A    ┆ null            │
-        │ 2          ┆ 20   ┆ B    ┆ null            │
-        │ 3          ┆ 8    ┆ E    ┆ null            │
-        │ 3          ┆ 8    ┆ E    ┆ null            │
-        └────────────┴──────┴──────┴─────────────────┘
+        ┌────────────┬──────┬──────┬───────────────┐
+        │ patient_id ┆ time ┆ code ┆ numeric_value │
+        │ ---        ┆ ---  ┆ ---  ┆ ---           │
+        │ i64        ┆ i64  ┆ str  ┆ f64           │
+        ╞════════════╪══════╪══════╪═══════════════╡
+        │ 1          ┆ 1    ┆ D    ┆ 2.0           │
+        │ 1          ┆ 2    ┆ C    ┆ null          │
+        │ 1          ┆ 2    ┆ C    ┆ 6.2           │
+        │ 1          ┆ 2    ┆ D    ┆ 2.0           │
+        │ 1          ┆ 10   ┆ A    ┆ null          │
+        │ 2          ┆ 20   ┆ B    ┆ null          │
+        │ 3          ┆ 8    ┆ E    ┆ null          │
+        │ 3          ┆ 8    ┆ E    ┆ null          │
+        └────────────┴──────┴──────┴───────────────┘
         >>> with TemporaryDirectory() as tmpdir:
         ...     sp_dir = Path(tmpdir)
         ...     (sp_dir / "subdir1").mkdir()
@@ -107,22 +107,22 @@ def merge_subdirs_and_sort(
         ...         sp_dir,
         ...         event_subsets=["subdir1", "subdir2"],
         ...         unique_by="*",
-        ...         additional_sort_by=["code", "numerical_value"]
+        ...         additional_sort_by=["code", "numeric_value"]
         ...     ).collect()
         shape: (7, 4)
-        ┌────────────┬──────┬──────┬─────────────────┐
-        │ patient_id ┆ time ┆ code ┆ numerical_value │
-        │ ---        ┆ ---  ┆ ---  ┆ ---             │
-        │ i64        ┆ i64  ┆ str  ┆ f64             │
-        ╞════════════╪══════╪══════╪═════════════════╡
-        │ 1          ┆ 1    ┆ D    ┆ 2.0             │
-        │ 1          ┆ 2    ┆ C    ┆ null            │
-        │ 1          ┆ 2    ┆ C    ┆ 6.2             │
-        │ 1          ┆ 2    ┆ D    ┆ 2.0             │
-        │ 1          ┆ 10   ┆ A    ┆ null            │
-        │ 2          ┆ 20   ┆ B    ┆ null            │
-        │ 3          ┆ 8    ┆ E    ┆ null            │
-        └────────────┴──────┴──────┴─────────────────┘
+        ┌────────────┬──────┬──────┬───────────────┐
+        │ patient_id ┆ time ┆ code ┆ numeric_value │
+        │ ---        ┆ ---  ┆ ---  ┆ ---           │
+        │ i64        ┆ i64  ┆ str  ┆ f64           │
+        ╞════════════╪══════╪══════╪═══════════════╡
+        │ 1          ┆ 1    ┆ D    ┆ 2.0           │
+        │ 1          ┆ 2    ┆ C    ┆ null          │
+        │ 1          ┆ 2    ┆ C    ┆ 6.2           │
+        │ 1          ┆ 2    ┆ D    ┆ 2.0           │
+        │ 1          ┆ 10   ┆ A    ┆ null          │
+        │ 2          ┆ 20   ┆ B    ┆ null          │
+        │ 3          ┆ 8    ┆ E    ┆ null          │
+        └────────────┴──────┴──────┴───────────────┘
         >>> with TemporaryDirectory() as tmpdir:
         ...     sp_dir = Path(tmpdir)
         ...     (sp_dir / "subdir1").mkdir()
@@ -130,14 +130,14 @@ def merge_subdirs_and_sort(
         ...     df2.write_parquet(sp_dir / "subdir1" / "file2.parquet")
         ...     (sp_dir / "subdir2").mkdir()
         ...     df3.write_parquet(sp_dir / "subdir2" / "df.parquet")
-        ...     # We just display the patient ID, time, and code columns as the numerical value column
+        ...     # We just display the patient ID, time, and code columns as the numeric value column
         ...     # is not guaranteed to be deterministic in the output given some rows will be dropped due to
         ...     # the unique-by constraint.
         ...     merge_subdirs_and_sort(
         ...         sp_dir,
         ...         event_subsets=["subdir1", "subdir2"],
         ...         unique_by=["patient_id", "time", "code"],
-        ...         additional_sort_by=["code", "numerical_value"]
+        ...         additional_sort_by=["code", "numeric_value"]
         ...     ).select("patient_id", "time", "code").collect()
         shape: (6, 3)
         ┌────────────┬──────┬──────┐

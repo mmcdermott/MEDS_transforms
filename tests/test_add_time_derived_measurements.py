@@ -100,7 +100,7 @@ This returns
 """
 
 WANT_TRAIN_0 = """
-patient_id,time,code,numerical_value
+patient_id,time,code,numeric_value
 239684,,EYE_COLOR//BROWN,
 239684,,HEIGHT,175.271115221764
 239684,"12/28/1980, 00:00:00","TIME_OF_DAY//[00,06)",
@@ -161,7 +161,7 @@ patient_id,time,code,numerical_value
 
 # All patients in this shard had only 4 events.
 WANT_TRAIN_1 = """
-patient_id,time,code,numerical_value
+patient_id,time,code,numeric_value
 68729,,EYE_COLOR//HAZEL,
 68729,,HEIGHT,160.3953106166676
 68729,"03/09/1978, 00:00:00","TIME_OF_DAY//[00,06)",
@@ -189,7 +189,7 @@ patient_id,time,code,numerical_value
 """
 
 WANT_TUNING_0 = """
-patient_id,time,code,numerical_value
+patient_id,time,code,numeric_value
 754281,,EYE_COLOR//BROWN,
 754281,,HEIGHT,166.22261567137025
 754281,"12/19/1988, 00:00:00","TIME_OF_DAY//[00,06)",
@@ -205,7 +205,7 @@ patient_id,time,code,numerical_value
 """
 
 WANT_HELD_OUT_0 = """
-patient_id,time,code,numerical_value
+patient_id,time,code,numeric_value
 1500733,,EYE_COLOR//BROWN,
 1500733,,HEIGHT,158.60131573580904
 1500733,"07/20/1986, 00:00:00","TIME_OF_DAY//[00,06)",

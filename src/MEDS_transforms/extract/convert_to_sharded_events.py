@@ -126,8 +126,8 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
             from which the MEDS column should be extracted. These columns must be either numeric or
             categorical (represented as either a `str` or a `Categorical` column in the raw data). Where
             possible, these additional columns should conform to the conventions of the MEDS data schema ---
-            e.g., primary numerical values associated with the event should be named `"numerical_value"` in
-            the output MEDS data (and thus have the key `"numerical_value"` in the `event_cfg` dictionary).
+            e.g., primary numeric values associated with the event should be named `"numeric_value"` in
+            the output MEDS data (and thus have the key `"numeric_value"` in the `event_cfg` dictionary).
 
     Returns:
         A DataFrame containing the event data extracted from the raw data, containing only unique rows across
@@ -154,49 +154,49 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         ...     "code": ["A", "B", "C", "D"],
         ...     "code_modifier": ["1", "2", "3", "4"],
         ...     "time": ["2021-01-01", "2021-01-02", "2021-01-03", "2021-01-04"],
-        ...     "numerical_value": [1, 2, 3, 4],
+        ...     "numeric_value": [1, 2, 3, 4],
         ... })
         >>> event_cfg = {
         ...     "code": ["FOO", "col(code)", "col(code_modifier)"],
         ...     "time": "col(time)",
         ...     "time_format": "%Y-%m-%d",
-        ...     "numerical_value": "numerical_value",
+        ...     "numeric_value": "numeric_value",
         ... }
         >>> extract_event(raw_data, event_cfg)
         shape: (4, 4)
-        ┌────────────┬───────────┬─────────────────────┬─────────────────┐
-        │ patient_id ┆ code      ┆ time                ┆ numerical_value │
-        │ ---        ┆ ---       ┆ ---                 ┆ ---             │
-        │ i64        ┆ str       ┆ datetime[μs]        ┆ i64             │
-        ╞════════════╪═══════════╪═════════════════════╪═════════════════╡
-        │ 1          ┆ FOO//A//1 ┆ 2021-01-01 00:00:00 ┆ 1               │
-        │ 1          ┆ FOO//B//2 ┆ 2021-01-02 00:00:00 ┆ 2               │
-        │ 2          ┆ FOO//C//3 ┆ 2021-01-03 00:00:00 ┆ 3               │
-        │ 2          ┆ FOO//D//4 ┆ 2021-01-04 00:00:00 ┆ 4               │
-        └────────────┴───────────┴─────────────────────┴─────────────────┘
+        ┌────────────┬───────────┬─────────────────────┬───────────────┐
+        │ patient_id ┆ code      ┆ time                ┆ numeric_value │
+        │ ---        ┆ ---       ┆ ---                 ┆ ---           │
+        │ i64        ┆ str       ┆ datetime[μs]        ┆ i64           │
+        ╞════════════╪═══════════╪═════════════════════╪═══════════════╡
+        │ 1          ┆ FOO//A//1 ┆ 2021-01-01 00:00:00 ┆ 1             │
+        │ 1          ┆ FOO//B//2 ┆ 2021-01-02 00:00:00 ┆ 2             │
+        │ 2          ┆ FOO//C//3 ┆ 2021-01-03 00:00:00 ┆ 3             │
+        │ 2          ┆ FOO//D//4 ┆ 2021-01-04 00:00:00 ┆ 4             │
+        └────────────┴───────────┴─────────────────────┴───────────────┘
         >>> data_with_nulls = pl.DataFrame({
         ...     "patient_id": [1, 1, 2, 2],
         ...     "code": ["A", None, "C", "D"],
         ...     "code_modifier": ["1", "2", "3", None],
         ...     "time": [None, "2021-01-02", "2021-01-03", "2021-01-04"],
-        ...     "numerical_value": [1, 2, 3, 4],
+        ...     "numeric_value": [1, 2, 3, 4],
         ... })
         >>> event_cfg = {
         ...     "code": ["col(code)", "col(code_modifier)"],
         ...     "time": "col(time)",
         ...     "time_format": "%Y-%m-%d",
-        ...     "numerical_value": "numerical_value",
+        ...     "numeric_value": "numeric_value",
         ... }
         >>> extract_event(data_with_nulls, event_cfg)
         shape: (2, 4)
-        ┌────────────┬────────┬─────────────────────┬─────────────────┐
-        │ patient_id ┆ code   ┆ time                ┆ numerical_value │
-        │ ---        ┆ ---    ┆ ---                 ┆ ---             │
-        │ i64        ┆ str    ┆ datetime[μs]        ┆ i64             │
-        ╞════════════╪════════╪═════════════════════╪═════════════════╡
-        │ 2          ┆ C//3   ┆ 2021-01-03 00:00:00 ┆ 3               │
-        │ 2          ┆ D//UNK ┆ 2021-01-04 00:00:00 ┆ 4               │
-        └────────────┴────────┴─────────────────────┴─────────────────┘
+        ┌────────────┬────────┬─────────────────────┬───────────────┐
+        │ patient_id ┆ code   ┆ time                ┆ numeric_value │
+        │ ---        ┆ ---    ┆ ---                 ┆ ---           │
+        │ i64        ┆ str    ┆ datetime[μs]        ┆ i64           │
+        ╞════════════╪════════╪═════════════════════╪═══════════════╡
+        │ 2          ┆ C//3   ┆ 2021-01-03 00:00:00 ┆ 3             │
+        │ 2          ┆ D//UNK ┆ 2021-01-04 00:00:00 ┆ 4             │
+        └────────────┴────────┴─────────────────────┴───────────────┘
         >>> from datetime import datetime
         >>> complex_raw_data = pl.DataFrame(
         ...     {
@@ -247,7 +247,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         ...     "code": ["ADMISSION", "col(admission_type)"],
         ...     "time": "col(admission_time)",
         ...     "time_format": "%Y-%m-%d %H:%M:%S",
-        ...     "numerical_value": "severity_score",
+        ...     "numeric_value": "severity_score",
         ... }
         >>> valid_discharge_event_cfg = {
         ...     "code": ["DISCHARGE", "col(discharge_location)"],
@@ -281,52 +281,52 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         └────────────┴─────────────────────┴─────────────────────┴────────────────┴────────────────────┴──────────────────┴────────────────┴────────────┴───────────┘
         >>> extract_event(complex_raw_data, valid_admission_event_cfg)
         shape: (6, 4)
-        ┌────────────┬──────────────┬─────────────────────┬─────────────────┐
-        │ patient_id ┆ code         ┆ time                ┆ numerical_value │
-        │ ---        ┆ ---          ┆ ---                 ┆ ---             │
-        │ u8         ┆ str          ┆ datetime[μs]        ┆ f64             │
-        ╞════════════╪══════════════╪═════════════════════╪═════════════════╡
-        │ 1          ┆ ADMISSION//A ┆ 2021-01-01 00:00:00 ┆ 1.0             │
-        │ 1          ┆ ADMISSION//B ┆ 2021-01-02 00:00:00 ┆ 2.0             │
-        │ 2          ┆ ADMISSION//C ┆ 2021-01-03 00:00:00 ┆ 3.0             │
-        │ 2          ┆ ADMISSION//D ┆ 2021-01-04 00:00:00 ┆ 4.0             │
-        │ 2          ┆ ADMISSION//E ┆ 2021-01-05 00:00:00 ┆ 5.0             │
-        │ 3          ┆ ADMISSION//F ┆ 2021-01-06 00:00:00 ┆ 6.0             │
-        └────────────┴──────────────┴─────────────────────┴─────────────────┘
+        ┌────────────┬──────────────┬─────────────────────┬───────────────┐
+        │ patient_id ┆ code         ┆ time                ┆ numeric_value │
+        │ ---        ┆ ---          ┆ ---                 ┆ ---           │
+        │ u8         ┆ str          ┆ datetime[μs]        ┆ f64           │
+        ╞════════════╪══════════════╪═════════════════════╪═══════════════╡
+        │ 1          ┆ ADMISSION//A ┆ 2021-01-01 00:00:00 ┆ 1.0           │
+        │ 1          ┆ ADMISSION//B ┆ 2021-01-02 00:00:00 ┆ 2.0           │
+        │ 2          ┆ ADMISSION//C ┆ 2021-01-03 00:00:00 ┆ 3.0           │
+        │ 2          ┆ ADMISSION//D ┆ 2021-01-04 00:00:00 ┆ 4.0           │
+        │ 2          ┆ ADMISSION//E ┆ 2021-01-05 00:00:00 ┆ 5.0           │
+        │ 3          ┆ ADMISSION//F ┆ 2021-01-06 00:00:00 ┆ 6.0           │
+        └────────────┴──────────────┴─────────────────────┴───────────────┘
         >>> extract_event(
         ...     complex_raw_data.with_columns(pl.col("severity_score").cast(pl.Utf8)),
         ...     valid_admission_event_cfg
         ... )
         shape: (6, 4)
-        ┌────────────┬──────────────┬─────────────────────┬─────────────────┐
-        │ patient_id ┆ code         ┆ time                ┆ numerical_value │
-        │ ---        ┆ ---          ┆ ---                 ┆ ---             │
-        │ u8         ┆ str          ┆ datetime[μs]        ┆ f64             │
-        ╞════════════╪══════════════╪═════════════════════╪═════════════════╡
-        │ 1          ┆ ADMISSION//A ┆ 2021-01-01 00:00:00 ┆ 1.0             │
-        │ 1          ┆ ADMISSION//B ┆ 2021-01-02 00:00:00 ┆ 2.0             │
-        │ 2          ┆ ADMISSION//C ┆ 2021-01-03 00:00:00 ┆ 3.0             │
-        │ 2          ┆ ADMISSION//D ┆ 2021-01-04 00:00:00 ┆ 4.0             │
-        │ 2          ┆ ADMISSION//E ┆ 2021-01-05 00:00:00 ┆ 5.0             │
-        │ 3          ┆ ADMISSION//F ┆ 2021-01-06 00:00:00 ┆ 6.0             │
-        └────────────┴──────────────┴─────────────────────┴─────────────────┘
+        ┌────────────┬──────────────┬─────────────────────┬───────────────┐
+        │ patient_id ┆ code         ┆ time                ┆ numeric_value │
+        │ ---        ┆ ---          ┆ ---                 ┆ ---           │
+        │ u8         ┆ str          ┆ datetime[μs]        ┆ f64           │
+        ╞════════════╪══════════════╪═════════════════════╪═══════════════╡
+        │ 1          ┆ ADMISSION//A ┆ 2021-01-01 00:00:00 ┆ 1.0           │
+        │ 1          ┆ ADMISSION//B ┆ 2021-01-02 00:00:00 ┆ 2.0           │
+        │ 2          ┆ ADMISSION//C ┆ 2021-01-03 00:00:00 ┆ 3.0           │
+        │ 2          ┆ ADMISSION//D ┆ 2021-01-04 00:00:00 ┆ 4.0           │
+        │ 2          ┆ ADMISSION//E ┆ 2021-01-05 00:00:00 ┆ 5.0           │
+        │ 3          ┆ ADMISSION//F ┆ 2021-01-06 00:00:00 ┆ 6.0           │
+        └────────────┴──────────────┴─────────────────────┴───────────────┘
         >>> extract_event(
         ...     complex_raw_data.with_columns(pl.col("severity_score").cast(pl.Utf8).cast(pl.Categorical)),
         ...     valid_admission_event_cfg
         ... )
         shape: (6, 4)
-        ┌────────────┬──────────────┬─────────────────────┬─────────────────┐
-        │ patient_id ┆ code         ┆ time                ┆ numerical_value │
-        │ ---        ┆ ---          ┆ ---                 ┆ ---             │
-        │ u8         ┆ str          ┆ datetime[μs]        ┆ f64             │
-        ╞════════════╪══════════════╪═════════════════════╪═════════════════╡
-        │ 1          ┆ ADMISSION//A ┆ 2021-01-01 00:00:00 ┆ 1.0             │
-        │ 1          ┆ ADMISSION//B ┆ 2021-01-02 00:00:00 ┆ 2.0             │
-        │ 2          ┆ ADMISSION//C ┆ 2021-01-03 00:00:00 ┆ 3.0             │
-        │ 2          ┆ ADMISSION//D ┆ 2021-01-04 00:00:00 ┆ 4.0             │
-        │ 2          ┆ ADMISSION//E ┆ 2021-01-05 00:00:00 ┆ 5.0             │
-        │ 3          ┆ ADMISSION//F ┆ 2021-01-06 00:00:00 ┆ 6.0             │
-        └────────────┴──────────────┴─────────────────────┴─────────────────┘
+        ┌────────────┬──────────────┬─────────────────────┬───────────────┐
+        │ patient_id ┆ code         ┆ time                ┆ numeric_value │
+        │ ---        ┆ ---          ┆ ---                 ┆ ---           │
+        │ u8         ┆ str          ┆ datetime[μs]        ┆ f64           │
+        ╞════════════╪══════════════╪═════════════════════╪═══════════════╡
+        │ 1          ┆ ADMISSION//A ┆ 2021-01-01 00:00:00 ┆ 1.0           │
+        │ 1          ┆ ADMISSION//B ┆ 2021-01-02 00:00:00 ┆ 2.0           │
+        │ 2          ┆ ADMISSION//C ┆ 2021-01-03 00:00:00 ┆ 3.0           │
+        │ 2          ┆ ADMISSION//D ┆ 2021-01-04 00:00:00 ┆ 4.0           │
+        │ 2          ┆ ADMISSION//E ┆ 2021-01-05 00:00:00 ┆ 5.0           │
+        │ 3          ┆ ADMISSION//F ┆ 2021-01-06 00:00:00 ┆ 6.0           │
+        └────────────┴──────────────┴─────────────────────┴───────────────┘
         >>> extract_event(complex_raw_data, valid_discharge_event_cfg)
         shape: (6, 5)
         ┌────────────┬─────────────────┬─────────────────────┬───────────────────┬────────────┐
@@ -465,13 +465,13 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         is_str = df.schema[v] == pl.Utf8
         is_cat = isinstance(df.schema[v], pl.Categorical)
         match k:
-            case "numerical_value" if is_numeric:
+            case "numeric_value" if is_numeric:
                 pass
-            case "numerical_value" if is_str:
-                logger.warning(f"Converting numerical_value to float from string for {code_expr}")
+            case "numeric_value" if is_str:
+                logger.warning(f"Converting numeric_value to float from string for {code_expr}")
                 col = col.cast(pl.Float64, strict=False)
-            case "numerical_value" if is_cat:
-                logger.warning(f"Converting numerical_value to float from categorical for {code_expr}")
+            case "numeric_value" if is_cat:
+                logger.warning(f"Converting numeric_value to float from categorical for {code_expr}")
                 col = col.cast(pl.Utf8).cast(pl.Float64, strict=False)
             case "text_value" if not df.schema[v] == pl.Utf8:
                 logger.warning(f"Converting text_value to string for {code_expr}")

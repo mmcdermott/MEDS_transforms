@@ -62,34 +62,34 @@ def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[
         >>> age_fn = age_fntr(age_cfg)
         >>> age_fn(df)
         shape: (2, 4)
-        ┌────────────┬─────────────────────┬──────┬─────────────────┐
-        │ patient_id ┆ time                ┆ code ┆ numerical_value │
-        │ ---        ┆ ---                 ┆ ---  ┆ ---             │
-        │ u32        ┆ datetime[μs]        ┆ str  ┆ f64             │
-        ╞════════════╪═════════════════════╪══════╪═════════════════╡
-        │ 1          ┆ 2021-01-01 00:00:00 ┆ AGE  ┆ 31.001347       │
-        │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE  ┆ 35.00417        │
-        └────────────┴─────────────────────┴──────┴─────────────────┘
+        ┌────────────┬─────────────────────┬──────┬───────────────┐
+        │ patient_id ┆ time                ┆ code ┆ numeric_value │
+        │ ---        ┆ ---                 ┆ ---  ┆ ---           │
+        │ u32        ┆ datetime[μs]        ┆ str  ┆ f64           │
+        ╞════════════╪═════════════════════╪══════╪═══════════════╡
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ AGE  ┆ 31.001347     │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE  ┆ 35.00417      │
+        └────────────┴─────────────────────┴──────┴───────────────┘
         >>> # Now, we'll use the add_new_events functor to add these age events to the original DataFrame.
         >>> add_age_fn = add_new_events_fntr(age_fn)
         >>> add_age_fn(df)
         shape: (10, 4)
-        ┌────────────┬─────────────────────┬────────┬─────────────────┐
-        │ patient_id ┆ time                ┆ code   ┆ numerical_value │
-        │ ---        ┆ ---                 ┆ ---    ┆ ---             │
-        │ u32        ┆ datetime[μs]        ┆ str    ┆ f64             │
-        ╞════════════╪═════════════════════╪════════╪═════════════════╡
-        │ 1          ┆ null                ┆ static ┆ null            │
-        │ 1          ┆ 1990-01-01 00:00:00 ┆ DOB    ┆ null            │
-        │ 1          ┆ 2021-01-01 00:00:00 ┆ AGE    ┆ 31.001347       │
-        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//A ┆ null            │
-        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//B ┆ null            │
-        │ 2          ┆ 1988-01-02 00:00:00 ┆ DOB    ┆ null            │
-        │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE    ┆ 35.00417        │
-        │ 2          ┆ 2023-01-03 00:00:00 ┆ lab//A ┆ null            │
-        │ 3          ┆ 2022-01-01 00:00:00 ┆ lab//B ┆ null            │
-        │ 3          ┆ 2022-01-01 00:00:00 ┆ dx//1  ┆ null            │
-        └────────────┴─────────────────────┴────────┴─────────────────┘
+        ┌────────────┬─────────────────────┬────────┬───────────────┐
+        │ patient_id ┆ time                ┆ code   ┆ numeric_value │
+        │ ---        ┆ ---                 ┆ ---    ┆ ---           │
+        │ u32        ┆ datetime[μs]        ┆ str    ┆ f64           │
+        ╞════════════╪═════════════════════╪════════╪═══════════════╡
+        │ 1          ┆ null                ┆ static ┆ null          │
+        │ 1          ┆ 1990-01-01 00:00:00 ┆ DOB    ┆ null          │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ AGE    ┆ 31.001347     │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//A ┆ null          │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//B ┆ null          │
+        │ 2          ┆ 1988-01-02 00:00:00 ┆ DOB    ┆ null          │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE    ┆ 35.00417      │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ lab//A ┆ null          │
+        │ 3          ┆ 2022-01-01 00:00:00 ┆ lab//B ┆ null          │
+        │ 3          ┆ 2022-01-01 00:00:00 ┆ dx//1  ┆ null          │
+        └────────────┴─────────────────────┴────────┴───────────────┘
     """
 
     def out_fn(df: pl.DataFrame) -> pl.DataFrame:
@@ -228,15 +228,15 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         >>> age_fn = age_fntr(age_cfg)
         >>> age_fn(df)
         shape: (3, 4)
-        ┌────────────┬─────────────────────┬──────┬─────────────────┐
-        │ patient_id ┆ time                ┆ code ┆ numerical_value │
-        │ ---        ┆ ---                 ┆ ---  ┆ ---             │
-        │ u32        ┆ datetime[μs]        ┆ str  ┆ f64             │
-        ╞════════════╪═════════════════════╪══════╪═════════════════╡
-        │ 1          ┆ 2021-01-01 00:00:00 ┆ AGE  ┆ 31.001347       │
-        │ 1          ┆ 2021-01-02 00:00:00 ┆ AGE  ┆ 31.004084       │
-        │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE  ┆ 35.00417        │
-        └────────────┴─────────────────────┴──────┴─────────────────┘
+        ┌────────────┬─────────────────────┬──────┬───────────────┐
+        │ patient_id ┆ time                ┆ code ┆ numeric_value │
+        │ ---        ┆ ---                 ┆ ---  ┆ ---           │
+        │ u32        ┆ datetime[μs]        ┆ str  ┆ f64           │
+        ╞════════════╪═════════════════════╪══════╪═══════════════╡
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ AGE  ┆ 31.001347     │
+        │ 1          ┆ 2021-01-02 00:00:00 ┆ AGE  ┆ 31.004084     │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE  ┆ 35.00417      │
+        └────────────┴─────────────────────┴──────┴───────────────┘
         >>> age_cfg = DictConfig({"DOB_code": "DOB", "age_code": "AGE", "age_unit": "scores"})
         >>> age_fn = age_fntr(age_cfg)
         Traceback (most recent call last):
@@ -259,10 +259,10 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
                 "patient_id",
                 "time",
                 pl.lit(cfg.age_code, dtype=df.schema["code"]).alias("code"),
-                age_expr.alias("numerical_value"),
+                age_expr.alias("numeric_value"),
             )
-            .drop_nulls(subset=["numerical_value"])
-            .filter(pl.col("numerical_value") > 0)
+            .drop_nulls(subset=["numeric_value"])
+            .filter(pl.col("numeric_value") > 0)
         )
 
     return fn

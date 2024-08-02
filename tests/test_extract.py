@@ -102,7 +102,7 @@ subjects:
   height:
     code: HEIGHT
     time: null
-    numerical_value: height
+    numeric_value: height
   dob:
     code: DOB
     time: col(dob)
@@ -122,7 +122,7 @@ admit_vitals:
     code: HR
     time: col(vitals_date)
     time_format: "%m/%d/%Y, %H:%M:%S"
-    numerical_value: HR
+    numeric_value: HR
     _metadata:
       input_metadata:
         description: {"title": {"lab_code": "HR"}}
@@ -131,7 +131,7 @@ admit_vitals:
     code: TEMP
     time: col(vitals_date)
     time_format: "%m/%d/%Y, %H:%M:%S"
-    numerical_value: temp
+    numeric_value: temp
     _metadata:
       input_metadata:
         description: {"title": {"lab_code": "temp"}}
@@ -161,14 +161,14 @@ def get_expected_output(df: str) -> pl.DataFrame:
             "patient_id",
             pl.col("time").str.strptime(pl.Datetime, "%m/%d/%Y, %H:%M:%S").alias("time"),
             pl.col("code"),
-            "numerical_value",
+            "numeric_value",
         )
         .sort(by=["patient_id", "time"])
     )
 
 
 MEDS_OUTPUT_TRAIN_0_SUBJECTS = """
-patient_id,time,code,numerical_value
+patient_id,time,code,numeric_value
 239684,,EYE_COLOR//BROWN,
 239684,,HEIGHT,175.271115221764
 239684,"12/28/1980, 00:00:00",DOB,
@@ -178,7 +178,7 @@ patient_id,time,code,numerical_value
 """
 
 MEDS_OUTPUT_TRAIN_0_ADMIT_VITALS = """
-patient_id,time,code,numerical_value
+patient_id,time,code,numeric_value
 239684,"05/11/2010, 17:41:51",ADMISSION//CARDIAC,
 239684,"05/11/2010, 17:41:51",HR,102.6
 239684,"05/11/2010, 17:41:51",TEMP,96.0
@@ -206,7 +206,7 @@ patient_id,time,code,numerical_value
 """
 
 MEDS_OUTPUT_TRAIN_1_SUBJECTS = """
-patient_id,time,code,numerical_value
+patient_id,time,code,numeric_value
 68729,,EYE_COLOR//HAZEL,
 68729,,HEIGHT,160.3953106166676
 68729,"03/09/1978, 00:00:00",DOB,
@@ -216,7 +216,7 @@ patient_id,time,code,numerical_value
 """
 
 MEDS_OUTPUT_TRAIN_1_ADMIT_VITALS = """
-patient_id,time,code,numerical_value
+patient_id,time,code,numeric_value
 68729,"05/26/2010, 02:30:56",ADMISSION//PULMONARY,
 68729,"05/26/2010, 02:30:56",HR,86.0
 68729,"05/26/2010, 02:30:56",TEMP,97.8
@@ -228,14 +228,14 @@ patient_id,time,code,numerical_value
 """
 
 MEDS_OUTPUT_TUNING_0_SUBJECTS = """
-patient_id,time,code,numerical_value
+patient_id,time,code,numeric_value
 754281,,EYE_COLOR//BROWN,
 754281,,HEIGHT,166.22261567137025
 754281,"12/19/1988, 00:00:00",DOB,
 """
 
 MEDS_OUTPUT_TUNING_0_ADMIT_VITALS = """
-patient_id,time,code,numerical_value
+patient_id,time,code,numeric_value
 754281,"01/03/2010, 06:27:59",ADMISSION//PULMONARY,
 754281,"01/03/2010, 06:27:59",HR,142.0
 754281,"01/03/2010, 06:27:59",TEMP,99.8
@@ -243,14 +243,14 @@ patient_id,time,code,numerical_value
 """
 
 MEDS_OUTPUT_HELD_OUT_0_SUBJECTS = """
-patient_id,time,code,numerical_value
+patient_id,time,code,numeric_value
 1500733,,EYE_COLOR//BROWN,
 1500733,,HEIGHT,158.60131573580904
 1500733,"07/20/1986, 00:00:00",DOB,
 """
 
 MEDS_OUTPUT_HELD_OUT_0_ADMIT_VITALS = """
-patient_id,time,code,numerical_value
+patient_id,time,code,numeric_value
 1500733,"06/03/2010, 14:54:38",ADMISSION//ORTHOPEDIC,
 1500733,"06/03/2010, 14:54:38",HR,91.4
 1500733,"06/03/2010, 14:54:38",TEMP,100.0

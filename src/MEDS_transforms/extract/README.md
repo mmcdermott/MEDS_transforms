@@ -6,7 +6,7 @@ dataset is:
 1. Arranged in a series of files on disk of an allowed format (e.g., `.csv`, `.csv.gz`, `.parquet`)...
 2. Such that each file stores a dataframe containing data about patients such that each row of any given
    table corresponds to zero or more observations about a patient at a given time...
-3. And you can configure how to extract those observations in the time, code, and numerical value
+3. And you can configure how to extract those observations in the time, code, and numeric value
    format of MEDS in the event conversion `yaml` file format specified below, then...
    this tool can automatically extract your raw data into a MEDS dataset for you in an efficient, reproducible,
    and communicable way.
@@ -54,7 +54,7 @@ step](#step-0-pre-meds) and the [Data Cleaning step](#step-3-data-cleanup), for 
 
 The event conversion configuration file tells MEDS Extract how to convert each row of a file among your raw
 data files into one or more MEDS measurements (meaning a tuple of a patient ID, a time, a categorical
-code, and/or various other value or properties columns, most commonly a numerical value). This file is written
+code, and/or various other value or properties columns, most commonly a numeric value). This file is written
 in yaml and has the following format:
 
 ```yaml
@@ -138,7 +138,7 @@ admit_vitals:
     code: HR
     time: col(vitals_date)
     time_format: '%m/%d/%Y, %H:%M:%S'
-    numerical_value: HR
+    numeric_value: HR
 ```
 
 ##### Partial MIMIC-IV Example
@@ -186,7 +186,7 @@ hosp/labevents:
     hadm_id: hadm_id
     time: col(charttime)
     time_format: '%Y-%m-%d %H:%M:%S'
-    numerical_value: valuenum
+    numeric_value: valuenum
     text_value: value
     priority: priority
 ```
@@ -215,7 +215,7 @@ cleaning transformations on multiple different datasets and leverage the full ME
 perform these data cleaning steps effectively and efficiently. Examples of possible data cleaning steps
 include:
 
-1. Extracting numerical values from free-text values in the dataset.
+1. Extracting numeric values from free-text values in the dataset.
 2. Splitting compound measurements into their constituent parts (e.g., splitting a "blood pressure"
    measurement that is recorded in the raw data as "120/80" into separate "systolic" and "diastolic" blood
    pressure measurements).

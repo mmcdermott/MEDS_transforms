@@ -41,12 +41,12 @@ patient:
     code:
       - "UNIT_ADMISSION_WEIGHT"
     time: col(unitadmittime)
-    numerical_value: "unitadmissionweight"
+    numeric_value: "unitadmissionweight"
   unit_admission_height:
     code:
       - "UNIT_ADMISSION_HEIGHT"
     time: col(unitadmittime)
-    numerical_value: "unitadmissionheight"
+    numeric_value: "unitadmissionheight"
   unit_discharge:
     code:
       - "UNIT_DISCHARGE"
@@ -57,7 +57,7 @@ patient:
     code:
       - "UNIT_DISCHARGE_WEIGHT"
     time: col(unitdischargetime)
-    numerical_value: "unitdischargeweight"
+    numeric_value: "unitdischargeweight"
 
 admissiondx:
   admission_diagnosis:
@@ -133,7 +133,7 @@ infusionDrug:
     code:
       - "INFUSION_PATIENT_WEIGHT"
     time: col(infusionEnteredTimestamp)
-    numerical_value: "patientweight"
+    numeric_value: "patientweight"
 
 lab:
   lab:
@@ -143,7 +143,7 @@ lab:
       - col(labmeasurenameinterface)
       - col(labname)
     time: col(labResultDrawnTimestamp)
-    numerical_value: "labresult"
+    numeric_value: "labresult"
     text_value: "labresulttext"
     lab_type_id: "labtypeid"
 

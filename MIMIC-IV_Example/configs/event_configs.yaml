@@ -98,7 +98,7 @@ hosp/labevents:
     hadm_id: hadm_id
     time: col(charttime)
     time_format: "%Y-%m-%d %H:%M:%S"
-    numerical_value: valuenum
+    numeric_value: valuenum
     text_value: value
     priority: priority
     _metadata:
@@ -209,7 +209,7 @@ icu/chartevents:
       - col(valueuom)
     time: col(charttime)
     time_format: "%Y-%m-%d %H:%M:%S"
-    numerical_value: valuenum
+    numeric_value: valuenum
     text_value: value
     hadm_id: hadm_id
     icustay_id: stay_id
@@ -276,7 +276,7 @@ icu/inputevents:
     icustay_id: stay_id
     order_id: orderid
     link_order_id: linkorderid
-    numerical_value:
+    numeric_value:
       rate
       #_metadata:
       # TODO: get this working with null columns
@@ -298,7 +298,7 @@ icu/inputevents:
     icustay_id: stay_id
     order_id: orderid
     link_order_id: linkorderid
-    numerical_value:
+    numeric_value:
       amount
       #_metadata:
       #  inputevents_to_rxnorm:
@@ -313,7 +313,7 @@ icu/inputevents:
       - KG
     time: col(starttime)
     time_format: "%Y-%m-%d %H:%M:%S"
-    numerical_value: patientweight
+    numeric_value: patientweight
 
 icu/outputevents:
   output:
@@ -325,7 +325,7 @@ icu/outputevents:
     time_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
     icustay_id: stay_id
-    numerical_value: value
+    numeric_value: value
     _metadata:
       outputevents_to_loinc:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated

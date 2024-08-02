@@ -191,18 +191,18 @@ def retrieve_columns(event_conversion_cfg: DictConfig) -> dict[str, list[str]]:
         ...             "code": ["EYE_COLOR", "col(eye_color)"], "time": None, "mod": "mod_col"
         ...         },
         ...         "height": {
-        ...             "code": "HEIGHT", "time": None, "numerical_value": "height"
+        ...             "code": "HEIGHT", "time": None, "numeric_value": "height"
         ...         }
         ...     },
         ...     "icu/chartevents": {
         ...         "patient_id_col": "patient_id_icu",
         ...         "heart_rate": {
-        ...             "code": "HEART_RATE", "time": "charttime", "numerical_value": "HR"
+        ...             "code": "HEART_RATE", "time": "charttime", "numeric_value": "HR"
         ...         },
         ...         "lab": {
         ...             "code": ["col(itemid)", "col(valueuom)"],
         ...             "time": "charttime",
-        ...             "numerical_value": "valuenum",
+        ...             "numeric_value": "valuenum",
         ...             "text_value": "value",
         ...             "mod": "mod_lab",
         ...         }

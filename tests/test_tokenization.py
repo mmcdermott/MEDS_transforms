@@ -32,7 +32,7 @@ def ts_to_time_delta_days(ts: list[list[datetime]]) -> list[list[float]]:
 SCHEMAS_SCHEMA = {
     "patient_id": NORMALIZED_MEDS_SCHEMA["patient_id"],
     "code": pl.List(NORMALIZED_MEDS_SCHEMA["code"]),
-    "numerical_value": pl.List(NORMALIZED_MEDS_SCHEMA["numerical_value"]),
+    "numeric_value": pl.List(NORMALIZED_MEDS_SCHEMA["numeric_value"]),
     "start_time": NORMALIZED_MEDS_SCHEMA["time"],
     "time": pl.List(NORMALIZED_MEDS_SCHEMA["time"]),
 }
@@ -40,7 +40,7 @@ SCHEMAS_SCHEMA = {
 SEQ_SCHEMA = {
     "patient_id": NORMALIZED_MEDS_SCHEMA["patient_id"],
     "code": pl.List(pl.List(pl.Float64)),
-    "numerical_value": pl.List(pl.List(NORMALIZED_MEDS_SCHEMA["numerical_value"])),
+    "numeric_value": pl.List(pl.List(NORMALIZED_MEDS_SCHEMA["numeric_value"])),
     "time_delta_days": pl.List(pl.Float64),
 }
 
@@ -68,7 +68,7 @@ WANT_SCHEMAS_TRAIN_0 = pl.DataFrame(
     {
         "patient_id": [239684, 1195293],
         "code": [[7, 9], [6, 9]],
-        "numerical_value": [[None, 1.5770289975852931], [None, 0.0680278558478863]],
+        "numeric_value": [[None, 1.5770289975852931], [None, 0.0680278558478863]],
         "start_time": [ts[0] for ts in TRAIN_0_TIMES],
         "time": TRAIN_0_TIMES,
     },
@@ -83,7 +83,7 @@ WANT_EVENT_SEQ_TRAIN_0 = pl.DataFrame(
             [[5], [1, 10, 11], [10, 11], [10, 11], [10, 11], [4]],
             [[5], [1, 10, 11], [10, 11], [10, 11], [10, 11], [10, 11], [10, 11], [4]],
         ],
-        "numerical_value": [
+        "numeric_value": [
             [
                 [float("nan")],
                 [float("nan"), -0.5697368239808219, -1.2714603102818045],
@@ -116,7 +116,7 @@ WANT_SCHEMAS_TRAIN_1 = pl.DataFrame(
     {
         "patient_id": [68729, 814703],
         "code": [[8, 9], [8, 9]],
-        "numerical_value": [[None, -0.543824685211534], [None, -1.101236106768607]],
+        "numeric_value": [[None, -0.543824685211534], [None, -1.101236106768607]],
         "start_time": [ts[0] for ts in TRAIN_1_TIMES],
         "time": TRAIN_1_TIMES,
     },
@@ -128,7 +128,7 @@ WANT_EVENT_SEQ_TRAIN_1 = pl.DataFrame(
         "patient_id": [68729, 814703],
         "time_delta_days": ts_to_time_delta_days(TRAIN_1_TIMES),
         "code": [[[5], [3, 10, 11], [4]], [[5], [2, 10, 11], [4]]],
-        "numerical_value": [
+        "numeric_value": [
             [[float("nan")], [float("nan"), -1.4474752256589318, -0.3404937241380279], [float("nan")]],
             [[float("nan")], [float("nan"), 3.0046677515276268, 0.8490746914901316], [float("nan")]],
         ],
@@ -142,7 +142,7 @@ WANT_SCHEMAS_TUNING_0 = pl.DataFrame(
     {
         "patient_id": [754281],
         "code": [[7, 9]],
-        "numerical_value": [[None, 0.28697820001946645]],
+        "numeric_value": [[None, 0.28697820001946645]],
         "start_time": [ts[0] for ts in TUNING_0_TIMES],
         "time": TUNING_0_TIMES,
     },
@@ -154,7 +154,7 @@ WANT_EVENT_SEQ_TUNING_0 = pl.DataFrame(
         "patient_id": [754281],
         "time_delta_days": ts_to_time_delta_days(TUNING_0_TIMES),
         "code": [[[5], [3, 10, 11], [4]]],
-        "numerical_value": [
+        "numeric_value": [
             [[float("nan")], [float("nan"), 1.5135699848214401, 0.6939135937995033], [float("nan")]]
         ],
     },
@@ -176,7 +176,7 @@ WANT_SCHEMAS_HELD_OUT_0 = pl.DataFrame(
     {
         "patient_id": [1500733],
         "code": [[7, 9]],
-        "numerical_value": [[None, -0.7995957679188177]],
+        "numeric_value": [[None, -0.7995957679188177]],
         "start_time": [ts[0] for ts in HELD_OUT_0_TIMES],
         "time": HELD_OUT_0_TIMES,
     },
@@ -188,7 +188,7 @@ WANT_EVENT_SEQ_HELD_OUT_0 = pl.DataFrame(
         "patient_id": [1500733],
         "time_delta_days": ts_to_time_delta_days(HELD_OUT_0_TIMES),
         "code": [[[5], [2, 10, 11], [10, 11], [10, 11], [4]]],
-        "numerical_value": [
+        "numeric_value": [
             [
                 [float("nan")],
                 [float("nan"), -1.1619458660768958, 0.7973543255932579],

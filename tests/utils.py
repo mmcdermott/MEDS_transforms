@@ -12,7 +12,7 @@ MEDS_PL_SCHEMA = {
     "patient_id": pl.UInt32,
     "time": pl.Datetime("us"),
     "code": pl.Utf8,
-    "numerical_value": pl.Float64,
+    "numeric_value": pl.Float64,
 }
 
 

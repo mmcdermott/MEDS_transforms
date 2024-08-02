@@ -78,7 +78,7 @@ Cut-off: 96.52486154259438, 100.39181021033531
 """  # noqa: E501
 
 WANT_TRAIN_0 = """
-patient_id,time,code,numerical_value,numerical_value/is_inlier
+patient_id,time,code,numeric_value,numeric_value/is_inlier
 239684,,EYE_COLOR//BROWN,,
 239684,,HEIGHT,,false
 239684,"12/28/1980, 00:00:00",DOB,,
@@ -112,7 +112,7 @@ patient_id,time,code,numerical_value,numerical_value/is_inlier
 """
 
 WANT_TRAIN_1 = """
-patient_id,time,code,numerical_value,numerical_value/is_inlier
+patient_id,time,code,numeric_value,numeric_value/is_inlier
 68729,,EYE_COLOR//HAZEL,,
 68729,,HEIGHT,160.3953106166676,true
 68729,"03/09/1978, 00:00:00",DOB,,
@@ -130,7 +130,7 @@ patient_id,time,code,numerical_value,numerical_value/is_inlier
 """
 
 WANT_TUNING_0 = """
-patient_id,time,code,numerical_value,numerical_value/is_inlier
+patient_id,time,code,numeric_value,numeric_value/is_inlier
 754281,,EYE_COLOR//BROWN,,
 754281,,HEIGHT,166.22261567137025,true
 754281,"12/19/1988, 00:00:00",DOB,,
@@ -141,7 +141,7 @@ patient_id,time,code,numerical_value,numerical_value/is_inlier
 """
 
 WANT_HELD_OUT_0 = """
-patient_id,time,code,numerical_value,numerical_value/is_inlier
+patient_id,time,code,numeric_value,numeric_value/is_inlier
 1500733,,EYE_COLOR//BROWN,,
 1500733,,HEIGHT,158.60131573580904,true
 1500733,"07/20/1986, 00:00:00",DOB,,
@@ -164,7 +164,7 @@ WANT_SHARDS = parse_meds_csvs(
     },
     schema={
         **MEDS_PL_SCHEMA,
-        "numerical_value/is_inlier": pl.Boolean,
+        "numeric_value/is_inlier": pl.Boolean,
     },
 )
 

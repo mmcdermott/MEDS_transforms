@@ -6,7 +6,7 @@ continuous time sequence into a temporal sequence at the level that will be cons
 
 All these functions take in _normalized_ data -- meaning data where there are _no longer_ any code modifiers,
 as those have been normalized alongside codes into integer indices (in the output code column). The only
-columns of concern here thus are `patient_id`, `time`, `code`, `numerical_value`.
+columns of concern here thus are `patient_id`, `time`, `code`, `numeric_value`.
 """
 
 import json
@@ -74,29 +74,29 @@ def split_static_and_dynamic(df: pl.LazyFrame) -> tuple[pl.LazyFrame, pl.LazyFra
         ...     "patient_id": [1, 1, 2, 2],
         ...     "time": [None, datetime(2021, 1, 1), None, datetime(2021, 1, 2)],
         ...     "code": [100, 101, 200, 201],
-        ...     "numerical_value": [1.0, 2.0, 3.0, 4.0]
+        ...     "numeric_value": [1.0, 2.0, 3.0, 4.0]
         ... }).lazy()
         >>> static, dynamic = split_static_and_dynamic(df)
         >>> static.collect()
         shape: (2, 3)
-        ┌────────────┬──────┬─────────────────┐
-        │ patient_id ┆ code ┆ numerical_value │
-        │ ---        ┆ ---  ┆ ---             │
-        │ i64        ┆ i64  ┆ f64             │
-        ╞════════════╪══════╪═════════════════╡
-        │ 1          ┆ 100  ┆ 1.0             │
-        │ 2          ┆ 200  ┆ 3.0             │
-        └────────────┴──────┴─────────────────┘
+        ┌────────────┬──────┬───────────────┐
+        │ patient_id ┆ code ┆ numeric_value │
+        │ ---        ┆ ---  ┆ ---           │
+        │ i64        ┆ i64  ┆ f64           │
+        ╞════════════╪══════╪═══════════════╡
+        │ 1          ┆ 100  ┆ 1.0           │
+        │ 2          ┆ 200  ┆ 3.0           │
+        └────────────┴──────┴───────────────┘
         >>> dynamic.collect()
         shape: (2, 4)
-        ┌────────────┬─────────────────────┬──────┬─────────────────┐
-        │ patient_id ┆ time                ┆ code ┆ numerical_value │
-        │ ---        ┆ ---                 ┆ ---  ┆ ---             │
-        │ i64        ┆ datetime[μs]        ┆ i64  ┆ f64             │
-        ╞════════════╪═════════════════════╪══════╪═════════════════╡
-        │ 1          ┆ 2021-01-01 00:00:00 ┆ 101  ┆ 2.0             │
-        │ 2          ┆ 2021-01-02 00:00:00 ┆ 201  ┆ 4.0             │
-        └────────────┴─────────────────────┴──────┴─────────────────┘
+        ┌────────────┬─────────────────────┬──────┬───────────────┐
+        │ patient_id ┆ time                ┆ code ┆ numeric_value │
+        │ ---        ┆ ---                 ┆ ---  ┆ ---           │
+        │ i64        ┆ datetime[μs]        ┆ i64  ┆ f64           │
+        ╞════════════╪═════════════════════╪══════╪═══════════════╡
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ 101  ┆ 2.0           │
+        │ 2          ┆ 2021-01-02 00:00:00 ┆ 201  ┆ 4.0           │
+        └────────────┴─────────────────────┴──────┴───────────────┘
     """
 
     static = df.filter(pl.col("time").is_null()).drop("time")
@@ -122,19 +122,19 @@ def extract_statics_and_schema(df: pl.LazyFrame) -> pl.LazyFrame:
         ...         None, datetime(2021, 1, 1), datetime(2021, 1, 1), datetime(2021, 1, 13),
         ...         None, datetime(2021, 1, 2), datetime(2021, 1, 2)],
         ...     "code": [100, 101, 102, 103, 200, 201, 202],
-        ...     "numerical_value": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+        ...     "numeric_value": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
         ... }).lazy()
         >>> df = extract_statics_and_schema(df).collect()
         >>> df.drop("time")
         shape: (2, 4)
-        ┌────────────┬───────────┬─────────────────┬─────────────────────┐
-        │ patient_id ┆ code      ┆ numerical_value ┆ start_time          │
-        │ ---        ┆ ---       ┆ ---             ┆ ---                 │
-        │ i64        ┆ list[i64] ┆ list[f64]       ┆ datetime[μs]        │
-        ╞════════════╪═══════════╪═════════════════╪═════════════════════╡
-        │ 1          ┆ [100]     ┆ [1.0]           ┆ 2021-01-01 00:00:00 │
-        │ 2          ┆ [200]     ┆ [5.0]           ┆ 2021-01-02 00:00:00 │
-        └────────────┴───────────┴─────────────────┴─────────────────────┘
+        ┌────────────┬───────────┬───────────────┬─────────────────────┐
+        │ patient_id ┆ code      ┆ numeric_value ┆ start_time          │
+        │ ---        ┆ ---       ┆ ---           ┆ ---                 │
+        │ i64        ┆ list[i64] ┆ list[f64]     ┆ datetime[μs]        │
+        ╞════════════╪═══════════╪═══════════════╪═════════════════════╡
+        │ 1          ┆ [100]     ┆ [1.0]         ┆ 2021-01-01 00:00:00 │
+        │ 2          ┆ [200]     ┆ [5.0]         ┆ 2021-01-02 00:00:00 │
+        └────────────┴───────────┴───────────────┴─────────────────────┘
         >>> df.select("patient_id", "time").explode("time")
         shape: (3, 2)
         ┌────────────┬─────────────────────┐
@@ -150,8 +150,8 @@ def extract_statics_and_schema(df: pl.LazyFrame) -> pl.LazyFrame:
 
     static, dynamic = split_static_and_dynamic(df)
 
-    # This collects static data by patient ID and stores only (as a list) the codes and numerical values.
-    static_by_patient = static.group_by("patient_id", maintain_order=True).agg("code", "numerical_value")
+    # This collects static data by patient ID and stores only (as a list) the codes and numeric values.
+    static_by_patient = static.group_by("patient_id", maintain_order=True).agg("code", "numeric_value")
 
     # This collects the unique times for each patient.
     schema_by_patient = dynamic.group_by("patient_id", maintain_order=True).agg(
@@ -176,7 +176,7 @@ def extract_seq_of_patient_events(df: pl.LazyFrame) -> pl.LazyFrame:
             - `patient_id`: The patient ID.
             - `time_delta_days`: The time delta in days, as a list of floats (ragged).
             - `code`: The code, as a list of lists of ints (ragged in both levels).
-            - `numerical_value`: The numerical value as a list of lists of floats (ragged in both levels).
+            - `numeric_value`: The numeric value as a list of lists of floats (ragged in both levels).
 
     Examples:
         >>> from datetime import datetime
@@ -186,12 +186,12 @@ def extract_seq_of_patient_events(df: pl.LazyFrame) -> pl.LazyFrame:
         ...         None, datetime(2021, 1, 1), datetime(2021, 1, 1), datetime(2021, 1, 13),
         ...         None, datetime(2021, 1, 2), datetime(2021, 1, 2)],
         ...     "code": [100, 101, 102, 103, 200, 201, 202],
-        ...     "numerical_value": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+        ...     "numeric_value": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
         ... }).lazy()
         >>> extract_seq_of_patient_events(df).collect()
         shape: (2, 4)
         ┌────────────┬─────────────────┬───────────────────────────┬─────────────────────┐
-        │ patient_id ┆ time_delta_days ┆ code                      ┆ numerical_value     │
+        │ patient_id ┆ time_delta_days ┆ code                      ┆ numeric_value       │
         │ ---        ┆ ---             ┆ ---                       ┆ ---                 │
         │ i64        ┆ list[f64]       ┆ list[list[f64]]           ┆ list[list[f64]]     │
         ╞════════════╪═════════════════╪═══════════════════════════╪═════════════════════╡
@@ -206,12 +206,12 @@ def extract_seq_of_patient_events(df: pl.LazyFrame) -> pl.LazyFrame:
 
     return (
         dynamic.group_by("patient_id", "time", maintain_order=True)
-        .agg(fill_to_nans("code").name.keep(), fill_to_nans("numerical_value").name.keep())
+        .agg(fill_to_nans("code").name.keep(), fill_to_nans("numeric_value").name.keep())
         .group_by("patient_id", maintain_order=True)
         .agg(
             fill_to_nans(time_delta_days_expr).alias("time_delta_days"),
             "code",
-            "numerical_value",
+            "numeric_value",
         )
     )
 
