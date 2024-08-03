@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """A polars-to-polars transformation function for filtering patients by sequence length."""
 from collections.abc import Callable
-from pathlib import Path
 
 import hydra
 import polars as pl
@@ -12,7 +11,7 @@ from MEDS_transforms.mapreduce.mapper import map_over
 
 
 def occlude_outliers_fntr(
-    stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifier_columns: list[str] | None = None
+    stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Filters patient events to only encompass those with a set of permissible codes.
 
@@ -62,12 +61,12 @@ def occlude_outliers_fntr(
         return lambda df: df
 
     join_cols = ["code"]
-    if code_modifier_columns:
-        join_cols.extend(code_modifier_columns)
+    if code_modifiers:
+        join_cols.extend(code_modifiers)
 
     cols_to_select = ["code"]
-    if code_modifier_columns:
-        cols_to_select.extend(code_modifier_columns)
+    if code_modifiers:
+        cols_to_select.extend(code_modifiers)
 
     mean_col = pl.col("values/sum") / pl.col("values/n_occurrences")
     stddev_col = (pl.col("values/sum_sqd") / pl.col("values/n_occurrences") - mean_col**2) ** 0.5
@@ -108,12 +107,7 @@ def occlude_outliers_fntr(
 def main(cfg: DictConfig):
     """TODO."""
 
-    code_metadata = pl.read_parquet(
-        Path(cfg.stage_cfg.metadata_input_dir) / "codes.parquet", use_pyarrow=True
-    )
-    compute_fn = occlude_outliers_fntr(cfg.stage_cfg, code_metadata)
-
-    map_over(cfg, compute_fn=compute_fn)
+    map_over(cfg, compute_fn=occlude_outliers_fntr)
 
 
 if __name__ == "__main__":
