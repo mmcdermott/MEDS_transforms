@@ -33,6 +33,7 @@ if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
 
     # Transforms
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT = transforms_root / "add_time_derived_measurements.py"
+    REORDER_MEASUREMENTS_SCRIPT = transforms_root / "reorder_measurements.py"
     NORMALIZATION_SCRIPT = transforms_root / "normalization.py"
     OCCLUDE_OUTLIERS_SCRIPT = transforms_root / "occlude_outliers.py"
     TENSORIZATION_SCRIPT = transforms_root / "tensorization.py"
@@ -47,6 +48,7 @@ else:
 
     # Transforms
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT = "MEDS_transform-add_time_derived_measurements"
+    REORDER_MEASUREMENTS_SCRIPT = "MEDS_transform-reorder_measurements"
     NORMALIZATION_SCRIPT = "MEDS_transform-normalization"
     OCCLUDE_OUTLIERS_SCRIPT = "MEDS_transform-occlude_outliers"
     TENSORIZATION_SCRIPT = "MEDS_transform-tensorization"
