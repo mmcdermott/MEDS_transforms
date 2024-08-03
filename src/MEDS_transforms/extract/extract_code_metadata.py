@@ -412,7 +412,8 @@ def main(cfg: DictConfig):
 
     reduced = reducer_fn(*[pl.scan_parquet(fp, glob=False) for fp in all_out_fps])
     join_cols = ["code", *cfg.get("code_modifier_cols", [])]
-    metadata_cols = [c for c in reduced.columns if c not in join_cols]
+    reduced_cols = reduced.collect_schema().names()
+    metadata_cols = [c for c in reduced_cols if c not in join_cols]
 
     n_unique_obs = reduced.select(pl.n_unique(*join_cols)).collect().item()
     n_rows = reduced.select(pl.count()).collect().item()
@@ -421,11 +422,12 @@ def main(cfg: DictConfig):
     if n_unique_obs != n_rows:
         aggs = {c: pl.col(c) for c in metadata_cols if c not in MEDS_METADATA_MANDATORY_TYPES}
         if "description" in metadata_cols:
-            aggs["description"] = pl.col("description").list.join(cfg.stage_cfg.description_separator)
+            separator = cfg.stage_cfg.description_separator
+            aggs["description"] = pl.col("description").str.concat(separator)
         if "parent_codes" in metadata_cols:
-            aggs["parent_codes"] = pl.col("parent_codes").explode().implode()
+            aggs["parent_codes"] = pl.col("parent_codes").explode()
 
-        reduced = reduced.group_by(join_cols).agg(*(pl.col(c) for c in metadata_cols))
+        reduced = reduced.group_by(join_cols).agg(**aggs)
 
     reduced = reduced.collect()
 

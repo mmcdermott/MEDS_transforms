@@ -252,7 +252,6 @@ def main(cfg: DictConfig):
             write_lazyframe,
             extract_statics_and_schema,
             do_return=False,
-            cache_intermediate=False,
             do_overwrite=cfg.do_overwrite,
         )
 
@@ -265,7 +264,6 @@ def main(cfg: DictConfig):
             write_lazyframe,
             extract_seq_of_patient_events,
             do_return=False,
-            cache_intermediate=False,
             do_overwrite=cfg.do_overwrite,
         )
 
