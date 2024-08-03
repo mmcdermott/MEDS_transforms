@@ -9,7 +9,6 @@ from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over
-from MEDS_transforms.utils import hydra_loguru_init
 
 
 def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[[pl.DataFrame], pl.DataFrame]:
@@ -403,9 +402,7 @@ def add_time_derived_measurements_fntr(stage_cfg: DictConfig) -> Callable[[pl.La
 def main(cfg: DictConfig):
     """Adds time-derived measurements to a MEDS cohort as separate observations at each unique time."""
 
-    hydra_loguru_init()
-    compute_fn = add_time_derived_measurements_fntr(cfg.stage_cfg)
-    map_over(cfg, compute_fn=compute_fn)
+    map_over(cfg, compute_fn=add_time_derived_measurements_fntr)
 
 
 if __name__ == "__main__":
