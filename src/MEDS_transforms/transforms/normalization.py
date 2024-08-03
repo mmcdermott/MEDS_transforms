@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """Transformations for normalizing MEDS datasets, across both categorical and continuous dimensions."""
 
-from functools import partial
-from pathlib import Path
 
 import hydra
 import polars as pl
@@ -13,7 +11,7 @@ from MEDS_transforms.mapreduce.mapper import map_over
 
 
 def normalize(
-    df: pl.LazyFrame, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
+    df: pl.LazyFrame, code_metadata: pl.DataFrame, code_modifiers: list[str] | None = None
 ) -> pl.LazyFrame:
     """Normalize a MEDS dataset across both categorical and continuous dimensions.
 
@@ -99,7 +97,7 @@ def normalize(
         ...         "values/std": pl.Float64,
         ...     },
         ... )
-        >>> normalize(MEDS_df.lazy(), code_metadata.lazy()).collect()
+        >>> normalize(MEDS_df.lazy(), code_metadata).collect()
         shape: (6, 4)
         ┌────────────┬─────────────────────┬──────┬───────────────┐
         │ patient_id ┆ time                ┆ code ┆ numeric_value │
@@ -153,7 +151,7 @@ def normalize(
         ...         "values/std": pl.Float64,
         ...     },
         ... )
-        >>> normalize(MEDS_df.lazy(), code_metadata.lazy(), ["unit"]).collect()
+        >>> normalize(MEDS_df.lazy(), code_metadata, ["unit"]).collect()
         shape: (6, 4)
         ┌────────────┬─────────────────────┬──────┬───────────────┐
         │ patient_id ┆ time                ┆ code ┆ numeric_value │
@@ -177,7 +175,7 @@ def normalize(
     mean_col = pl.col("values/sum") / pl.col("values/n_occurrences")
     stddev_col = (pl.col("values/sum_sqd") / pl.col("values/n_occurrences") - mean_col**2) ** 0.5
 
-    code_metadata_columns = set(code_metadata.collect_schema().names())
+    code_metadata_columns = set(code_metadata.columns)
     if "values/mean" in code_metadata_columns:
         cols_to_select.append("values/mean")
     else:
@@ -196,7 +194,7 @@ def normalize(
     return (
         df.with_row_index(idx_col)
         .join(
-            code_metadata.select(cols_to_select),
+            code_metadata.lazy().select(cols_to_select),
             on=["code"] + code_modifiers,
             how="inner",
             join_nulls=True,
@@ -219,13 +217,7 @@ def normalize(
 def main(cfg: DictConfig):
     """TODO."""
 
-    code_metadata = pl.read_parquet(
-        Path(cfg.stage_cfg.metadata_input_dir) / "codes.parquet", use_pyarrow=True
-    ).lazy()
-    code_modifiers = cfg.get("code_modifier_columns", None)
-    compute_fn = partial(normalize, code_metadata=code_metadata, code_modifiers=code_modifiers)
-
-    map_over(cfg, compute_fn=compute_fn)
+    map_over(cfg, compute_fn=normalize)
 
 
 if __name__ == "__main__":
