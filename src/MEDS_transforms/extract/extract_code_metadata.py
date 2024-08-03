@@ -13,7 +13,7 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_transforms.extract import CONFIG_YAML
+from MEDS_transforms.extract import CONFIG_YAML, MEDS_METADATA_MANDATORY_TYPES
 from MEDS_transforms.extract.convert_to_sharded_events import get_code_expr
 from MEDS_transforms.extract.parser import cfg_to_expr
 from MEDS_transforms.extract.utils import get_supported_fp
@@ -72,7 +72,7 @@ def extract_metadata(
         ┌───────────┬──────────┐
         │ code      ┆ desc     │
         │ ---       ┆ ---      │
-        │ cat       ┆ str      │
+        │ str       ┆ str      │
         ╞═══════════╪══════════╡
         │ FOO//A//1 ┆ Code A-1 │
         │ FOO//B//2 ┆ B-2      │
@@ -84,7 +84,7 @@ def extract_metadata(
         ┌───────────┬──────────┐
         │ code      ┆ desc     │
         │ ---       ┆ ---      │
-        │ cat       ┆ str      │
+        │ str       ┆ str      │
         ╞═══════════╪══════════╡
         │ FOO//A//1 ┆ Code A-1 │
         │ FOO//C//3 ┆ C with 3 │
@@ -98,7 +98,8 @@ def extract_metadata(
             ...
         TypeError: Event configuration must be a dictionary. Got: <class 'list'> ['foo'].
 
-    You can also manipulate the columns in more complex ways when assigning metadata from the input source.
+    You can also manipulate the columns in more complex ways when assigning metadata from the input source,
+    and mandatory MEDS metadata columns will be cast to the correct types:
         >>> raw_metadata = pl.DataFrame({
         ...     "code": ["A", "A", "C", "D"],
         ...     "code_modifier": ["1", "1", "2", "3"],
@@ -109,8 +110,8 @@ def extract_metadata(
         >>> event_cfg = {
         ...     "code": ["FOO", "col(code)", "col(code_modifier)"],
         ...     "_metadata": {
-        ...         "desc": ["special_title", "title"],
-        ...         "parent_code": [
+        ...         "description": ["special_title", "title"],
+        ...         "parent_codes": [
         ...             {"OUT_VAL/{code_modifier}/2": {"code_modifier_2": "2"}},
         ...             {"OUT_VAL_for_3/{code_modifier}": {"code_modifier_2": "3"}},
         ...             {
@@ -122,16 +123,16 @@ def extract_metadata(
         ... }
         >>> extract_metadata(raw_metadata, event_cfg)
         shape: (4, 3)
-        ┌───────────┬───────┬─────────────────┐
-        │ code      ┆ desc  ┆ parent_code     │
-        │ ---       ┆ ---   ┆ ---             │
-        │ cat       ┆ str   ┆ str             │
-        ╞═══════════╪═══════╪═════════════════╡
-        │ FOO//A//1 ┆ used  ┆ null            │
-        │ FOO//A//1 ┆ A-1-2 ┆ OUT_VAL/1/2     │
-        │ FOO//C//2 ┆ C-2-3 ┆ OUT_VAL_for_3/2 │
-        │ FOO//D//3 ┆ null  ┆ expanded form   │
-        └───────────┴───────┴─────────────────┘
+        ┌───────────┬─────────────┬─────────────────────┐
+        │ code      ┆ description ┆ parent_codes        │
+        │ ---       ┆ ---         ┆ ---                 │
+        │ str       ┆ str         ┆ list[str]           │
+        ╞═══════════╪═════════════╪═════════════════════╡
+        │ FOO//A//1 ┆ used        ┆ null                │
+        │ FOO//A//1 ┆ A-1-2       ┆ ["OUT_VAL/1/2"]     │
+        │ FOO//C//2 ┆ C-2-3       ┆ ["OUT_VAL_for_3/2"] │
+        │ FOO//D//3 ┆ null        ┆ ["expanded form"]   │
+        └───────────┴─────────────┴─────────────────────┘
     """
     event_cfg = copy.deepcopy(event_cfg)
 
@@ -176,6 +177,14 @@ def extract_metadata(
 
     metadata_df = metadata_df.filter(~pl.all_horizontal(*[pl.col(c).is_null() for c in final_cols]))
 
+    for mandatory_col, mandatory_type in MEDS_METADATA_MANDATORY_TYPES.items():
+        if mandatory_col not in final_cols:
+            continue
+
+        if metadata_df.schema[mandatory_col] is not mandatory_type:
+            logger.warning(f"Metadata column '{mandatory_col}' must be of type {mandatory_type}. Casting.")
+            metadata_df = metadata_df.with_columns(pl.col(mandatory_col).cast(mandatory_type), strict=False)
+
     return metadata_df.unique(maintain_order=True).select("code", *final_cols)
 
 
@@ -215,7 +224,7 @@ def extract_all_metadata(
         ┌───────────┬──────────┬───────┐
         │ code      ┆ desc     ┆ desc2 │
         │ ---       ┆ ---      ┆ ---   │
-        │ cat       ┆ str      ┆ str   │
+        │ str       ┆ str      ┆ str   │
         ╞═══════════╪══════════╪═══════╡
         │ FOO//A//1 ┆ Code A-1 ┆ null  │
         │ BAR//B//2 ┆ null     ┆ B-2   │
@@ -312,7 +321,33 @@ def get_events_and_metadata_by_metadata_fp(event_configs: dict | DictConfig) -> 
 
 @hydra.main(version_base=None, config_path=str(CONFIG_YAML.parent), config_name=CONFIG_YAML.stem)
 def main(cfg: DictConfig):
-    """TODO."""
+    """Extracts any dataset-specific metadata and adds it to any existing code metadata file.
+
+    This script can extract arbitrary, code-linked metadata columns from input mappings and add them to the
+    `metadata/codes.parquet` file. The metadata columns are extracted from the raw metadata files using a
+    parsing DSL that is specified in the `event_conversion_config_fp` file. See `parser.py` for more details
+    on this DSL.
+
+    Note that there are two sentinel columns in the output metadata that have certain mandates for MEDS
+    compliance: The `description` column and the `parent_codes` column. The `description` column must be a
+    string, and if there are multiple matches in the extracted metadata for a code, in this script they will
+    be concatenated into a single string with the `description_separator` string. The `parent_codes` column
+    must be a list of strings, each formatted as an OMOP vocabulary name, followed by a "/", followed by the
+    OMOP concept code. This column is used to link codes to their parent codes in the OMOP vocabulary.
+
+    All arguments are specified through the command line into the `cfg` object through Hydra.
+
+    The `cfg.stage_cfg` object is a special key that is imputed by OmegaConf to contain the stage-specific
+    configuration arguments based on the global, pipeline-level configuration file. It cannot be overwritten
+    directly on the command line, but can be overwritten implicitly by overwriting components of the
+    `stage_configs.extract_code_metadata` key.
+
+    Args:
+        stage_configs.extract_code_metadata.description_separator: If there are multiple metadata matches for
+            a row, this string will be used as a separator to join the matches for the sentinel
+            `"description"` column into a single string in the output metadata, per compliance with the MEDS
+            schema.
+    """
 
     stage_input_dir, partial_metadata_dir, _, _ = stage_init(cfg)
     raw_input_dir = Path(cfg.input_dir)
@@ -377,24 +412,35 @@ def main(cfg: DictConfig):
 
     reduced = reducer_fn(*[pl.scan_parquet(fp, glob=False) for fp in all_out_fps])
     join_cols = ["code", *cfg.get("code_modifier_cols", [])]
-    metadata_cols = [c for c in reduced.columns if c not in join_cols]
+    reduced_cols = reduced.collect_schema().names()
+    metadata_cols = [c for c in reduced_cols if c not in join_cols]
 
     n_unique_obs = reduced.select(pl.n_unique(*join_cols)).collect().item()
     n_rows = reduced.select(pl.count()).collect().item()
     logger.info(f"Collected metadata for {n_unique_obs} unique codes among {n_rows} total observations.")
 
     if n_unique_obs != n_rows:
-        reduced = reduced.group_by(join_cols).agg(*(pl.col(c) for c in metadata_cols)).collect()
-    else:
-        reduced = reduced.collect()
+        aggs = {c: pl.col(c) for c in metadata_cols if c not in MEDS_METADATA_MANDATORY_TYPES}
+        if "description" in metadata_cols:
+            separator = cfg.stage_cfg.description_separator
+            aggs["description"] = pl.col("description").str.concat(separator)
+        if "parent_codes" in metadata_cols:
+            aggs["parent_codes"] = pl.col("parent_codes").explode()
 
-    reducer_fp = Path(cfg.cohort_dir) / "code_metadata.parquet"
+        reduced = reduced.group_by(join_cols).agg(**aggs)
 
-    if reducer_fp.exists():
-        logger.info(f"Joining to existing code metadata at {str(reducer_fp.resolve())}")
-        existing = pl.read_parquet(reducer_fp, use_pyarrow=True)
+    reduced = reduced.collect()
+
+    metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
+    old_metadata_fp = metadata_input_dir / "codes.parquet"
+
+    if old_metadata_fp.exists():
+        logger.info(f"Joining to existing code metadata at {str(old_metadata_fp.resolve())}")
+        existing = pl.read_parquet(old_metadata_fp, use_pyarrow=True)
         reduced = existing.join(reduced, on=join_cols, how="full", coalesce=True)
 
+    reducer_fp = Path(cfg.stage_cfg.reducer_output_dir) / "codes.parquet"
+    reducer_fp.parent.mkdir(parents=True, exist_ok=True)
     reduced.write_parquet(reducer_fp, use_pyarrow=True)
     logger.info(f"Finished reduction in {datetime.now() - start}")
 

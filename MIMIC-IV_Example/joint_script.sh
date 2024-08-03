@@ -51,6 +51,8 @@ MEDS_extract-shard_events \
     cohort_dir="$MIMICIV_MEDS_DIR" \
     stage="shard_events" \
     stage_configs.shard_events.infer_schema_length=999999999 \
+    etl_metadata.dataset_name="MIMIC-IV" \
+    etl_metadata.dataset_version="2.2" \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
 
 echo "Splitting patients in serial"
@@ -58,6 +60,8 @@ MEDS_extract-split_and_shard_patients \
     input_dir="$MIMICIV_PREMEDS_DIR" \
     cohort_dir="$MIMICIV_MEDS_DIR" \
     stage="split_and_shard_patients" \
+    etl_metadata.dataset_name="MIMIC-IV" \
+    etl_metadata.dataset_version="2.2" \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
 
 echo "Converting to sharded events with $N_PARALLEL_WORKERS workers in parallel"
@@ -68,6 +72,8 @@ MEDS_extract-convert_to_sharded_events \
     input_dir="$MIMICIV_PREMEDS_DIR" \
     cohort_dir="$MIMICIV_MEDS_DIR" \
     stage="convert_to_sharded_events" \
+    etl_metadata.dataset_name="MIMIC-IV" \
+    etl_metadata.dataset_version="2.2" \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
 
 echo "Merging to a MEDS cohort with $N_PARALLEL_WORKERS workers in parallel"
@@ -77,7 +83,9 @@ MEDS_extract-merge_to_MEDS_cohort \
     hydra/launcher=joblib \
     input_dir="$MIMICIV_PREMEDS_DIR" \
     cohort_dir="$MIMICIV_MEDS_DIR" \
-    stage="merge_to_MEDS_cohort"
+    stage="merge_to_MEDS_cohort" \
+    etl_metadata.dataset_name="MIMIC-IV" \
+    etl_metadata.dataset_version="2.2" \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
 
 echo "Aggregating initial code stats with $N_PARALLEL_WORKERS workers in parallel"
@@ -88,13 +96,38 @@ MEDS_transform-aggregate_code_metadata \
     hydra/launcher=joblib \
     input_dir="$MIMICIV_PREMEDS_DIR" \
     cohort_dir="$MIMICIV_MEDS_DIR" \
-    stage="aggregate_code_metadata"
+    stage="aggregate_code_metadata" \
+    etl_metadata.dataset_name="MIMIC-IV" \
+    etl_metadata.dataset_version="2.2" \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
 
 # TODO -- make this the pre-meds dir and have the pre-meds script symlink
-echo "Collecting code metadata with $N_PARALLEL_WORKERS workers in parallel"
+echo "Collecting code metadata in serial."
 MEDS_extract-extract_code_metadata \
     input_dir="$MIMICIV_RAW_DIR" \
     cohort_dir="$MIMICIV_MEDS_DIR" \
     stage="extract_code_metadata" \
+    etl_metadata.dataset_name="MIMIC-IV" \
+    etl_metadata.dataset_version="2.2" \
+    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
+
+echo "Finalizing MEDS data with $N_PARALLEL_WORKERS workers in parallel"
+MEDS_extract-finalize_MEDS_data \
+    --multirun \
+    worker="range(0,$N_PARALLEL_WORKERS)" \
+    hydra/launcher=joblib \
+    input_dir="$MIMICIV_RAW_DIR" \
+    cohort_dir="$MIMICIV_MEDS_DIR" \
+    stage="finalize_MEDS_data" \
+    etl_metadata.dataset_name="MIMIC-IV" \
+    etl_metadata.dataset_version="2.2" \
+    event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
+
+echo "Finalizing MEDS metadata in serial."
+MEDS_extract-finalize_MEDS_metadata \
+    input_dir="$MIMICIV_RAW_DIR" \
+    cohort_dir="$MIMICIV_MEDS_DIR" \
+    stage="finalize_MEDS_metadata" \
+    etl_metadata.dataset_name="MIMIC-IV" \
+    etl_metadata.dataset_version="2.2" \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"

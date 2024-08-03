@@ -52,8 +52,6 @@ else:
     TENSORIZATION_SCRIPT = "MEDS_transform-tensorization"
     TOKENIZATION_SCRIPT = "MEDS_transform-tokenization"
 
-pl.enable_string_cache()
-
 # Test MEDS data (inputs)
 
 SPLITS = {
@@ -64,7 +62,7 @@ SPLITS = {
 }
 
 MEDS_TRAIN_0 = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 239684,,EYE_COLOR//BROWN,
 239684,,HEIGHT,175.271115221764
 239684,"12/28/1980, 00:00:00",DOB,
@@ -98,7 +96,7 @@ patient_id,timestamp,code,numerical_value
 """
 
 MEDS_TRAIN_1 = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 68729,,EYE_COLOR//HAZEL,
 68729,,HEIGHT,160.3953106166676
 68729,"03/09/1978, 00:00:00",DOB,
@@ -116,7 +114,7 @@ patient_id,timestamp,code,numerical_value
 """
 
 MEDS_TUNING_0 = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 754281,,EYE_COLOR//BROWN,
 754281,,HEIGHT,166.22261567137025
 754281,"12/19/1988, 00:00:00",DOB,
@@ -127,7 +125,7 @@ patient_id,timestamp,code,numerical_value
 """
 
 MEDS_HELD_OUT_0 = """
-patient_id,timestamp,code,numerical_value
+patient_id,time,code,numeric_value
 1500733,,EYE_COLOR//BROWN,
 1500733,,HEIGHT,158.60131573580904
 1500733,"07/20/1986, 00:00:00",DOB,
@@ -168,7 +166,7 @@ TEMP,12,4,12,1181.4999999999998,116373.38999999998,"Body Temperature",LOINC/8310
 """
 
 MEDS_CODE_METADATA_SCHEMA = {
-    "code": pl.Categorical,
+    "code": pl.Utf8,
     "code/n_occurrences": pl.UInt8,
     "code/n_patients": pl.UInt8,
     "values/n_occurrences": pl.UInt8,
@@ -296,9 +294,14 @@ def single_stage_transform_tester(
         MEDS_dir = Path(d) / "MEDS_cohort"
         cohort_dir = Path(d) / "output_cohort"
 
+        MEDS_data_dir = MEDS_dir / "data"
+        MEDS_metadata_dir = MEDS_dir / "metadata"
+        cohort_metadata_dir = cohort_dir / "metadata"
+
         # Create the directories
-        MEDS_dir.mkdir()
-        cohort_dir.mkdir()
+        MEDS_data_dir.mkdir(parents=True)
+        MEDS_metadata_dir.mkdir(parents=True)
+        cohort_dir.mkdir(parents=True)
 
         # Write the splits
         splits_fp = MEDS_dir / "splits.json"
@@ -309,11 +312,11 @@ def single_stage_transform_tester(
 
         # Write the shards
         for shard_name, df in input_shards.items():
-            fp = MEDS_dir / f"{shard_name}.parquet"
+            fp = MEDS_data_dir / f"{shard_name}.parquet"
             fp.parent.mkdir(parents=True, exist_ok=True)
             df.write_parquet(fp, use_pyarrow=True)
 
-        code_metadata_fp = MEDS_dir / "code_metadata.parquet"
+        code_metadata_fp = MEDS_metadata_dir / "codes.parquet"
         if code_metadata is None:
             code_metadata = MEDS_CODE_METADATA
         elif isinstance(code_metadata, str):
@@ -342,10 +345,10 @@ def single_stage_transform_tester(
         # Check the output
         if isinstance(want_outputs, pl.DataFrame):
             # The want output is a code_metadata file in the root directory in this case.
-            check_df_output(cohort_dir / "code_metadata.parquet", want_outputs, stderr, stdout)
+            check_df_output(cohort_metadata_dir / "codes.parquet", want_outputs, stderr, stdout)
         else:
             for shard_name, want in want_outputs.items():
-                output_fp = cohort_dir / stage_name / f"{shard_name}{file_suffix}"
+                output_fp = cohort_dir / "data" / f"{shard_name}{file_suffix}"
                 if file_suffix == ".parquet":
                     check_df_output(output_fp, want, stderr, stdout)
                 elif file_suffix == ".nrt":
