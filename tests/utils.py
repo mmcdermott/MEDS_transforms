@@ -41,7 +41,27 @@ def parse_meds_csvs(
 def dict_to_hydra_kwargs(d: dict[str, str]) -> str:
     """Converts a dictionary to a hydra kwargs string for testing purposes.
 
-    TODO: doctests.
+    Args:
+        d: The dictionary to convert.
+
+    Returns:
+        A string representation of the dictionary in hydra kwargs (dot-list) format.
+
+    Raises:
+        ValueError: If a key in the dictionary is not dot-list compatible.
+
+    Examples:
+        >>> print(" ".join(dict_to_hydra_kwargs({"a": 1, "b": "foo", "c": {"d": 2, "f": ["foo", "bar"]}})))
+        a=1 b=foo c.d=2 'c.f=["foo", "bar"]'
+        >>> from datetime import datetime
+        >>> dict_to_hydra_kwargs({"a": 1, 2: "foo"})
+        Traceback (most recent call last):
+            ...
+        ValueError: Expected all keys to be strings, got 2
+        >>> dict_to_hydra_kwargs({"a": datetime(2021, 11, 1)})
+        Traceback (most recent call last):
+            ...
+        ValueError: Unexpected type for value for key a: <class 'datetime.datetime'>: 2021-11-01 00:00:00
     """
 
     out = []
@@ -55,19 +75,25 @@ def dict_to_hydra_kwargs(d: dict[str, str]) -> str:
                 out.append(f"{k}=false")
             case None:
                 out.append(f"~{k}")
-            case str() | int() | float() | list():
+            case str() | int() | float():
                 out.append(f"{k}={v}")
             case dict():
                 inner_kwargs = dict_to_hydra_kwargs(v)
-                for inner_kv in inner_kwargs.split():
+                for inner_kv in inner_kwargs:
                     if inner_kv.startswith("~"):
                         out.append(f"~{k}.{inner_kv[1:]}")
+                    elif inner_kv.startswith("'"):
+                        out.append(f"'{k}.{inner_kv[1:]}")
                     else:
                         out.append(f"{k}.{inner_kv}")
+            case list() | tuple():
+                v = list(v)
+                v_str_inner = ", ".join(f'"{x}"' for x in v)
+                out.append(f"'{k}=[{v_str_inner}]'")
             case _:
                 raise ValueError(f"Unexpected type for value for key {k}: {type(v)}: {v}")
 
-    return " ".join(out)
+    return out
 
 
 def run_command(
@@ -81,7 +107,7 @@ def run_command(
     command_parts = script
     if config_name is not None:
         command_parts.append(f"--config-name={config_name}")
-    command_parts.append(dict_to_hydra_kwargs(hydra_kwargs))
+    command_parts.append(" ".join(dict_to_hydra_kwargs(hydra_kwargs)))
 
     full_cmd = " ".join(command_parts)
     command_out = subprocess.run(full_cmd, shell=True, capture_output=True)

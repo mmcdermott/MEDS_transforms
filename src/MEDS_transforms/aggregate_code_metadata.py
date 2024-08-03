@@ -116,16 +116,14 @@ CODE_METADATA_AGGREGATIONS: dict[METADATA_FN, MapReducePair] = {
 }
 
 
-def validate_args_and_get_code_cols(
-    stage_cfg: DictConfig, code_modifier_columns: list[str] | None
-) -> list[str]:
-    """Validates the stage configuration and code_modifier_columns argument and returns the code group keys.
+def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[str] | None) -> list[str]:
+    """Validates the stage configuration and code_modifiers argument and returns the code group keys.
 
     Args:
         stage_cfg: The configuration object for this stage. It must contain an `aggregations` field that has a
             list of aggregations that should be applied in this stage. Each aggregation must be a string in
             the `METADATA_FN` enumeration.
-        code_modifier_columns: A list of column names that should be used in addition to the core `code`
+        code_modifiers: A list of column names that should be used in addition to the core `code`
             column to group the data before applying the aggregations. If None, only the `code` column will be
             used.
 
@@ -135,7 +133,7 @@ def validate_args_and_get_code_cols(
     Raises:
         ValueError: If the stage config either does not contain an aggregations field, contains an empty or
             mis-typed aggregations field, or contains an invalid aggregation function.
-        ValueError: If the code_modifier_columns argument is not a list of strings or None.
+        ValueError: If the code_modifiers argument is not a list of strings or None.
 
     Examples:
         >>> no_aggs_cfg = DictConfig({"other_key": "other_value"})
@@ -155,11 +153,11 @@ def validate_args_and_get_code_cols(
         >>> validate_args_and_get_code_cols(valid_cfg, 33)
         Traceback (most recent call last):
             ...
-        ValueError: code_modifier_columns must be a list of strings or None. Got 33
+        ValueError: code_modifiers must be a list of strings or None. Got 33
         >>> validate_args_and_get_code_cols(valid_cfg, [33])
         Traceback (most recent call last):
             ...
-        ValueError: code_modifier_columns must be a list of strings or None. Got [33]
+        ValueError: code_modifiers must be a list of strings or None. Got [33]
         >>> validate_args_and_get_code_cols(valid_cfg, ["modifier1"])
         ['code', 'modifier1']
         >>> validate_args_and_get_code_cols(valid_cfg, None)
@@ -179,19 +177,17 @@ def validate_args_and_get_code_cols(
                 f"{', '.join([fn.value for fn in METADATA_FN])}"
             )
 
-    match code_modifier_columns:
+    match code_modifiers:
         case None:
             return ["code"]
-        case list() | ListConfig() if all(isinstance(col, str) for col in code_modifier_columns):
-            return ["code"] + code_modifier_columns
+        case list() | ListConfig() if all(isinstance(col, str) for col in code_modifiers):
+            return ["code"] + code_modifiers
         case _:
-            raise ValueError(
-                f"code_modifier_columns must be a list of strings or None. Got {code_modifier_columns}"
-            )
+            raise ValueError(f"code_modifiers must be a list of strings or None. Got {code_modifiers}")
 
 
 def mapper_fntr(
-    stage_cfg: DictConfig, code_modifier_columns: list[str] | None
+    stage_cfg: DictConfig, code_modifiers: list[str] | None
 ) -> Callable[[pl.DataFrame], pl.DataFrame]:
     """Returns a function that extracts code metadata from a MEDS cohort shard.
 
@@ -200,7 +196,7 @@ def mapper_fntr(
             list of aggregations that should be applied in this stage. Each aggregation must be a string in
             the `METADATA_FN` enumeration, and the mapper function is specified in the
             `CODE_METADATA_AGGREGATIONS` dictionary.
-        code_modifier_columns: A list of column names that should be used in addition to the core `code`
+        code_modifiers: A list of column names that should be used in addition to the core `code`
             column to group the data before applying the aggregations. If None, only the `code` column will be
             used.
 
@@ -210,7 +206,7 @@ def mapper_fntr(
         A function that extracts the specified metadata from a MEDS cohort shard after grouping by the
         specified code & modifier columns. **Note**: The output of this function will, if
         ``stage_cfg.do_summarize_over_all_codes`` is True, contain the metadata summarizing all observations
-        across all codes and patients in the shard, with both ``code`` and all ``code_modifier_columns`` set
+        across all codes and patients in the shard, with both ``code`` and all ``code_modifiers`` set
         to `None` in the output dataframe, in the same format as the code/modifier specific rows with non-null
         values.
 
@@ -272,9 +268,9 @@ def mapper_fntr(
         │ C    ┆ 2               ┆ 1             │
         │ D    ┆ 1               ┆ 0             │
         └──────┴─────────────────┴───────────────┘
-        >>> code_modifier_columns = ["modifier1"]
+        >>> code_modifiers = ["modifier1"]
         >>> stage_cfg = DictConfig({"aggregations": ["code/n_patients", "values/n_ints"]})
-        >>> mapper = mapper_fntr(stage_cfg, ListConfig(code_modifier_columns))
+        >>> mapper = mapper_fntr(stage_cfg, ListConfig(code_modifiers))
         >>> mapper(df.lazy()).collect()
         shape: (5, 4)
         ┌──────┬───────────┬─────────────────┬───────────────┐
@@ -289,7 +285,7 @@ def mapper_fntr(
         │ D    ┆ null      ┆ 1               ┆ 0             │
         └──────┴───────────┴─────────────────┴───────────────┘
         >>> stage_cfg = DictConfig({"aggregations": ["code/n_occurrences", "values/sum"]})
-        >>> mapper = mapper_fntr(stage_cfg, code_modifier_columns)
+        >>> mapper = mapper_fntr(stage_cfg, code_modifiers)
         >>> mapper(df.lazy()).collect()
         shape: (5, 4)
         ┌──────┬───────────┬────────────────────┬────────────┐
@@ -307,7 +303,7 @@ def mapper_fntr(
         ...     "aggregations": ["code/n_occurrences", "values/sum"],
         ...     "do_summarize_over_all_codes": True,
         ... })
-        >>> mapper = mapper_fntr(stage_cfg, code_modifier_columns)
+        >>> mapper = mapper_fntr(stage_cfg, code_modifiers)
         >>> mapper(df.lazy()).collect()
         shape: (6, 4)
         ┌──────┬───────────┬────────────────────┬────────────┐
@@ -323,7 +319,7 @@ def mapper_fntr(
         │ D    ┆ null      ┆ 1                  ┆ 0.0        │
         └──────┴───────────┴────────────────────┴────────────┘
         >>> stage_cfg = DictConfig({"aggregations": ["values/n_patients", "values/n_occurrences"]})
-        >>> mapper = mapper_fntr(stage_cfg, code_modifier_columns)
+        >>> mapper = mapper_fntr(stage_cfg, code_modifiers)
         >>> mapper(df.lazy()).collect()
         shape: (5, 4)
         ┌──────┬───────────┬───────────────────┬──────────────────────┐
@@ -338,7 +334,7 @@ def mapper_fntr(
         │ D    ┆ null      ┆ 0                 ┆ 0                    │
         └──────┴───────────┴───────────────────┴──────────────────────┘
         >>> stage_cfg = DictConfig({"aggregations": ["values/sum_sqd", "values/min", "values/max"]})
-        >>> mapper = mapper_fntr(stage_cfg, code_modifier_columns)
+        >>> mapper = mapper_fntr(stage_cfg, code_modifiers)
         >>> mapper(df.lazy()).collect()
         shape: (5, 5)
         ┌──────┬───────────┬────────────────┬────────────┬────────────┐
@@ -354,7 +350,7 @@ def mapper_fntr(
         └──────┴───────────┴────────────────┴────────────┴────────────┘
     """
 
-    code_key_columns = validate_args_and_get_code_cols(stage_cfg, code_modifier_columns)
+    code_key_columns = validate_args_and_get_code_cols(stage_cfg, code_modifiers)
     aggregations = stage_cfg.aggregations
 
     agg_operations = {agg: CODE_METADATA_AGGREGATIONS[agg].mapper for agg in aggregations}
@@ -381,7 +377,7 @@ def mapper_fntr(
 
 
 def reducer_fntr(
-    stage_cfg: DictConfig, code_modifier_columns: list[str] | None = None
+    stage_cfg: DictConfig, code_modifiers: list[str] | None = None
 ) -> Callable[[Sequence[pl.DataFrame]], pl.DataFrame]:
     """Returns a function that merges different code metadata files together into an aggregated total.
 
@@ -390,7 +386,7 @@ def reducer_fntr(
             list of aggregations that should be applied in this stage. Each aggregation must be a string in
             the `METADATA_FN` enumeration, and the reduction function is specified in the
             `CODE_METADATA_AGGREGATIONS` dictionary.
-        code_modifier_columns: A list of column names that should be used in addition to the core `code`
+        code_modifiers: A list of column names that should be used in addition to the core `code`
             column to group the data before applying the aggregations. If None, only the `code` column will be
             used.
 
@@ -440,9 +436,9 @@ def reducer_fntr(
         ...     "values/min": [0],
         ...     "values/max": [2],
         ... })
-        >>> code_modifier_columns = ["modifier1"]
+        >>> code_modifiers = ["modifier1"]
         >>> stage_cfg = DictConfig({"aggregations": ["code/n_patients", "values/n_ints"]})
-        >>> reducer = reducer_fntr(stage_cfg, code_modifier_columns)
+        >>> reducer = reducer_fntr(stage_cfg, code_modifiers)
         >>> reducer(df_1, df_2, df_3)
         shape: (7, 4)
         ┌──────┬───────────┬─────────────────┬───────────────┐
@@ -459,7 +455,7 @@ def reducer_fntr(
         │ D    ┆ 1         ┆ 2               ┆ 3             │
         └──────┴───────────┴─────────────────┴───────────────┘
         >>> cfg = DictConfig({
-        ...     "code_modifier_columns": ["modifier1"],
+        ...     "code_modifiers": ["modifier1"],
         ...     "code_processing_stages": {
         ...         "stage1": ["code/n_patients", "values/n_ints"],
         ...         "stage2": ["code/n_occurrences", "values/sum"],
@@ -469,7 +465,7 @@ def reducer_fntr(
         ...     }
         ... })
         >>> stage_cfg = DictConfig({"aggregations": ["code/n_occurrences", "values/sum"]})
-        >>> reducer = reducer_fntr(stage_cfg, code_modifier_columns)
+        >>> reducer = reducer_fntr(stage_cfg, code_modifiers)
         >>> reducer(df_1, df_2, df_3)
         shape: (7, 4)
         ┌──────┬───────────┬────────────────────┬────────────┐
@@ -486,7 +482,7 @@ def reducer_fntr(
         │ D    ┆ 1         ┆ 2                  ┆ 2.0        │
         └──────┴───────────┴────────────────────┴────────────┘
         >>> stage_cfg = DictConfig({"aggregations": ["values/n_patients", "values/n_occurrences"]})
-        >>> reducer = reducer_fntr(stage_cfg, code_modifier_columns)
+        >>> reducer = reducer_fntr(stage_cfg, code_modifiers)
         >>> reducer(df_1, df_2, df_3)
         shape: (7, 4)
         ┌──────┬───────────┬───────────────────┬──────────────────────┐
@@ -503,7 +499,7 @@ def reducer_fntr(
         │ D    ┆ 1         ┆ 1                 ┆ 3                    │
         └──────┴───────────┴───────────────────┴──────────────────────┘
         >>> stage_cfg = DictConfig({"aggregations": ["values/sum_sqd", "values/min", "values/max"]})
-        >>> reducer = reducer_fntr(stage_cfg, code_modifier_columns)
+        >>> reducer = reducer_fntr(stage_cfg, code_modifiers)
         >>> reducer(df_1, df_2, df_3)
         shape: (7, 5)
         ┌──────┬───────────┬────────────────┬────────────┬────────────┐
@@ -525,7 +521,7 @@ def reducer_fntr(
         KeyError: 'Column values/min not found in DataFrame 0 for reduction.'
     """
 
-    code_key_columns = validate_args_and_get_code_cols(stage_cfg, code_modifier_columns)
+    code_key_columns = validate_args_and_get_code_cols(stage_cfg, code_modifiers)
     aggregations = stage_cfg.aggregations
 
     agg_operations = {
@@ -554,8 +550,7 @@ def reducer_fntr(
 
 def run_map_reduce(cfg: DictConfig):
     """Stored separately so it can be easily imported into the pre-built extraction pipelines."""
-    mapper_fn = mapper_fntr(cfg.stage_cfg, cfg.get("code_modifier_columns", None))
-    all_out_fps = map_over(cfg, compute_fn=mapper_fn)
+    all_out_fps = map_over(cfg, compute_fn=mapper_fntr)
 
     if cfg.worker != 0:
         logger.info("Code metadata mapping completed. Exiting")
@@ -572,7 +567,7 @@ def run_map_reduce(cfg: DictConfig):
     reducer_fp = Path(cfg.stage_cfg.reducer_output_dir) / "codes.parquet"
     reducer_fp.parent.mkdir(parents=True, exist_ok=True)
 
-    reducer_fn = reducer_fntr(cfg.stage_cfg, cfg.get("code_modifier_columns", None))
+    reducer_fn = reducer_fntr(cfg.stage_cfg, cfg.get("code_modifiers", None))
     reduced = reducer_fn(*[pl.scan_parquet(fp, glob=False) for fp in all_out_fps]).with_columns(
         cs.numeric().shrink_dtype().name.keep()
     )

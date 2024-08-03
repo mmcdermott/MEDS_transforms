@@ -10,7 +10,6 @@ from omegaconf import DictConfig
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over
-from MEDS_transforms.utils import hydra_loguru_init
 
 
 def filter_patients_by_num_measurements(df: pl.LazyFrame, min_measurements_per_patient: int) -> pl.LazyFrame:
@@ -231,10 +230,7 @@ def filter_patients_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.L
 def main(cfg: DictConfig):
     """TODO."""
 
-    hydra_loguru_init()
-    compute_fn = filter_patients_fntr(cfg.stage_cfg)
-
-    map_over(cfg, compute_fn=compute_fn)
+    map_over(cfg, compute_fn=filter_patients_fntr)
 
 
 if __name__ == "__main__":
