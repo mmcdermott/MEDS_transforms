@@ -10,8 +10,6 @@ from omegaconf import DictConfig
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over
 
-pl.enable_string_cache()
-
 
 def filter_measurements_fntr(
     stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifier_columns: list[str] | None = None
@@ -27,15 +25,15 @@ def filter_measurements_fntr(
 
     Examples:
         >>> code_metadata_df = pl.DataFrame({
-        ...     "code":     pl.Series(["A", "A", "B", "C"], dtype=pl.Categorical),
+        ...     "code":               ["A", "A", "B", "C"],
         ...     "modifier1":          [1,   2,   1,   2],
         ...     "code/n_patients":    [2,   1,   3,   2],
         ...     "code/n_occurrences": [4,   5,   3,   2],
         ... })
         >>> data = pl.DataFrame({
-        ...     "patient_id":     [1,   1,   2,   2],
-        ...     "code": pl.Series(["A", "B", "A", "C"], dtype=pl.Categorical),
-        ...     "modifier1":      [1,   1,   2,   2],
+        ...     "patient_id": [1,   1,   2,   2],
+        ...     "code":       ["A", "B", "A", "C"],
+        ...     "modifier1":  [1,   1,   2,   2],
         ... }).lazy()
         >>> stage_cfg = DictConfig({"min_patients_per_code": 2, "min_occurrences_per_code": 3})
         >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
@@ -44,7 +42,7 @@ def filter_measurements_fntr(
         ┌────────────┬──────┬───────────┐
         │ patient_id ┆ code ┆ modifier1 │
         │ ---        ┆ ---  ┆ ---       │
-        │ i64        ┆ cat  ┆ i64       │
+        │ i64        ┆ str  ┆ i64       │
         ╞════════════╪══════╪═══════════╡
         │ 1          ┆ A    ┆ 1         │
         │ 1          ┆ B    ┆ 1         │
@@ -56,7 +54,7 @@ def filter_measurements_fntr(
         ┌────────────┬──────┬───────────┐
         │ patient_id ┆ code ┆ modifier1 │
         │ ---        ┆ ---  ┆ ---       │
-        │ i64        ┆ cat  ┆ i64       │
+        │ i64        ┆ str  ┆ i64       │
         ╞════════════╪══════╪═══════════╡
         │ 1          ┆ A    ┆ 1         │
         │ 2          ┆ A    ┆ 2         │
@@ -68,7 +66,7 @@ def filter_measurements_fntr(
         ┌────────────┬──────┬───────────┐
         │ patient_id ┆ code ┆ modifier1 │
         │ ---        ┆ ---  ┆ ---       │
-        │ i64        ┆ cat  ┆ i64       │
+        │ i64        ┆ str  ┆ i64       │
         ╞════════════╪══════╪═══════════╡
         │ 1          ┆ A    ┆ 1         │
         │ 1          ┆ B    ┆ 1         │
@@ -82,7 +80,7 @@ def filter_measurements_fntr(
         ┌────────────┬──────┬───────────┐
         │ patient_id ┆ code ┆ modifier1 │
         │ ---        ┆ ---  ┆ ---       │
-        │ i64        ┆ cat  ┆ i64       │
+        │ i64        ┆ str  ┆ i64       │
         ╞════════════╪══════╪═══════════╡
         │ 1          ┆ A    ┆ 1         │
         │ 1          ┆ B    ┆ 1         │
@@ -96,7 +94,7 @@ def filter_measurements_fntr(
         ┌────────────┬──────┬───────────┐
         │ patient_id ┆ code ┆ modifier1 │
         │ ---        ┆ ---  ┆ ---       │
-        │ i64        ┆ cat  ┆ i64       │
+        │ i64        ┆ str  ┆ i64       │
         ╞════════════╪══════╪═══════════╡
         │ 2          ┆ A    ┆ 2         │
         └────────────┴──────┴───────────┘
@@ -149,7 +147,7 @@ def main(cfg: DictConfig):
     """TODO."""
 
     code_metadata = pl.read_parquet(
-        Path(cfg.stage_cfg.metadata_input_dir) / "code_metadata.parquet", use_pyarrow=True
+        Path(cfg.stage_cfg.metadata_input_dir) / "codes.parquet", use_pyarrow=True
     )
     compute_fn = filter_measurements_fntr(cfg.stage_cfg, code_metadata)
 

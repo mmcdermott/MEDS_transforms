@@ -41,7 +41,7 @@ preparation for mapping that transformation out across the patient data by code.
 
 ##### Operation Steps
 
-1. Add new information or transform existing columns in an existing `code_metadata.parquet` file. Note that
+1. Add new information or transform existing columns in an existing `metadata/codes.parquet` file. Note that
    `code` or `code_modifier` columns should _not_ be modified in this step as that will break the linkage
    with the patient data.
 
@@ -72,7 +72,7 @@ simplicity).
 1. Per-shard, filter the pateint data to satisfy desired set of patient or other data critieria.
 2. Per-shard, group by code and collect some aggregate statistics. Optionally also compute statistics across
    all codes.
-3. Reduce the per-shard aggregate files into a unified `code_metadata.parquet` file.
+3. Reduce the per-shard aggregate files into a unified `metadata/codes.parquet` file.
 4. Optionally merge with static per-code metadata from prior steps.
 
 ##### Parameters
@@ -94,7 +94,7 @@ Patient Filters: **None**
 
 Functions:
 
-1. Various aggregation functions; see `src/MEDS_transforms/code_metadata.py` for a list of supported
+1. Various aggregation functions; see `src/MEDS_transforms/aggregate_code_metadata.py` for a list of supported
    functions.
 
 ##### Planned Future Operations
@@ -145,11 +145,11 @@ None at this time. To request a new operation, please open a GitHub issue.
 #### Filtering Measurements
 
 This operation assumes that any requisite aggregate, per-code information is pre-computed and can be joined in
-via a `code_metadata.parquet` file.
+via a `metadata/codes.parquet` file.
 
 ##### Operation Steps
 
-1. Per-shard, join the data, if necessary, to the provided, global `code_metadata.parquet` file.
+1. Per-shard, join the data, if necessary, to the provided, global `metadata/codes.parquet` file.
 2. Apply row-based criteria to each measurement to determine if it should be retained or removed.
 3. Return the filtered dataset, in the same format as the original, but with only the measurements to be
    retained.
@@ -157,7 +157,7 @@ via a `code_metadata.parquet` file.
 ##### Parameters
 
 1. What criteria should be used to filter measurements.
-2. What, if any, columns in the `code_metadata.parquet` file should be joined in to the data.
+2. What, if any, columns in the `metadata/codes.parquet` file should be joined in to the data.
 
 ##### Status
 
@@ -168,7 +168,7 @@ but supports such extension relatively natively.
 ##### Currently supported operations
 
 Currently, measurements can be filtered on the basis of `min_patients_per_code` and `min_occurrences_per_code`
-thresholds, which are read from the `code_metadata.parquet` file via the `code/n_patients` and
+thresholds, which are read from the `metadata/codes.parquet` file via the `code/n_patients` and
 `code/n_occurrences` columns, respectively.
 
 ##### Planned Future Operations
@@ -190,7 +190,7 @@ order), see the "Transforming Measurements within Events" section.
 #### Occluding Features within Measurements
 
 This operation assumes that any requisite aggregate, per-code information is pre-computed and can be joined in
-via a `code_metadata.parquet` file.
+via a `metadata/codes.parquet` file.
 
 **TODO** This is not really a prototype, but is really a single function, or a subset of a prototype. IT has
 functionally the same API as numerical value normalization, with the modification that the indicator columns
@@ -198,7 +198,7 @@ are added and this function is not reversible.
 
 ##### Operation Steps
 
-1. Per-shard, join the data, if necessary, to the provided, global `code_metadata.parquet` file.
+1. Per-shard, join the data, if necessary, to the provided, global `metadata/codes.parquet` file.
 2. Apply row-based criteria to each measurement to determine if individual features should be occluded or
    retained in full granularity.
 3. Set occluded data to the occlusion target (typically `"UNK"`, `None`, or `np.NaN`) and add an indicator
@@ -209,7 +209,7 @@ are added and this function is not reversible.
 1. What criteria should be used to occlude features.
    - Relatedly, what occlusion value should be used for occluded features.
    - Relatedly, what the name of the occlusion column should be (can be set by default for features).
-2. What, if any, columns in the `code_metadata.parquet` file should be joined in to the data.
+2. What, if any, columns in the `metadata/codes.parquet` file should be joined in to the data.
 
 ##### Status
 
