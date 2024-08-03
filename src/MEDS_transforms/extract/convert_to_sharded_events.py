@@ -332,7 +332,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         ┌────────────┬─────────────────┬─────────────────────┬───────────────────┬────────────┐
         │ patient_id ┆ code            ┆ time                ┆ categorical_value ┆ text_value │
         │ ---        ┆ ---             ┆ ---                 ┆ ---               ┆ ---        │
-        │ u8         ┆ str             ┆ datetime[μs]        ┆ cat               ┆ str        │
+        │ u8         ┆ str             ┆ datetime[μs]        ┆ str               ┆ str        │
         ╞════════════╪═════════════════╪═════════════════════╪═══════════════════╪════════════╡
         │ 1          ┆ DISCHARGE//Home ┆ 2021-01-01 11:23:45 ┆ AOx4              ┆ Home       │
         │ 1          ┆ DISCHARGE//SNF  ┆ 2021-01-02 12:34:56 ┆ AO                ┆ SNF        │
@@ -623,7 +623,7 @@ def convert_to_events(
         ┌────────────┬───────────┬─────────────────────┬────────────────┬───────────────────────┬────────────────────┬───────────┐
         │ patient_id ┆ code      ┆ time                ┆ admission_type ┆ severity_on_admission ┆ discharge_location ┆ eye_color │
         │ ---        ┆ ---       ┆ ---                 ┆ ---            ┆ ---                   ┆ ---                ┆ ---       │
-        │ u8         ┆ str       ┆ datetime[μs]        ┆ cat            ┆ f64                   ┆ cat                ┆ cat       │
+        │ u8         ┆ str       ┆ datetime[μs]        ┆ str            ┆ f64                   ┆ cat                ┆ cat       │
         ╞════════════╪═══════════╪═════════════════════╪════════════════╪═══════════════════════╪════════════════════╪═══════════╡
         │ 1          ┆ ADMISSION ┆ 2021-01-01 00:00:00 ┆ A              ┆ 1.0                   ┆ null               ┆ null      │
         │ 1          ┆ ADMISSION ┆ 2021-01-02 00:00:00 ┆ B              ┆ 2.0                   ┆ null               ┆ null      │
