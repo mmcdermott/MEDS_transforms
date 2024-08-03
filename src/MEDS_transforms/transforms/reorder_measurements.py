@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """A polars-to-polars transformation function for filtering patients by sequence length."""
 from collections.abc import Callable
-from pathlib import Path
 
 import hydra
 import polars as pl
@@ -14,14 +13,14 @@ from MEDS_transforms.utils import get_smallest_valid_uint_type
 
 
 def reorder_by_code_fntr(
-    stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifier_columns: list[str] | None = None
+    stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Re-orders a dataframe within the temporal and subject ID ordering via a specified code order.
 
     Args:
         stage_cfg: TODO
         code_metadata: TODO
-        code_modifier_columns: TODO
+        code_modifiers: TODO
 
     Returns:
         A function with signature `Callable[[pl.LazyFrame], pl.LazyFrame]` that re-orders the input DataFrame.
@@ -110,13 +109,13 @@ def reorder_by_code_fntr(
     code_pattern_idx_dtype = get_smallest_valid_uint_type(num_code_patterns + 1)  # TODO: make function
 
     join_cols = ["code"]
-    if code_modifier_columns:
+    if code_modifiers:
         logger.warning("Code reordering currently only matches against the 'code' column, not code modifiers")
-        join_cols.extend(code_modifier_columns)
+        join_cols.extend(code_modifiers)
 
     cols_to_select = ["code"]
-    if code_modifier_columns:
-        cols_to_select.extend(code_modifier_columns)
+    if code_modifiers:
+        cols_to_select.extend(code_modifiers)
 
     code_order_idx_exprs = pl  # this let's us chain the when/then/otherwise calls equivalently over the loop.
     for i, code_matcher in enumerate(ordered_code_patterns):
@@ -176,11 +175,7 @@ def main(cfg: DictConfig):
             quotes: ``'stage_configs.reorder_measurements.ordered_code_patterns=["foo$", "bar", "foo.*"]'``.
     """
 
-    code_metadata = pl.read_parquet(
-        Path(cfg.stage_cfg.metadata_input_dir) / "codes.parquet", use_pyarrow=True
-    )
-
-    map_over(cfg, compute_fn=reorder_by_code_fntr(cfg.stage_cfg, code_metadata))
+    map_over(cfg, reorder_by_code_fntr)
 
 
 if __name__ == "__main__":
