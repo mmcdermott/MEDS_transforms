@@ -10,8 +10,6 @@ from omegaconf import DictConfig, OmegaConf
 from MEDS_transforms.extract import CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over, shard_iterator
 
-pl.enable_string_cache()
-
 
 def merge_subdirs_and_sort(
     sp_dir: Path,
@@ -32,7 +30,7 @@ def merge_subdirs_and_sort(
             are not all columns is not guaranteed, but is also *not* random, so this may have statistical
             implications.
         additional_sort_by: Additional columns to sort by, in addition to the default sorting by patient ID
-            and timestamp. If `None`, only patient ID and timestamp are used. If a list of strings, these
+            and time. If `None`, only patient ID and time are used. If a list of strings, these
             columns are used in addition to the default sorting. If a column is not found in the dataframe, it
             is omitted from the sort-by, a warning is logged, but an error is *not* raised. This functionality
             is useful both for deterministic testing and in cases where a data owner wants to impose
@@ -42,7 +40,7 @@ def merge_subdirs_and_sort(
         A single dataframe containing all the data from the parquet files in the subdirs of `sp_dir`. These
         files will be concatenated diagonally, taking the union of all rows in all dataframes and all unique
         columns in all dataframes to form the merged output. The returned dataframe will be made unique by the
-        columns specified in `unique_by` and sorted by first patient ID, then timestamp, then all columns in
+        columns specified in `unique_by` and sorted by first patient ID, then time, then all columns in
         `additional_sort_by`, if any.
 
     Raises:
@@ -51,18 +49,18 @@ def merge_subdirs_and_sort(
 
     Examples:
         >>> from tempfile import TemporaryDirectory
-        >>> df1 = pl.DataFrame({"patient_id": [1, 2], "timestamp": [10, 20], "code": ["A", "B"]})
+        >>> df1 = pl.DataFrame({"patient_id": [1, 2], "time": [10, 20], "code": ["A", "B"]})
         >>> df2 = pl.DataFrame({
         ...     "patient_id":      [1,   1,    3],
-        ...     "timestamp":       [2,   1,    8],
+        ...     "time":       [2,   1,    8],
         ...     "code":            ["C", "D",  "E"],
-        ...     "numerical_value": [None, 2.0, None],
+        ...     "numeric_value": [None, 2.0, None],
         ... })
         >>> df3 = pl.DataFrame({
         ...     "patient_id":      [1,   1,    3],
-        ...     "timestamp":       [2,   2,    8],
+        ...     "time":       [2,   2,    8],
         ...     "code":            ["C", "D",  "E"],
-        ...     "numerical_value": [6.2, 2.0, None],
+        ...     "numeric_value": [6.2, 2.0, None],
         ... })
         >>> with TemporaryDirectory() as tmpdir:
         ...     sp_dir = Path(tmpdir)
@@ -81,23 +79,23 @@ def merge_subdirs_and_sort(
         ...         sp_dir,
         ...         event_subsets=["subdir1", "subdir2"],
         ...         unique_by=None,
-        ...         additional_sort_by=["code", "numerical_value", "missing_col_will_not_error"]
+        ...         additional_sort_by=["code", "numeric_value", "missing_col_will_not_error"]
         ...     ).collect()
         shape: (8, 4)
-        ┌────────────┬───────────┬──────┬─────────────────┐
-        │ patient_id ┆ timestamp ┆ code ┆ numerical_value │
-        │ ---        ┆ ---       ┆ ---  ┆ ---             │
-        │ i64        ┆ i64       ┆ str  ┆ f64             │
-        ╞════════════╪═══════════╪══════╪═════════════════╡
-        │ 1          ┆ 1         ┆ D    ┆ 2.0             │
-        │ 1          ┆ 2         ┆ C    ┆ null            │
-        │ 1          ┆ 2         ┆ C    ┆ 6.2             │
-        │ 1          ┆ 2         ┆ D    ┆ 2.0             │
-        │ 1          ┆ 10        ┆ A    ┆ null            │
-        │ 2          ┆ 20        ┆ B    ┆ null            │
-        │ 3          ┆ 8         ┆ E    ┆ null            │
-        │ 3          ┆ 8         ┆ E    ┆ null            │
-        └────────────┴───────────┴──────┴─────────────────┘
+        ┌────────────┬──────┬──────┬───────────────┐
+        │ patient_id ┆ time ┆ code ┆ numeric_value │
+        │ ---        ┆ ---  ┆ ---  ┆ ---           │
+        │ i64        ┆ i64  ┆ str  ┆ f64           │
+        ╞════════════╪══════╪══════╪═══════════════╡
+        │ 1          ┆ 1    ┆ D    ┆ 2.0           │
+        │ 1          ┆ 2    ┆ C    ┆ null          │
+        │ 1          ┆ 2    ┆ C    ┆ 6.2           │
+        │ 1          ┆ 2    ┆ D    ┆ 2.0           │
+        │ 1          ┆ 10   ┆ A    ┆ null          │
+        │ 2          ┆ 20   ┆ B    ┆ null          │
+        │ 3          ┆ 8    ┆ E    ┆ null          │
+        │ 3          ┆ 8    ┆ E    ┆ null          │
+        └────────────┴──────┴──────┴───────────────┘
         >>> with TemporaryDirectory() as tmpdir:
         ...     sp_dir = Path(tmpdir)
         ...     (sp_dir / "subdir1").mkdir()
@@ -109,22 +107,22 @@ def merge_subdirs_and_sort(
         ...         sp_dir,
         ...         event_subsets=["subdir1", "subdir2"],
         ...         unique_by="*",
-        ...         additional_sort_by=["code", "numerical_value"]
+        ...         additional_sort_by=["code", "numeric_value"]
         ...     ).collect()
         shape: (7, 4)
-        ┌────────────┬───────────┬──────┬─────────────────┐
-        │ patient_id ┆ timestamp ┆ code ┆ numerical_value │
-        │ ---        ┆ ---       ┆ ---  ┆ ---             │
-        │ i64        ┆ i64       ┆ str  ┆ f64             │
-        ╞════════════╪═══════════╪══════╪═════════════════╡
-        │ 1          ┆ 1         ┆ D    ┆ 2.0             │
-        │ 1          ┆ 2         ┆ C    ┆ null            │
-        │ 1          ┆ 2         ┆ C    ┆ 6.2             │
-        │ 1          ┆ 2         ┆ D    ┆ 2.0             │
-        │ 1          ┆ 10        ┆ A    ┆ null            │
-        │ 2          ┆ 20        ┆ B    ┆ null            │
-        │ 3          ┆ 8         ┆ E    ┆ null            │
-        └────────────┴───────────┴──────┴─────────────────┘
+        ┌────────────┬──────┬──────┬───────────────┐
+        │ patient_id ┆ time ┆ code ┆ numeric_value │
+        │ ---        ┆ ---  ┆ ---  ┆ ---           │
+        │ i64        ┆ i64  ┆ str  ┆ f64           │
+        ╞════════════╪══════╪══════╪═══════════════╡
+        │ 1          ┆ 1    ┆ D    ┆ 2.0           │
+        │ 1          ┆ 2    ┆ C    ┆ null          │
+        │ 1          ┆ 2    ┆ C    ┆ 6.2           │
+        │ 1          ┆ 2    ┆ D    ┆ 2.0           │
+        │ 1          ┆ 10   ┆ A    ┆ null          │
+        │ 2          ┆ 20   ┆ B    ┆ null          │
+        │ 3          ┆ 8    ┆ E    ┆ null          │
+        └────────────┴──────┴──────┴───────────────┘
         >>> with TemporaryDirectory() as tmpdir:
         ...     sp_dir = Path(tmpdir)
         ...     (sp_dir / "subdir1").mkdir()
@@ -132,28 +130,28 @@ def merge_subdirs_and_sort(
         ...     df2.write_parquet(sp_dir / "subdir1" / "file2.parquet")
         ...     (sp_dir / "subdir2").mkdir()
         ...     df3.write_parquet(sp_dir / "subdir2" / "df.parquet")
-        ...     # We just display the patient ID, timestamp, and code columns as the numerical value column
+        ...     # We just display the patient ID, time, and code columns as the numeric value column
         ...     # is not guaranteed to be deterministic in the output given some rows will be dropped due to
         ...     # the unique-by constraint.
         ...     merge_subdirs_and_sort(
         ...         sp_dir,
         ...         event_subsets=["subdir1", "subdir2"],
-        ...         unique_by=["patient_id", "timestamp", "code"],
-        ...         additional_sort_by=["code", "numerical_value"]
-        ...     ).select("patient_id", "timestamp", "code").collect()
+        ...         unique_by=["patient_id", "time", "code"],
+        ...         additional_sort_by=["code", "numeric_value"]
+        ...     ).select("patient_id", "time", "code").collect()
         shape: (6, 3)
-        ┌────────────┬───────────┬──────┐
-        │ patient_id ┆ timestamp ┆ code │
-        │ ---        ┆ ---       ┆ ---  │
-        │ i64        ┆ i64       ┆ str  │
-        ╞════════════╪═══════════╪══════╡
-        │ 1          ┆ 1         ┆ D    │
-        │ 1          ┆ 2         ┆ C    │
-        │ 1          ┆ 2         ┆ D    │
-        │ 1          ┆ 10        ┆ A    │
-        │ 2          ┆ 20        ┆ B    │
-        │ 3          ┆ 8         ┆ E    │
-        └────────────┴───────────┴──────┘
+        ┌────────────┬──────┬──────┐
+        │ patient_id ┆ time ┆ code │
+        │ ---        ┆ ---  ┆ ---  │
+        │ i64        ┆ i64  ┆ str  │
+        ╞════════════╪══════╪══════╡
+        │ 1          ┆ 1    ┆ D    │
+        │ 1          ┆ 2    ┆ C    │
+        │ 1          ┆ 2    ┆ D    │
+        │ 1          ┆ 10   ┆ A    │
+        │ 2          ┆ 20   ┆ B    │
+        │ 3          ┆ 8    ┆ E    │
+        └────────────┴──────┴──────┘
     """
     files_to_read = [fp for es in event_subsets for fp in (sp_dir / es).glob("*.parquet")]
     if not files_to_read:
@@ -189,7 +187,7 @@ def merge_subdirs_and_sort(
         case _:
             raise ValueError(f"Invalid unique_by value: {unique_by}")
 
-    sort_by = ["patient_id", "timestamp"]
+    sort_by = ["patient_id", "time"]
     if additional_sort_by is not None:
         for s in additional_sort_by:
             if s in df_columns:
@@ -207,7 +205,7 @@ def main(cfg: DictConfig):
     This function takes all dataframes (in parquet files) in any subdirs of the `cfg.stage_cfg.input_dir` and
     merges them into a single dataframe. All dataframes in the subdirs are assumed to be in the unnested, MEDS
     format, and cover the same group of patients (specific to the shard being processed). The merged dataframe
-    will also be sorted by patient ID and timestamp.
+    will also be sorted by patient ID and time.
 
     All arguments are specified through the command line into the `cfg` object through Hydra.
 
@@ -220,8 +218,8 @@ def main(cfg: DictConfig):
         stage_configs.merge_to_MEDS_cohort.unique_by: The list of columns that should be ensured to be unique
             after the dataframes are merged. Defaults to `"*"`, which means all columns are used.
         stage_configs.merge_to_MEDS_cohort.additional_sort_by: Additional columns to sort by, in addition to
-            the default sorting by patient ID and timestamp. Defaults to `None`, which means only patient ID
-            and timestamp are used.
+            the default sorting by patient ID and time. Defaults to `None`, which means only patient ID
+            and time are used.
 
     Returns:
         Writes the merged dataframes to the shard-specific output filepath in the `cfg.stage_cfg.output_dir`.

@@ -27,7 +27,7 @@ def convert_to_NRT(tokenized_df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
 
     Returns:
         A `JointNestedRaggedTensorDict` object representing the tokenized dataframe, accounting for however
-        many levels of ragged nesting are present among the codes and numerical values.
+        many levels of ragged nesting are present among the codes and numeric values.
 
     Raises:
         ValueError: If there are no time delta columns or if there are multiple time delta columns.
@@ -37,12 +37,12 @@ def convert_to_NRT(tokenized_df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
         ...     "patient_id": [1, 2],
         ...     "time_delta_days": [[float("nan"), 12.0], [float("nan")]],
         ...     "code": [[[101.0, 102.0], [103.0]], [[201.0, 202.0]]],
-        ...     "numerical_value": [[[2.0, 3.0], [4.0]], [[6.0, 7.0]]]
+        ...     "numeric_value": [[[2.0, 3.0], [4.0]], [[6.0, 7.0]]]
         ... })
         >>> df
         shape: (2, 4)
         ┌────────────┬─────────────────┬───────────────────────────┬─────────────────────┐
-        │ patient_id ┆ time_delta_days ┆ code                      ┆ numerical_value     │
+        │ patient_id ┆ time_delta_days ┆ code                      ┆ numeric_value       │
         │ ---        ┆ ---             ┆ ---                       ┆ ---                 │
         │ i64        ┆ list[f64]       ┆ list[list[f64]]           ┆ list[list[f64]]     │
         ╞════════════╪═════════════════╪═══════════════════════════╪═════════════════════╡
@@ -68,7 +68,7 @@ def convert_to_NRT(tokenized_df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
         <BLANKLINE>
          [[ True  True]
           [False False]]]
-        numerical_value
+        numeric_value
         [[[2. 3.]
           [4. 0.]]
         <BLANKLINE>
@@ -91,7 +91,7 @@ def convert_to_NRT(tokenized_df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
     time_delta_col = time_delta_cols[0]
 
     return JointNestedRaggedTensorDict(
-        tokenized_df.select(time_delta_col, "code", "numerical_value").collect().to_dict(as_series=False)
+        tokenized_df.select(time_delta_col, "code", "numeric_value").collect().to_dict(as_series=False)
     )
 
 
