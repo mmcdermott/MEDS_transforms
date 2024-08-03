@@ -276,7 +276,6 @@ icu/inputevents:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
         parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
-        rateuom: null # A null column means this column is needed in pulling from the metadata.
   input_end:
     code:
       - INFUSION_END
@@ -296,8 +295,6 @@ icu/inputevents:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
         parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
-        statusdescription: null
-        amountuom: null
   patient_weight:
     code:
       - PATIENT_WEIGHT_AT_INFUSION

@@ -1,3 +1,3 @@
 extract_code_metadata:
   is_metadata: true
-  description_seperator: "\n"
+  description_separator: "\n"
