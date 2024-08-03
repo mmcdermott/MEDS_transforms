@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """A polars-to-polars transformation function for filtering patients by sequence length."""
 from collections.abc import Callable
-from pathlib import Path
 
 import hydra
 import polars as pl
@@ -12,7 +11,7 @@ from MEDS_transforms.mapreduce.mapper import map_over
 
 
 def filter_measurements_fntr(
-    stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifier_columns: list[str] | None = None
+    stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Returns a function that filters patient events to only encompass those with a set of permissible codes.
 
@@ -113,8 +112,8 @@ def filter_measurements_fntr(
         return lambda df: df
 
     join_cols = ["code"]
-    if code_modifier_columns:
-        join_cols.extend(code_modifier_columns)
+    if code_modifiers:
+        join_cols.extend(code_modifiers)
 
     allowed_code_metadata = (code_metadata.filter(pl.all_horizontal(filter_exprs)).select(join_cols)).lazy()
 
@@ -145,13 +144,7 @@ def filter_measurements_fntr(
 )
 def main(cfg: DictConfig):
     """TODO."""
-
-    code_metadata = pl.read_parquet(
-        Path(cfg.stage_cfg.metadata_input_dir) / "codes.parquet", use_pyarrow=True
-    )
-    compute_fn = filter_measurements_fntr(cfg.stage_cfg, code_metadata)
-
-    map_over(cfg, compute_fn=compute_fn)
+    map_over(cfg, compute_fn=filter_measurements_fntr)
 
 
 if __name__ == "__main__":

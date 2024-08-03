@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""Functions for tensorizing MEDS datasets.
-
-TODO
-"""
+"""Functions for tensorizing MEDS datasets."""
 
 from functools import partial
 
@@ -16,14 +13,14 @@ from MEDS_transforms.mapreduce.mapper import map_over
 from MEDS_transforms.mapreduce.utils import shard_iterator
 
 
-def convert_to_NRT(tokenized_df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
+def convert_to_NRT(df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
     """This converts a tokenized dataframe into a nested ragged tensor.
 
     Most of the work for this function is actually done in `tokenize` -- this function is just a wrapper
     to convert the output into a nested ragged tensor using polars' built-in `to_dict` method.
 
     Args:
-        tokenized_df: The tokenized dataframe.
+        df: The tokenized dataframe.
 
     Returns:
         A `JointNestedRaggedTensorDict` object representing the tokenized dataframe, accounting for however
@@ -81,7 +78,7 @@ def convert_to_NRT(tokenized_df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
 
     # There should only be one time delta column, but this ensures we catch it regardless of the unit of time
     # used to convert the time deltas, and that we verify there is only one such column.
-    time_delta_cols = [c for c in tokenized_df.collect_schema().names() if c.startswith("time_delta_")]
+    time_delta_cols = [c for c in df.collect_schema().names() if c.startswith("time_delta_")]
 
     if len(time_delta_cols) == 0:
         raise ValueError("Expected at least one time delta column, found none")
@@ -91,7 +88,7 @@ def convert_to_NRT(tokenized_df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
     time_delta_col = time_delta_cols[0]
 
     return JointNestedRaggedTensorDict(
-        tokenized_df.select(time_delta_col, "code", "numeric_value").collect().to_dict(as_series=False)
+        df.select(time_delta_col, "code", "numeric_value").collect().to_dict(as_series=False)
     )
 
 
