@@ -476,13 +476,11 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
             case "text_value" if not df.schema[v] == pl.Utf8:
                 logger.warning(f"Converting text_value to string for {code_expr}")
                 col = col.cast(pl.Utf8, strict=False)
-            case "categorical_value" if not isinstance(df.schema[v], pl.Categorical):
-                logger.warning(f"Converting categorical_value to categorical for {code_expr}")
-                col = col.cast(pl.Utf8).cast(pl.Categorical)
+            case "categorical_value" if not is_str:
+                logger.warning(f"Converting categorical_value to string for {code_expr}")
+                col = col.cast(pl.Utf8)
             case _ if is_str:
-                # TODO(mmd): Is this right? Is this always a good idea? It probably usually is, but maybe not
-                # always. Maybe a check on unique values first?
-                col = col.cast(pl.Categorical)
+                pass
             case _ if not (is_numeric or is_str or is_cat):
                 raise ValueError(
                     f"Source column '{v}' for event column {k} is not numeric, string, or categorical! "
