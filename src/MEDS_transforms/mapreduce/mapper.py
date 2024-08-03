@@ -15,7 +15,7 @@ from .utils import rwlock_wrap, shard_iterator
 
 DF_T = TypeVar("DF_T")
 
-MAP_FN_T = Callable[[DF_T], DF_T] | tuple[Callable[[DF_T], DF_T]]
+MAP_FN_T = Callable[[DF_T], DF_T]
 SHARD_GEN_T = Generator[tuple[Path, Path], None, None]
 SHARD_ITR_FNTR_T = Callable[[DictConfig], SHARD_GEN_T]
 
@@ -45,9 +45,6 @@ def map_over(
 
     if compute_fn is None:
         compute_fn = identity_fn
-
-    if not isinstance(compute_fn, tuple):
-        compute_fn = (compute_fn,)
 
     process_split = cfg.stage_cfg.get("process_split", None)
     split_fp = Path(cfg.input_dir) / "metadata" / "patient_split.parquet"
@@ -79,9 +76,8 @@ def map_over(
             out_fp,
             read_fn,
             write_fn,
-            *compute_fn,
+            compute_fn,
             do_return=False,
-            cache_intermediate=False,
             do_overwrite=cfg.do_overwrite,
         )
         all_out_fps.append(out_fp)
