@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 
 """Performs pre-MEDS data wrangling for MIMIC-IV."""
-import rootutils
-
-root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
 from datetime import datetime
 from functools import partial
@@ -77,7 +74,12 @@ def main(cfg: DictConfig):
     for in_fp in all_fps:
         pfx = get_shard_prefix(raw_cohort_dir, in_fp)
 
-        fp, read_fn = get_supported_fp(raw_cohort_dir, pfx)
+        try:
+            fp, read_fn = get_supported_fp(raw_cohort_dir, pfx)
+        except FileNotFoundError:
+            logger.info(f"Skipping {pfx} @ {str(in_fp.resolve())} as no compatible dataframe file was found.")
+            continue
+
         if fp.suffix in [".csv", ".csv.gz"]:
             read_fn = partial(read_fn, infer_schema_length=100000)
 

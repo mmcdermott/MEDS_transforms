@@ -66,7 +66,7 @@ else
 fi
 
 if [ "$DO_UNZIP" == "true" ]; then
-  echo "Unzipping gunzip csv files."
+  echo "Unzipping csv files."
     for file in "${MIMICIV_RAW_DIR}"/*/*.csv.gz; do gzip -d --force "$file"; done
 else
   echo "Skipping unzipping."
