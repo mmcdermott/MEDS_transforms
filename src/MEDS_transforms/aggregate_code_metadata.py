@@ -406,7 +406,7 @@ def mapper_fntr(
         │ D    ┆ null      ┆ 0.0            ┆ null       ┆ null       │
         └──────┴───────────┴────────────────┴────────────┴────────────┘
         >>> stage_cfg = DictConfig({"aggregations": ["values/quantiles"]})
-        >>> mapper = mapper_fntr(stage_cfg, code_modifier_columns)
+        >>> mapper = mapper_fntr(stage_cfg, code_modifiers)
         >>> mapper(df.lazy()).collect().select("code", "modifier1", pl.col("values/quantiles"))
         shape: (5, 3)
         ┌──────┬───────────┬──────────────────┐
@@ -600,7 +600,7 @@ def reducer_fntr(
         >>> stage_cfg = DictConfig({
         ...     "aggregations": [{"name": "values/quantiles", "quantiles": [0.25, 0.5, 0.75]}],
         ... })
-        >>> reducer = reducer_fntr(stage_cfg, code_modifier_columns)
+        >>> reducer = reducer_fntr(stage_cfg, code_modifiers)
         >>> reducer(df_1, df_2, df_3).unnest("values/quantiles")
         shape: (7, 5)
         ┌──────┬───────────┬──────────────────────┬─────────────────────┬──────────────────────┐
