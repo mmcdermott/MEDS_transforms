@@ -5,8 +5,8 @@ import rootutils
 
 root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
-import gzip
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 
 import hydra
@@ -14,21 +14,8 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig
 
+from MEDS_transforms.extract.utils import get_supported_fp
 from MEDS_transforms.utils import get_shard_prefix, hydra_loguru_init, write_lazyframe
-
-
-def load_raw_mimic_file(fp: Path, **kwargs) -> pl.LazyFrame:
-    """Load a raw MIMIC file into a Polars DataFrame.
-
-    Args:
-        fp: The path to the MIMIC file.
-
-    Returns:
-        The Polars DataFrame containing the MIMIC data.
-    """
-
-    with gzip.open(fp, mode="rb") as f:
-        return pl.read_csv(f, infer_schema_length=100000, **kwargs).lazy()
 
 
 def add_discharge_time_by_hadm_id(
@@ -82,14 +69,24 @@ def main(cfg: DictConfig):
     raw_cohort_dir = Path(cfg.raw_cohort_dir)
     MEDS_input_dir = Path(cfg.output_dir)
 
-    all_fps = list(raw_cohort_dir.glob("**/*.csv.gz"))
+    all_fps = list(raw_cohort_dir.glob("**/*.*"))
 
     dfs_to_load = {}
+    seen_fps = {}
 
     for in_fp in all_fps:
         pfx = get_shard_prefix(raw_cohort_dir, in_fp)
 
-        out_fp = MEDS_input_dir / in_fp.relative_to(raw_cohort_dir)
+        fp, read_fn = get_supported_fp(raw_cohort_dir, pfx)
+        if fp.suffix in [".csv", ".csv.gz"]:
+            read_fn = partial(read_fn, infer_schema_length=100000)
+
+        if str(fp.resolve()) in seen_fps:
+            continue
+        else:
+            seen_fps[str(fp.resolve())] = read_fn
+
+        out_fp = MEDS_input_dir / fp.relative_to(raw_cohort_dir)
 
         if out_fp.is_file():
             print(f"Done with {pfx}. Continuing")
@@ -99,10 +96,9 @@ def main(cfg: DictConfig):
 
         if pfx not in FUNCTIONS:
             logger.info(
-                f"No function needed for {pfx}: "
-                f"Symlinking {str(in_fp.resolve())} to {str(out_fp.resolve())}"
+                f"No function needed for {pfx}: " f"Symlinking {str(fp.resolve())} to {str(out_fp.resolve())}"
             )
-            relative_in_fp = in_fp.relative_to(out_fp.resolve().parent, walk_up=True)
+            relative_in_fp = fp.relative_to(out_fp.resolve().parent, walk_up=True)
             out_fp.symlink_to(relative_in_fp)
             continue
         else:
@@ -115,8 +111,8 @@ def main(cfg: DictConfig):
             if not need_df:
                 st = datetime.now()
                 logger.info(f"Processing {pfx}...")
-                df = load_raw_mimic_file(in_fp)
-                logger.info(f"  Loaded raw {in_fp} in {datetime.now() - st}")
+                df = read_fn(fp)
+                logger.info(f"  Loaded raw {fp} in {datetime.now() - st}")
                 processed_df = fn(df)
                 write_lazyframe(processed_df, out_fp)
                 logger.info(f"  Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - st}")
@@ -125,19 +121,19 @@ def main(cfg: DictConfig):
                 if needed_pfx not in dfs_to_load:
                     dfs_to_load[needed_pfx] = {"fps": set(), "cols": set()}
 
-                dfs_to_load[needed_pfx]["fps"].add(in_fp)
+                dfs_to_load[needed_pfx]["fps"].add(fp)
                 dfs_to_load[needed_pfx]["cols"].update(needed_cols)
 
     for df_to_load_pfx, fps_and_cols in dfs_to_load.items():
         fps = fps_and_cols["fps"]
         cols = list(fps_and_cols["cols"])
 
-        df_to_load_fp = raw_cohort_dir / f"{df_to_load_pfx}.csv.gz"
+        df_to_load_fp, df_to_load_read_fn = get_supported_fp(raw_cohort_dir, df_to_load_pfx)
 
         st = datetime.now()
 
         logger.info(f"Loading {str(df_to_load_fp.resolve())} for manipulating other dataframes...")
-        df = load_raw_mimic_file(df_to_load_fp, columns=cols)
+        df = read_fn(df_to_load_fp, columns=cols)
         logger.info(f"  Loaded in {datetime.now() - st}")
 
         for fp in fps:
@@ -149,7 +145,7 @@ def main(cfg: DictConfig):
 
             fp_st = datetime.now()
             logger.info(f"    Loading {str(fp.resolve())}...")
-            fp_df = load_raw_mimic_file(fp)
+            fp_df = seen_fps[str(fp.resolve())](fp)
             logger.info(f"    Loaded in {datetime.now() - fp_st}")
             processed_df = fn(fp_df, df)
             write_lazyframe(processed_df, out_fp)
