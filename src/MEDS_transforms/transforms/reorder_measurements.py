@@ -13,14 +13,20 @@ from MEDS_transforms.utils import get_smallest_valid_uint_type
 
 
 def reorder_by_code_fntr(
-    stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
+    stage_cfg: DictConfig, code_metadata: pl.DataFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Re-orders a dataframe within the temporal and subject ID ordering via a specified code order.
 
     Args:
-        stage_cfg: TODO
-        code_metadata: TODO
-        code_modifiers: TODO
+        stage_cfg: The stage-specific configuration object which contains the `ordered_code_patterns` field
+            that defines the order of the codes within each patient event (unique timepoint). Each element of
+            this list should be a regex pattern that matches codes that should be re-ordered at the index of
+            the regex pattern in the list. Codes are matched in the order of the list, and if a code matches
+            multiple regex patterns, it will be ordered by the first regex pattern that matches it.
+        code_metadata: The metadata DataFrame that contains the code column and any code modifiers. This must
+            contain a `code` column that has all codes in the dataset.
+        code_modifiers: The list of columns that are "code modifiers", meaning they should be used along with
+            the code in join or group-by operations.
 
     Returns:
         A function with signature `Callable[[pl.LazyFrame], pl.LazyFrame]` that re-orders the input DataFrame.
@@ -106,7 +112,7 @@ def reorder_by_code_fntr(
         )
 
     num_code_patterns = len(ordered_code_patterns)
-    code_pattern_idx_dtype = get_smallest_valid_uint_type(num_code_patterns + 1)  # TODO: make function
+    code_pattern_idx_dtype = get_smallest_valid_uint_type(num_code_patterns + 1)
 
     join_cols = ["code"]
     if code_modifiers:

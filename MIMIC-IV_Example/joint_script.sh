@@ -11,10 +11,11 @@ function display_help() {
     echo "sharding events, splitting patients, converting to sharded events, and merging into a MEDS cohort."
     echo
     echo "Arguments:"
-    echo "  MIMICIV_RAW_DIR        Directory containing raw MIMIC-IV data files."
-    echo "  MIMICIV_PREMEDS_DIR    Output directory for pre-MEDS data."
-    echo "  MIMICIV_MEDS_DIR       Output directory for processed MEDS data."
-    echo "  N_PARALLEL_WORKERS     Number of parallel workers for processing."
+    echo "  MIMICIV_RAW_DIR                               Directory containing raw MIMIC-IV data files."
+    echo "  MIMICIV_PREMEDS_DIR                           Output directory for pre-MEDS data."
+    echo "  MIMICIV_MEDS_DIR                              Output directory for processed MEDS data."
+    echo "  N_PARALLEL_WORKERS                            Number of parallel workers for processing."
+    echo "  (OPTIONAL) do_unzip=true OR do_unzip=false    Optional flag to unzip csv files before processing."
     echo
     echo "Options:"
     echo "  -h, --help          Display this help message and exit."
@@ -37,7 +38,39 @@ MIMICIV_PREMEDS_DIR="$2"
 MIMICIV_MEDS_DIR="$3"
 N_PARALLEL_WORKERS="$4"
 
-shift 4
+# Default do_unzip value
+DO_UNZIP="false"
+
+# Check if the 5th argument is either do_unzip=true or do_unzip=false
+if [ $# -ge 5 ]; then
+  case "$5" in
+    do_unzip=true)
+      DO_UNZIP="true"
+      shift 5
+      ;;
+    do_unzip=false)
+      DO_UNZIP="false"
+      shift 5
+      ;;
+    do_unzip=*)
+      echo "Error: Invalid do_unzip value. Use 'do_unzip=true' or 'do_unzip=false'."
+      exit 1
+      ;;
+    *)
+      # If the 5th argument is not related to do_unzip, leave it for other_args
+      shift 4
+      ;;
+  esac
+else
+  shift 4
+fi
+
+if [ "$DO_UNZIP" == "true" ]; then
+  echo "Unzipping csv files."
+    for file in "${MIMICIV_RAW_DIR}"/*/*.csv.gz; do gzip -d --force "$file"; done
+else
+  echo "Skipping unzipping."
+fi
 
 echo "Running pre-MEDS conversion."
 ./MIMIC-IV_Example/pre_MEDS.py raw_cohort_dir="$MIMICIV_RAW_DIR" output_dir="$MIMICIV_PREMEDS_DIR"
