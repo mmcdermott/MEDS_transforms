@@ -1,5 +1,6 @@
 """Basic utilities for parallelizable map operations on sharded MEDS datasets with caching and locking."""
 
+import copy
 import inspect
 from collections.abc import Callable, Generator
 from datetime import datetime
@@ -10,7 +11,7 @@ from typing import Any, NotRequired, TypedDict, TypeVar
 
 import polars as pl
 from loguru import logger
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig
 
 from ..extract.parser import is_matcher, matcher_to_expr
 from ..utils import stage_init, write_lazyframe
@@ -170,7 +171,31 @@ def validate_match_revise(stage_cfg: DictConfig):
             raise ValueError(f"Match revise config must contain a valid matcher in {MATCHER_KEY}")
 
 
-def match_revise_fntr(matcher_expr: pl.Expr, compute_fn: Callable[[DF_T], DF_T]) -> Callable[[DF_T], DF_T]:
+def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_COMPUTE_FN_T) -> COMPUTE_FN_T:
+    """TODO.
+
+    Args:
+
+    Returns:
+
+    Examples:
+        >>> raise NotImplementedError("TODO: Add examples")
+    """
+    stage_cfg = copy.deepcopy(stage_cfg)
+
+    if not is_match_revise(stage_cfg):
+        return bind_compute_fn(cfg, stage_cfg, compute_fn)
+
+    validate_match_revise(stage_cfg)
+
+    matchers_and_fns = []
+    for match_revise_cfg in stage_cfg.pop(MATCH_REVISE_KEY):
+        matcher = matcher_to_expr(match_revise_cfg.pop(MATCHER_KEY))
+        local_stage_cfg = DictConfig({**stage_cfg, **match_revise_cfg})
+        local_compute_fn = bind_compute_fn(cfg, local_stage_cfg, compute_fn)
+
+        matchers_and_fns.append((matcher, local_compute_fn))
+
     @wraps(compute_fn)
     def match_revise_fn(df: DF_T) -> DF_T:
         cols = df.collect_schema().names
@@ -180,24 +205,77 @@ def match_revise_fntr(matcher_expr: pl.Expr, compute_fn: Callable[[DF_T], DF_T])
 
         df = df.with_row_index(idx_col)
 
-        matches = df.filter(matcher_expr)
-        revised = compute_fn(matches)
-        return compute_fn(df.filter(matcher_expr))
+        unmatched_df = df
+
+        revision_parts = []
+        for matcher_expr, local_compute_fn in matchers_and_fns:
+            matched_df = unmatched_df.filter(matcher_expr).with_columns(
+                pl.col(idx_col).fill_null("forward").name.keep()
+            )
+            unmatched_df = unmatched_df.filter(~matcher_expr)
+
+            revision_parts = local_compute_fn(matched_df)
+
+        revision_parts.append(unmatched_df)
+        return (
+            pl.concat(revision_parts, how="vertical")
+            .sort(["patient_id", "time", idx_col], maintain_order=True)
+            .drop(idx_col)
+        )
 
     return match_revise_fn
 
 
-def get_match_revise_compute_fn(stage_cfg: DictConfig, compute_fn: MAP_FN_T) -> MAP_FN_T:
-    if not is_match_revise(stage_cfg):
-        return compute_fn
+def bind_compute_fn(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_COMPUTE_FN_T) -> COMPUTE_FN_T:
+    """Bind the compute function to the appropriate parameters based on the type of the compute function.
 
-    validate_match_revise(stage_cfg)
+    Args:
+        cfg: The DictConfig configuration object.
+        stage_cfg: The DictConfig stage configuration object. This is separated from the ``cfg`` argument
+            because in some cases, such as under the match and revise paradigm, the stage config may be
+            modified dynamically under different matcher conditions to yield different compute functions.
+        compute_fn: The compute function to bind.
 
-    match_revise_options = stage_cfg[MATCH_REVISE_KEY]
-    out_compute_fn = []
-    for match_revise_cfg in match_revise_options:
-        matcher = matcher_to_expr(match_revise_cfg[MATCHER_KEY])
-        compute_fn = (partial(pl.filter, matcher),) + compute_fn
+    Returns:
+        The compute function bound to the appropriate parameters.
+
+    Raises:
+        ValueError: If the compute function is not a valid compute function.
+
+    Examples:
+        >>> raise NotImplementedError("TODO: Add examples")
+    """
+
+    def fntr_params(compute_fn: ANY_COMPUTE_FN_T) -> ComputeFnArgs:
+        compute_fn_params = inspect.signature(compute_fn).parameters
+        kwargs = ComputeFnArgs()
+
+        if "cfg" in compute_fn_params:
+            kwargs["cfg"] = cfg
+        if "stage_cfg" in compute_fn_params:
+            kwargs["stage_cfg"] = stage_cfg
+        if "code_modifiers" in compute_fn_params:
+            code_modifiers = cfg.get("code_modifiers", None)
+            kwargs["code_modifiers"] = code_modifiers
+        if "code_metadata" in compute_fn_params:
+            kwargs["code_metadata"] = pl.read_parquet(
+                Path(stage_cfg.metadata_input_dir) / "codes.parquet", use_pyarrow=True
+            )
+        return kwargs
+
+    if compute_fn is None:
+        return identity_fn
+    match compute_fn_type(compute_fn):
+        case ComputeFnType.DIRECT:
+            pass
+        case ComputeFnType.UNBOUND:
+            compute_fn = partial(compute_fn, **fntr_params(compute_fn))
+        case ComputeFnType.FUNCTOR:
+            compute_fn = compute_fn(**fntr_params(compute_fn))
+        case _:
+            raise ValueError("Invalid compute function")
+
+    return compute_fn
 
 
 def map_over(
@@ -233,34 +311,7 @@ def map_over(
             f"Split {process_split} requested, but no patient split file found at {str(split_fp)}."
         )
 
-    def fntr_params(compute_fn: ANY_COMPUTE_FN_T) -> ComputeFnArgs:
-        compute_fn_params = inspect.signature(compute_fn).parameters
-        kwargs = ComputeFnArgs()
-
-        if "cfg" in compute_fn_params:
-            kwargs["cfg"] = cfg
-        if "stage_cfg" in compute_fn_params:
-            kwargs["stage_cfg"] = cfg.stage_cfg
-        if "code_modifiers" in compute_fn_params:
-            code_modifiers = cfg.get("code_modifiers", None)
-            kwargs["code_modifiers"] = code_modifiers
-        if "code_metadata" in compute_fn_params:
-            kwargs["code_metadata"] = pl.read_parquet(
-                Path(cfg.stage_cfg.metadata_input_dir) / "codes.parquet", use_pyarrow=True
-            )
-        return kwargs
-
-    if compute_fn is None:
-        compute_fn = identity_fn
-    match compute_fn_type(compute_fn):
-        case ComputeFnType.DIRECT:
-            pass
-        case ComputeFnType.UNBOUND:
-            compute_fn = partial(compute_fn, **fntr_params(compute_fn))
-        case ComputeFnType.FUNCTOR:
-            compute_fn = compute_fn(**fntr_params(compute_fn))
-        case _:
-            raise ValueError("Invalid compute function")
+    compute_fn = match_revise_fntr(cfg, cfg.stage_cfg, compute_fn)
 
     all_out_fps = []
     for in_fp, out_fp in shard_iterator_fntr(cfg):
