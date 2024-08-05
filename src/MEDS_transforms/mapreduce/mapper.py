@@ -229,16 +229,45 @@ def is_match_revise(stage_cfg: DictConfig) -> bool:
     """Check if the stage configuration is in a match and revise format.
 
     Examples:
-        >>> raise NotImplementedError
+        >>> is_match_revise(DictConfig({"_match_revise": []}))
+        False
+        >>> is_match_revise(DictConfig({"_match_revise": [{"_matcher": {"code": "CODE//TEMP"}}]}))
+        True
+        >>> is_match_revise(DictConfig({"foo": "bar"}))
+        False
     """
-    return stage_cfg.get(MATCH_REVISE_KEY, False)
+    return bool(stage_cfg.get(MATCH_REVISE_KEY, False))
 
 
 def validate_match_revise(stage_cfg: DictConfig):
     """Validate that the stage configuration is in a match and revise format.
 
     Examples:
-        >>> raise NotImplementedError
+        >>> validate_match_revise(DictConfig({"foo": []}))
+        Traceback (most recent call last):
+            ...
+        ValueError: Stage configuration must contain a _match_revise key
+        >>> validate_match_revise(DictConfig({"_match_revise": "foo"}))
+        Traceback (most recent call last):
+            ...
+        ValueError: Match revise options must be a list, got <class 'str'>
+        >>> validate_match_revise(DictConfig({"_match_revise": [1]}))
+        Traceback (most recent call last):
+            ...
+        ValueError: Match revise config 0 must be a dict, got <class 'int'>
+        >>> validate_match_revise(DictConfig({"_match_revise": [{"_matcher": {"foo": "bar"}}, 1]}))
+        Traceback (most recent call last):
+            ...
+        ValueError: Match revise config 1 must be a dict, got <class 'int'>
+        >>> validate_match_revise(DictConfig({"_match_revise": [{"foo": "bar"}]}))
+        Traceback (most recent call last):
+            ...
+        ValueError: Match revise config 0 must contain a _matcher key
+        >>> validate_match_revise(DictConfig({"_match_revise": [{"_matcher": {32: "bar"}}]}))
+        Traceback (most recent call last):
+            ...
+        ValueError: Match revise config 0 must contain a valid matcher in _matcher
+        >>> validate_match_revise(DictConfig({"_match_revise": [{"_matcher": {"code": "CODE//TEMP"}}]}))
     """
 
     if MATCH_REVISE_KEY not in stage_cfg:
@@ -248,15 +277,15 @@ def validate_match_revise(stage_cfg: DictConfig):
     if not isinstance(match_revise_options, (list, ListConfig)):
         raise ValueError(f"Match revise options must be a list, got {type(match_revise_options)}")
 
-    for match_revise_cfg in match_revise_options:
+    for i, match_revise_cfg in enumerate(match_revise_options):
         if not isinstance(match_revise_cfg, (dict, DictConfig)):
-            raise ValueError(f"Match revise config must be a dict, got {type(match_revise_cfg)}")
+            raise ValueError(f"Match revise config {i} must be a dict, got {type(match_revise_cfg)}")
 
         if MATCHER_KEY not in match_revise_cfg:
-            raise ValueError(f"Match revise config must contain a {MATCHER_KEY} key")
+            raise ValueError(f"Match revise config {i} must contain a {MATCHER_KEY} key")
 
         if not is_matcher(match_revise_cfg[MATCHER_KEY]):
-            raise ValueError(f"Match revise config must contain a valid matcher in {MATCHER_KEY}")
+            raise ValueError(f"Match revise config {i} must contain a valid matcher in {MATCHER_KEY}")
 
 
 def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_COMPUTE_FN_T) -> COMPUTE_FN_T:
@@ -345,19 +374,33 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
         >>> cfg = DictConfig({"stage_cfg": stage_cfg})
         >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
         >>> match_revise_fn(df.lazy()).collect()
+        shape: (6, 4)
+        ┌────────────┬──────┬─────────────┬─────────────────┐
+        │ patient_id ┆ time ┆ initial_idx ┆ code            │
+        │ ---        ┆ ---  ┆ ---         ┆ ---             │
+        │ i64        ┆ i64  ┆ i64         ┆ str             │
+        ╞════════════╪══════╪═════════════╪═════════════════╡
+        │ 1          ┆ 1    ┆ 0           ┆ FINAL           │
+        │ 1          ┆ 2    ┆ 1           ┆ CODE//bizz//foo │
+        │ 1          ┆ 2    ┆ 2           ┆ CODE//foo//bar  │
+        │ 2          ┆ 1    ┆ 4           ┆ CODE//bizz//foo │
+        │ 2          ┆ 1    ┆ 3           ┆ FINAL           │
+        │ 2          ┆ 2    ┆ 5           ┆ CODE//foo//bar  │
+        └────────────┴──────┴─────────────┴─────────────────┘
         >>> stage_cfg = DictConfig({
         ...     "global_code_end": "foo", "_match_revise": [{"_matcher": {"missing": "CODE//TEMP_2"}}]
         ... })
         >>> cfg = DictConfig({"stage_cfg": stage_cfg})
         >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
-        >>> match_revise_fn(df.lazy()).collect()
+        >>> match_revise_fn(df.lazy()).collect() # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
-        ValueError: Missing needed columns {'code'} for local matcher 0:
+        ValueError: Missing needed columns {'missing'} for local matcher 0:
+            [(col("missing")) == (String(CODE//TEMP_2))].all_horizontal()
+        Columns available: 'code', 'initial_idx', 'patient_id', 'time'
         >>> stage_cfg = DictConfig({"global_code_end": "foo"})
         >>> cfg = DictConfig({"stage_cfg": stage_cfg})
         >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
-        >>> match_revise_fn(df.lazy()).collect()
         Traceback (most recent call last):
             ...
         ValueError: Invalid match and revise configuration...
@@ -385,9 +428,10 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
         revision_parts = []
         for i, (matcher_expr, need_cols, local_compute_fn) in enumerate(matchers_and_fns):
             if not need_cols.issubset(cols):
+                cols_str = "', '".join(x for x in sorted(cols))
                 raise ValueError(
                     f"Missing needed columns {need_cols - cols} for local matcher {i}: "
-                    f"{matcher_expr}\nColumns available: {cols}"
+                    f"{matcher_expr}\nColumns available: '{cols_str}'"
                 )
             matched_df = unmatched_df.filter(matcher_expr)
             unmatched_df = unmatched_df.filter(~matcher_expr)
