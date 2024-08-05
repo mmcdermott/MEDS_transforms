@@ -3,8 +3,8 @@ admissions:
     - "admittedat"
     - "dischargedat"
   pseudotime_col: 
-    - "admittedattimestamp"
-    - "dischargedattimestamp"
+    - "admittedattime"
+    - "dischargedattime"
   output_data_cols:
     - "location"
     - "urgency" 
@@ -22,9 +22,9 @@ numericitems:
     - "registeredat"
     - "updatedat"
   pseudotime_col: 
-    - "measuredattimestamp"
-    - "registeredattimestamp"
-    - "updatedattimestamp"
+    - "measuredattime"
+    - "registeredattime"
+    - "updatedattime"
   output_data_cols:
     - "item"
     - "value"
@@ -40,9 +40,9 @@ listitems:
     - "registeredat"
     - "updatedat"
   pseudotime_col: 
-    - "measuredattimestamp"
-    - "registeredattimestamp"
-    - "updatedattimestamp"
+    - "measuredattime"
+    - "registeredattime"
+    - "updatedattime"
   output_data_cols:
     - "item"
     - "value"
@@ -58,9 +58,9 @@ freetextitems:
     - "registeredat"
     - "updatedat"
   pseudotime_col: 
-    - "measuredattimestamp"
-    - "registeredattimestamp"
-    - "updatedattimestamp"
+    - "measuredattime"
+    - "registeredattime"
+    - "updatedattime"
   output_data_cols:
     - "item"
     - "value"
@@ -76,8 +76,8 @@ drugitems:
     - "start"
     - "stop"
   pseudotime_col: 
-    - "starttimestamp"
-    - "stoptimestamp"
+    - "starttime"
+    - "stoptime"
   output_data_cols:
     - "orderid"
     - "ordercategory"
@@ -98,7 +98,7 @@ drugitems:
 
 procedureorderitems:
   offset_col: "registeredat"
-  pseudotime_col: "registeredattimestamp"
+  pseudotime_col: "registeredattime"
   output_data_cols:
     - "orderid"
     - "ordercategoryname"
@@ -110,7 +110,7 @@ processitems:
     - "start"
     - "stop"
   pseudotime_col: 
-    - "starttimestamp"
-    - "stoptimestamp"
+    - "starttime"
+    - "stoptime"
   output_data_cols:
     - "item"

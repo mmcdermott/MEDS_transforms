@@ -66,7 +66,7 @@ def process_patient_and_admissions(df: pl.LazyFrame) -> pl.LazyFrame:
         PATIENT_ID, 
         pseudo_date_of_birth.alias("dateofbirth"),
         "gender",
-        origin_pseudotime.alias("firstadmittedattimestamp"),
+        origin_pseudotime.alias("firstadmittedattime"),
     ), df.select(PATIENT_ID, ADMISSION_ID)
 
 
@@ -105,7 +105,7 @@ def join_and_get_pseudotime_fntr(
         `configs/event_configs.yaml` file.
         """
         pseudotimes = [
-            (pl.col("firstadmittedattimestamp") + pl.duration(milliseconds=pl.col(offset))).alias(pseudotime)
+            (pl.col("firstadmittedattime") + pl.duration(milliseconds=pl.col(offset))).alias(pseudotime)
             for pseudotime, offset in zip(pseudotime_col, offset_col)
         ]
 

@@ -3,10 +3,10 @@ patient_id_col: patientid
 patient:
   dob: 
     code: "DOB"
-    timestamp: col(dateofbirth)
+    time: col(dateofbirth)
   gender:
     code: ["GENDER", "col(gender)"]
-    timestamp: null
+    time: null
 
 admissions:
   icu_admission:
@@ -16,24 +16,24 @@ admissions:
       - col(urgency)
       - col(origin)
       - col(specialty)
-    timestamp: col(admittedattimestamp)
+    time: col(admittedattime)
   icu_discharge:
     code: 
       - "ICU_DISCHARGE"
       - col(destination)
-    timestamp: col(dischargedattimestamp)
+    time: col(dischargedattime)
   weight:
     code:
       - "WEIGHT_AT_ADMISSION"
       - col(weightsource)
       - col(weightgroup)
-    timestamp: col(admittedattimestamp)
+    time: col(admittedattime)
   height: 
     code:
       - "HEIGHT_AT_ADMISSION"
       - col(heightsource)
       - col(heightgroup)
-    timestamp: col(admittedattimestamp)
+    time: col(admittedattime)
 
 numericitems:
   event:
@@ -41,7 +41,7 @@ numericitems:
       - MEASURE
       - col(item)
       - col(unit)
-    timestamp: col(measuredattimestamp)
+    time: col(measuredattime)
     numerical_value: value
 
 listitems:
@@ -51,7 +51,7 @@ listitems:
       - col(item)
       - col(islabresult)
       - col(value)
-    timestamp: col(measuredattimestamp)
+    time: col(measuredattime)
   
 freetextitems:
   event:
@@ -59,7 +59,7 @@ freetextitems:
       - MEASURE
       - col(item)
       - col(islabresult)
-    timestamp: col(measuredattimestamp)
+    time: col(measuredattime)
     text_value: value
 
 procedureorderitems:
@@ -68,7 +68,7 @@ procedureorderitems:
       - PROCEDURE
       - col(ordercategoryname)
       - col(item)
-    timestamp: col(registeredattimestamp)
+    time: col(registeredattime)
 
 processitems:
   start: 
@@ -76,13 +76,13 @@ processitems:
       - PROCESS
       - START
       - col(item)
-    timestamp: col(starttimestamp)
+    time: col(starttime)
   end:
     code: 
       - PROCESS
       - END
       - col(item)
-    timestamp: col(stoptimestamp)
+    time: col(stoptime)
 
 drugitems: 
   start: 
@@ -92,7 +92,7 @@ drugitems:
       - col(ordercategory)
       - col(item)
       - col(action)
-    timestamp: col(starttimestamp)
+    time: col(starttime)
   rate: 
     code:
       - DRUG
@@ -100,7 +100,7 @@ drugitems:
       - col(ordercategory)
       - col(item)
       - col(rateunit)
-    timestamp: col(starttimestamp)
+    time: col(starttime)
     numerical_value: col(rate)
   dose: 
     code:
@@ -109,7 +109,7 @@ drugitems:
       - col(ordercategory)
       - col(item)
       - col(doseunit)
-    timestamp: col(starttimestamp)
+    time: col(starttime)
     numerical_value: col(dose)
   end:
     code:
@@ -117,4 +117,4 @@ drugitems:
       - END
       - col(ordercategory)
       - col(item)
-    timestamp: col(stoptimestamp)
+    time: col(stoptime)
