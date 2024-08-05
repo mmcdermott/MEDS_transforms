@@ -9,6 +9,9 @@ defaults:
       - occlude_outliers
       - fit_normalization
       - fit_vocabulary_indices
+      # This stage is intentionally included as a stage config but not a stage so it is not executed in
+      # default pipelines but if someone adds it to their list of stages it can be run like normal.
+      - reorder_measurements
   - _self_
 
 etl_metadata.pipeline_name: "preprocess"
@@ -16,7 +19,7 @@ etl_metadata.pipeline_name: "preprocess"
 # Global pipeline parameters:
 # 1. Code modifiers will be used as adjoining parts of the `code` columns during group-bys and eventual
 #    tokenization.
-code_modifier_columns: ???
+code_modifiers: ???
 
 # The shards map filepath is stored in the global input directory for model-specific pre-processing.
 shards_map_fp: "${input_dir}/splits.json"

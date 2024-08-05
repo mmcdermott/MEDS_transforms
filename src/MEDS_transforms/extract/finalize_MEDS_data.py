@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 """Sets the MEDS data files to the right schema."""
-from functools import partial
 
 import hydra
 import polars as pl
@@ -13,7 +12,7 @@ from MEDS_transforms.extract import CONFIG_YAML, MEDS_DATA_MANDATORY_TYPES
 from MEDS_transforms.mapreduce.mapper import map_over
 
 
-def get_and_validate_data_schema(data: pl.LazyFrame, do_retype: bool = True) -> pa.Table:
+def get_and_validate_data_schema(df: pl.LazyFrame, stage_cfg: DictConfig) -> pa.Table:
     """Validates the schema of a MEDS data DataFrame.
 
     This function validates the schema of a MEDS data DataFrame, ensuring that it has the correct columns
@@ -25,17 +24,18 @@ def get_and_validate_data_schema(data: pl.LazyFrame, do_retype: bool = True) -> 
          columns cannot be set to `None`.
 
     Args:
-        data: The MEDS data DataFrame to validate.
+        df: The MEDS data DataFrame to validate.
+        stage_cfg: The stage configuration object.
 
     Returns:
-        pa.Table: The validated code metadata DataFrame, with columns re-typed as needed.
+        pa.Table: The validated MEDS data DataFrame, with columns re-typed as needed.
 
     Raises:
-        ValueError: if do_retype is False and the code metadata DataFrame is not schema compliant.
+        ValueError: if do_retype is False and the MEDS data DataFrame is not schema compliant.
 
     Examples:
         >>> df = pl.DataFrame({})
-        >>> get_and_validate_data_schema(df.lazy(), do_retype=False) # doctest: +NORMALIZE_WHITESPACE
+        >>> get_and_validate_data_schema(df.lazy(), dict(do_retype=False)) # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
         ValueError: MEDS Data DataFrame must have a 'patient_id' column of type Int64.
@@ -43,7 +43,7 @@ def get_and_validate_data_schema(data: pl.LazyFrame, do_retype: bool = True) -> 
                         Datetime(time_unit='us', time_zone=None).
                     MEDS Data DataFrame must have a 'code' column of type String.
                     MEDS Data DataFrame must have a 'numeric_value' column of type Float32.
-        >>> get_and_validate_data_schema(df.lazy()) # doctest: +NORMALIZE_WHITESPACE
+        >>> get_and_validate_data_schema(df.lazy(), {}) # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
         ValueError: MEDS Data DataFrame must have a 'patient_id' column of type Int64.
@@ -54,12 +54,12 @@ def get_and_validate_data_schema(data: pl.LazyFrame, do_retype: bool = True) -> 
         ...     "time": [datetime(2021, 1, 1), datetime(2021, 1, 2)],
         ...     "code": ["A", "B"], "text_value": ["1", None], "numeric_value": [None, 34.2]
         ... })
-        >>> get_and_validate_data_schema(df.lazy(), do_retype=False) # doctest: +NORMALIZE_WHITESPACE
+        >>> get_and_validate_data_schema(df.lazy(), dict(do_retype=False)) # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
         ValueError: MEDS Data 'patient_id' column must be of type Int64. Got UInt32.
                     MEDS Data 'numeric_value' column must be of type Float32. Got Float64.
-        >>> get_and_validate_data_schema(df.lazy())
+        >>> get_and_validate_data_schema(df.lazy(), {})
         pyarrow.Table
         patient_id: int64
         time: timestamp[us]
@@ -74,17 +74,18 @@ def get_and_validate_data_schema(data: pl.LazyFrame, do_retype: bool = True) -> 
         text_value: [["1",null]]
     """
 
-    schema = data.collect_schema()
+    do_retype = stage_cfg.get("do_retype", True)
+    schema = df.collect_schema()
     errors = []
     for col, dtype in MEDS_DATA_MANDATORY_TYPES.items():
         if col in schema and schema[col] != dtype:
             if do_retype:
-                data = data.with_columns(pl.col(col).cast(dtype, strict=False))
+                df = df.with_columns(pl.col(col).cast(dtype, strict=False))
             else:
                 errors.append(f"MEDS Data '{col}' column must be of type {dtype}. Got {schema[col]}.")
         elif col not in schema:
             if col in ("numeric_value", "time") and do_retype:
-                data = data.with_columns(pl.lit(None, dtype=dtype).alias(col))
+                df = df.with_columns(pl.lit(None, dtype=dtype).alias(col))
             else:
                 errors.append(f"MEDS Data DataFrame must have a '{col}' column of type {dtype}.")
 
@@ -94,15 +95,15 @@ def get_and_validate_data_schema(data: pl.LazyFrame, do_retype: bool = True) -> 
     additional_cols = [col for col in schema if col not in MEDS_DATA_MANDATORY_TYPES]
 
     if additional_cols:
-        extra_schema = data.head(0).select(additional_cols).collect().to_arrow().schema
+        extra_schema = df.head(0).select(additional_cols).collect().to_arrow().schema
         measurement_properties = list(zip(extra_schema.names, extra_schema.types))
-        data = data.select(*MEDS_DATA_MANDATORY_TYPES.keys(), *additional_cols)
+        df = df.select(*MEDS_DATA_MANDATORY_TYPES.keys(), *additional_cols)
     else:
-        data = data.select(*MEDS_DATA_MANDATORY_TYPES.keys())
+        df = df.select(*MEDS_DATA_MANDATORY_TYPES.keys())
         measurement_properties = []
 
     validated_schema = data_schema(measurement_properties)
-    return data.collect().to_arrow().cast(validated_schema)
+    return df.collect().to_arrow().cast(validated_schema)
 
 
 @hydra.main(version_base=None, config_path=str(CONFIG_YAML.parent), config_name=CONFIG_YAML.stem)
@@ -130,10 +131,7 @@ def main(cfg: DictConfig):
             May not work properly with other default aspects of the MEDS_Extract pipeline if set to `False`.
     """
 
-    compute_fn = partial(get_and_validate_data_schema, do_retype=cfg.stage_cfg.get("do_retype", True))
-    write_fn = pq.write_table
-
-    map_over(cfg, compute_fn, write_fn=write_fn)
+    map_over(cfg, compute_fn=get_and_validate_data_schema, write_fn=pq.write_table)
 
 
 if __name__ == "__main__":
