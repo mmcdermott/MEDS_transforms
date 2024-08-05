@@ -4,9 +4,6 @@
 
 See the docstring of `main` for more information.
 """
-import rootutils
-
-root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
 import gzip
 from collections.abc import Callable
