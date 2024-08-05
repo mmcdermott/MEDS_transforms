@@ -137,10 +137,84 @@ def compute_fn_type(compute_fn: ANY_COMPUTE_FN_T) -> ComputeFnType | None:
 
 
 def identity_fn(df: Any) -> Any:
+    """A "null" compute function that returns the input DataFrame as is.
+
+    Args:
+        df: The input DataFrame.
+
+    Returns:
+        The input DataFrame.
+
+    Examples:
+        >>> df = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+        >>> (identity_fn(df) == df).select(pl.all_horizontal(pl.all().all())).item()
+        True
+    """
+
     return df
 
 
 def read_and_filter_fntr(filter_expr: pl.Expr, read_fn: Callable[[Path], DF_T]) -> Callable[[Path], DF_T]:
+    """Create a function that reads a DataFrame from a file and filters it based on a given expression.
+
+    This is specified as a functor in this way to allow it to modify arbitrary other read functions for use in
+    different mapreduce pipelines.
+
+    Args:
+        filter_expr: The filter expression to apply to the DataFrame.
+        read_fn: The read function to use to read the DataFrame.
+
+    Returns:
+        A function that reads a DataFrame from a file and filters it based on the given expression.
+
+    Examples:
+        >>> dfs = {
+        ...     "df1": pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]}),
+        ...     "df2": pl.DataFrame({"a": [4, 5, 6], "b": [7, 8, 9]})
+        ... }
+        >>> read_fn = lambda key: dfs[key]
+        >>> fn = read_and_filter_fntr((pl.col("a") % 2) == 0, read_fn)
+        >>> fn("df1")
+        shape: (1, 2)
+        ┌─────┬─────┐
+        │ a   ┆ b   │
+        │ --- ┆ --- │
+        │ i64 ┆ i64 │
+        ╞═════╪═════╡
+        │ 2   ┆ 5   │
+        └─────┴─────┘
+        >>> fn("df2")
+        shape: (2, 2)
+        ┌─────┬─────┐
+        │ a   ┆ b   │
+        │ --- ┆ --- │
+        │ i64 ┆ i64 │
+        ╞═════╪═════╡
+        │ 4   ┆ 7   │
+        │ 6   ┆ 9   │
+        └─────┴─────┘
+        >>> fn = read_and_filter_fntr((pl.col("b") % 2) == 0, read_fn)
+        >>> fn("df1")
+        shape: (2, 2)
+        ┌─────┬─────┐
+        │ a   ┆ b   │
+        │ --- ┆ --- │
+        │ i64 ┆ i64 │
+        ╞═════╪═════╡
+        │ 1   ┆ 4   │
+        │ 3   ┆ 6   │
+        └─────┴─────┘
+        >>> fn("df2")
+        shape: (1, 2)
+        ┌─────┬─────┐
+        │ a   ┆ b   │
+        │ --- ┆ --- │
+        │ i64 ┆ i64 │
+        ╞═════╪═════╡
+        │ 5   ┆ 8   │
+        └─────┴─────┘
+    """
+
     def read_and_filter(in_fp: Path) -> DF_T:
         return read_fn(in_fp).filter(filter_expr)
 
@@ -152,10 +226,24 @@ MATCHER_KEY = "_matcher"
 
 
 def is_match_revise(stage_cfg: DictConfig) -> bool:
+    """Check if the stage configuration is in a match and revise format.
+
+    Examples:
+        >>> raise NotImplementedError
+    """
     return stage_cfg.get(MATCH_REVISE_KEY, False)
 
 
 def validate_match_revise(stage_cfg: DictConfig):
+    """Validate that the stage configuration is in a match and revise format.
+
+    Examples:
+        >>> raise NotImplementedError
+    """
+
+    if MATCH_REVISE_KEY not in stage_cfg:
+        raise ValueError(f"Stage configuration must contain a {MATCH_REVISE_KEY} key")
+
     match_revise_options = stage_cfg[MATCH_REVISE_KEY]
     if not isinstance(match_revise_options, (list, ListConfig)):
         raise ValueError(f"Match revise options must be a list, got {type(match_revise_options)}")
@@ -172,56 +260,142 @@ def validate_match_revise(stage_cfg: DictConfig):
 
 
 def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_COMPUTE_FN_T) -> COMPUTE_FN_T:
-    """TODO.
+    """A functor that creates a match & revise compute function based on the given configuration.
+
+    Stage configurations for match & revise must be in a match and revise format. Consider the below example,
+    showing the ``stage_cfg`` object in ``yaml`` format:
+
+        ```yaml
+        global_arg_1: "foo"
+        _match_revise:
+          - _matcher: {code: "CODE//BAR"}
+            local_arg_1: "bar"
+          - _matcher: {code: "CODE//BAZ"}
+            local_arg_1: "baz"
+        ```
+
+    This configuration will create a match & revise compute function that will filter the input DataFrame for
+    rows that match the ``CODE//BAR`` code and apply the compute function with the ``local_arg_1=bar``
+    parameter, and then filter the input DataFrame for rows that match the ``CODE//BAZ`` code and apply the
+    compute function with the ``local_arg_1=baz`` parameter. Both of these local compute functions will be
+    applied to the input DataFrame in sequence, and the resulting DataFrames will be concatenated alongside
+    any of the dataframe that matches no matcher (which will be left unmodified) and merged in a sorted way
+    that respects the ``patient_id``, ``time`` ordering first, then the order of the match & revise blocks
+    themselves, then the order of the rows in each match & revise block output. Each local compute function
+    will also use the ``global_arg_1=foo`` parameter.
 
     Args:
+        cfg: The DictConfig configuration object.
+        stage_cfg: The DictConfig stage configuration object. This stage configuration must be in a match and
+            revise format, meaning it must have a key ``"_match_revise"`` that contains a list of local match
+            & revise configurations. Each local match & revise configuration must contain a key ``"_matcher"``
+            which links to the matcher configuration to use to filter the input DataFrame for the local
+            compute execution, and all other keys are local configuration parameters to be used in the local
+            compute execution.
+        compute_fn: The compute function to bind to the match & revise configuration local arguments.
 
     Returns:
+        A function that applies the match & revise compute function to the input DataFrame.
+
+    Raises:
+        ValueError: If the stage configuration is not in a match and revise format.
 
     Examples:
-        >>> raise NotImplementedError("TODO: Add examples")
+        >>> df = pl.DataFrame({
+        ...     "patient_id": [1, 1, 1, 2, 2, 2],
+        ...     "time": [1, 2, 2, 1, 1, 2],
+        ...     "initial_idx": [0, 1, 2, 3, 4, 5],
+        ...     "code": ["FINAL", "CODE//TEMP_2", "CODE//TEMP_1", "FINAL", "CODE//TEMP_2", "CODE//TEMP_1"]
+        ... })
+        >>> def compute_fn(df: pl.DataFrame, stage_cfg: DictConfig) -> pl.DataFrame:
+        ...     return df.with_columns(
+        ...         pl.col("code").str.slice(0, len("CODE//")) +
+        ...         stage_cfg.local_code_mid + "//" + stage_cfg.global_code_end
+        ...     )
+        >>> stage_cfg = DictConfig({
+        ...     "global_code_end": "foo",
+        ...     "_match_revise": [
+        ...         {"_matcher": {"code": "CODE//TEMP_1"}, "local_code_mid": "bar"},
+        ...         {"_matcher": {"code": "CODE//TEMP_2"}, "local_code_mid": "baz"}
+        ...     ]
+        ... })
+        >>> cfg = DictConfig({"stage_cfg": stage_cfg})
+        >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
+        >>> match_revise_fn(df.lazy()).collect()
+        shape: (6, 4)
+        ┌────────────┬──────┬─────────────┬────────────────┐
+        │ patient_id ┆ time ┆ initial_idx ┆ code           │
+        │ ---        ┆ ---  ┆ ---         ┆ ---            │
+        │ i64        ┆ i64  ┆ i64         ┆ str            │
+        ╞════════════╪══════╪═════════════╪════════════════╡
+        │ 1          ┆ 1    ┆ 0           ┆ FINAL          │
+        │ 1          ┆ 2    ┆ 2           ┆ CODE//bar//foo │
+        │ 1          ┆ 2    ┆ 1           ┆ CODE//baz//foo │
+        │ 2          ┆ 1    ┆ 4           ┆ CODE//baz//foo │
+        │ 2          ┆ 1    ┆ 3           ┆ FINAL          │
+        │ 2          ┆ 2    ┆ 5           ┆ CODE//bar//foo │
+        └────────────┴──────┴─────────────┴────────────────┘
+        >>> stage_cfg = DictConfig({
+        ...     "global_code_end": "foo",
+        ...     "_match_revise": [
+        ...         {"_matcher": {"code": "CODE//TEMP_2"}, "local_code_mid": "bizz"},
+        ...         {"_matcher": {"code": "CODE//TEMP_1"}, "local_code_mid": "foo", "global_code_end": "bar"},
+        ...     ]
+        ... })
+        >>> cfg = DictConfig({"stage_cfg": stage_cfg})
+        >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
+        >>> match_revise_fn(df.lazy()).collect()
+        >>> stage_cfg = DictConfig({
+        ...     "global_code_end": "foo", "_match_revise": [{"_matcher": {"missing": "CODE//TEMP_2"}}]
+        ... })
+        >>> cfg = DictConfig({"stage_cfg": stage_cfg})
+        >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
+        >>> match_revise_fn(df.lazy()).collect()
+        Traceback (most recent call last):
+            ...
+        ValueError: Missing needed columns {'code'} for local matcher 0:
+        >>> stage_cfg = DictConfig({"global_code_end": "foo"})
+        >>> cfg = DictConfig({"stage_cfg": stage_cfg})
+        >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
+        >>> match_revise_fn(df.lazy()).collect()
+        Traceback (most recent call last):
+            ...
+        ValueError: Invalid match and revise configuration...
     """
     stage_cfg = copy.deepcopy(stage_cfg)
 
-    if not is_match_revise(stage_cfg):
-        return bind_compute_fn(cfg, stage_cfg, compute_fn)
-
-    validate_match_revise(stage_cfg)
+    try:
+        validate_match_revise(stage_cfg)
+    except ValueError as e:
+        raise ValueError("Invalid match and revise configuration") from e
 
     matchers_and_fns = []
     for match_revise_cfg in stage_cfg.pop(MATCH_REVISE_KEY):
-        matcher = matcher_to_expr(match_revise_cfg.pop(MATCHER_KEY))
+        matcher, cols = matcher_to_expr(match_revise_cfg.pop(MATCHER_KEY))
         local_stage_cfg = DictConfig({**stage_cfg, **match_revise_cfg})
         local_compute_fn = bind_compute_fn(cfg, local_stage_cfg, compute_fn)
 
-        matchers_and_fns.append((matcher, local_compute_fn))
+        matchers_and_fns.append((matcher, cols, local_compute_fn))
 
     @wraps(compute_fn)
     def match_revise_fn(df: DF_T) -> DF_T:
-        cols = df.collect_schema().names
-        idx_col = "_row_idx"
-        while idx_col in cols:
-            idx_col = f"_{idx_col}"
-
-        df = df.with_row_index(idx_col)
-
         unmatched_df = df
+        cols = set(df.collect_schema().names())
 
         revision_parts = []
-        for matcher_expr, local_compute_fn in matchers_and_fns:
-            matched_df = unmatched_df.filter(matcher_expr).with_columns(
-                pl.col(idx_col).fill_null("forward").name.keep()
-            )
+        for i, (matcher_expr, need_cols, local_compute_fn) in enumerate(matchers_and_fns):
+            if not need_cols.issubset(cols):
+                raise ValueError(
+                    f"Missing needed columns {need_cols - cols} for local matcher {i}: "
+                    f"{matcher_expr}\nColumns available: {cols}"
+                )
+            matched_df = unmatched_df.filter(matcher_expr)
             unmatched_df = unmatched_df.filter(~matcher_expr)
 
-            revision_parts = local_compute_fn(matched_df)
+            revision_parts.append(local_compute_fn(matched_df))
 
         revision_parts.append(unmatched_df)
-        return (
-            pl.concat(revision_parts, how="vertical")
-            .sort(["patient_id", "time", idx_col], maintain_order=True)
-            .drop(idx_col)
-        )
+        return pl.concat(revision_parts, how="vertical").sort(["patient_id", "time"], maintain_order=True)
 
     return match_revise_fn
 
@@ -232,8 +406,8 @@ def bind_compute_fn(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_COMP
     Args:
         cfg: The DictConfig configuration object.
         stage_cfg: The DictConfig stage configuration object. This is separated from the ``cfg`` argument
-            because in some cases, such as under the match and revise paradigm, the stage config may be
-            modified dynamically under different matcher conditions to yield different compute functions.
+            because in some cases, such as under the match & revise paradigm, the stage config may be modified
+            dynamically under different matcher conditions to yield different compute functions.
         compute_fn: The compute function to bind.
 
     Returns:
@@ -311,7 +485,10 @@ def map_over(
             f"Split {process_split} requested, but no patient split file found at {str(split_fp)}."
         )
 
-    compute_fn = match_revise_fntr(cfg, cfg.stage_cfg, compute_fn)
+    if is_match_revise(cfg.stage_cfg):
+        compute_fn = match_revise_fntr(cfg, cfg.stage_cfg, compute_fn)
+    else:
+        compute_fn = bind_compute_fn(cfg, cfg.stage_cfg, compute_fn)
 
     all_out_fps = []
     for in_fp, out_fp in shard_iterator_fntr(cfg):
