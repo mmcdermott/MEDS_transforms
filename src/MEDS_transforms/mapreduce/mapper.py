@@ -461,7 +461,79 @@ def bind_compute_fn(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_COMP
         ValueError: If the compute function is not a valid compute function.
 
     Examples:
-        >>> raise NotImplementedError("TODO: Add examples")
+        >>> compute_fn = bind_compute_fn(DictConfig({}), DictConfig({}), None)
+        >>> compute_fn("foobar")
+        'foobar'
+        >>> def compute_fntr(df: pl.DataFrame, cfg: DictConfig) -> pl.DataFrame:
+        ...     return df.with_columns(pl.lit(cfg.val).alias("val"))
+        >>> compute_fn = bind_compute_fn(DictConfig({"val": "foo"}), None, compute_fntr)
+        >>> compute_fn(pl.DataFrame({"a": [1, 2, 3]}))
+        shape: (3, 2)
+        ┌─────┬─────┐
+        │ a   ┆ val │
+        │ --- ┆ --- │
+        │ i64 ┆ str │
+        ╞═════╪═════╡
+        │ 1   ┆ foo │
+        │ 2   ┆ foo │
+        │ 3   ┆ foo │
+        └─────┴─────┘
+        >>> def compute_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
+        ...     return lambda df: df.with_columns(pl.lit(cfg.val).alias("val"))
+        >>> compute_fn = bind_compute_fn(DictConfig({"val": "foo"}), None, compute_fntr)
+        >>> compute_fn(pl.DataFrame({"a": [1, 2, 3]}))
+        shape: (3, 2)
+        ┌─────┬─────┐
+        │ a   ┆ val │
+        │ --- ┆ --- │
+        │ i64 ┆ str │
+        ╞═════╪═════╡
+        │ 1   ┆ foo │
+        │ 2   ┆ foo │
+        │ 3   ┆ foo │
+        └─────┴─────┘
+        >>> def compute_fntr(stage_cfg, cfg) -> Callable[[pl.DataFrame], pl.DataFrame]:
+        ...     return lambda df: df.with_columns(
+        ...         pl.lit(stage_cfg.val).alias("stage_val"), pl.lit(cfg.val).alias("cfg_val")
+        ...     )
+        >>> compute_fn = bind_compute_fn(DictConfig({"val": "quo"}), DictConfig({"val": "bar"}), compute_fntr)
+        >>> compute_fn(pl.DataFrame({"a": [1, 2, 3]}))
+        shape: (3, 3)
+        ┌─────┬───────────┬─────────┐
+        │ a   ┆ stage_val ┆ cfg_val │
+        │ --- ┆ ---       ┆ ---     │
+        │ i64 ┆ str       ┆ str     │
+        ╞═════╪═══════════╪═════════╡
+        │ 1   ┆ bar       ┆ quo     │
+        │ 2   ┆ bar       ┆ quo     │
+        │ 3   ┆ bar       ┆ quo     │
+        └─────┴───────────┴─────────┘
+        >>> def compute_fntr(df, code_metadata):
+        ...     return df.join(code_metadata, on="a")
+        >>> code_metadata_df = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+        >>> from tempfile import TemporaryDirectory
+        >>> with TemporaryDirectory() as tmpdir:
+        ...     code_metadata_fp = Path(tmpdir) / "codes.parquet"
+        ...     code_metadata_df.write_parquet(code_metadata_fp)
+        ...     stage_cfg = DictConfig({"metadata_input_dir": tmpdir})
+        ...     compute_fn = bind_compute_fn(DictConfig({}), stage_cfg, compute_fntr)
+        ...     compute_fn(pl.DataFrame({"a": [1, 2, 3]}))
+        shape: (3, 2)
+        ┌─────┬─────┐
+        │ a   ┆ b   │
+        │ --- ┆ --- │
+        │ i64 ┆ i64 │
+        ╞═════╪═════╡
+        │ 1   ┆ 4   │
+        │ 2   ┆ 5   │
+        │ 3   ┆ 6   │
+        └─────┴─────┘
+        >>> def compute_fntr(df: pl.DataFrame, cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
+        ...     return lambda df: df
+        >>> bind_compute_fn(DictConfig({}), DictConfig({}), compute_fntr)
+        Traceback (most recent call last):
+            ...
+        ValueError: Invalid compute function
     """
 
     def fntr_params(compute_fn: ANY_COMPUTE_FN_T) -> ComputeFnArgs:
