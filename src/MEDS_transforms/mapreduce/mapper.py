@@ -1,6 +1,5 @@
 """Basic utilities for parallelizable map operations on sharded MEDS datasets with caching and locking."""
 
-import copy
 import inspect
 from collections.abc import Callable, Generator
 from datetime import datetime
@@ -9,6 +8,7 @@ from functools import partial, wraps
 from pathlib import Path
 from typing import Any, NotRequired, TypedDict, TypeVar
 
+import hydra
 import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, ListConfig
@@ -405,12 +405,12 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
             ...
         ValueError: Invalid match and revise configuration...
     """
-    stage_cfg = copy.deepcopy(stage_cfg)
-
     try:
         validate_match_revise(stage_cfg)
     except ValueError as e:
         raise ValueError("Invalid match and revise configuration") from e
+
+    stage_cfg = hydra.utils.instantiate(stage_cfg)
 
     matchers_and_fns = []
     for match_revise_cfg in stage_cfg.pop(MATCH_REVISE_KEY):
