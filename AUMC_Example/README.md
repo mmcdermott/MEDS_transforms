@@ -1,6 +1,6 @@
 # AUMC Example
 
-This is an example of how to extract a MEDS dataset from AUMC. All scripts in this README are assumed to
+This is an example of how to extract a MEDS dataset from AUMCdb (https://github.com/AmsterdamUMC/AmsterdamUMCdb). All scripts in this README are assumed to
 be run **not** from this directory but from the root directory of this entire repository (e.g., one directory
 up from this one).
 
@@ -37,25 +37,7 @@ pip install .[examples,local_parallelism]
 
 ## Step 1: Download AUMC
 
-Download the AUMC dataset from following the instructions on https://github.com/AmsterdamUMC/AmsterdamUMCdb?tab=readme-ov-file. You will need the raw `.csv` files for this example. We will use `$MIMICIV_RAW_DIR` to denote
-the root directory of where the resulting _core data files_ are stored -- e.g., there should be a `hosp` and
-`icu` subdirectory of `$MIMICIV_RAW_DIR`.
-
-## Step 1.5: Download MIMIC-IV Metadata files
-
-```bash
-cd $MIMIC_RAW_DIR
-wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/d_labitems_to_loinc.csv
-wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/inputevents_to_rxnorm.csv
-wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/lab_itemid_to_loinc.csv
-wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/meas_chartevents_main.csv
-wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/meas_chartevents_value.csv
-wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/numerics-summary.csv
-wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/outputevents_to_loinc.csv
-wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/proc_datetimeevents.csv
-wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/proc_itemid.csv
-wget https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/waveforms-summary.csv
-```
+Download the AUMC dataset from following the instructions on https://github.com/AmsterdamUMC/AmsterdamUMCdb?tab=readme-ov-file. You will need the raw `.csv` files for this example. We will use `$AUMC_RAW_DIR` to denote the root directory of where the resulting _core data files_ are stored.
 
 ## Step 2: Run the basic MEDS ETL
 
@@ -128,11 +110,7 @@ This is a step in 4 parts:
 
 Currently, some tables are ignored, including:
 
-1. `hosp/emar_detail`
-2. `hosp/microbiologyevents`
-3. `hosp/services`
-4. `icu/datetimeevents`
-5. `icu/ingredientevents`
+INSERT TABLES IGNORED HERE
 
 Lots of questions remain about how to appropriately handle times of the data -- e.g., things like HCPCS
 events are stored at the level of the _date_, not the _datetime_. How should those be slotted into the
@@ -154,4 +132,3 @@ may need to run `unset SLURM_CPU_BIND` in your terminal first to avoid errors.
 
 If you wanted, some other processing could also be done here, such as:
 
-1. Converting the patient's dynamically recorded race into a static, most commonly recorded race field.
