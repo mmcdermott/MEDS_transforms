@@ -1,6 +1,6 @@
 import polars as pl
 
-from MEDS_transforms import EXTRACT_CONFIG_YAML, MANDATORY_TYPES
+from MEDS_transforms import EXTRACT_CONFIG_YAML, MANDATORY_COLUMNS, MANDATORY_TYPES
 
 # We set this equality explicitly here so linting does not remove an apparently "unused" import if we just
 # rename with "as" during the import.
@@ -13,4 +13,4 @@ MEDS_METADATA_MANDATORY_TYPES = {
     "parent_codes": pl.List(pl.String),
 }
 
-MEDS_DATA_MANDATORY_TYPES = MANDATORY_TYPES
+MEDS_DATA_MANDATORY_TYPES = {c: MANDATORY_TYPES[c] for c in MANDATORY_COLUMNS}

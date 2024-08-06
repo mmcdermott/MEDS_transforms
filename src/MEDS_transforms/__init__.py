@@ -12,6 +12,8 @@ except PackageNotFoundError:
 PREPROCESS_CONFIG_YAML = files(__package_name__).joinpath("configs/preprocess.yaml")
 EXTRACT_CONFIG_YAML = files(__package_name__).joinpath("configs/extract.yaml")
 
+MANDATORY_COLUMNS = ["patient_id", "time", "code", "numeric_value"]
+
 MANDATORY_TYPES = {
     "patient_id": pl.Int64,
     "time": pl.Datetime("us"),
