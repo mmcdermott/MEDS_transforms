@@ -1,5 +1,7 @@
 # MEDS Transforms
 
+[![codecov](https://codecov.io/gh/mmcdermott/MEDS_transforms/graph/badge.svg?token=5RORKQOZF9)](https://codecov.io/gh/mmcdermott/MEDS_transforms)
+
 This repository contains a set of functions and scripts for extraction to and transformation/pre-processing of
 MEDS-formatted data.
 
