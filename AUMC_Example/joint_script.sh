@@ -89,13 +89,14 @@ MEDS_extract-merge_to_MEDS_cohort \
     stage="merge_to_MEDS_cohort" \
     event_conversion_config_fp=./AUMC_Example/configs/event_configs.yaml "$@"
 
-echo "Aggregating initial code stats with $N_PARALLEL_WORKERS workers in parallel"
-MEDS_transform-aggregate_code_metadata \
-    --config-name="extract" \
+echo "Finalizing MEDS data with $N_PARALLEL_WORKERS workers in parallel"
+MEDS_extract-finalize_MEDS_data \
     --multirun \
     worker="range(0,$N_PARALLEL_WORKERS)" \
     hydra/launcher=joblib \
-    input_dir="$AUMC_PREMEDS_DIR" \
+    input_dir="$AUMC_RAW_DIR" \
     cohort_dir="$AUMC_MEDS_DIR" \
-    stage="aggregate_code_metadata" \
+    stage="finalize_MEDS_data" \
+    etl_metadata.dataset_name="AUMCdb" \
+    etl_metadata.dataset_version="1.0.2" \
     event_conversion_config_fp=./AUMC_Example/configs/event_configs.yaml "$@"
