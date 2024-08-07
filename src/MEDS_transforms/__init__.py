@@ -19,14 +19,14 @@ MANDATORY_TYPES = {
     "time": pl.Datetime("us"),
     "code": pl.String,
     "numeric_value": pl.Float32,
-    "categoric_value": pl.String,
+    "categorical_value": pl.String,
     "text_value": pl.String,
 }
 
 DEPRECATED_NAMES = {
     "numerical_value": "numeric_value",
-    "categorical_value": "categoric_value",
-    "category_value": "categoric_value",
+    "category_value": "categorical_value",
+    "categoric_value": "categorical_value",
     "textual_value": "text_value",
     "timestamp": "time",
     "subject_id": "patient_id",
