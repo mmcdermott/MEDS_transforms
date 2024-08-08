@@ -41,3 +41,5 @@ plugins:
       nav_file: SUMMARY.md
   - section-index
   - mkdocstrings
+  - git-authors
+  - git-revision-date-localized
