@@ -76,6 +76,12 @@ def shard_patients[
         Traceback (most recent call last):
             ...
         ValueError: Unable to adjust splits to ensure all splits have at least 1 patient.
+        >>> external_splits = {
+        ...     'train': np.array([1, 2, 3, 4, 5], dtype=int),
+        ...     'test': np.array([6, 7, 8, 9, 10], dtype=int),
+        ... }
+        >>> shard_patients(patients, 5, external_splits)
+        {'train/0': [1, 2, 3, 4, 5], 'test/0': [6, 7, 8, 9, 10]}
     """
 
     if sum(split_fracs_dict.values()) != 1:
@@ -125,10 +131,13 @@ def shard_patients[
 
         splits = {**{k: v for k, v in zip(split_names, patients_per_split)}, **splits}
     else:
-        logger.info(
-            "The external split definition covered all patients. No need to perform an "
-            "additional patient split."
-        )
+        if split_fracs_dict:
+            logger.warning(
+                "External splits were provided covering all patients, but split_fracs_dict was not empty. "
+                "Ignoring the split_fracs_dict."
+            )
+        else:
+            logger.info("External splits were provided covering all patients.")
 
     # Sharding
     final_shards = {}
@@ -236,7 +245,7 @@ def main(cfg: DictConfig):
         if not external_splits_json_fp.exists():
             raise FileNotFoundError(f"External splits JSON file not found at {external_splits_json_fp}")
 
-        logger.info(f"Reading external splits from {cfg.stage_cfg.external_splits_json_fp}")
+        logger.info(f"Reading external splits from {str(cfg.stage_cfg.external_splits_json_fp.resolve())}")
         external_splits = json.loads(external_splits_json_fp.read_text())
 
         size_strs = ", ".join(f"{k}: {len(v)}" for k, v in external_splits.items())
