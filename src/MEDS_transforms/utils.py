@@ -59,15 +59,14 @@ def write_lazyframe(df: pl.LazyFrame, out_fp: Path) -> None:
     df.write_parquet(out_fp, use_pyarrow=True)
 
 
-def stage_init(cfg: DictConfig):
+def stage_init(cfg: DictConfig) -> tuple[Path, Path, Path]:
     """Initializes the stage by logging the configuration and the stage-specific paths.
 
     Args:
         cfg: The global configuration object, which should have a ``cfg.stage_cfg`` attribute containing the
             stage specific configuration.
 
-    Returns: The data input directory, stage output directory, metadata input directory, and the shards file
-        path.
+    Returns: The data input directory, stage output directory, and metadata input directory.
     """
     hydra_loguru_init()
 
@@ -78,7 +77,6 @@ def stage_init(cfg: DictConfig):
     input_dir = Path(cfg.stage_cfg.data_input_dir)
     output_dir = Path(cfg.stage_cfg.output_dir)
     metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
-    shards_map_fp = Path(cfg.shards_map_fp)
 
     def chk(x: Path):
         return "✅" if x.exists() else "❌"
@@ -89,7 +87,6 @@ def stage_init(cfg: DictConfig):
             "input_dir": input_dir,
             "output_dir": output_dir,
             "metadata_input_dir": metadata_input_dir,
-            "shards_map_fp": shards_map_fp,
         }.items()
     ]
 
@@ -99,7 +96,7 @@ def stage_init(cfg: DictConfig):
     ]
     logger.debug("\n".join(logger_strs + paths_strs))
 
-    return input_dir, output_dir, metadata_input_dir, shards_map_fp
+    return input_dir, output_dir, metadata_input_dir
 
 
 def get_package_name() -> str:

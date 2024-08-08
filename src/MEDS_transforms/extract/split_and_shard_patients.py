@@ -186,7 +186,7 @@ def main(cfg: DictConfig):
             ensure that split fractions sum to 1.
     """
 
-    subsharded_dir, MEDS_cohort_dir, _, _ = stage_init(cfg)
+    subsharded_dir, MEDS_cohort_dir, _ = stage_init(cfg)
 
     event_conversion_cfg_fp = Path(cfg.event_conversion_config_fp)
     if not event_conversion_cfg_fp.exists():
