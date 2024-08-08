@@ -123,7 +123,7 @@ def shard_patients[
         patients = rng.permutation(patient_ids_to_split)
         patients_per_split = np.split(patients, split_lens.cumsum())
 
-        splits = {**splits, **{k: v for k, v in zip(split_names, patients_per_split)}}
+        splits = {**{k: v for k, v in zip(split_names, patients_per_split)}, **splits}
     else:
         logger.info(
             "The external split definition covered all patients. No need to perform an "
