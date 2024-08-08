@@ -42,8 +42,8 @@ preparation for mapping that transformation out across the patient data by code.
 ##### Operation Steps
 
 1. Add new information or transform existing columns in an existing `metadata/codes.parquet` file. Note that
-   `code` or `code_modifier` columns should _not_ be modified in this step as that will break the linkage
-   with the patient data.
+    `code` or `code_modifier` columns should _not_ be modified in this step as that will break the linkage
+    with the patient data.
 
 ##### Parameters
 
@@ -71,7 +71,7 @@ simplicity).
 
 1. Per-shard, filter the pateint data to satisfy desired set of patient or other data critieria.
 2. Per-shard, group by code and collect some aggregate statistics. Optionally also compute statistics across
-   all codes.
+    all codes.
 3. Reduce the per-shard aggregate files into a unified `metadata/codes.parquet` file.
 4. Optionally merge with static per-code metadata from prior steps.
 
@@ -79,8 +79,8 @@ simplicity).
 
 1. What (if any) patient data filters should be applied prior to aggregation.
 2. What aggregation functions should be applied to each code. Each aggregation function must specify both a
-   _mapper_ function that computes aggregate data on a per-shard basis and a _reducer_ function that
-   combines different shards together into a single, unified metadata file.
+    _mapper_ function that computes aggregate data on a per-shard basis and a _reducer_ function that
+    combines different shards together into a single, unified metadata file.
 3. Whether or not aggregation functions should be computed over all raw data (the "null" code case).
 
 ##### Status
@@ -95,7 +95,7 @@ Patient Filters: **None**
 Functions:
 
 1. Various aggregation functions; see `src/MEDS_transforms/aggregate_code_metadata.py` for a list of supported
-   functions.
+    functions.
 
 ##### Planned Future Operations
 
@@ -108,9 +108,9 @@ include:
 
 1. Filtering patients wholesale based on aggregate, patient-level criteria (e.g., number of events, etc.)
 2. Filtering the data to only include patient data that matches some cohort specification (meaning removing
-   data that is not within pre-identified ranges of time on a per-patient basis).
+    data that is not within pre-identified ranges of time on a per-patient basis).
 3. Filtering individual measurements from the data based on some criteria (e.g., removing measurements that
-   have codes that are not included in the overall vocabulary, etc.).
+    have codes that are not included in the overall vocabulary, etc.).
 
 #### Filtering Patients
 
@@ -152,7 +152,7 @@ via a `metadata/codes.parquet` file.
 1. Per-shard, join the data, if necessary, to the provided, global `metadata/codes.parquet` file.
 2. Apply row-based criteria to each measurement to determine if it should be retained or removed.
 3. Return the filtered dataset, in the same format as the original, but with only the measurements to be
-   retained.
+    retained.
 
 ##### Parameters
 
@@ -200,15 +200,15 @@ are added and this function is not reversible.
 
 1. Per-shard, join the data, if necessary, to the provided, global `metadata/codes.parquet` file.
 2. Apply row-based criteria to each measurement to determine if individual features should be occluded or
-   retained in full granularity.
+    retained in full granularity.
 3. Set occluded data to the occlusion target (typically `"UNK"`, `None`, or `np.NaN`) and add an indicator
-   column indicating occlusion status.
+    column indicating occlusion status.
 
 ##### Parameters
 
 1. What criteria should be used to occlude features.
-   - Relatedly, what occlusion value should be used for occluded features.
-   - Relatedly, what the name of the occlusion column should be (can be set by default for features).
+    - Relatedly, what occlusion value should be used for occluded features.
+    - Relatedly, what the name of the occlusion column should be (can be set by default for features).
 2. What, if any, columns in the `metadata/codes.parquet` file should be joined in to the data.
 
 ##### Status
@@ -219,7 +219,7 @@ This operation is only supported through the single `filter_outliers_fntr` funct
 ##### Currently supported operations
 
 1. Occluding numerical values if they take a value more distant from the code's mean by a specified number
-   of standard deviations.
+    of standard deviations.
 
 ### Transforming Measurements within Events
 
@@ -227,10 +227,10 @@ These aren't implemented yet, but are planned:
 
 1. Re-order measurements within the event ordering.
 2. Split measurements into multiple measurements in a particular order and via a particular functional form.
-   E.g.,
-   - Performing ontology expansion
-   - Splitting a multi-faceted measurement (e.g., blood pressure recorded as `"120/80"`) into multiple
-     measurements (e.g., a systolic and diastolic blood pressure measurement with values `120` and `80`).
+    E.g.,
+    - Performing ontology expansion
+    - Splitting a multi-faceted measurement (e.g., blood pressure recorded as `"120/80"`) into multiple
+        measurements (e.g., a systolic and diastolic blood pressure measurement with values `120` and `80`).
 
 ## Requesting New Prototypes
 
