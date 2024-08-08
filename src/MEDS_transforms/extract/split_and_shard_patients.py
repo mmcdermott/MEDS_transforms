@@ -77,11 +77,15 @@ def shard_patients[
             ...
         ValueError: Unable to adjust splits to ensure all splits have at least 1 patient.
         >>> external_splits = {
-        ...     'train': np.array([1, 2, 3, 4, 5], dtype=int),
-        ...     'test': np.array([6, 7, 8, 9, 10], dtype=int),
+        ...     'train': np.array([1, 2, 3, 4, 5, 6], dtype=int),
+        ...     'test': np.array([7, 8, 9, 10], dtype=int),
         ... }
-        >>> shard_patients(patients, 5, external_splits)
-        {'train/0': [1, 2, 3, 4, 5], 'test/0': [6, 7, 8, 9, 10]}
+        >>> shard_patients(patients, 6, external_splits)
+        {'train/0': [1, 2, 3, 4, 5, 6], 'test/0': [7, 8, 9, 10]}
+        >>> shard_patients(patients, 3, external_splits)
+        Traceback (most recent call last):
+            ...
+        ValueError: External splits must have fewer patients than n_patients_per_shard (3): len(train)=6, ...
     """
 
     if sum(split_fracs_dict.values()) != 1:
@@ -97,6 +101,14 @@ def shard_patients[
                     f"Attempting to convert to numpy array of dtype {patients.dtype}."
                 )
                 external_splits[k] = np.array(external_splits[k], dtype=patients.dtype)
+        if too_lengthy_external_splits := {
+            k: len(v) for k, v in external_splits.items() if len(v) > n_patients_per_shard
+        }:
+            raise ValueError(
+                f"External splits must have fewer patients than n_patients_per_shard "
+                f"({n_patients_per_shard}): "
+                + ", ".join(f"len({k})={v}" for k, v in too_lengthy_external_splits.items())
+            )
 
     patients = np.unique(patients)
 
