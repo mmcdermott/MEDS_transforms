@@ -71,7 +71,7 @@ Under this tokenization strategy _without modification_, our sample data would b
      - HR: 88
      - RR: 20
      - Temp: 37.2
-     - BP: 120/80
+     - BP
    - Sequence Element 2: 12/1 10:04
      - O2: 98
      - RR: 22
@@ -85,7 +85,7 @@ Under this tokenization strategy _without modification_, our sample data would b
      - RR: 18
    - Sequence Element 2: 3/17 11:28
      - Temp: 37.0
-     - BP: 130/90
+     - BP
    - Sequence Element 3: 3/17 11:30
      - O2: 96
      - RR: 20
