@@ -1,0 +1,45 @@
+site_name: MEDS-Transforms
+repo_url: https://github.com/mmcdermott/MEDS_transforms
+site_description: Documentation for the MEDS Transforms package
+site_author: Matthew McDermott
+
+nav:
+  - Home: index.md
+  - "Pipeline Configuration": pipeline_configuration.md
+  - "Pre-processing Operations": preprocessing_operation_prototypes.md
+  - "Terminology": terminology.md
+  - API: api/
+  - Issues: https://github.com/mmcdermott/MEDS_transforms/issues
+
+theme:
+  name: material
+  locale: en
+
+markdown_extensions:
+  - smarty
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.smartsymbols
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+plugins:
+  - search
+  - gen-files:
+      scripts:
+        - docs/gen_ref_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - section-index
+  - mkdocstrings
+  - git-authors
+  - git-revision-date-localized
