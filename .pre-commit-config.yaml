@@ -1,7 +1,7 @@
 default_language_version:
   python: python3.12
 
-exclude: "sample_data|docs/MIMIC_IV_tutorial/wandb_reports"
+exclude: "docs/index.md"
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -95,10 +95,12 @@ repos:
           - mdformat-gfm
           - mdformat-tables
           - mdformat_frontmatter
-          - mdformat-myst
           - mdformat-black
           - mdformat-config
           - mdformat-shfmt
+          - mdformat-mkdocs
+          - mdformat-toc
+          - mdformat-admon
 
   # word spelling linter
   - repo: https://github.com/codespell-project/codespell
