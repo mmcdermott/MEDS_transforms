@@ -5,6 +5,9 @@ site_author: Matthew McDermott
 
 nav:
   - Home: index.md
+  - "Pipeline Configuration": pipeline_configuration.md
+  - "Pre-processing Operations": preprocessing_operation_prototypes.md
+  - "Terminology": terminology.md
   - API: api/
   - Issues: https://github.com/mmcdermott/MEDS_transforms/issues
 
@@ -14,8 +17,16 @@ theme:
 
 markdown_extensions:
   - smarty
-    #  - pymdownx.arithmatex:
-    #      generic: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.smartsymbols
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences
 
 extra_javascript:
   - javascripts/mathjax.js
