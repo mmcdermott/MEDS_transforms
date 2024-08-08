@@ -228,6 +228,12 @@ consider things like:
 Often, when these tokens are added, in the ultimate, tensorized data, elements such as the timestamp of the
 sequence elements are dropped (as they are captured via the time interval tokens directly).
 
+Questions / Issues with this strategy:
+
+1. How do we handle null timestamps in this case? Do we have a special "start of sequence" token or something
+   to represent the "time interval" from null to the first timepoint? Or what about the "end of sequence"
+   token? Do we have a special time interval for going from the last timepoint to a null timepoint?
+
 #### Separate static, dynamic, and/or time-derived measurements:
 
 For some models, it may be useful to separate static measurements from dynamic measurements, or to separate
