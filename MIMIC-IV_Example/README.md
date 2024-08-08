@@ -72,14 +72,14 @@ several steps:
 This is a step in a few parts:
 
 1. Join a few tables by `hadm_id` to get the right times in the right rows for processing. In
-   particular, we need to join:
-   - the `hosp/diagnoses_icd` table with the `hosp/admissions` table to get the `dischtime` for each
-     `hadm_id`.
-   - the `hosp/drgcodes` table with the `hosp/admissions` table to get the `dischtime` for each `hadm_id`.
+    particular, we need to join:
+    - the `hosp/diagnoses_icd` table with the `hosp/admissions` table to get the `dischtime` for each
+        `hadm_id`.
+    - the `hosp/drgcodes` table with the `hosp/admissions` table to get the `dischtime` for each `hadm_id`.
 2. Convert the patient's static data to a more parseable form. This entails:
-   - Get the patient's DOB in a format that is usable for MEDS, rather than the integral `anchor_year` and
-     `anchor_offset` fields.
-   - Merge the patient's `dod` with the `deathtime` from the `admissions` table.
+    - Get the patient's DOB in a format that is usable for MEDS, rather than the integral `anchor_year` and
+        `anchor_offset` fields.
+    - Merge the patient's `dod` with the `deathtime` from the `admissions` table.
 
 After these steps, modified files or symlinks to the original files will be written in a new directory which
 will be used as the input to the actual MEDS extraction ETL. We'll use `$MIMICIV_PREMEDS_DIR` to denote this
@@ -104,24 +104,24 @@ subdirectories of the same root directory).
 This is a step in 4 parts:
 
 1. Sub-shard the raw files. Run this command as many times simultaneously as you would like to have workers
-   performing this sub-sharding step. See below for how to automate this parallelism using hydra launchers.
+    performing this sub-sharding step. See below for how to automate this parallelism using hydra launchers.
 
-   This step uses the `./scripts/extraction/shard_events.py` script. See `joint_script*.sh` for the expected
-   format of the command.
+    This step uses the `./scripts/extraction/shard_events.py` script. See `joint_script*.sh` for the expected
+    format of the command.
 
 2. Extract and form the patient splits and sub-shards. The `./scripts/extraction/split_and_shard_patients.py`
-   script is used for this step. See `joint_script*.sh` for the expected format of the command.
+    script is used for this step. See `joint_script*.sh` for the expected format of the command.
 
 3. Extract patient sub-shards and convert to MEDS events. The
-   `./scripts/extraction/convert_to_sharded_events.py` script is used for this step. See `joint_script*.sh` for
-   the expected format of the command.
+    `./scripts/extraction/convert_to_sharded_events.py` script is used for this step. See `joint_script*.sh` for
+    the expected format of the command.
 
 4. Merge the MEDS events into a single file per patient sub-shard. The
-   `./scripts/extraction/merge_to_MEDS_cohort.py` script is used for this step. See `joint_script*.sh` for the
-   expected format of the command.
+    `./scripts/extraction/merge_to_MEDS_cohort.py` script is used for this step. See `joint_script*.sh` for the
+    expected format of the command.
 
 5. (Optional) Generate preliminary code statistics and merge to external metadata. This is not performed
-   currently in the `joint_script*.sh` scripts.
+    currently in the `joint_script*.sh` scripts.
 
 ## Limitations / TO-DOs:
 

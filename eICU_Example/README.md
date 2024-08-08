@@ -10,21 +10,21 @@ up from this one).
 **Status**: This is a work in progress. The code is not yet functional. Remaining work includes:
 
 - [ ] Implementing the pre-MEDS processing step.
-  - [ ] Identifying the pre-MEDS steps for eICU
+    - [ ] Identifying the pre-MEDS steps for eICU
 - [ ] Testing the pre-MEDS processing step on live eICU-CRD.
-  - [ ] Test that it runs at all.
-  - [ ] Test that the output is as expected.
+    - [ ] Test that it runs at all.
+    - [ ] Test that the output is as expected.
 - [ ] Check the installation instructions on a fresh client.
 - [ ] Testing the `configs/event_configs.yaml` configuration on eICU-CRD
 - [ ] Testing the MEDS extraction ETL runs on eICU-CRD (this should be expected to work, but needs
-  live testing).
-  - [ ] Sub-sharding
-  - [ ] Patient split gathering
-  - [ ] Event extraction
-  - [ ] Merging
+    live testing).
+    - [ ] Sub-sharding
+    - [ ] Patient split gathering
+    - [ ] Event extraction
+    - [ ] Merging
 - [ ] Validating the output MEDS cohort
-  - [ ] Basic validation
-  - [ ] Detailed validation
+    - [ ] Basic validation
+    - [ ] Detailed validation
 
 ## Step 0: Installation
 
@@ -50,12 +50,12 @@ there should be a `hosp` and `icu` subdirectory of `$EICU_RAW_DIR`.
 This is a step in a few parts:
 
 1. Join a few tables by `hadm_id` to get the right timestamps in the right rows for processing. In
-   particular, we need to join:
-   - TODO
+    particular, we need to join:
+    - TODO
 2. Convert the patient's static data to a more parseable form. This entails:
-   - Get the patient's DOB in a format that is usable for MEDS, rather than the integral `anchor_year` and
-     `anchor_offset` fields.
-   - Merge the patient's `dod` with the `deathtime` from the `admissions` table.
+    - Get the patient's DOB in a format that is usable for MEDS, rather than the integral `anchor_year` and
+        `anchor_offset` fields.
+    - Merge the patient's `dod` with the `deathtime` from the `admissions` table.
 
 After these steps, modified files or symlinks to the original files will be written in a new directory which
 will be used as the input to the actual MEDS extraction ETL. We'll use `$EICU_PREMEDS_DIR` to denote this
@@ -89,7 +89,7 @@ subdirectories of the same root directory).
 This is a step in 4 parts:
 
 1. Sub-shard the raw files. Run this command as many times simultaneously as you would like to have workers
-   performing this sub-sharding step. See below for how to automate this parallelism using hydra launchers.
+    performing this sub-sharding step. See below for how to automate this parallelism using hydra launchers.
 
 ```bash
 ./scripts/extraction/shard_events.py \
@@ -100,7 +100,7 @@ This is a step in 4 parts:
 
 In practice, on a machine with 150 GB of RAM and 10 cores, this step takes approximately 20 minutes in total.
 
-2. Extract and form the patient splits and sub-shards.
+1. Extract and form the patient splits and sub-shards.
 
 ```bash
 ./scripts/extraction/split_and_shard_patients.py \
@@ -111,7 +111,7 @@ In practice, on a machine with 150 GB of RAM and 10 cores, this step takes appro
 
 In practice, on a machine with 150 GB of RAM and 10 cores, this step takes less than 5 minutes in total.
 
-3. Extract patient sub-shards and convert to MEDS events.
+1. Extract patient sub-shards and convert to MEDS events.
 
 ```bash
 ./scripts/extraction/convert_to_sharded_events.py \
@@ -126,7 +126,7 @@ multiple times (though this will, of course, consume more resources). If your fi
 commands can also be launched as separate slurm jobs, for example. For eICU, this level of parallelization
 and performance is not necessary; however, for larger datasets, it can be.
 
-4. Merge the MEDS events into a single file per patient sub-shard.
+1. Merge the MEDS events into a single file per patient sub-shard.
 
 ```bash
 ./scripts/extraction/merge_to_MEDS_cohort.py \
@@ -166,7 +166,7 @@ to finish before moving on to the next stage. Let `$N_PARALLEL_WORKERS` be the n
 
 In practice, on a machine with 150 GB of RAM and 10 cores, this step takes approximately 20 minutes in total.
 
-2. Extract and form the patient splits and sub-shards.
+1. Extract and form the patient splits and sub-shards.
 
 ```bash
 ./scripts/extraction/split_and_shard_patients.py \
@@ -177,7 +177,7 @@ In practice, on a machine with 150 GB of RAM and 10 cores, this step takes appro
 
 In practice, on a machine with 150 GB of RAM and 10 cores, this step takes less than 5 minutes in total.
 
-3. Extract patient sub-shards and convert to MEDS events.
+1. Extract patient sub-shards and convert to MEDS events.
 
 ```bash
 ./scripts/extraction/convert_to_sharded_events.py \
@@ -192,7 +192,7 @@ multiple times (though this will, of course, consume more resources). If your fi
 commands can also be launched as separate slurm jobs, for example. For eICU, this level of parallelization
 and performance is not necessary; however, for larger datasets, it can be.
 
-4. Merge the MEDS events into a single file per patient sub-shard.
+1. Merge the MEDS events into a single file per patient sub-shard.
 
 ```bash
 ./scripts/extraction/merge_to_MEDS_cohort.py \
@@ -206,7 +206,7 @@ and performance is not necessary; however, for larger datasets, it can be.
 Currently, some tables are ignored, including:
 
 1. `admissiondrug`: The [documentation](https://eicu-crd.mit.edu/eicutables/admissiondrug/) notes that this is
-   extremely infrequently used, so we skip it.
+    extremely infrequently used, so we skip it.
 2.
 
 Lots of questions remain about how to appropriately handle timestamps of the data -- e.g., things like HCPCS
