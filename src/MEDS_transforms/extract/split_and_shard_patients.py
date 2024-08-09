@@ -83,9 +83,7 @@ def shard_patients[
         >>> shard_patients(patients, 6, external_splits)
         {'train/0': [1, 2, 3, 4, 5, 6], 'test/0': [7, 8, 9, 10]}
         >>> shard_patients(patients, 3, external_splits)
-        Traceback (most recent call last):
-            ...
-        ValueError: External splits must have fewer patients than n_patients_per_shard (3): len(train)=6, ...
+        {'train/0': [5, 1, 3], 'train/1': [2, 6, 4], 'test/0': [10, 7], 'test/1': [8, 9]}
     """
 
     if sum(split_fracs_dict.values()) != 1:
@@ -101,14 +99,6 @@ def shard_patients[
                     f"Attempting to convert to numpy array of dtype {patients.dtype}."
                 )
                 external_splits[k] = np.array(external_splits[k], dtype=patients.dtype)
-        if too_lengthy_external_splits := {
-            k: len(v) for k, v in external_splits.items() if len(v) > n_patients_per_shard
-        }:
-            raise ValueError(
-                f"External splits must have fewer patients than n_patients_per_shard "
-                f"({n_patients_per_shard}): "
-                + ", ".join(f"len({k})={v}" for k, v in too_lengthy_external_splits.items())
-            )
 
     patients = np.unique(patients)
 
@@ -119,8 +109,8 @@ def shard_patients[
 
     splits = external_splits
 
+    rng = np.random.default_rng(seed)
     if n_patients := len(patient_ids_to_split):
-        rng = np.random.default_rng(seed)
         split_names_idx = rng.permutation(len(split_fracs_dict))
         split_names = np.array(list(split_fracs_dict.keys()))[split_names_idx]
         split_fracs = np.array([split_fracs_dict[k] for k in split_names])
