@@ -1,7 +1,7 @@
 """Basic utilities for parallelizable mapreduces on sharded MEDS datasets with caching and locking."""
 
+import hashlib
 import json
-import random
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -236,7 +236,7 @@ def shard_iterator(
             - `stage_cfg.train_only` (optional): The prefix of the shards to process (e.g.,
               `"train/"`). If not provided, all shards will be processed.
             - `worker` (optional): The worker ID for the MR worker; this is also used to seed the
-              randomization process. If not provided, the randomization process is unseeded.
+              randomization process. If not provided, the randomization process will be unseeded.
         out_suffix: The suffix of the output files. Defaults to ".parquet".
         in_prefix: The prefix of the input files. Defaults to "". This must be a full path component. It can
             end with a slash but even if it doesn't it will be interpreted as a full path component.
@@ -277,10 +277,10 @@ def shard_iterator(
         ...     })
         ...     fps, includes_only_train = shard_iterator(cfg)
         >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps] # doctest: +NORMALIZE_WHITESPACE
-        [(PosixPath('data/train/0.parquet'),  PosixPath('output/train/0.parquet')),
+        [(PosixPath('data/train/1.parquet'),  PosixPath('output/train/1.parquet')),
+         (PosixPath('data/held_out.parquet'), PosixPath('output/held_out.parquet')),
          (PosixPath('data/tuning.parquet'),   PosixPath('output/tuning.parquet')),
-         (PosixPath('data/train/1.parquet'),  PosixPath('output/train/1.parquet')),
-         (PosixPath('data/held_out.parquet'), PosixPath('output/held_out.parquet'))]
+         (PosixPath('data/train/0.parquet'),  PosixPath('output/train/0.parquet'))]
         >>> includes_only_train
         False
 
@@ -296,10 +296,10 @@ def shard_iterator(
         ...     })
         ...     fps, includes_only_train = shard_iterator(cfg)
         >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps] # doctest: +NORMALIZE_WHITESPACE
-        [(PosixPath('data/held_out.parquet'), PosixPath('output/held_out.parquet')),
+        [(PosixPath('data/tuning.parquet'),   PosixPath('output/tuning.parquet')),
+         (PosixPath('data/held_out.parquet'), PosixPath('output/held_out.parquet')),
          (PosixPath('data/train/1.parquet'),  PosixPath('output/train/1.parquet')),
-         (PosixPath('data/train/0.parquet'),  PosixPath('output/train/0.parquet')),
-         (PosixPath('data/tuning.parquet'),   PosixPath('output/tuning.parquet'))]
+         (PosixPath('data/train/0.parquet'),  PosixPath('output/train/0.parquet'))]
         >>> includes_only_train
         False
 
@@ -337,8 +337,8 @@ def shard_iterator(
         ...     })
         ...     fps, includes_only_train = shard_iterator(cfg)
         >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps] # doctest: +NORMALIZE_WHITESPACE
-        [(PosixPath('data/train/0.parquet'),  PosixPath('output/train/0.parquet')),
-         (PosixPath('data/train/1.parquet'),  PosixPath('output/train/1.parquet'))]
+        [(PosixPath('data/train/1.parquet'),  PosixPath('output/train/1.parquet')),
+         (PosixPath('data/train/0.parquet'),  PosixPath('output/train/0.parquet'))]
         >>> includes_only_train
         True
 
@@ -358,9 +358,9 @@ def shard_iterator(
         ...     })
         ...     fps, includes_only_train = shard_iterator(cfg)
         >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps] # doctest: +NORMALIZE_WHITESPACE
-        [(PosixPath('data/train.parquet'),  PosixPath('output/train.parquet')),
-         (PosixPath('data/train_1.parquet'),  PosixPath('output/train_1.parquet')),
-         (PosixPath('data/train-2.parquet'),  PosixPath('output/train-2.parquet'))]
+        [(PosixPath('data/train_1.parquet'),  PosixPath('output/train_1.parquet')),
+         (PosixPath('data/train-2.parquet'),  PosixPath('output/train-2.parquet')),
+         (PosixPath('data/train.parquet'),  PosixPath('output/train.parquet'))]
         >>> includes_only_train
         False
 
@@ -381,8 +381,8 @@ def shard_iterator(
         ...     })
         ...     fps, includes_only_train = shard_iterator(cfg)
         >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps] # doctest: +NORMALIZE_WHITESPACE
-        [(PosixPath('data/1.parquet'), PosixPath('output/1.parquet')),
-         (PosixPath('data/0.parquet'), PosixPath('output/0.parquet')),
+        [(PosixPath('data/0.parquet'), PosixPath('output/0.parquet')),
+         (PosixPath('data/1.parquet'), PosixPath('output/1.parquet')),
          (PosixPath('data/2.parquet'), PosixPath('output/2.parquet'))]
         >>> includes_only_train
         False
@@ -423,8 +423,18 @@ def shard_iterator(
         )
 
     if "worker" in cfg:
-        random.seed(cfg.worker)
-    random.shuffle(shards)
+        add_str = str(cfg.worker)
+    else:
+        add_str = str(datetime.now())
+
+    shard_keys = []
+    for shard in shards:
+        shard_hash = hashlib.sha256((add_str + shard).encode("utf-8")).hexdigest()
+        if shard_hash in shard_keys:
+            raise ValueError(f"Hash collision for shard {shard} with add_str {add_str}!")
+        shard_keys.append(int(shard_hash, 16))
+
+    shards = [shard for _, shard in sorted(zip(shard_keys, shards))]
 
     logger.info(f"Mapping computation over a maximum of {len(shards)} shards")
 
