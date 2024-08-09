@@ -5,10 +5,7 @@ scripts.
 """
 
 
-from .transform_tester_base import (
-    REORDER_MEASUREMENTS_SCRIPT,
-    single_stage_transform_tester,
-)
+from .transform_tester_base import REORDER_MEASUREMENTS_SCRIPT, single_stage_transform_tester
 from .utils import parse_meds_csvs
 
 ORDERED_CODE_PATTERNS = [
