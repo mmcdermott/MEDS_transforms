@@ -7,10 +7,7 @@ scripts.
 
 import polars as pl
 
-from .transform_tester_base import (
-    OCCLUDE_OUTLIERS_SCRIPT,
-    single_stage_transform_tester,
-)
+from .transform_tester_base import OCCLUDE_OUTLIERS_SCRIPT, single_stage_transform_tester
 from .utils import MEDS_PL_SCHEMA, parse_meds_csvs
 
 # This is the code metadata

@@ -5,10 +5,7 @@ scripts.
 """
 
 
-from .transform_tester_base import (
-    ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT,
-    single_stage_transform_tester,
-)
+from .transform_tester_base import ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT, single_stage_transform_tester
 from .utils import parse_meds_csvs
 
 AGE_CALCULATION_STR = """
