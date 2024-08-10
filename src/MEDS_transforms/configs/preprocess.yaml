@@ -1,6 +1,7 @@
 defaults:
   - pipeline
   - stage_configs:
+      - reshard_to_split
       - filter_patients
       - add_time_derived_measurements
       - count_code_occurrences
