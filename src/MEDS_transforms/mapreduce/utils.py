@@ -179,7 +179,7 @@ def rwlock_wrap[
             if do_return:
                 return True, read_fn(out_fp)
             else:
-                return True
+                return True, None
 
     cache_directory = out_fp.parent / f".{out_fp.stem}_cache"
     cache_directory.mkdir(exist_ok=True, parents=True)
@@ -213,7 +213,7 @@ def rwlock_wrap[
         if do_return:
             return True, df
         else:
-            return True
+            return True, None
 
     except Exception as e:
         logger.warning(f"Clearing lock due to Exception {e} at {lock_fp} after {datetime.now() - st_time}")

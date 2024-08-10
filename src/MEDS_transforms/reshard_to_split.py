@@ -11,9 +11,9 @@ from loguru import logger
 from omegaconf import DictConfig
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.extract.split_and_shard_patients import shard_iterator_by_shard_map, shard_patients
+from MEDS_transforms.extract.split_and_shard_patients import shard_patients
 from MEDS_transforms.mapreduce.mapper import identity_fn, read_and_filter_fntr
-from MEDS_transforms.mapreduce.utils import rwlock_wrap, shard_iterator
+from MEDS_transforms.mapreduce.utils import rwlock_wrap, shard_iterator, shuffle_shards
 from MEDS_transforms.utils import stage_init, write_lazyframe
 
 
@@ -28,7 +28,7 @@ def main(cfg: DictConfig):
     splits_file = Path(cfg.input_dir) / "metadata" / "patient_splits.parquet"
     splits_df = pl.read_parquet(splits_file, use_pyarrow=True)
     splits_map = defaultdict(list)
-    for pt_id, sp in splits_df.iterrows():
+    for pt_id, sp in splits_df.iter_rows():
         splits_map[sp].append(pt_id)
 
     new_sharded_splits = shard_patients(
@@ -56,7 +56,6 @@ def main(cfg: DictConfig):
 
     shards_fp.write_text(json.dumps(new_sharded_splits))
 
-    data_input_dir = Path(cfg.stage_cfg.data_input_dir)
     output_dir = Path(cfg.stage_cfg.output_dir)
 
     orig_shards_iter, include_only_train = shard_iterator(cfg, out_suffix="")
@@ -65,19 +64,8 @@ def main(cfg: DictConfig):
 
     orig_shards_iter = [(in_fp, out_fp.relative_to(output_dir)) for in_fp, out_fp in orig_shards_iter]
 
-    # Here, we modify the config in a hacky way to make the right shard mapping
-    cfg.shards_map_fp = str(shards_fp.resolve())
-    cfg.stage_cfg.data_input_dir = str(output_dir.resolve())
-
-    new_shards_iter, include_only_train = shard_iterator_by_shard_map(cfg)
-    if include_only_train:
-        raise ValueError("This stage does not support include_only_train=True")
-
-    cfg.stage_cfg.data_input_dir = str(data_input_dir.resolve())
-    new_shards_iter = [
-        (in_fp.relative_to(data_input_dir).with_suffix(""), out_fp.with_suffix(""))
-        for in_fp, out_fp in new_shards_iter
-    ]
+    new_shards = shuffle_shards(list(new_sharded_splits.keys()), cfg)
+    new_shards_iter = [(shard_name, output_dir / shard_name) for shard_name in new_shards]
 
     # Step 1: Sub-sharding stage
     logger.info("Starting sub-sharding")
@@ -143,7 +131,17 @@ def main(cfg: DictConfig):
             for fp in in_fps:
                 if fp.exists():
                     fp.unlink()
-            subshard_dir.rmdir()
+            try:
+                for root, dirs, files in subshard_dir.walk(top_down=False):
+                    walked_dir = root.relative_to(subshard_dir)
+                    if files:
+                        raise FileExistsError(f"Files found in {walked_dir} after cleanup!: {files}")
+                    for d in dirs:
+                        (root / d).rmdir()
+                subshard_dir.rmdir()
+            except OSError as e:
+                contents_str = "\n".join([str(f) for f in subshard_dir.iterdir()])
+                raise ValueError(f"Could not remove {str(subshard_dir)}. Contents:\n{contents_str}") from e
 
     logger.info(f"Done with {cfg.stage}")
 

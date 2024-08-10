@@ -1,1 +1,2 @@
-n_patients_per_shard: 50000
+reshard_to_split:
+  n_patients_per_shard: 50000
