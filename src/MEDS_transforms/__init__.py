@@ -25,8 +25,8 @@ MANDATORY_TYPES = {
 
 DEPRECATED_NAMES = {
     "numerical_value": "numeric_value",
-    "category_value": "categorical_value",
-    "categoric_value": "categorical_value",
+    "categoric_value": "categoric_value",
+    "category_value": "categoric_value",
     "textual_value": "text_value",
     "timestamp": "time",
     "subject_id": "patient_id",
