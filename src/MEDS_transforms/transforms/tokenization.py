@@ -9,8 +9,6 @@ as those have been normalized alongside codes into integer indices (in the outpu
 columns of concern here thus are `patient_id`, `time`, `code`, `numeric_value`.
 """
 
-import json
-import random
 from pathlib import Path
 
 import hydra
@@ -19,7 +17,7 @@ from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce.mapper import rwlock_wrap
+from MEDS_transforms.mapreduce.utils import rwlock_wrap, shard_iterator
 from MEDS_transforms.utils import hydra_loguru_init, write_lazyframe
 
 SECONDS_PER_MINUTE = 60.0
@@ -230,18 +228,17 @@ def main(cfg: DictConfig):
         f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
     )
 
-    input_dir = Path(cfg.stage_cfg.data_input_dir)
     output_dir = Path(cfg.stage_cfg.output_dir)
+    shards_single_output, include_only_train = shard_iterator(cfg)
 
-    shards = json.loads((Path(cfg.input_dir) / "splits.json").read_text())
+    if include_only_train:
+        raise ValueError("Not supported for this stage.")
 
-    patient_splits = list(shards.keys())
-    random.shuffle(patient_splits)
+    for in_fp, out_fp in shards_single_output:
+        sharded_path = out_fp.relative_to(output_dir)
 
-    for sp in patient_splits:
-        in_fp = input_dir / f"{sp}.parquet"
-        schema_out_fp = output_dir / "schemas" / f"{sp}.parquet"
-        event_seq_out_fp = output_dir / "event_seqs" / f"{sp}.parquet"
+        schema_out_fp = output_dir / "schemas" / sharded_path
+        event_seq_out_fp = output_dir / "event_seqs" / sharded_path
 
         logger.info(f"Tokenizing {str(in_fp.resolve())} into schemas at {str(schema_out_fp.resolve())}")
 
