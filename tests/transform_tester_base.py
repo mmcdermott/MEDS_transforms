@@ -26,6 +26,7 @@ filters_root = code_root / "filters"
 if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
     # Root Source
     FIT_VOCABULARY_INDICES_SCRIPT = code_root / "fit_vocabulary_indices.py"
+    RESHARD_TO_SPLIT_SCRIPT = code_root / "reshard_to_split.py"
 
     # Filters
     FILTER_MEASUREMENTS_SCRIPT = filters_root / "filter_measurements.py"
@@ -41,6 +42,7 @@ if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
 else:
     # Root Source
     FIT_VOCABULARY_INDICES_SCRIPT = "MEDS_transform-fit_vocabulary_indices"
+    RESHARD_TO_SPLIT_SCRIPT = "MEDS_transform-reshard_to_split"
 
     # Filters
     FILTER_MEASUREMENTS_SCRIPT = "MEDS_transform-filter_measurements"
