@@ -80,7 +80,9 @@ def main(cfg: DictConfig):
             if not patients:
                 raise ValueError(f"No patients found for {subshard_name}!")
 
-            logger.info(f"Sub-sharding {str(in_fp.resolve())} into {str(out_fp.resolve())}")
+            logger.info(
+                f"Sub-sharding {str(in_fp.resolve())} to {len(patients)} patients in {str(out_fp.resolve())}"
+            )
 
             rwlock_wrap(
                 in_fp,

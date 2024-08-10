@@ -183,10 +183,9 @@ WANT_SHARDS = parse_meds_csvs(
 
 IN_SHARDS = parse_meds_csvs(
     {
-        "train/0": IN_SHARD_0,
-        "train/1": IN_SHARD_1,
-        "tuning/0": IN_SHARD_0,
-        "held_out/0": IN_SHARD_0,
+        "0": IN_SHARD_0,
+        "1": IN_SHARD_1,
+        "2": IN_SHARD_2,
     }
 )
 
