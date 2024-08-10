@@ -13,7 +13,7 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, ListConfig
 
-from ..extract.parser import is_matcher, matcher_to_expr
+from ..parser import is_matcher, matcher_to_expr
 from ..utils import stage_init, write_lazyframe
 from .utils import rwlock_wrap, shard_iterator
 
