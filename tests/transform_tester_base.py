@@ -7,6 +7,7 @@ scripts.
 import json
 import os
 import tempfile
+from collections import defaultdict
 from io import StringIO
 from pathlib import Path
 
@@ -58,11 +59,17 @@ else:
 
 # Test MEDS data (inputs)
 
-SPLITS = {
+SHARDS = {
     "train/0": [239684, 1195293],
     "train/1": [68729, 814703],
     "tuning/0": [754281],
     "held_out/0": [1500733],
+}
+
+SPLITS = {
+    "train": [239684, 1195293, 68729, 814703],
+    "tuning": [754281],
+    "held_out": [1500733],
 }
 
 MEDS_TRAIN_0 = """
@@ -294,6 +301,8 @@ def single_stage_transform_tester(
     do_pass_stage_name: bool = False,
     file_suffix: str = ".parquet",
     do_use_config_yaml: bool = False,
+    input_shards_map: dict[str, list[int]] | None = None,
+    input_splits_map: dict[str, list[int]] | None = None,
 ):
     with tempfile.TemporaryDirectory() as d:
         MEDS_dir = Path(d) / "MEDS_cohort"
@@ -308,9 +317,23 @@ def single_stage_transform_tester(
         MEDS_metadata_dir.mkdir(parents=True)
         cohort_dir.mkdir(parents=True)
 
-        # Write the splits
-        splits_fp = MEDS_dir / "splits.json"
-        splits_fp.write_text(json.dumps(SPLITS))
+        # Write the shards map
+        if input_shards_map is None:
+            input_shards_map = SHARDS
+
+        shards_fp = MEDS_metadata_dir / ".shards.json"
+        shards_fp.write_text(json.dumps(input_shards_map))
+
+        # Write the splits parquet file
+        if input_splits_map is None:
+            input_splits_map = SPLITS
+        input_splits_as_df = defaultdict(list)
+        for split_name, patient_ids in input_splits_map.items():
+            input_splits_as_df["patient_id"].extend(patient_ids)
+            input_splits_as_df["split"].extend([split_name] * len(patient_ids))
+        input_splits_df = pl.DataFrame(input_splits_as_df)
+        input_splits_fp = MEDS_metadata_dir / "patient_splits.parquet"
+        input_splits_df.write_parquet(input_splits_fp, use_pyarrow=True)
 
         if input_shards is None:
             input_shards = MEDS_SHARDS
