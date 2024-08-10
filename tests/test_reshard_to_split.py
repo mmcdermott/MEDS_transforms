@@ -8,6 +8,12 @@ scripts.
 from .transform_tester_base import RESHARD_TO_SPLIT_SCRIPT, single_stage_transform_tester
 from .utils import parse_meds_csvs
 
+IN_SHARDS_MAP = {
+    "0": [68729, 1195293],
+    "1": [754281, 814703],
+    "2": [239684, 1500733],
+}
+
 IN_SHARD_0 = """
 patient_id,time,code,numeric_value
 68729,,EYE_COLOR//HAZEL,
@@ -83,10 +89,9 @@ patient_id,time,code,numeric_value
 """
 
 SPLITS = {
-    "train/0": [239684, 1195293],
-    "train/1": [68729, 814703],
-    "tuning/0": [754281],
-    "held_out/0": [1500733],
+    "train": [239684, 1195293, 68729, 814703],
+    "tuning": [754281],
+    "held_out": [1500733],
 }
 
 WANT_TRAIN_0 = """
@@ -193,5 +198,6 @@ def test_reshard_to_split():
         transform_stage_kwargs={},
         want_outputs=WANT_SHARDS,
         input_shards=IN_SHARDS,
-        input_splits=SPLITS,
+        input_shards_map=IN_SHARDS_MAP,
+        input_splits_map=SPLITS,
     )
