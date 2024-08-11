@@ -128,7 +128,6 @@ def main(cfg: DictConfig):
 
         def compute_fn(df: list[pl.DataFrame]) -> pl.LazyFrame:
             logger.info(f"Merging {subshard_dir}/**/*.parquet into {str(out_fp.resolve())}")
-            # pl.concat(dfs, how="vertical").lazy()
             return df.sort(by=["patient_id", "time"], maintain_order=True, multithreaded=False)
 
         def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
