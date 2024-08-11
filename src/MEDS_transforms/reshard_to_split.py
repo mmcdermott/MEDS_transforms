@@ -98,11 +98,9 @@ def main(cfg: DictConfig):
                 read_and_filter_fntr(pl.col("patient_id").is_in(patients), pl.scan_parquet),
                 write_lazyframe,
                 identity_fn,
-                do_return=False,
                 do_overwrite=cfg.do_overwrite,
             )
 
-    logger.info("Merging sub-shards")
     for subshard_name, subshard_dir in new_shards_iter:
         in_dir = subshard_dir
         in_fps = subshard_fps[subshard_name]
@@ -112,7 +110,7 @@ def main(cfg: DictConfig):
         out_fp = subshard_dir.with_suffix(".parquet")
 
         def read_fn(in_dir: Path) -> pl.LazyFrame:
-            while not (all(is_complete_parquet_file(fp) for fp in in_fps) or out_fp.is_file()):
+            while not all(is_complete_parquet_file(fp) for fp in in_fps):
                 logger.info("Waiting to begin merging for all sub-shard files to be written...")
                 time.sleep(cfg.polling_time)
 
@@ -149,19 +147,17 @@ def main(cfg: DictConfig):
                 contents_str = "\n".join([str(f) for f in subshard_dir.iterdir()])
                 raise ValueError(f"Could not remove {str(subshard_dir)}. Contents:\n{contents_str}") from e
 
-        logger.info(f"Merging files to {str(out_fp.resolve())}")
-        result_computed, _ = rwlock_wrap(
+        logger.info(f"Merging sub-shards for {subshard_name} to {str(out_fp.resolve())}")
+        rwlock_wrap(
             in_dir,
             out_fp,
             read_fn,
             write_fn,
             compute_fn,
-            do_return=False,
             do_overwrite=cfg.do_overwrite,
         )
 
     logger.info(f"Done with {cfg.stage}")
-    return 0
 
 
 if __name__ == "__main__":
