@@ -111,11 +111,22 @@ def main(cfg: DictConfig):
                 logger.info("Waiting to begin merging for all sub-shard files to be written...")
                 time.sleep(cfg.polling_time)
 
-            return [pl.scan_parquet(fp, glob=False) for fp in in_fps]
+            logger.info(f"Merging {str(in_dir.resolve())}/**/*.parquet:")
+            df = None
+            for fp in in_fps:
+                if not fp.is_file():
+                    raise FileNotFoundError(f"File {str(fp.resolve())} not found.")
+                logger.info(f"  - {str(fp.resolve())}")
+                if df is None:
+                    df = pl.scan_parquet(fp, glob=False)
+                else:
+                    df = df.merge_sorted(pl.scan_parquet(fp, glob=False), key="patient_id")
+            return df
 
-        def compute_fn(dfs: list[pl.LazyFrame]) -> pl.LazyFrame:
+        def compute_fn(df: list[pl.DataFrame]) -> pl.LazyFrame:
             logger.info(f"Merging {subshard_dir}/**/*.parquet into {str(out_fp.resolve())}")
-            return pl.concat(dfs, how="diagonal_relaxed").sort(
+            #pl.concat(dfs, how="vertical").lazy()
+            return df.sort(
                 by=["patient_id", "time"], maintain_order=True, multithreaded=False
             )
 
@@ -150,6 +161,7 @@ def main(cfg: DictConfig):
         )
 
     logger.info(f"Done with {cfg.stage}")
+    return 0
 
 
 if __name__ == "__main__":
