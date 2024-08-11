@@ -54,7 +54,7 @@ def main(cfg: DictConfig):
             shards_fp.unlink()
         else:
             old_shards_map = json.loads(shards_fp.read_text())
-            if (old_shards_map != new_sharded_splits):
+            if old_shards_map != new_sharded_splits:
                 raise FileExistsError(f"{str(shards_fp.resolve())} already exists and shard map differs.")
 
     shards_fp.write_text(json.dumps(new_sharded_splits))
