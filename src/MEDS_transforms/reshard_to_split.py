@@ -101,38 +101,27 @@ def main(cfg: DictConfig):
     for subshard_name, subshard_dir in new_shards_iter:
         in_dir = subshard_dir
         in_fps = subshard_fps[subshard_name]
-        out_fp = subshard_dir.with_suffix(".parquet")
-
-        logger.info(f"Merging {subshard_dir}/**/*.parquet into {str(out_fp.resolve())}")
-
-        if not subshard_fps:
+        if not in_fps:
             raise ValueError(f"No subshards found for {subshard_name}!")
 
-        if out_fp.is_file():
-            logger.info(f"Output file {str(out_fp.resolve())} already exists. Skipping.")
-            continue
+        out_fp = subshard_dir.with_suffix(".parquet")
 
-        while not (all(fp.is_file() for fp in in_fps) or out_fp.is_file()):
-            logger.info("Waiting to begin merging for all sub-shard files to be written...")
-            time.sleep(cfg.polling_time)
+        def read_fn(in_dir: Path) -> pl.LazyFrame:
+            while not (all(fp.is_file() for fp in in_fps) or out_fp.is_file()):
+                logger.info("Waiting to begin merging for all sub-shard files to be written...")
+                time.sleep(cfg.polling_time)
 
-        def read_fn(fp: Path) -> pl.LazyFrame:
-            return pl.concat([pl.scan_parquet(fp, glob=False) for fp in in_fps], how="diagonal_relaxed").sort(
+            return [pl.scan_parquet(fp, glob=False) for fp in in_fps]
+
+        def compute_fn(dfs: list[pl.LazyFrame]) -> pl.LazyFrame:
+            logger.info(f"Merging {subshard_dir}/**/*.parquet into {str(out_fp.resolve())}")
+            return pl.concat(dfs, how="diagonal_relaxed").sort(
                 by=["patient_id", "time"], maintain_order=True, multithreaded=False
             )
 
-        logger.info(f"Merging files to {str(out_fp.resolve())}")
-        result_computed, _ = rwlock_wrap(
-            in_dir,
-            out_fp,
-            read_fn,
-            write_lazyframe,
-            identity_fn,
-            do_return=False,
-            do_overwrite=cfg.do_overwrite,
-        )
+        def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
+            write_lazyframe(df, out_fp)
 
-        if result_computed:
             logger.info(f"Cleaning up subsharded files in {str(subshard_dir.resolve())}/*.")
             for fp in in_fps:
                 if fp.exists():
@@ -148,6 +137,17 @@ def main(cfg: DictConfig):
             except OSError as e:
                 contents_str = "\n".join([str(f) for f in subshard_dir.iterdir()])
                 raise ValueError(f"Could not remove {str(subshard_dir)}. Contents:\n{contents_str}") from e
+
+        logger.info(f"Merging files to {str(out_fp.resolve())}")
+        result_computed, _ = rwlock_wrap(
+            in_dir,
+            out_fp,
+            read_fn,
+            write_fn,
+            compute_fn,
+            do_return=False,
+            do_overwrite=cfg.do_overwrite,
+        )
 
     logger.info(f"Done with {cfg.stage}")
 
