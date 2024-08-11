@@ -14,7 +14,12 @@ from omegaconf import DictConfig
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.extract.split_and_shard_patients import shard_patients
 from MEDS_transforms.mapreduce.mapper import identity_fn, read_and_filter_fntr
-from MEDS_transforms.mapreduce.utils import rwlock_wrap, shard_iterator, shuffle_shards
+from MEDS_transforms.mapreduce.utils import (
+    is_complete_parquet_file,
+    rwlock_wrap,
+    shard_iterator,
+    shuffle_shards,
+)
 from MEDS_transforms.utils import stage_init, write_lazyframe
 
 
@@ -107,15 +112,13 @@ def main(cfg: DictConfig):
         out_fp = subshard_dir.with_suffix(".parquet")
 
         def read_fn(in_dir: Path) -> pl.LazyFrame:
-            while not (all(fp.is_file() for fp in in_fps) or out_fp.is_file()):
+            while not (all(is_complete_parquet_file(fp) for fp in in_fps) or out_fp.is_file()):
                 logger.info("Waiting to begin merging for all sub-shard files to be written...")
                 time.sleep(cfg.polling_time)
 
             logger.info(f"Merging {str(in_dir.resolve())}/**/*.parquet:")
             df = None
             for fp in in_fps:
-                if not fp.is_file():
-                    raise FileNotFoundError(f"File {str(fp.resolve())} not found.")
                 logger.info(f"  - {str(fp.resolve())}")
                 if df is None:
                     df = pl.scan_parquet(fp, glob=False)

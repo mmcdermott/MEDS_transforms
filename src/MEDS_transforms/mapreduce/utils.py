@@ -6,10 +6,44 @@ from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
+import pyarrow.parquet as pq
 from loguru import logger
 from omegaconf import DictConfig
 
 LOCK_TIME_FMT = "%Y-%m-%dT%H:%M:%S.%f"
+
+
+def is_complete_parquet_file(fp: Path) -> bool:
+    """Check if a parquet file is complete.
+
+    Args:
+        fp: The file path to the parquet file.
+
+    Returns:
+        True if the parquet file is complete, False otherwise.
+
+    Examples:
+        >>> import tempfile, polars as pl
+        >>> df = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+        >>> with tempfile.NamedTemporaryFile() as tmp:
+        ...     df.write_parquet(tmp)
+        ...     is_complete_parquet_file(tmp)
+        True
+        >>> with tempfile.NamedTemporaryFile() as tmp:
+        ...     df.write_csv(tmp)
+        ...     is_complete_parquet_file(tmp)
+        False
+        >>> with tempfile.TemporaryDirectory() as tmp:
+        ...     tmp = Path(tmp)
+        ...     is_complete_parquet_file(tmp / "nonexistent.parquet")
+        False
+    """
+
+    try:
+        _ = pq.ParquetFile(fp)
+        return True
+    except Exception:
+        return False
 
 
 def get_earliest_lock(cache_directory: Path) -> datetime | None:

@@ -16,6 +16,7 @@ from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over
+from MEDS_transforms.mapreduce.utils import is_complete_parquet_file
 from MEDS_transforms.utils import write_lazyframe
 
 
@@ -667,7 +668,7 @@ def run_map_reduce(cfg: DictConfig):
 
     logger.info("Starting reduction process")
 
-    while not all(fp.is_file() for fp in all_out_fps):
+    while not all(is_complete_parquet_file(fp) for fp in all_out_fps):
         logger.info("Waiting to begin reduction for all files to be written...")
         time.sleep(cfg.polling_time)
 
