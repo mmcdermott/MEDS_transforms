@@ -27,6 +27,11 @@ dev = ["pre-commit"]
 tests = ["pytest", "pytest-cov", "rootutils"]
 local_parallelism = ["hydra-joblib-launcher"]
 slurm_parallelism = ["hydra-submitit-launcher"]
+docs = [
+  "mkdocs==1.6.0", "mkdocs-material==9.5.31", "mkdocstrings[python,shell]==0.25.2", "mkdocs-gen-files==0.5.0",
+  "mkdocs-literate-nav==0.6.1", "mkdocs-section-index==0.3.9", "mkdocs-git-authors-plugin==0.9.0",
+  "mkdocs-git-revision-date-localized-plugin==1.2.6"
+]
 
 [project.scripts]
 # MEDS_extract
@@ -42,6 +47,7 @@ MEDS_extract-finalize_MEDS_data = "MEDS_transforms.extract.finalize_MEDS_data:ma
 ## General
 MEDS_transform-aggregate_code_metadata = "MEDS_transforms.aggregate_code_metadata:main"
 MEDS_transform-fit_vocabulary_indices = "MEDS_transforms.fit_vocabulary_indices:main"
+MEDS_transform-reshard_to_split = "MEDS_transforms.reshard_to_split:main"
 ## Filters
 MEDS_transform-filter_measurements = "MEDS_transforms.filters.filter_measurements:main"
 MEDS_transform-filter_patients = "MEDS_transforms.filters.filter_patients:main"
