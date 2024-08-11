@@ -4,6 +4,7 @@
 import json
 import time
 from collections import defaultdict
+from functools import partial
 from pathlib import Path
 
 import hydra
@@ -23,6 +24,35 @@ from MEDS_transforms.mapreduce.utils import (
 from MEDS_transforms.utils import stage_init, write_lazyframe
 
 
+def valid_json_file(fp: Path) -> bool:
+    """Check if a file is a valid JSON file."""
+    if not fp.is_file():
+        return False
+    try:
+        json.loads(fp.read_text())
+        return True
+    except json.JSONDecodeError:
+        return False
+
+
+def make_new_shards_fn(df: pl.DataFrame, cfg: DictConfig, stage_cfg: DictConfig) -> dict[str, list[str]]:
+    splits_map = defaultdict(list)
+    for pt_id, sp in df.iter_rows():
+        splits_map[sp].append(pt_id)
+
+    return shard_patients(
+        patients=df["patient_id"].to_numpy(),
+        n_patients_per_shard=stage_cfg.n_patients_per_shard,
+        external_splits=splits_map,
+        split_fracs_dict=None,
+        seed=cfg.get("seed", 1),
+    )
+
+
+def write_json(d: dict, fp: Path) -> None:
+    fp.write_text(json.dumps(d))
+
+
 @hydra.main(
     version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
 )
@@ -31,40 +61,29 @@ def main(cfg: DictConfig):
 
     stage_init(cfg)
 
-    splits_file = Path(cfg.input_dir) / "metadata" / "patient_splits.parquet"
-    splits_df = pl.read_parquet(splits_file, use_pyarrow=True)
-    splits_map = defaultdict(list)
-    for pt_id, sp in splits_df.iter_rows():
-        splits_map[sp].append(pt_id)
+    output_dir = Path(cfg.stage_cfg.output_dir)
 
-    new_sharded_splits = shard_patients(
-        patients=splits_df["patient_id"].to_numpy(),
-        n_patients_per_shard=cfg.stage_cfg.n_patients_per_shard,
-        external_splits=splits_map,
-        split_fracs_dict=None,
-        seed=cfg.get("seed", 1),
+    splits_file = Path(cfg.input_dir) / "metadata" / "patient_splits.parquet"
+    shards_fp = output_dir / ".shards.json"
+
+    rwlock_wrap(
+        splits_file,
+        shards_fp,
+        partial(pl.read_parquet, use_pyarrow=True),
+        write_json,
+        partial(make_new_shards_fn, cfg=cfg, stage_cfg=cfg.stage_cfg),
+        do_overwrite=cfg.do_overwrite,
+        out_fp_checker=valid_json_file,
     )
 
-    output_dir = Path(cfg.stage_cfg.output_dir)
+    max_iters = cfg.get("max_iters", 10)
+    iters = 0
+    while not valid_json_file(shards_fp) and iters < max_iters:
+        logger.info(f"Waiting to begin until shards map is written. Iteration {iters}/{max_iters}...")
+        time.sleep(cfg.polling_time)
+        iters += 1
 
-    # Write shards to file
-    if "shards_map_fp" in cfg:
-        shards_fp = Path(cfg.shards_map_fp)
-    else:
-        shards_fp = output_dir / ".shards.json"
-
-    if shards_fp.is_file():
-        if cfg.do_overwrite:
-            logger.warning(f"Overwriting {str(shards_fp.resolve())}")
-            shards_fp.unlink()
-        else:
-            old_shards_map = json.loads(shards_fp.read_text())
-            if old_shards_map != new_sharded_splits:
-                raise FileExistsError(f"{str(shards_fp.resolve())} already exists and shard map differs.")
-
-    shards_fp.write_text(json.dumps(new_sharded_splits))
-
-    output_dir = Path(cfg.stage_cfg.output_dir)
+    new_sharded_splits = json.loads(shards_fp.read_text())
 
     orig_shards_iter, include_only_train = shard_iterator(cfg, out_suffix="")
     if include_only_train:
