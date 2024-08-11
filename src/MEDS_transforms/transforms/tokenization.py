@@ -248,7 +248,6 @@ def main(cfg: DictConfig):
             pl.scan_parquet,
             write_lazyframe,
             extract_statics_and_schema,
-            do_return=False,
             do_overwrite=cfg.do_overwrite,
         )
 
@@ -260,7 +259,6 @@ def main(cfg: DictConfig):
             pl.scan_parquet,
             write_lazyframe,
             extract_seq_of_patient_events,
-            do_return=False,
             do_overwrite=cfg.do_overwrite,
         )
 

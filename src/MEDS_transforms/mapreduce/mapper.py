@@ -621,7 +621,6 @@ def map_over(
             read_fn,
             write_fn,
             compute_fn,
-            do_return=False,
             do_overwrite=cfg.do_overwrite,
         )
         all_out_fps.append(out_fp)

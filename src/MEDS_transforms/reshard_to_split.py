@@ -4,6 +4,7 @@
 import json
 import time
 from collections import defaultdict
+from functools import partial
 from pathlib import Path
 
 import hydra
@@ -14,8 +15,42 @@ from omegaconf import DictConfig
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.extract.split_and_shard_patients import shard_patients
 from MEDS_transforms.mapreduce.mapper import identity_fn, read_and_filter_fntr
-from MEDS_transforms.mapreduce.utils import rwlock_wrap, shard_iterator, shuffle_shards
+from MEDS_transforms.mapreduce.utils import (
+    is_complete_parquet_file,
+    rwlock_wrap,
+    shard_iterator,
+    shuffle_shards,
+)
 from MEDS_transforms.utils import stage_init, write_lazyframe
+
+
+def valid_json_file(fp: Path) -> bool:
+    """Check if a file is a valid JSON file."""
+    if not fp.is_file():
+        return False
+    try:
+        json.loads(fp.read_text())
+        return True
+    except json.JSONDecodeError:
+        return False
+
+
+def make_new_shards_fn(df: pl.DataFrame, cfg: DictConfig, stage_cfg: DictConfig) -> dict[str, list[str]]:
+    splits_map = defaultdict(list)
+    for pt_id, sp in df.iter_rows():
+        splits_map[sp].append(pt_id)
+
+    return shard_patients(
+        patients=df["patient_id"].to_numpy(),
+        n_patients_per_shard=stage_cfg.n_patients_per_shard,
+        external_splits=splits_map,
+        split_fracs_dict=None,
+        seed=cfg.get("seed", 1),
+    )
+
+
+def write_json(d: dict, fp: Path) -> None:
+    fp.write_text(json.dumps(d))
 
 
 @hydra.main(
@@ -26,40 +61,29 @@ def main(cfg: DictConfig):
 
     stage_init(cfg)
 
-    splits_file = Path(cfg.input_dir) / "metadata" / "patient_splits.parquet"
-    splits_df = pl.read_parquet(splits_file, use_pyarrow=True)
-    splits_map = defaultdict(list)
-    for pt_id, sp in splits_df.iter_rows():
-        splits_map[sp].append(pt_id)
+    output_dir = Path(cfg.stage_cfg.output_dir)
 
-    new_sharded_splits = shard_patients(
-        patients=splits_df["patient_id"].to_numpy(),
-        n_patients_per_shard=cfg.stage_cfg.n_patients_per_shard,
-        external_splits=splits_map,
-        split_fracs_dict=None,
-        seed=cfg.get("seed", 1),
+    splits_file = Path(cfg.input_dir) / "metadata" / "patient_splits.parquet"
+    shards_fp = output_dir / ".shards.json"
+
+    rwlock_wrap(
+        splits_file,
+        shards_fp,
+        partial(pl.read_parquet, use_pyarrow=True),
+        write_json,
+        partial(make_new_shards_fn, cfg=cfg, stage_cfg=cfg.stage_cfg),
+        do_overwrite=cfg.do_overwrite,
+        out_fp_checker=valid_json_file,
     )
 
-    output_dir = Path(cfg.stage_cfg.output_dir)
+    max_iters = cfg.get("max_iters", 10)
+    iters = 0
+    while not valid_json_file(shards_fp) and iters < max_iters:
+        logger.info(f"Waiting to begin until shards map is written. Iteration {iters}/{max_iters}...")
+        time.sleep(cfg.polling_time)
+        iters += 1
 
-    # Write shards to file
-    if "shards_map_fp" in cfg:
-        shards_fp = Path(cfg.shards_map_fp)
-    else:
-        shards_fp = output_dir / ".shards.json"
-
-    if shards_fp.is_file():
-        if cfg.do_overwrite:
-            logger.warning(f"Overwriting {str(shards_fp.resolve())}")
-            shards_fp.unlink()
-        else:
-            old_shards_map = json.loads(shards_fp.read_text())
-            if old_shards_map != new_sharded_splits:
-                raise FileExistsError(f"{str(shards_fp.resolve())} already exists and shard map differs.")
-
-    shards_fp.write_text(json.dumps(new_sharded_splits))
-
-    output_dir = Path(cfg.stage_cfg.output_dir)
+    new_sharded_splits = json.loads(shards_fp.read_text())
 
     orig_shards_iter, include_only_train = shard_iterator(cfg, out_suffix="")
     if include_only_train:
@@ -93,46 +117,39 @@ def main(cfg: DictConfig):
                 read_and_filter_fntr(pl.col("patient_id").is_in(patients), pl.scan_parquet),
                 write_lazyframe,
                 identity_fn,
-                do_return=False,
                 do_overwrite=cfg.do_overwrite,
             )
 
-    logger.info("Merging sub-shards")
     for subshard_name, subshard_dir in new_shards_iter:
         in_dir = subshard_dir
         in_fps = subshard_fps[subshard_name]
-        out_fp = subshard_dir.with_suffix(".parquet")
-
-        logger.info(f"Merging {subshard_dir}/**/*.parquet into {str(out_fp.resolve())}")
-
-        if not subshard_fps:
+        if not in_fps:
             raise ValueError(f"No subshards found for {subshard_name}!")
 
-        if out_fp.is_file():
-            logger.info(f"Output file {str(out_fp.resolve())} already exists. Skipping.")
-            continue
+        out_fp = subshard_dir.with_suffix(".parquet")
 
-        while not (all(fp.is_file() for fp in in_fps) or out_fp.is_file()):
-            logger.info("Waiting to begin merging for all sub-shard files to be written...")
-            time.sleep(cfg.polling_time)
+        def read_fn(in_dir: Path) -> pl.LazyFrame:
+            while not all(is_complete_parquet_file(fp) for fp in in_fps):
+                logger.info("Waiting to begin merging for all sub-shard files to be written...")
+                time.sleep(cfg.polling_time)
 
-        def read_fn(fp: Path) -> pl.LazyFrame:
-            return pl.concat([pl.scan_parquet(fp, glob=False) for fp in in_fps], how="diagonal_relaxed").sort(
-                by=["patient_id", "time"], maintain_order=True, multithreaded=False
-            )
+            logger.info(f"Merging {str(in_dir.resolve())}/**/*.parquet:")
+            df = None
+            for fp in in_fps:
+                logger.info(f"  - {str(fp.resolve())}")
+                if df is None:
+                    df = pl.scan_parquet(fp, glob=False)
+                else:
+                    df = df.merge_sorted(pl.scan_parquet(fp, glob=False), key="patient_id")
+            return df
 
-        logger.info(f"Merging files to {str(out_fp.resolve())}")
-        result_computed, _ = rwlock_wrap(
-            in_dir,
-            out_fp,
-            read_fn,
-            write_lazyframe,
-            identity_fn,
-            do_return=False,
-            do_overwrite=cfg.do_overwrite,
-        )
+        def compute_fn(df: list[pl.DataFrame]) -> pl.LazyFrame:
+            logger.info(f"Merging {subshard_dir}/**/*.parquet into {str(out_fp.resolve())}")
+            return df.sort(by=["patient_id", "time"], maintain_order=True, multithreaded=False)
 
-        if result_computed:
+        def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
+            write_lazyframe(df, out_fp)
+
             logger.info(f"Cleaning up subsharded files in {str(subshard_dir.resolve())}/*.")
             for fp in in_fps:
                 if fp.exists():
@@ -148,6 +165,16 @@ def main(cfg: DictConfig):
             except OSError as e:
                 contents_str = "\n".join([str(f) for f in subshard_dir.iterdir()])
                 raise ValueError(f"Could not remove {str(subshard_dir)}. Contents:\n{contents_str}") from e
+
+        logger.info(f"Merging sub-shards for {subshard_name} to {str(out_fp.resolve())}")
+        rwlock_wrap(
+            in_dir,
+            out_fp,
+            read_fn,
+            write_fn,
+            compute_fn,
+            do_overwrite=cfg.do_overwrite,
+        )
 
     logger.info(f"Done with {cfg.stage}")
 
