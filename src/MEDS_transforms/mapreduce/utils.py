@@ -6,10 +6,44 @@ from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
+import pyarrow.parquet as pq
 from loguru import logger
 from omegaconf import DictConfig
 
 LOCK_TIME_FMT = "%Y-%m-%dT%H:%M:%S.%f"
+
+
+def is_complete_parquet_file(fp: Path) -> bool:
+    """Check if a parquet file is complete.
+
+    Args:
+        fp: The file path to the parquet file.
+
+    Returns:
+        True if the parquet file is complete, False otherwise.
+
+    Examples:
+        >>> import tempfile, polars as pl
+        >>> df = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+        >>> with tempfile.NamedTemporaryFile() as tmp:
+        ...     df.write_parquet(tmp)
+        ...     is_complete_parquet_file(tmp)
+        True
+        >>> with tempfile.NamedTemporaryFile() as tmp:
+        ...     df.write_csv(tmp)
+        ...     is_complete_parquet_file(tmp)
+        False
+        >>> with tempfile.TemporaryDirectory() as tmp:
+        ...     tmp = Path(tmp)
+        ...     is_complete_parquet_file(tmp / "nonexistent.parquet")
+        False
+    """
+
+    try:
+        _ = pq.ParquetFile(fp)
+        return True
+    except Exception:
+        return False
 
 
 def get_earliest_lock(cache_directory: Path) -> datetime | None:
@@ -83,6 +117,13 @@ def register_lock(cache_directory: Path) -> tuple[datetime, Path]:
     return lock_time, lock_fp
 
 
+def default_file_checker(fp: Path) -> bool:
+    """Check if a file exists and is complete."""
+    if fp.suffix == ".parquet":
+        return is_complete_parquet_file(fp)
+    return fp.is_file()
+
+
 def rwlock_wrap[
     DF_T
 ](
@@ -92,8 +133,8 @@ def rwlock_wrap[
     write_fn: Callable[[DF_T, Path], None],
     compute_fn: Callable[[DF_T], DF_T],
     do_overwrite: bool = False,
-    do_return: bool = False,
-) -> tuple[bool, DF_T | None]:
+    out_fp_checker: Callable[[Path], bool] = default_file_checker,
+) -> bool:
     """Wrap a series of file-in file-out map transformations on a dataframe with caching and locking.
 
     Args:
@@ -112,11 +153,9 @@ def rwlock_wrap[
             type DF_T and return a dataframe of (generic) type DF_T.
         do_overwrite: If True, the output file will be overwritten if it already exists. This is `False` by
             default.
-        do_return: If True, the final dataframe will be returned. This is `False` by default.
 
     Returns:
-        The dataframe resulting from the transformations applied in sequence to the dataframe stored in
-        `in_fp`.
+        True if the computation was run, False otherwise.
 
     Examples:
         >>> import polars as pl
@@ -132,7 +171,7 @@ def rwlock_wrap[
         >>> read_fn = pl.read_csv
         >>> write_fn = pl.DataFrame.write_csv
         >>> compute_fn = lambda df: df.with_columns(pl.col("c") * 2).filter(pl.col("c") > 4)
-        >>> result_computed = rwlock_wrap(in_fp, out_fp, read_fn, write_fn, compute_fn, do_return=False)
+        >>> result_computed = rwlock_wrap(in_fp, out_fp, read_fn, write_fn, compute_fn)
         >>> assert result_computed
         >>> print(out_fp.read_text())
         a,b,c
@@ -145,49 +184,33 @@ def rwlock_wrap[
         Traceback (most recent call last):
             ...
         polars.exceptions.ColumnNotFoundError: unable to find column "d"; valid columns: ["a", "b", "c"]
-        >>> cache_directory = root / f".output_cache"
+        >>> cache_directory = root / f".output.csv_cache"
         >>> lock_dir = cache_directory / "locks"
         >>> assert not list(lock_dir.iterdir())
         >>> def lock_dir_checker_fn(df: pl.DataFrame) -> pl.DataFrame:
         ...     print(f"Lock dir empty? {not (list(lock_dir.iterdir()))}")
         ...     return df
-        >>> result_computed, out_df = rwlock_wrap(
-        ...     in_fp, out_fp, read_fn, write_fn, lock_dir_checker_fn, do_return=True
-        ... )
+        >>> result_computed = rwlock_wrap(in_fp, out_fp, read_fn, write_fn, lock_dir_checker_fn)
         Lock dir empty? False
         >>> assert result_computed
-        >>> out_df
-        shape: (3, 3)
-        ┌─────┬─────┬─────┐
-        │ a   ┆ b   ┆ c   │
-        │ --- ┆ --- ┆ --- │
-        │ i64 ┆ i64 ┆ i64 │
-        ╞═════╪═════╪═════╡
-        │ 1   ┆ 2   ┆ 3   │
-        │ 3   ┆ 4   ┆ -1  │
-        │ 3   ┆ 5   ┆ 6   │
-        └─────┴─────┴─────┘
         >>> directory.cleanup()
     """
 
-    if out_fp.is_file():
+    if out_fp_checker(out_fp):
         if do_overwrite:
             logger.info(f"Deleting existing {out_fp} as do_overwrite={do_overwrite}.")
             out_fp.unlink()
         else:
-            logger.info(f"{out_fp} exists; reading directly and returning.")
-            if do_return:
-                return True, read_fn(out_fp)
-            else:
-                return True
+            logger.info(f"{out_fp} exists; returning.")
+            return False
 
-    cache_directory = out_fp.parent / f".{out_fp.stem}_cache"
+    cache_directory = out_fp.parent / f".{out_fp.parts[-1]}_cache"
     cache_directory.mkdir(exist_ok=True, parents=True)
 
     earliest_lock_time = get_earliest_lock(cache_directory)
     if earliest_lock_time is not None:
         logger.info(f"{out_fp} is in progress as of {earliest_lock_time}. Returning.")
-        return False, None if do_return else False
+        return False
 
     st_time, lock_fp = register_lock(cache_directory)
 
@@ -196,11 +219,19 @@ def rwlock_wrap[
     if earliest_lock_time < st_time:
         logger.info(f"Earlier lock found at {earliest_lock_time}. Deleting current lock and returning.")
         lock_fp.unlink()
-        return False, None if do_return else False
+        return False
 
     logger.info(f"Reading input dataframe from {in_fp}")
     df = read_fn(in_fp)
     logger.info("Read dataset")
+
+    earliest_lock_time = get_earliest_lock(cache_directory)
+    if earliest_lock_time < st_time:
+        logger.info(
+            f"Earlier lock found post read at {earliest_lock_time}. Deleting current lock and returning."
+        )
+        lock_fp.unlink()
+        return False
 
     try:
         df = compute_fn(df)
@@ -210,15 +241,50 @@ def rwlock_wrap[
         logger.info(f"Leaving cache directory {cache_directory}, but clearing lock at {lock_fp}")
         lock_fp.unlink()
 
-        if do_return:
-            return True, df
-        else:
-            return True
+        return True
 
     except Exception as e:
         logger.warning(f"Clearing lock due to Exception {e} at {lock_fp} after {datetime.now() - st_time}")
         lock_fp.unlink()
         raise e
+
+
+def shuffle_shards(shards: list[str], cfg: DictConfig) -> list[str]:
+    """Shuffle the shards in a deterministic, pseudo-random way based on the worker ID in the configuration.
+
+    Args:
+        shards: The list of shards to shuffle.
+        cfg: The configuration dictionary for the overall pipeline. Should (possibly) contain the following
+            keys (some are optional, as marked below):
+            - `worker` (optional): The worker ID for the MR worker; this is also used to seed the
+              randomization process. If not provided, the randomization process will be unseeded.
+
+    Returns:
+        The shuffled list of shards.
+
+    Examples:
+        >>> cfg = DictConfig({"worker": 1})
+        >>> shards = ["train/0", "train/1", "tuning", "held_out"]
+        >>> shuffle_shards(shards, cfg)
+        ['train/1', 'held_out', 'tuning', 'train/0']
+        >>> cfg = DictConfig({"worker": 2})
+        >>> shuffle_shards(shards, cfg)
+        ['tuning', 'held_out', 'train/1', 'train/0']
+    """
+
+    if "worker" in cfg:
+        add_str = str(cfg["worker"])
+    else:
+        add_str = str(datetime.now())
+
+    shard_keys = []
+    for shard in shards:
+        shard_hash = hashlib.sha256((add_str + shard).encode("utf-8")).hexdigest()
+        if shard_hash in shard_keys:
+            raise ValueError(f"Hash collision for shard {shard} with add_str {add_str}!")
+        shard_keys.append(int(shard_hash, 16))
+
+    return [shard for _, shard in sorted(zip(shard_keys, shards))]
 
 
 def shard_iterator(
@@ -422,19 +488,7 @@ def shard_iterator(
             "and relying on `patient_splits.parquet` for filtering."
         )
 
-    if "worker" in cfg:
-        add_str = str(cfg.worker)
-    else:
-        add_str = str(datetime.now())
-
-    shard_keys = []
-    for shard in shards:
-        shard_hash = hashlib.sha256((add_str + shard).encode("utf-8")).hexdigest()
-        if shard_hash in shard_keys:
-            raise ValueError(f"Hash collision for shard {shard} with add_str {add_str}!")
-        shard_keys.append(int(shard_hash, 16))
-
-    shards = [shard for _, shard in sorted(zip(shard_keys, shards))]
+    shards = shuffle_shards(shards, cfg)
 
     logger.info(f"Mapping computation over a maximum of {len(shards)} shards")
 
@@ -446,3 +500,89 @@ def shard_iterator(
         out.append((in_fp, out_fp))
 
     return out, includes_only_train
+
+
+def shard_iterator_by_shard_map(cfg: DictConfig) -> tuple[list[str], bool]:
+    """Returns an iterator over shard paths and output paths based on a shard map file, not files on disk.
+
+    Args:
+        cfg: The configuration dictionary for the overall pipeline. Should contain the following keys:
+            - `shards_map_fp` (mandatory): The file path to the shards map file.
+            - `stage_cfg.data_input_dir` (mandatory): The directory containing the input data.
+            - `stage_cfg.output_dir` (mandatory): The directory to write the output data.
+            - `worker` (optional): The worker ID for the MR worker; this is also used to seed the
+
+    Returns:
+        A list of pairs of input and output file paths for each shard, as well as a boolean indicating
+        whether the shards are only train shards.
+
+    Raises:
+        ValueError: If the `shards_map_fp` key is not present in the configuration.
+        FileNotFoundError: If the shard map file is not found at the path specified in the configuration.
+        ValueError: If the `train_only` key is present in the configuration.
+
+    Examples:
+        >>> from tempfile import NamedTemporaryFile, TemporaryDirectory
+        >>> import json
+        >>> shard_iterator_by_shard_map(DictConfig({}))
+        Traceback (most recent call last):
+            ...
+        ValueError: shards_map_fp must be present in the configuration for a map-based shard iterator.
+        >>> with NamedTemporaryFile() as tmp:
+        ...     cfg = DictConfig({"shards_map_fp": tmp.name, "stage_cfg": {"train_only": True}})
+        ...     shard_iterator_by_shard_map(cfg)
+        Traceback (most recent call last):
+            ...
+        ValueError: train_only is not supported for this stage.
+        >>> with TemporaryDirectory() as tmp:
+        ...     tmp = Path(tmp)
+        ...     shards_map_fp = tmp / "shards_map.json"
+        ...     cfg = DictConfig({"shards_map_fp": shards_map_fp, "stage_cfg": {"train_only": False}})
+        ...     shard_iterator_by_shard_map(cfg)
+        Traceback (most recent call last):
+            ...
+        FileNotFoundError: Shard map file not found at ...shards_map.json
+        >>> shards = {"train/0": [1, 2, 3, 4], "train/1": [5, 6, 7], "tuning": [8], "held_out": [9]}
+        >>> with NamedTemporaryFile() as tmp:
+        ...     _ = Path(tmp.name).write_text(json.dumps(shards))
+        ...     cfg = DictConfig({
+        ...         "shards_map_fp": tmp.name,
+        ...         "worker": 1,
+        ...         "stage_cfg": {"data_input_dir": "data", "output_dir": "output"},
+        ...     })
+        ...     fps, includes_only_train = shard_iterator_by_shard_map(cfg)
+        >>> fps # doctest: +NORMALIZE_WHITESPACE
+        [(PosixPath('data/train/1'),  PosixPath('output/train/1.parquet')),
+         (PosixPath('data/held_out'), PosixPath('output/held_out.parquet')),
+         (PosixPath('data/tuning'),   PosixPath('output/tuning.parquet')),
+         (PosixPath('data/train/0'),  PosixPath('output/train/0.parquet'))]
+        >>> includes_only_train
+        False
+    """
+
+    if "shards_map_fp" not in cfg:
+        raise ValueError("shards_map_fp must be present in the configuration for a map-based shard iterator.")
+
+    if cfg.stage_cfg.get("train_only", None):
+        raise ValueError("train_only is not supported for this stage.")
+
+    shard_map_fp = Path(cfg.shards_map_fp)
+    if not shard_map_fp.exists():
+        raise FileNotFoundError(f"Shard map file not found at {str(shard_map_fp.resolve())}")
+
+    shards = list(json.loads(shard_map_fp.read_text()).keys())
+
+    input_dir = Path(cfg.stage_cfg.data_input_dir)
+    output_dir = Path(cfg.stage_cfg.output_dir)
+
+    shards = shuffle_shards(shards, cfg)
+
+    logger.info(f"Mapping computation over a maximum of {len(shards)} shards")
+
+    out = []
+    for sh in shards:
+        in_fp = input_dir / sh
+        out_fp = output_dir / f"{sh}.parquet"
+        out.append((in_fp, out_fp))
+
+    return out, False

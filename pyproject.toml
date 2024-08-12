@@ -47,6 +47,7 @@ MEDS_extract-finalize_MEDS_data = "MEDS_transforms.extract.finalize_MEDS_data:ma
 ## General
 MEDS_transform-aggregate_code_metadata = "MEDS_transforms.aggregate_code_metadata:main"
 MEDS_transform-fit_vocabulary_indices = "MEDS_transforms.fit_vocabulary_indices:main"
+MEDS_transform-reshard_to_split = "MEDS_transforms.reshard_to_split:main"
 ## Filters
 MEDS_transform-filter_measurements = "MEDS_transforms.filters.filter_measurements:main"
 MEDS_transform-filter_patients = "MEDS_transforms.filters.filter_patients:main"

@@ -19,7 +19,7 @@ def shard_patients[
     patients: np.ndarray,
     n_patients_per_shard: int = 50000,
     external_splits: dict[str, Sequence[SUBJ_ID_T]] | None = None,
-    split_fracs_dict: dict[str, float] = {"train": 0.8, "tuning": 0.1, "held_out": 0.1},
+    split_fracs_dict: dict[str, float] | None = {"train": 0.8, "tuning": 0.1, "held_out": 0.1},
     seed: int = 1,
 ) -> dict[str, list[SUBJ_ID_T]]:
     """Shard a list of patients, nested within train/tuning/held-out splits.
@@ -41,7 +41,8 @@ def shard_patients[
             tasks or test cases (e.g., prospective tests); training patients should often still be included in
             the IID splits to maximize the amount of data that can be used for training.
         split_fracs_dict: A dictionary mapping the split name to the fraction of patients to include in that
-            split. Defaults to 80% train, 10% tuning, 10% held-out.
+            split. Defaults to 80% train, 10% tuning, 10% held-out. This can be None or empty only when
+            external splits fully specify the population.
         seed: The random seed to use for shuffling the patients before seeding and sharding. This is useful
             for ensuring reproducibility.
 
@@ -80,14 +81,11 @@ def shard_patients[
         ...     'train': np.array([1, 2, 3, 4, 5, 6], dtype=int),
         ...     'test': np.array([7, 8, 9, 10], dtype=int),
         ... }
-        >>> shard_patients(patients, 6, external_splits)
+        >>> shard_patients(patients, 6, external_splits, split_fracs_dict=None)
         {'train/0': [1, 2, 3, 4, 5, 6], 'test/0': [7, 8, 9, 10]}
         >>> shard_patients(patients, 3, external_splits)
         {'train/0': [5, 1, 3], 'train/1': [2, 6, 4], 'test/0': [10, 7], 'test/1': [8, 9]}
     """
-
-    if sum(split_fracs_dict.values()) != 1:
-        raise ValueError("The sum of the split fractions must be equal to 1.")
 
     if external_splits is None:
         external_splits = {}
@@ -111,6 +109,8 @@ def shard_patients[
 
     rng = np.random.default_rng(seed)
     if n_patients := len(patient_ids_to_split):
+        if sum(split_fracs_dict.values()) != 1:
+            raise ValueError("The sum of the split fractions must be equal to 1.")
         split_names_idx = rng.permutation(len(split_fracs_dict))
         split_names = np.array(list(split_fracs_dict.keys()))[split_names_idx]
         split_fracs = np.array([split_fracs_dict[k] for k in split_names])
