@@ -7,6 +7,7 @@ scripts.
 import json
 import os
 import tempfile
+from collections import defaultdict
 from io import StringIO
 from pathlib import Path
 
@@ -26,6 +27,7 @@ filters_root = code_root / "filters"
 if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
     # Root Source
     FIT_VOCABULARY_INDICES_SCRIPT = code_root / "fit_vocabulary_indices.py"
+    RESHARD_TO_SPLIT_SCRIPT = code_root / "reshard_to_split.py"
 
     # Filters
     FILTER_MEASUREMENTS_SCRIPT = filters_root / "filter_measurements.py"
@@ -41,6 +43,7 @@ if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
 else:
     # Root Source
     FIT_VOCABULARY_INDICES_SCRIPT = "MEDS_transform-fit_vocabulary_indices"
+    RESHARD_TO_SPLIT_SCRIPT = "MEDS_transform-reshard_to_split"
 
     # Filters
     FILTER_MEASUREMENTS_SCRIPT = "MEDS_transform-filter_measurements"
@@ -56,11 +59,17 @@ else:
 
 # Test MEDS data (inputs)
 
-SPLITS = {
+SHARDS = {
     "train/0": [239684, 1195293],
     "train/1": [68729, 814703],
     "tuning/0": [754281],
     "held_out/0": [1500733],
+}
+
+SPLITS = {
+    "train": [239684, 1195293, 68729, 814703],
+    "tuning": [754281],
+    "held_out": [1500733],
 }
 
 MEDS_TRAIN_0 = """
@@ -291,6 +300,9 @@ def single_stage_transform_tester(
     input_shards: dict[str, pl.DataFrame] | None = None,
     do_pass_stage_name: bool = False,
     file_suffix: str = ".parquet",
+    do_use_config_yaml: bool = False,
+    input_shards_map: dict[str, list[int]] | None = None,
+    input_splits_map: dict[str, list[int]] | None = None,
 ):
     with tempfile.TemporaryDirectory() as d:
         MEDS_dir = Path(d) / "MEDS_cohort"
@@ -305,9 +317,23 @@ def single_stage_transform_tester(
         MEDS_metadata_dir.mkdir(parents=True)
         cohort_dir.mkdir(parents=True)
 
-        # Write the splits
-        splits_fp = MEDS_dir / "splits.json"
-        splits_fp.write_text(json.dumps(SPLITS))
+        # Write the shards map
+        if input_shards_map is None:
+            input_shards_map = SHARDS
+
+        shards_fp = MEDS_metadata_dir / ".shards.json"
+        shards_fp.write_text(json.dumps(input_shards_map))
+
+        # Write the splits parquet file
+        if input_splits_map is None:
+            input_splits_map = SPLITS
+        input_splits_as_df = defaultdict(list)
+        for split_name, patient_ids in input_splits_map.items():
+            input_splits_as_df["patient_id"].extend(patient_ids)
+            input_splits_as_df["split"].extend([split_name] * len(patient_ids))
+        input_splits_df = pl.DataFrame(input_splits_as_df)
+        input_splits_fp = MEDS_metadata_dir / "patient_splits.parquet"
+        input_splits_df.write_parquet(input_splits_fp, use_pyarrow=True)
 
         if input_shards is None:
             input_shards = MEDS_SHARDS
@@ -337,12 +363,17 @@ def single_stage_transform_tester(
         if transform_stage_kwargs:
             pipeline_config_kwargs["stage_configs"] = {stage_name: transform_stage_kwargs}
 
+        run_command_kwargs = {
+            "script": transform_script,
+            "hydra_kwargs": pipeline_config_kwargs,
+            "test_name": f"Single stage transform: {stage_name}",
+        }
+        if do_use_config_yaml:
+            run_command_kwargs["do_use_config_yaml"] = True
+            run_command_kwargs["config_name"] = "preprocess"
+
         # Run the transform
-        stderr, stdout = run_command(
-            transform_script,
-            pipeline_config_kwargs,
-            f"Single stage transform: {stage_name}",
-        )
+        stderr, stdout = run_command(**run_command_kwargs)
 
         # Check the output
         if isinstance(want_outputs, pl.DataFrame):
