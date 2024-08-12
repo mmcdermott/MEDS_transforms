@@ -14,13 +14,7 @@ from omegaconf import DictConfig
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.extract.split_and_shard_patients import shard_patients
-from MEDS_transforms.mapreduce.mapper import identity_fn, read_and_filter_fntr
-from MEDS_transforms.mapreduce.utils import (
-    is_complete_parquet_file,
-    rwlock_wrap,
-    shard_iterator,
-    shuffle_shards,
-)
+from MEDS_transforms.mapreduce.utils import rwlock_wrap, shard_iterator, shuffle_shards
 from MEDS_transforms.utils import stage_init, write_lazyframe
 
 
@@ -92,83 +86,35 @@ def main(cfg: DictConfig):
     orig_shards_iter = [(in_fp, out_fp.relative_to(output_dir)) for in_fp, out_fp in orig_shards_iter]
 
     new_shards = shuffle_shards(list(new_sharded_splits.keys()), cfg)
-    new_shards_iter = [(shard_name, output_dir / shard_name) for shard_name in new_shards]
+    new_shards_iter = [(shard_name, output_dir / f"{shard_name}.parquet") for shard_name in new_shards]
 
     # Step 1: Sub-sharding stage
     logger.info("Starting sub-sharding")
-    subshard_fps = defaultdict(list)
 
-    for in_fp, orig_shard_name in orig_shards_iter:
-        for subshard_name, out_dir in new_shards_iter:
-            out_fp = out_dir / f"{orig_shard_name}.parquet"
-            subshard_fps[subshard_name].append(out_fp)
-            patients = new_sharded_splits[subshard_name]
+    for subshard_name, out_fp in new_shards_iter:
+        patients = new_sharded_splits[subshard_name]
 
-            if not patients:
-                raise ValueError(f"No patients found for {subshard_name}!")
-
-            logger.info(
-                f"Sub-sharding {str(in_fp.resolve())} to {len(patients)} patients in {str(out_fp.resolve())}"
-            )
-
-            rwlock_wrap(
-                in_fp,
-                out_fp,
-                read_and_filter_fntr(pl.col("patient_id").is_in(patients), pl.scan_parquet),
-                write_lazyframe,
-                identity_fn,
-                do_overwrite=cfg.do_overwrite,
-            )
-
-    for subshard_name, subshard_dir in new_shards_iter:
-        in_dir = subshard_dir
-        in_fps = subshard_fps[subshard_name]
-        if not in_fps:
-            raise ValueError(f"No subshards found for {subshard_name}!")
-
-        out_fp = subshard_dir.with_suffix(".parquet")
-
-        def read_fn(in_dir: Path) -> pl.LazyFrame:
-            while not all(is_complete_parquet_file(fp) for fp in in_fps):
-                logger.info("Waiting to begin merging for all sub-shard files to be written...")
-                time.sleep(cfg.polling_time)
-
-            logger.info(f"Merging {str(in_dir.resolve())}/**/*.parquet:")
+        def read_fn(input_dir: Path) -> pl.LazyFrame:
             df = None
-            for fp in in_fps:
-                logger.info(f"  - {str(fp.resolve())}")
+            logger.info(f"Reading shards for {subshard_name} (file names are in the input sharding scheme):")
+            for in_fp, _ in orig_shards_iter:
+                logger.info(f"  - {str(in_fp.relative_to(input_dir).resolve())}")
+                new_df = pl.scan_parquet(in_fp, glob=False).filter(pl.col("patient_id").is_in(patients))
                 if df is None:
-                    df = pl.scan_parquet(fp, glob=False)
+                    df = new_df
                 else:
-                    df = df.merge_sorted(pl.scan_parquet(fp, glob=False), key="patient_id")
+                    df = df.merge_sorted(new_df, key="patient_id")
             return df
 
         def compute_fn(df: list[pl.DataFrame]) -> pl.LazyFrame:
-            logger.info(f"Merging {subshard_dir}/**/*.parquet into {str(out_fp.resolve())}")
             return df.sort(by=["patient_id", "time"], maintain_order=True, multithreaded=False)
 
         def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
             write_lazyframe(df, out_fp)
 
-            logger.info(f"Cleaning up subsharded files in {str(subshard_dir.resolve())}/*.")
-            for fp in in_fps:
-                if fp.exists():
-                    fp.unlink()
-            try:
-                for root, dirs, files in subshard_dir.walk(top_down=False):
-                    walked_dir = root.relative_to(subshard_dir)
-                    if files:
-                        raise FileExistsError(f"Files found in {walked_dir} after cleanup!: {files}")
-                    for d in dirs:
-                        (root / d).rmdir()
-                subshard_dir.rmdir()
-            except OSError as e:
-                contents_str = "\n".join([str(f) for f in subshard_dir.iterdir()])
-                raise ValueError(f"Could not remove {str(subshard_dir)}. Contents:\n{contents_str}") from e
-
         logger.info(f"Merging sub-shards for {subshard_name} to {str(out_fp.resolve())}")
         rwlock_wrap(
-            in_dir,
+            cfg.stage_cfg.data_input_dir,
             out_fp,
             read_fn,
             write_fn,
