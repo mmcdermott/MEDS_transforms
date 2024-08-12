@@ -303,6 +303,7 @@ def single_stage_transform_tester(
     do_use_config_yaml: bool = False,
     input_shards_map: dict[str, list[int]] | None = None,
     input_splits_map: dict[str, list[int]] | None = None,
+    assert_no_other_outputs: bool = True,
 ):
     with tempfile.TemporaryDirectory() as d:
         MEDS_dir = Path(d) / "MEDS_cohort"
@@ -388,3 +389,12 @@ def single_stage_transform_tester(
                     check_NRT_output(output_fp, want, stderr, stdout)
                 else:
                     raise ValueError(f"Unknown file suffix: {file_suffix}")
+
+            if assert_no_other_outputs:
+                all_outputs = list((cohort_dir / "data").glob(f"**/*{file_suffix}"))
+                assert len(want_outputs) == len(all_outputs), (
+                    f"Expected {len(want_outputs)} outputs, but found {len(all_outputs)}.\n"
+                    f"Found outputs: {[fp.relative_to(cohort_dir/'data') for fp in all_outputs]}\n"
+                    f"Script stdout:\n{stdout}\n"
+                    f"Script stderr:\n{stderr}"
+                )
