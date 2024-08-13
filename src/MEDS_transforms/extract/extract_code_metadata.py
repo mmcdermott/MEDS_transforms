@@ -365,7 +365,7 @@ def main(cfg: DictConfig):
 
     events_and_metadata_by_metadata_fp = get_events_and_metadata_by_metadata_fp(event_conversion_cfg)
     if not events_and_metadata_by_metadata_fp:
-        logger.info("No metadata extraction configurations found. Exiting...")
+        logger.info("No _metadata blocks in the event_conversion_config.yaml found. Exiting...")
         return
 
     event_metadata_configs = list(events_and_metadata_by_metadata_fp.items())
