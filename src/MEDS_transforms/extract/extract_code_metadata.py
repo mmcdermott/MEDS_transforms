@@ -364,6 +364,10 @@ def main(cfg: DictConfig):
     OmegaConf.save(event_conversion_cfg, partial_metadata_dir / "event_conversion_config.yaml")
 
     events_and_metadata_by_metadata_fp = get_events_and_metadata_by_metadata_fp(event_conversion_cfg)
+    if not events_and_metadata_by_metadata_fp:
+        logger.info("No metadata extraction configurations found. Exiting...")
+        return
+
     event_metadata_configs = list(events_and_metadata_by_metadata_fp.items())
     random.shuffle(event_metadata_configs)
 
