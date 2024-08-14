@@ -81,7 +81,7 @@ normalized_vals_by_code_and_subj = {}
 for code, vals in vals_by_code_and_subj.items():
     mean, std = means_stds_by_code[code]
     normalized_vals_by_code_and_subj[code] = [
-        [(np.float64(val) - mean) / std for val in subj_vals] for subj_vals in vals
+        [(np.float32(val) - mean) / std for val in subj_vals] for subj_vals in vals
     ]
 
 for code, normalized_vals in normalized_vals_by_code_and_subj.items():
