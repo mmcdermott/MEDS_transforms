@@ -423,6 +423,25 @@ def mapper_fntr(
         │ C    ┆ 1         ┆ [5.0, 7.5]       │
         │ D    ┆ null      ┆ []               │
         └──────┴───────────┴──────────────────┘
+        >>> stage_cfg = DictConfig({
+        ...     "aggregations": [{"name": "values/quantiles", "quantiles": [0.25, 0.5, 0.75]}],
+        ...     "do_summarize_over_all_codes": True,
+        ... })
+        >>> mapper = mapper_fntr(stage_cfg, code_modifiers)
+        >>> mapper(df.lazy()).collect().select("code", "modifier1", pl.col("values/quantiles"))
+        shape: (5, 3)
+        ┌──────┬───────────┬──────────────────┐
+        │ code ┆ modifier1 ┆ values/quantiles │
+        │ ---  ┆ ---       ┆ ---              │
+        │ str  ┆ i64       ┆ list[f64]        │
+        ╞══════╪═══════════╪══════════════════╡
+        | null | null      | [1.1, 4.0, 7.5]  |
+        │ A    ┆ 1         ┆ [1.1, 1.1]       │
+        │ A    ┆ 2         ┆ [6.0]            │
+        │ B    ┆ 2         ┆ [2.0, 4.0]       │
+        │ C    ┆ 1         ┆ [5.0, 7.5]       │
+        │ D    ┆ null      ┆ []               │
+        └──────┴───────────┴──────────────────┘
     """
 
     code_key_columns = validate_args_and_get_code_cols(stage_cfg, code_modifiers)
