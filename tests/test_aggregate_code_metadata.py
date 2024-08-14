@@ -144,9 +144,9 @@ WANT_OUTPUT_CODE_METADATA_FILE = pl.DataFrame(
         "parent_codes": pl.List(pl.String),
         "values/quantiles": pl.Struct(
             {
-                "values/quantile/0.25": pl.Float64,
-                "values/quantile/0.5": pl.Float64,
-                "values/quantile/0.75": pl.Float64,
+                "values/quantile/0.25": pl.Float32,
+                "values/quantile/0.5": pl.Float32,
+                "values/quantile/0.75": pl.Float32,
             }
         ),
     },
