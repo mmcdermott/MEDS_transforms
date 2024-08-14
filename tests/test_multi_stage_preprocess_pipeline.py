@@ -18,6 +18,8 @@ The stage configuration arguments will be as given in the yaml block below:
 """
 
 
+from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
+
 from .transform_tester_base import (
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT,
     AGGREGATE_CODE_METADATA_SCRIPT,
@@ -54,6 +56,11 @@ fit_normalization:
     - "values/sum_sqd"
 """
 
+WANT_NRTs = {
+    "train/1.nrt": JointNestedRaggedTensorDict({}),  # this shard was fully filtered out.
+    "tuning/0.nrt": JointNestedRaggedTensorDict({}),  # this shard was fully filtered out.
+}
+
 
 def test_pipeline():
     multi_stage_transform_tester(
@@ -80,4 +87,5 @@ def test_pipeline():
             "tensorization",
         ],
         stage_configs=STAGE_CONFIG_YAML,
+        want_data=WANT_NRTs,
     )
