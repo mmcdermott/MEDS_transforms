@@ -223,5 +223,5 @@ def test_tokenization():
         stage_name="tokenization",
         transform_stage_kwargs=None,
         input_shards=NORMALIZED_SHARDS,
-        want_outputs={**WANT_SCHEMAS, **WANT_EVENT_SEQS},
+        want_data={**WANT_SCHEMAS, **WANT_EVENT_SEQS},
     )

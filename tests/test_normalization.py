@@ -225,5 +225,5 @@ def test_normalization():
         stage_name="normalization",
         transform_stage_kwargs=None,
         input_code_metadata=MEDS_CODE_METADATA_CSV,
-        want_outputs=WANT_SHARDS,
+        want_data=WANT_SHARDS,
     )

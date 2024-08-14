@@ -211,8 +211,6 @@ MEDS_CODE_METADATA = parse_code_metadata_csv(MEDS_CODE_METADATA_CSV)
 def check_NRT_output(
     output_fp: Path,
     want_nrt: JointNestedRaggedTensorDict,
-    stderr: str,
-    stdout: str,
 ):
     assert output_fp.is_file(), f"Expected {output_fp} to exist."
 
@@ -220,8 +218,6 @@ def check_NRT_output(
 
     # assert got_nrt.schema == want_nrt.schema, (
     #    f"Expected the schema of the NRT at {output_fp} to be equal to the target.\n"
-    #    f"Script stdout:\n{stdout}\n"
-    #    f"Script stderr:\n{stderr}\n"
     #    f"Wanted:\n{want_nrt.schema}\n"
     #    f"Got:\n{got_nrt.schema}"
     # )
@@ -231,8 +227,6 @@ def check_NRT_output(
 
     assert got_tensors.keys() == want_tensors.keys(), (
         f"Expected the keys of the NRT at {output_fp} to be equal to the target.\n"
-        f"Script stdout:\n{stdout}\n"
-        f"Script stderr:\n{stderr}\n"
         f"Wanted:\n{list(want_tensors.keys())}\n"
         f"Got:\n{list(got_tensors.keys())}"
     )
@@ -243,8 +237,6 @@ def check_NRT_output(
 
         assert type(want_v) is type(got_v), (
             f"Expected tensor {k} of the NRT at {output_fp} to be of the same type as the target.\n"
-            f"Script stdout:\n{stdout}\n"
-            f"Script stderr:\n{stderr}\n"
             f"Wanted:\n{type(want_v)}\n"
             f"Got:\n{type(got_v)}"
         )
@@ -252,24 +244,18 @@ def check_NRT_output(
         if isinstance(want_v, list):
             assert len(want_v) == len(got_v), (
                 f"Expected list {k} of the NRT at {output_fp} to be of the same length as the target.\n"
-                f"Script stdout:\n{stdout}\n"
-                f"Script stderr:\n{stderr}\n"
                 f"Wanted:\n{len(want_v)}\n"
                 f"Got:\n{len(got_v)}"
             )
             for i, (want_i, got_i) in enumerate(zip(want_v, got_v)):
                 assert np.array_equal(want_i, got_i, equal_nan=True), (
                     f"Expected tensor {k}[{i}] of the NRT at {output_fp} to be equal to the target.\n"
-                    f"Script stdout:\n{stdout}\n"
-                    f"Script stderr:\n{stderr}\n"
                     f"Wanted:\n{want_i}\n"
                     f"Got:\n{got_i}"
                 )
         else:
             assert np.array_equal(want_v, got_v, equal_nan=True), (
                 f"Expected tensor {k} of the NRT at {output_fp} to be equal to the target.\n"
-                f"Script stdout:\n{stdout}\n"
-                f"Script stderr:\n{stderr}\n"
                 f"Wanted:\n{want_v}\n"
                 f"Got:\n{got_v}"
             )
@@ -278,8 +264,6 @@ def check_NRT_output(
 def check_df_output(
     output_fp: Path,
     want_df: pl.DataFrame,
-    stderr: str,
-    stdout: str,
     check_column_order: bool = False,
     check_row_order: bool = True,
     **kwargs,
@@ -292,8 +276,6 @@ def check_df_output(
         got_df,
         (
             f"Expected the dataframe at {output_fp} to be equal to the target.\n"
-            f"Script stdout:\n{stdout}\n"
-            f"Script stderr:\n{stderr}"
         ),
         check_column_order=check_column_order,
         check_row_order=check_row_order,
@@ -356,15 +338,47 @@ def input_MEDS_dataset(
 
         yield MEDS_dir, cohort_dir
 
+def check_outputs(
+    cohort_dir: Path,
+    want_data: dict[str, pl.DataFrame] | None = None,
+    want_metadata: pl.DataFrame | None = None,
+    assert_no_other_outputs: bool = True,
+):
+    if want_metadata is not None:
+        cohort_metadata_dir = cohort_dir / "metadata"
+        check_df_output(cohort_metadata_dir / "codes.parquet", want_metadata)
+
+    if want_data:
+        for shard_name, want in want_data.items():
+            if Path(shard_name).suffix == "":
+                shard_name = f"{shard_name}.parquet"
+
+            file_suffix = Path(shard_name).suffix
+
+            output_fp = cohort_dir / "data" / f"{shard_name}"
+            if file_suffix == ".parquet":
+                check_df_output(output_fp, want)
+            elif file_suffix == ".nrt":
+                check_NRT_output(output_fp, want)
+            else:
+                raise ValueError(f"Unknown file suffix: {file_suffix}")
+
+        if assert_no_other_outputs:
+            all_outputs = list((cohort_dir / "data").glob(f"**/*{file_suffix}"))
+            assert len(want_data) == len(all_outputs), (
+                f"Expected {len(want_data)} outputs, but found {len(all_outputs)}.\n"
+                f"Found outputs: {[fp.relative_to(cohort_dir/'data') for fp in all_outputs]}\n"
+            )
+
 
 def single_stage_transform_tester(
     transform_script: str | Path,
     stage_name: str,
     transform_stage_kwargs: dict[str, str] | None,
-    want_outputs: pl.DataFrame | dict[str, pl.DataFrame],
     do_pass_stage_name: bool = False,
-    file_suffix: str = ".parquet",
     do_use_config_yaml: bool = False,
+    want_data: dict[str, pl.DataFrame] | None = None,
+    want_metadata: pl.DataFrame | None = None,
     assert_no_other_outputs: bool = True,
     **input_data_kwargs,
 ):
@@ -394,26 +408,11 @@ def single_stage_transform_tester(
         # Run the transform
         stderr, stdout = run_command(**run_command_kwargs)
 
-        # Check the output
-        if isinstance(want_outputs, pl.DataFrame):
-            # The want output is a code_metadata file in the root directory in this case.
-            cohort_metadata_dir = cohort_dir / "metadata"
-            check_df_output(cohort_metadata_dir / "codes.parquet", want_outputs, stderr, stdout)
-        else:
-            for shard_name, want in want_outputs.items():
-                output_fp = cohort_dir / "data" / f"{shard_name}{file_suffix}"
-                if file_suffix == ".parquet":
-                    check_df_output(output_fp, want, stderr, stdout)
-                elif file_suffix == ".nrt":
-                    check_NRT_output(output_fp, want, stderr, stdout)
-                else:
-                    raise ValueError(f"Unknown file suffix: {file_suffix}")
-
-            if assert_no_other_outputs:
-                all_outputs = list((cohort_dir / "data").glob(f"**/*{file_suffix}"))
-                assert len(want_outputs) == len(all_outputs), (
-                    f"Expected {len(want_outputs)} outputs, but found {len(all_outputs)}.\n"
-                    f"Found outputs: {[fp.relative_to(cohort_dir/'data') for fp in all_outputs]}\n"
-                    f"Script stdout:\n{stdout}\n"
-                    f"Script stderr:\n{stderr}"
-                )
+        try:
+            check_outputs(cohort_dir, want_data=want_data, want_metadata=want_metadata)
+        except Exception as e:
+            raise AssertionError(
+                f"Single stage transform {stage_name} failed.\n"
+                f"Script stdout:\n{stdout}\n"
+                f"Script stderr:\n{stderr}"
+            ) from e

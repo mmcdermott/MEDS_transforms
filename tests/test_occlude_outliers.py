@@ -171,5 +171,5 @@ def test_occlude_outliers():
         transform_script=OCCLUDE_OUTLIERS_SCRIPT,
         stage_name="occlude_outliers",
         transform_stage_kwargs={"stddev_cutoff": 1},
-        want_outputs=WANT_SHARDS,
+        want_data=WANT_SHARDS,
     )

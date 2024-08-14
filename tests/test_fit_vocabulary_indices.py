@@ -33,5 +33,5 @@ def test_fit_vocabulary_indices_with_default_stage_config():
         transform_script=FIT_VOCABULARY_INDICES_SCRIPT,
         stage_name="fit_vocabulary_indices",
         transform_stage_kwargs=None,
-        want_outputs=parse_code_metadata_csv(WANT_CSV),
+        want_metadata=parse_code_metadata_csv(WANT_CSV),
     )
