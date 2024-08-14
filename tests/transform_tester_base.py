@@ -23,7 +23,7 @@ import polars as pl
 import rootutils
 from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 
-from .utils import assert_df_equal, parse_meds_csvs, run_command
+from .utils import assert_df_equal, parse_meds_csvs, run_command, MEDS_PL_SCHEMA
 
 root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
@@ -200,6 +200,10 @@ MEDS_CODE_METADATA_SCHEMA = {
     "parent_codes": pl.Utf8,
     "code/vocab_index": pl.UInt8,
 }
+
+def parse_shards_yaml(yaml_str: str, **schema_updates) -> pl.DataFrame:
+    schema = {**MEDS_PL_SCHEMA, **schema_updates}
+    return parse_meds_csvs(load_yaml(yaml_str, Loader=Loader), schema=schema)
 
 
 def parse_code_metadata_csv(csv_str: str) -> pl.DataFrame:
