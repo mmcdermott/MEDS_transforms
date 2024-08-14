@@ -244,7 +244,7 @@ def populate_stage(
          'reducer_output_dir': '/c/d/metadata'}
         >>> populate_stage("stage6", *args) # doctest: +NORMALIZE_WHITESPACE
         {'is_metadata': False, 'data_input_dir': '/c/d/stage4',
-         'metadata_input_dir': '/c/d/stage5', 'output_dir': '/c/d/data', 'reducer_output_dir': None}
+         'metadata_input_dir': '/c/d/metadata', 'output_dir': '/c/d/data', 'reducer_output_dir': None}
         >>> populate_stage("stage7", *args) # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
@@ -304,7 +304,7 @@ def populate_stage(
     if is_first_metadata_stage:
         default_metadata_input_dir = pipeline_input_metadata_dir
     else:
-        default_metadata_input_dir = prior_metadata_stage["output_dir"]
+        default_metadata_input_dir = prior_metadata_stage["reducer_output_dir"]
 
     # Now, we need to set output directories. The output directory for the stage will either be a stage
     # specific output directory, or, for the last data or metadata stages, respectively, will be the global
