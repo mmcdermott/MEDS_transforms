@@ -10,6 +10,7 @@ try:
     from yaml import CLoader as Loader
 except ImportError:
     from yaml import Loader
+
 import json
 import os
 import tempfile
@@ -23,7 +24,7 @@ import polars as pl
 import rootutils
 from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 
-from .utils import assert_df_equal, parse_meds_csvs, run_command, MEDS_PL_SCHEMA
+from .utils import MEDS_PL_SCHEMA, assert_df_equal, parse_meds_csvs, run_command
 
 root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
@@ -201,6 +202,7 @@ MEDS_CODE_METADATA_SCHEMA = {
     "code/vocab_index": pl.UInt8,
 }
 
+
 def parse_shards_yaml(yaml_str: str, **schema_updates) -> pl.DataFrame:
     schema = {**MEDS_PL_SCHEMA, **schema_updates}
     return parse_meds_csvs(load_yaml(yaml_str, Loader=Loader), schema=schema)
@@ -350,21 +352,28 @@ def input_MEDS_dataset(
 def check_outputs(
     cohort_dir: Path,
     want_data: dict[str, pl.DataFrame] | None = None,
-    want_metadata: pl.DataFrame | None = None,
+    want_metadata: dict[str, pl.DataFrame] | pl.DataFrame | None = None,
     assert_no_other_outputs: bool = True,
+    outputs_from_cohort_dir: bool = False,
 ):
     if want_metadata is not None:
-        cohort_metadata_dir = cohort_dir / "metadata"
-        check_df_output(cohort_metadata_dir / "codes.parquet", want_metadata)
+        if isinstance(want_metadata, pl.DataFrame):
+            want_metadata = {"codes.parquet": want_metadata}
+        metadata_root = cohort_dir if outputs_from_cohort_dir else cohort_dir / "metadata"
+        for shard_name, want in want_metadata.items():
+            if Path(shard_name).suffix == "":
+                shard_name = f"{shard_name}.parquet"
+            check_df_output(metadata_root / shard_name, want)
 
     if want_data:
+        data_root = cohort_dir if outputs_from_cohort_dir else cohort_dir / "data"
         for shard_name, want in want_data.items():
             if Path(shard_name).suffix == "":
                 shard_name = f"{shard_name}.parquet"
 
             file_suffix = Path(shard_name).suffix
 
-            output_fp = cohort_dir / "data" / f"{shard_name}"
+            output_fp = data_root / f"{shard_name}"
             if file_suffix == ".parquet":
                 check_df_output(output_fp, want)
             elif file_suffix == ".nrt":
@@ -373,7 +382,7 @@ def check_outputs(
                 raise ValueError(f"Unknown file suffix: {file_suffix}")
 
         if assert_no_other_outputs:
-            all_outputs = list((cohort_dir / "data").glob(f"**/*{file_suffix}"))
+            all_outputs = list((data_root).glob(f"**/*{file_suffix}"))
             assert len(want_data) == len(all_outputs), (
                 f"Expected {len(want_data)} outputs, but found {len(all_outputs)}.\n"
                 f"Found outputs: {[fp.relative_to(cohort_dir/'data') for fp in all_outputs]}\n"
@@ -434,6 +443,7 @@ def multi_stage_transform_tester(
     do_pass_stage_name: bool | dict[str, bool] = True,
     want_data: dict[str, pl.DataFrame] | None = None,
     want_metadata: pl.DataFrame | None = None,
+    outputs_from_cohort_dir: bool = True,
     **input_data_kwargs,
 ):
     with input_MEDS_dataset(**input_data_kwargs) as (MEDS_dir, cohort_dir):
@@ -478,4 +488,9 @@ def multi_stage_transform_tester(
                 do_pass_stage_name=do_pass_stage_name[stage],
             )
 
-        check_outputs(cohort_dir, want_data=want_data, want_metadata=want_metadata)
+        check_outputs(
+            cohort_dir,
+            want_data=want_data,
+            want_metadata=want_metadata,
+            outputs_from_cohort_dir=outputs_from_cohort_dir,
+        )

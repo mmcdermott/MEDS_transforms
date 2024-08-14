@@ -15,6 +15,7 @@ MEDS_PL_SCHEMA = {
     "time": pl.Datetime("us"),
     "code": pl.Utf8,
     "numeric_value": pl.Float32,
+    "numeric_value/is_inlier": pl.Boolean,
 }
 
 
@@ -26,10 +27,12 @@ def parse_meds_csvs(
     TODO: doctests.
     """
 
-    read_schema = {**schema}
-    read_schema["time"] = pl.Utf8
+    default_read_schema = {**schema}
+    default_read_schema["time"] = pl.Utf8
 
     def reader(csv_str: str) -> pl.DataFrame:
+        cols = csv_str.strip().split("\n")[0].split(",")
+        read_schema = {k: v for k, v in default_read_schema.items() if k in cols}
         return pl.read_csv(StringIO(csv_str), schema=read_schema).with_columns(
             pl.col("time").str.strptime(MEDS_PL_SCHEMA["time"], DEFAULT_CSV_TS_FORMAT)
         )
