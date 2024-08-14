@@ -181,6 +181,6 @@ def test_aggregate_code_metadata():
         stage_name="aggregate_code_metadata",
         transform_stage_kwargs={"aggregations": AGGREGATIONS, "do_summarize_over_all_codes": True},
         want_outputs=WANT_OUTPUT_CODE_METADATA_FILE,
-        code_metadata=MEDS_CODE_METADATA_FILE,
+        input_code_metadata=MEDS_CODE_METADATA_FILE,
         do_use_config_yaml=True,
     )

@@ -224,6 +224,6 @@ def test_normalization():
         transform_script=NORMALIZATION_SCRIPT,
         stage_name="normalization",
         transform_stage_kwargs=None,
-        code_metadata=MEDS_CODE_METADATA_CSV,
+        input_code_metadata=MEDS_CODE_METADATA_CSV,
         want_outputs=WANT_SHARDS,
     )

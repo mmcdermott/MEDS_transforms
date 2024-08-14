@@ -8,6 +8,7 @@ import json
 import os
 import tempfile
 from collections import defaultdict
+from contextlib import contextmanager
 from io import StringIO
 from pathlib import Path
 
@@ -300,19 +301,12 @@ def check_df_output(
     )
 
 
-def single_stage_transform_tester(
-    transform_script: str | Path,
-    stage_name: str,
-    transform_stage_kwargs: dict[str, str] | None,
-    want_outputs: pl.DataFrame | dict[str, pl.DataFrame],
-    code_metadata: pl.DataFrame | str | None = None,
+@contextmanager
+def input_MEDS_dataset(
+    input_code_metadata: pl.DataFrame | str | None = None,
     input_shards: dict[str, pl.DataFrame] | None = None,
-    do_pass_stage_name: bool = False,
-    file_suffix: str = ".parquet",
-    do_use_config_yaml: bool = False,
     input_shards_map: dict[str, list[int]] | None = None,
     input_splits_map: dict[str, list[int]] | None = None,
-    assert_no_other_outputs: bool = True,
 ):
     with tempfile.TemporaryDirectory() as d:
         MEDS_dir = Path(d) / "MEDS_cohort"
@@ -320,7 +314,6 @@ def single_stage_transform_tester(
 
         MEDS_data_dir = MEDS_dir / "data"
         MEDS_metadata_dir = MEDS_dir / "metadata"
-        cohort_metadata_dir = cohort_dir / "metadata"
 
         # Create the directories
         MEDS_data_dir.mkdir(parents=True)
@@ -355,12 +348,27 @@ def single_stage_transform_tester(
             df.write_parquet(fp, use_pyarrow=True)
 
         code_metadata_fp = MEDS_metadata_dir / "codes.parquet"
-        if code_metadata is None:
-            code_metadata = MEDS_CODE_METADATA
-        elif isinstance(code_metadata, str):
-            code_metadata = parse_code_metadata_csv(code_metadata)
-        code_metadata.write_parquet(code_metadata_fp, use_pyarrow=True)
+        if input_code_metadata is None:
+            input_code_metadata = MEDS_CODE_METADATA
+        elif isinstance(input_code_metadata, str):
+            input_code_metadata = parse_code_metadata_csv(input_code_metadata)
+        input_code_metadata.write_parquet(code_metadata_fp, use_pyarrow=True)
 
+        yield MEDS_dir, cohort_dir
+
+
+def single_stage_transform_tester(
+    transform_script: str | Path,
+    stage_name: str,
+    transform_stage_kwargs: dict[str, str] | None,
+    want_outputs: pl.DataFrame | dict[str, pl.DataFrame],
+    do_pass_stage_name: bool = False,
+    file_suffix: str = ".parquet",
+    do_use_config_yaml: bool = False,
+    assert_no_other_outputs: bool = True,
+    **input_data_kwargs,
+):
+    with input_MEDS_dataset(**input_data_kwargs) as (MEDS_dir, cohort_dir):
         pipeline_config_kwargs = {
             "input_dir": str(MEDS_dir.resolve()),
             "cohort_dir": str(cohort_dir.resolve()),
@@ -388,6 +396,7 @@ def single_stage_transform_tester(
         # Check the output
         if isinstance(want_outputs, pl.DataFrame):
             # The want output is a code_metadata file in the root directory in this case.
+            cohort_metadata_dir = cohort_dir / "metadata"
             check_df_output(cohort_metadata_dir / "codes.parquet", want_outputs, stderr, stdout)
         else:
             for shard_name, want in want_outputs.items():
