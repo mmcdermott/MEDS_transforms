@@ -4,6 +4,12 @@ Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, ra
 scripts.
 """
 
+from yaml import load as load_yaml
+
+try:
+    from yaml import CLoader as Loader
+except ImportError:
+    from yaml import Loader
 import json
 import os
 import tempfile
@@ -274,9 +280,7 @@ def check_df_output(
     assert_df_equal(
         want_df,
         got_df,
-        (
-            f"Expected the dataframe at {output_fp} to be equal to the target.\n"
-        ),
+        (f"Expected the dataframe at {output_fp} to be equal to the target.\n"),
         check_column_order=check_column_order,
         check_row_order=check_row_order,
         **kwargs,
@@ -337,6 +341,7 @@ def input_MEDS_dataset(
         input_code_metadata.write_parquet(code_metadata_fp, use_pyarrow=True)
 
         yield MEDS_dir, cohort_dir
+
 
 def check_outputs(
     cohort_dir: Path,
@@ -416,3 +421,57 @@ def single_stage_transform_tester(
                 f"Script stdout:\n{stdout}\n"
                 f"Script stderr:\n{stderr}"
             ) from e
+
+
+def multi_stage_transform_tester(
+    transform_scripts: list[str | Path],
+    stage_names: list[str],
+    stage_configs: dict[str, str] | str | None,
+    do_pass_stage_name: bool | dict[str, bool] = True,
+    want_data: dict[str, pl.DataFrame] | None = None,
+    want_metadata: pl.DataFrame | None = None,
+    **input_data_kwargs,
+):
+    with input_MEDS_dataset(**input_data_kwargs) as (MEDS_dir, cohort_dir):
+        match stage_configs:
+            case None:
+                stage_configs = {}
+            case str():
+                stage_configs = load_yaml(stage_configs, Loader=Loader)
+            case dict():
+                pass
+            case _:
+                raise ValueError(f"Unknown stage_configs type: {type(stage_configs)}")
+
+        match do_pass_stage_name:
+            case True:
+                do_pass_stage_name = {stage_name: True for stage_name in stage_names}
+            case False:
+                do_pass_stage_name = {stage_name: False for stage_name in stage_names}
+            case dict():
+                pass
+            case _:
+                raise ValueError(f"Unknown do_pass_stage_name type: {type(do_pass_stage_name)}")
+
+        pipeline_config_kwargs = {
+            "input_dir": str(MEDS_dir.resolve()),
+            "cohort_dir": str(cohort_dir.resolve()),
+            "stages": stage_names,
+            "stage_configs": stage_configs,
+            "hydra.verbose": True,
+        }
+
+        script_outputs = {}
+        n_stages = len(stage_names)
+        for i, (stage, script) in enumerate(zip(stage_names, transform_scripts)):
+            script_outputs[stage] = run_command(
+                script=script,
+                hydra_kwargs=pipeline_config_kwargs,
+                do_use_config_yaml=True,
+                config_name="preprocess",
+                test_name=f"Multi stage transform {i}/{n_stages}: {stage}",
+                stage_name=stage,
+                do_pass_stage_name=do_pass_stage_name[stage],
+            )
+
+        check_outputs(cohort_dir, want_data=want_data, want_metadata=want_metadata)
