@@ -376,8 +376,6 @@ def single_stage_transform_tester(
             "hydra.verbose": True,
         }
 
-        if do_pass_stage_name:
-            pipeline_config_kwargs["stage"] = stage_name
         if transform_stage_kwargs:
             pipeline_config_kwargs["stage_configs"] = {stage_name: transform_stage_kwargs}
 
@@ -389,6 +387,9 @@ def single_stage_transform_tester(
         if do_use_config_yaml:
             run_command_kwargs["do_use_config_yaml"] = True
             run_command_kwargs["config_name"] = "preprocess"
+        if do_pass_stage_name:
+            run_command_kwargs["stage"] = stage_name
+            run_command_kwargs["do_pass_stage_name"] = True
 
         # Run the transform
         stderr, stdout = run_command(**run_command_kwargs)

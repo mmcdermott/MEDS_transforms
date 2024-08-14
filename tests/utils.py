@@ -105,6 +105,8 @@ def run_command(
     config_name: str | None = None,
     should_error: bool = False,
     do_use_config_yaml: bool = False,
+    stage_name: str | None = None,
+    do_pass_stage_name: bool = False,
 ):
     script = ["python", str(script.resolve())] if isinstance(script, Path) else [script]
     command_parts = script
@@ -138,6 +140,11 @@ def run_command(
         if config_name is not None:
             command_parts.append(f"--config-name={config_name}")
         command_parts.append(" ".join(dict_to_hydra_kwargs(hydra_kwargs)))
+
+    if do_pass_stage_name:
+        if stage_name is None:
+            raise ValueError("stage_name must be provided if do_pass_stage_name is True.")
+        command_parts.append(f"stage={stage_name}")
 
     full_cmd = " ".join(command_parts)
     err_cmd_lines.append(f"Running command: {full_cmd}")
