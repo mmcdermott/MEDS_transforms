@@ -26,6 +26,7 @@ filters_root = code_root / "filters"
 
 if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
     # Root Source
+    AGGREGATE_CODE_METADATA_SCRIPT = code_root / "aggregate_code_metadata.py"
     FIT_VOCABULARY_INDICES_SCRIPT = code_root / "fit_vocabulary_indices.py"
     RESHARD_TO_SPLIT_SCRIPT = code_root / "reshard_to_split.py"
 
@@ -42,6 +43,7 @@ if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
     TOKENIZATION_SCRIPT = transforms_root / "tokenization.py"
 else:
     # Root Source
+    AGGREGATE_CODE_METADATA_SCRIPT = "MEDS_transform-aggregate_code_metadata"
     FIT_VOCABULARY_INDICES_SCRIPT = "MEDS_transform-fit_vocabulary_indices"
     RESHARD_TO_SPLIT_SCRIPT = "MEDS_transform-reshard_to_split"
 
@@ -161,7 +163,7 @@ MEDS_SHARDS = parse_meds_csvs(
 
 
 MEDS_CODE_METADATA_CSV = """
-code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,description,parent_code
+code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,description,parent_codes
 ,44,4,28,3198.8389005974336,382968.28937288234,,
 ADMISSION//CARDIAC,2,2,0,,,,
 ADMISSION//ORTHOPEDIC,1,1,0,,,,
@@ -184,7 +186,7 @@ MEDS_CODE_METADATA_SCHEMA = {
     "values/sum": pl.Float32,
     "values/sum_sqd": pl.Float32,
     "description": pl.Utf8,
-    "parent_code": pl.Utf8,
+    "parent_codes": pl.Utf8,
     "code/vocab_index": pl.UInt8,
 }
 
@@ -192,7 +194,10 @@ MEDS_CODE_METADATA_SCHEMA = {
 def parse_code_metadata_csv(csv_str: str) -> pl.DataFrame:
     cols = csv_str.strip().split("\n")[0].split(",")
     schema = {col: dt for col, dt in MEDS_CODE_METADATA_SCHEMA.items() if col in cols}
-    return pl.read_csv(StringIO(csv_str), schema=schema)
+    df = pl.read_csv(StringIO(csv_str), schema=schema)
+    if "parent_codes" in cols:
+        df = df.with_columns(pl.col("parent_codes").cast(pl.List(pl.Utf8)))
+    return df
 
 
 MEDS_CODE_METADATA = parse_code_metadata_csv(MEDS_CODE_METADATA_CSV)

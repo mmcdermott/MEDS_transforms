@@ -682,6 +682,15 @@ def run_map_reduce(cfg: DictConfig):
         cs.numeric().shrink_dtype().name.keep()
     )
 
+    old_metadata_fp = Path(cfg.stage_cfg.metadata_input_dir) / "codes.parquet"
+    join_cols = ["code", *cfg.get("code_modifier_cols", [])]
+
+    if old_metadata_fp.exists():
+        logger.info(f"Joining to existing code metadata at {str(old_metadata_fp.resolve())}")
+        existing = pl.scan_parquet(old_metadata_fp)
+        existing = existing.drop(*[c for c in existing.columns if c in set(reduced.columns) - set(join_cols)])
+        reduced = reduced.join(existing, on=join_cols, how="left", coalesce=True)
+
     write_lazyframe(reduced, reducer_fp)
     logger.info(f"Finished reduction in {datetime.now() - start}")
 

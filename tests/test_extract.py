@@ -18,7 +18,6 @@ if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
     SPLIT_AND_SHARD_SCRIPT = extraction_root / "split_and_shard_patients.py"
     CONVERT_TO_SHARDED_EVENTS_SCRIPT = extraction_root / "convert_to_sharded_events.py"
     MERGE_TO_MEDS_COHORT_SCRIPT = extraction_root / "merge_to_MEDS_cohort.py"
-    AGGREGATE_CODE_METADATA_SCRIPT = code_root / "aggregate_code_metadata.py"
     EXTRACT_CODE_METADATA_SCRIPT = extraction_root / "extract_code_metadata.py"
     FINALIZE_DATA_SCRIPT = extraction_root / "finalize_MEDS_data.py"
     FINALIZE_METADATA_SCRIPT = extraction_root / "finalize_MEDS_metadata.py"
@@ -27,7 +26,6 @@ else:
     SPLIT_AND_SHARD_SCRIPT = "MEDS_extract-split_and_shard_patients"
     CONVERT_TO_SHARDED_EVENTS_SCRIPT = "MEDS_extract-convert_to_sharded_events"
     MERGE_TO_MEDS_COHORT_SCRIPT = "MEDS_extract-merge_to_MEDS_cohort"
-    AGGREGATE_CODE_METADATA_SCRIPT = "MEDS_transform-aggregate_code_metadata"
     EXTRACT_CODE_METADATA_SCRIPT = "MEDS_extract-extract_code_metadata"
     FINALIZE_DATA_SCRIPT = "MEDS_extract-finalize_MEDS_data"
     FINALIZE_METADATA_SCRIPT = "MEDS_extract-finalize_MEDS_metadata"
@@ -262,35 +260,12 @@ patient_id,time,code,numeric_value
 """
 
 MEDS_OUTPUT_CODE_METADATA_FILE = """
-code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd
-,44,4,28,3198.8389005974336,382968.28937288234
-ADMISSION//CARDIAC,2,2,0,,
-ADMISSION//ORTHOPEDIC,1,1,0,,
-ADMISSION//PULMONARY,1,1,0,,
-DISCHARGE,4,4,0,,
-DOB,4,4,0,,
-EYE_COLOR//BLUE,1,1,0,,
-EYE_COLOR//BROWN,1,1,0,,
-EYE_COLOR//HAZEL,2,2,0,,
-HEIGHT,4,4,4,656.8389005974336,108056.12937288235
-HR,12,4,12,1360.5000000000002,158538.77
-TEMP,12,4,12,1181.4999999999998,116373.38999999998
-"""
-
-MEDS_OUTPUT_CODE_METADATA_FILE_WITH_DESC = """
-code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,description,parent_codes
-,44,4,28,3198.8389005974336,382968.28937288234,,
-ADMISSION//CARDIAC,2,2,0,,,,
-ADMISSION//ORTHOPEDIC,1,1,0,,,,
-ADMISSION//PULMONARY,1,1,0,,,,
-DISCHARGE,4,4,0,,,,
-DOB,4,4,0,,,,
-EYE_COLOR//BLUE,1,1,0,,,"Blue Eyes. Less common than brown.",
-EYE_COLOR//BROWN,1,1,0,,,"Brown Eyes. The most common eye color.",
-EYE_COLOR//HAZEL,2,2,0,,,"Hazel eyes. These are uncommon",
-HEIGHT,4,4,4,656.8389005974336,108056.12937288235,,
-HR,12,4,12,1360.5000000000002,158538.77,"Heart Rate",LOINC/8867-4
-TEMP,12,4,12,1181.4999999999998,116373.38999999998,"Body Temperature",LOINC/8310-5
+code,description,parent_codes
+EYE_COLOR//BLUE,"Blue Eyes. Less common than brown.",
+EYE_COLOR//BROWN,"Brown Eyes. The most common eye color.",
+EYE_COLOR//HAZEL,"Hazel eyes. These are uncommon",
+HR,"Heart Rate",LOINC/8867-4
+TEMP,"Body Temperature",LOINC/8310-5
 """
 
 MEDS_OUTPUT_DATASET_METADATA_JSON = {
@@ -549,41 +524,6 @@ def test_extraction():
             print(f"stdout:\n{full_stdout}")
             raise e
 
-        # Stage 5: Aggregate preliminary code metadata
-        stderr, stdout = run_command(
-            AGGREGATE_CODE_METADATA_SCRIPT,
-            extraction_config_kwargs,
-            "aggregate_code_metadata",
-            config_name="extract",
-        )
-        all_stderrs.append(stderr)
-        all_stdouts.append(stdout)
-
-        full_stderr = "\n".join(all_stderrs)
-        full_stdout = "\n".join(all_stdouts)
-
-        output_file = MEDS_cohort_dir / "aggregate_code_metadata" / "codes.parquet"
-        assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
-
-        got_df = pl.read_parquet(output_file, glob=False)
-
-        want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE)).with_columns(
-            pl.col("code"),
-            pl.col("code/n_occurrences").cast(pl.UInt8),
-            pl.col("code/n_patients").cast(pl.UInt8),
-            pl.col("values/n_occurrences").cast(pl.UInt8),
-            pl.col("values/sum").cast(pl.Float32).fill_null(0),
-            pl.col("values/sum_sqd").cast(pl.Float32).fill_null(0),
-        )
-
-        assert_df_equal(
-            want=want_df,
-            got=got_df,
-            msg="Code metadata differs!",
-            check_column_order=False,
-            check_row_order=False,
-        )
-
         # Stage 6: Extract code metadata
         stderr, stdout = run_command(
             EXTRACT_CODE_METADATA_SCRIPT,
@@ -601,13 +541,8 @@ def test_extraction():
 
         got_df = pl.read_parquet(output_file, glob=False)
 
-        want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE_WITH_DESC)).with_columns(
+        want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE)).with_columns(
             pl.col("code"),
-            pl.col("code/n_occurrences").cast(pl.UInt8),
-            pl.col("code/n_patients").cast(pl.UInt8),
-            pl.col("values/n_occurrences").cast(pl.UInt8),
-            pl.col("values/sum").cast(pl.Float32).fill_null(0),
-            pl.col("values/sum_sqd").cast(pl.Float32).fill_null(0),
             pl.col("parent_codes").cast(pl.List(pl.Utf8)),
         )
 
@@ -689,13 +624,8 @@ def test_extraction():
 
         got_df = pl.read_parquet(output_file, glob=False, use_pyarrow=True)
 
-        want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE_WITH_DESC)).with_columns(
+        want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE)).with_columns(
             pl.col("code"),
-            pl.col("code/n_occurrences").cast(pl.UInt8),
-            pl.col("code/n_patients").cast(pl.UInt8),
-            pl.col("values/n_occurrences").cast(pl.UInt8),
-            pl.col("values/sum").cast(pl.Float32).fill_null(0),
-            pl.col("values/sum_sqd").cast(pl.Float32).fill_null(0),
             pl.col("parent_codes").cast(pl.List(pl.Utf8)),
         )
 
