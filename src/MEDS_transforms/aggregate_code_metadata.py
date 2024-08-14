@@ -429,19 +429,19 @@ def mapper_fntr(
         ... })
         >>> mapper = mapper_fntr(stage_cfg, code_modifiers)
         >>> mapper(df.lazy()).collect().select("code", "modifier1", pl.col("values/quantiles"))
-        shape: (5, 3)
-        ┌──────┬───────────┬──────────────────┐
-        │ code ┆ modifier1 ┆ values/quantiles │
-        │ ---  ┆ ---       ┆ ---              │
-        │ str  ┆ i64       ┆ list[f64]        │
-        ╞══════╪═══════════╪══════════════════╡
-        | null | null      | [1.1, 4.0, 7.5]  |
-        │ A    ┆ 1         ┆ [1.1, 1.1]       │
-        │ A    ┆ 2         ┆ [6.0]            │
-        │ B    ┆ 2         ┆ [2.0, 4.0]       │
-        │ C    ┆ 1         ┆ [5.0, 7.5]       │
-        │ D    ┆ null      ┆ []               │
-        └──────┴───────────┴──────────────────┘
+        shape: (6, 3)
+        ┌──────┬───────────┬───────────────────┐
+        │ code ┆ modifier1 ┆ values/quantiles  │
+        │ ---  ┆ ---       ┆ ---               │
+        │ str  ┆ i64       ┆ list[f64]         │
+        ╞══════╪═══════════╪═══════════════════╡
+        │ null ┆ null      ┆ [1.1, 2.0, … 7.5] │
+        │ A    ┆ 1         ┆ [1.1, 1.1]        │
+        │ A    ┆ 2         ┆ [6.0]             │
+        │ B    ┆ 2         ┆ [2.0, 4.0]        │
+        │ C    ┆ 1         ┆ [5.0, 7.5]        │
+        │ D    ┆ null      ┆ []                │
+        └──────┴───────────┴───────────────────┘
     """
 
     code_key_columns = validate_args_and_get_code_cols(stage_cfg, code_modifiers)
@@ -456,7 +456,12 @@ def mapper_fntr(
         return df.group_by(code_key_columns).agg(**agg_operations).sort(code_key_columns)
 
     def all_patients_mapper(df: pl.LazyFrame) -> pl.LazyFrame:
-        return df.select(**agg_operations)
+        local_agg_operations = agg_operations.copy()
+        if METADATA_FN.VALUES_QUANTILES in agg_operations:
+            local_agg_operations[METADATA_FN.VALUES_QUANTILES] = agg_operations[
+                METADATA_FN.VALUES_QUANTILES
+            ].implode()
+        return df.select(**local_agg_operations)
 
     if stage_cfg.get("do_summarize_over_all_codes", False):
 
@@ -464,7 +469,7 @@ def mapper_fntr(
             by_code = by_code_mapper(df)
             all_patients = all_patients_mapper(df)
             return pl.concat([all_patients, by_code], how="diagonal_relaxed").select(
-                *code_key_columns, *aggregations
+                *code_key_columns, *agg_operations.keys()
             )
 
     else:
