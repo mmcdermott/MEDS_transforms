@@ -367,11 +367,13 @@ def check_outputs(
 
     if want_data:
         data_root = cohort_dir if outputs_from_cohort_dir else cohort_dir / "data"
+        all_file_suffixes = set()
         for shard_name, want in want_data.items():
             if Path(shard_name).suffix == "":
                 shard_name = f"{shard_name}.parquet"
 
             file_suffix = Path(shard_name).suffix
+            all_file_suffixes.add(file_suffix)
 
             output_fp = data_root / f"{shard_name}"
             if file_suffix == ".parquet":
@@ -382,10 +384,12 @@ def check_outputs(
                 raise ValueError(f"Unknown file suffix: {file_suffix}")
 
         if assert_no_other_outputs:
-            all_outputs = list((data_root).glob(f"**/*{file_suffix}"))
+            all_outputs = []
+            for suffix in all_file_suffixes:
+                all_outputs.extend(list((data_root).glob(f"**/*{suffix}")))
             assert len(want_data) == len(all_outputs), (
-                f"Expected {len(want_data)} outputs, but found {len(all_outputs)}.\n"
-                f"Found outputs: {[fp.relative_to(cohort_dir/'data') for fp in all_outputs]}\n"
+                f"Want {len(want_data)} outputs, but found {len(all_outputs)}.\n"
+                f"Found outputs: {[fp.relative_to(data_root) for fp in all_outputs]}\n"
             )
 
 

@@ -17,7 +17,7 @@ In this test, the following stages are run:
 The stage configuration arguments will be as given in the yaml block below:
 """
 
-
+import polars as pl
 from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 
 from .transform_tester_base import (
@@ -33,14 +33,20 @@ from .transform_tester_base import (
     parse_shards_yaml,
 )
 
-MEDS_CODE_METADATA_FILE = """
-code,description,parent_codes
-EYE_COLOR//BLUE,"Blue Eyes. Less common than brown.",
-EYE_COLOR//BROWN,"Brown Eyes. The most common eye color.",
-EYE_COLOR//HAZEL,"Hazel eyes. These are uncommon",
-HR,"Heart Rate",LOINC/8867-4
-TEMP,"Body Temperature",LOINC/8310-5
-"""
+MEDS_CODE_METADATA = pl.DataFrame(
+    {
+        "code": ["EYE_COLOR//BLUE", "EYE_COLOR//BROWN", "EYE_COLOR//HAZEL", "HR", "TEMP"],
+        "description": [
+            "Blue Eyes. Less common than brown.",
+            "Brown Eyes. The most common eye color.",
+            "Hazel eyes. These are uncommon",
+            "Heart Rate",
+            "Body Temperature",
+        ],
+        "parent_codes": [None, None, None, ["LOINC/8867-4"], ["LOINC/8310-5"]],
+    },
+    schema={"code": pl.String, "description": pl.String, "parent_codes": pl.List(pl.String)},
+)
 
 STAGE_CONFIG_YAML = """
 filter_patients:
@@ -70,7 +76,7 @@ fit_normalization:
 """
 
 # After filtering out patients with fewer than 5 events:
-WANT_POST_FILTER = parse_shards_yaml(
+WANT_FILTER = parse_shards_yaml(
     """
   "filter_patients/train/0": |-2
     patient_id,time,code,numeric_value
@@ -127,7 +133,7 @@ WANT_POST_FILTER = parse_shards_yaml(
 """
 )
 
-WANT_POST_TIME_DERIVED = parse_shards_yaml(
+WANT_TIME_DERIVED = parse_shards_yaml(
     """
   "add_time_derived_measurements/train/0": |-2
     patient_id,time,code,numeric_value
@@ -219,11 +225,14 @@ WANT_POST_TIME_DERIVED = parse_shards_yaml(
 """
 )
 
-FIT_OUTLIERS_NEW_METADATA = """
+# Fit outliers python code
+FIT_OUTLIERS_CODE = """
+```python
+>>> from tests.test_multi_stage_preprocess_pipeline import WANT_TIME_DERIVED
 >>> import polars as pl
 >>> VALS = pl.col("numeric_value").drop_nulls().drop_nans()
 >>> post_outliers = (
-...     pl.concat(POST_TIME_DERIVED_YAML.values(), how='vertical')
+...     WANT_TIME_DERIVED['add_time_derived_measurements/train/0']
 ...     .group_by("code")
 ...     .agg(
 ...         VALS.len().alias("values/n_occurrences"),
@@ -233,50 +242,148 @@ FIT_OUTLIERS_NEW_METADATA = """
 ...     .filter(pl.col("values/n_occurrences") > 0)
 ... )
 >>> post_outliers
+shape: (4, 4)
 ┌────────┬──────────────────────┬─────────────┬────────────────┐
 │ code   ┆ values/n_occurrences ┆ values/sum  ┆ values/sum_sqd │
 │ ---    ┆ ---                  ┆ ---         ┆ ---            │
 │ str    ┆ u32                  ┆ f32         ┆ f32            │
 ╞════════╪══════════════════════╪═════════════╪════════════════╡
-│ HR     ┆ 13                   ┆ 1370.200073 ┆ 145770.0625    │
-│ TEMP   ┆ 13                   ┆ 1284.000122 ┆ 126868.632812  │
-│ AGE    ┆ 16                   ┆ 466.360046  ┆ 13761.804688   │
-│ HEIGHT ┆ 3                    ┆ 498.559326  ┆ 82996.109375   │
+│ HR     ┆ 10                   ┆ 1104.300049 ┆ 122174.726562  │
+│ AGE    ┆ 12                   ┆ 370.865448  ┆ 11482.001953   │
+│ TEMP   ┆ 10                   ┆ 983.600037  ┆ 96788.53125    │
+│ HEIGHT ┆ 2                    ┆ 339.958008  ┆ 57841.734375   │
 └────────┴──────────────────────┴─────────────┴────────────────┘
+>>> print(post_outliers.to_dict(as_series=False))
+{'code': ['HR', 'AGE', 'TEMP', 'HEIGHT'],
+ 'values/n_occurrences': [10, 12, 10, 2],
+ 'values/sum': [1104.300048828125, 370.8654479980469, 983.6000366210938, 339.9580078125],
+ 'values/sum_sqd': [122174.7265625, 11482.001953125, 96788.53125, 57841.734375]}
+
+
+```
+"""
+
+# Input:
+# code,description,parent_codes
+# EYE_COLOR//BLUE,"Blue Eyes. Less common than brown.",
+# EYE_COLOR//BROWN,"Brown Eyes. The most common eye color.",
+# EYE_COLOR//HAZEL,"Hazel eyes. These are uncommon",
+# HR,"Heart Rate",LOINC/8867-4
+# TEMP,"Body Temperature",LOINC/8310-5
+
+WANT_FIT_OUTLIERS = {
+    "fit_outlier_detection/codes.parquet": pl.DataFrame(
+        {
+            "code": [
+                "EYE_COLOR//BLUE",
+                "EYE_COLOR//BROWN",
+                "HR",
+                "TEMP",
+                "AGE",
+                "HEIGHT",
+                "TIME_OF_DAY//[18,24)",
+                "TIME_OF_DAY//[12,18)",
+                "TIME_OF_DAY//[00,06)",
+                "ADMISSION//CARDIAC",
+                "DISCHARGE",
+                "DOB",
+            ],
+            "values/n_occurrences": [0, 0, 10, 10, 12, 2, 0, 0, 0, 0, 0, 0],
+            "values/sum": [
+                0.0,
+                0.0,
+                1104.300048828125,
+                983.6000366210938,
+                370.8654479980469,
+                339.9580078125,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+            ],
+            "values/sum_sqd": [
+                0.0,
+                0.0,
+                122174.7265625,
+                96788.53125,
+                11482.001953125,
+                57841.734375,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+            ],
+            "description": [
+                "Blue Eyes. Less common than brown.",
+                "Brown Eyes. The most common eye color.",
+                "Heart Rate",
+                "Body Temperature",
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ],
+            "parent_codes": [
+                None,
+                None,
+                ["LOINC/8867-4"],
+                ["LOINC/8310-5"],
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ],
+        },
+        schema={
+            "code": pl.String,
+            "description": pl.String,
+            "parent_codes": pl.List(pl.String),
+            "values/n_occurrences": pl.UInt8,  # In the real stage, this is shrunk, so it differs from the ex.
+            "values/sum": pl.Float32,
+            "values/sum_sqd": pl.Float32,
+        },
+    ).sort(by="code")
+}
+
+# For occluding outliers
+OCCLUDE_OUTLIERS_CODE = """
+```python
 # This implies the following means and standard deviations
 >>> mean_col = pl.col("values/sum") / pl.col("values/n_occurrences")
 >>> stddev_col = (pl.col("values/sum_sqd") / pl.col("values/n_occurrences") - mean_col**2) ** 0.5
->>> post_outliers.select("code", mean_col.alias("values/mean"), stddev_col.alias("values/std"))
-shape: (4, 3)
-┌────────┬─────────────┬────────────┐
-│ code   ┆ values/mean ┆ values/std │
-│ ---    ┆ ---         ┆ ---        │
-│ str    ┆ f64         ┆ f64        │
-╞════════╪═════════════╪════════════╡
-│ AGE    ┆ 29.147503   ┆ 3.2459     │
-│ HR     ┆ 105.400006  ┆ 10.194143  │
-│ TEMP   ┆ 98.76924    ┆ 1.939794   │
-│ HEIGHT ┆ 166.186442  ┆ 6.887399   │
-└────────┴─────────────┴────────────┘
 >>> post_outliers.select(
 ...     "code",
-...     (mean_col + stddev_col).alias("values/inlier_upper_bound"),
-...     (mean_col - stddev_col).alias("values/inlier_lower_bound")
+...     (mean_col - stddev_col).alias("values/inlier_lower_bound"),
+...     (mean_col + stddev_col).alias("values/inlier_upper_bound")
 ... )
 shape: (4, 3)
 ┌────────┬───────────────────────────┬───────────────────────────┐
-│ code   ┆ values/inlier_upper_bound ┆ values/inlier_lower_bound │
+│ code   ┆ values/inlier_lower_bound ┆ values/inlier_upper_bound │
 │ ---    ┆ ---                       ┆ ---                       │
 │ str    ┆ f64                       ┆ f64                       │
 ╞════════╪═══════════════════════════╪═══════════════════════════╡
-│ AGE    ┆ 32.393403                 ┆ 25.901603                 │
-│ HR     ┆ 115.594148                ┆ 95.205863                 │
-│ TEMP   ┆ 100.709034                ┆ 96.829447                 │
-│ HEIGHT ┆ 173.073841                ┆ 159.299043                │
+│ HR     ┆ 105.666951                ┆ 115.193058                │
+│ AGE    ┆ 29.606836                 ┆ 32.204072                 │
+│ TEMP   ┆ 96.319708                 ┆ 100.400299                │
+│ HEIGHT ┆ 164.686989                ┆ 175.271019                │
 └────────┴───────────────────────────┴───────────────────────────┘
+
+```
 """
 
-WANT_POST_OCCLUDE_OUTLIERS = parse_shards_yaml(
+WANT_OCCLUDE_OUTLIERS = parse_shards_yaml(
     """
   "occlude_outliers/train/0": |-2
     patient_id,time,code,numeric_value,numeric_value/is_inlier
@@ -285,27 +392,27 @@ WANT_POST_OCCLUDE_OUTLIERS = parse_shards_yaml(
     239684,"12/28/1980, 00:00:00","TIME_OF_DAY//[00,06)",,
     239684,"12/28/1980, 00:00:00",DOB,,
     239684,"05/11/2010, 17:41:51","TIME_OF_DAY//[12,18)",,
-    239684,"05/11/2010, 17:41:51",AGE,29.36883360091833,true
+    239684,"05/11/2010, 17:41:51",AGE,,false
     239684,"05/11/2010, 17:41:51",ADMISSION//CARDIAC,,
-    239684,"05/11/2010, 17:41:51",HR,102.6,true
+    239684,"05/11/2010, 17:41:51",HR,,false
     239684,"05/11/2010, 17:41:51",TEMP,,false
     239684,"05/11/2010, 17:48:48","TIME_OF_DAY//[12,18)",,
-    239684,"05/11/2010, 17:48:48",AGE,29.36884681513314,true
-    239684,"05/11/2010, 17:48:48",HR,105.1,true
+    239684,"05/11/2010, 17:48:48",AGE,,false
+    239684,"05/11/2010, 17:48:48",HR,,false
     239684,"05/11/2010, 17:48:48",TEMP,,false
     239684,"05/11/2010, 18:25:35","TIME_OF_DAY//[18,24)",,
-    239684,"05/11/2010, 18:25:35",AGE,29.36891675223647,true
+    239684,"05/11/2010, 18:25:35",AGE,,false
     239684,"05/11/2010, 18:25:35",HR,113.4,true
     239684,"05/11/2010, 18:25:35",TEMP,,false
     239684,"05/11/2010, 18:57:18","TIME_OF_DAY//[18,24)",,
-    239684,"05/11/2010, 18:57:18",AGE,29.36897705595538,true
+    239684,"05/11/2010, 18:57:18",AGE,,false
     239684,"05/11/2010, 18:57:18",HR,112.6,true
     239684,"05/11/2010, 18:57:18",TEMP,,false
     239684,"05/11/2010, 19:27:19","TIME_OF_DAY//[18,24)",,
-    239684,"05/11/2010, 19:27:19",AGE,29.369034127420306,true
+    239684,"05/11/2010, 19:27:19",AGE,,false
     239684,"05/11/2010, 19:27:19",DISCHARGE,,
     1195293,,EYE_COLOR//BLUE,,
-    1195293,,HEIGHT,164.6868838269085,true
+    1195293,,HEIGHT,,false
     1195293,"06/20/1978, 00:00:00","TIME_OF_DAY//[00,06)",,
     1195293,"06/20/1978, 00:00:00",DOB,,
     1195293,"06/20/2010, 19:23:52","TIME_OF_DAY//[18,24)",,
@@ -338,10 +445,10 @@ WANT_POST_OCCLUDE_OUTLIERS = parse_shards_yaml(
     1195293,"06/20/2010, 20:50:04",DISCHARGE,,
 
   "occlude_outliers/train/1": |-2
-    patient_id,time,code,numeric_value
+    patient_id,time,code,numeric_value,numeric_value/is_inlier
 
   "occlude_outliers/tuning/0": |-2
-    patient_id,time,code,numeric_value
+    patient_id,time,code,numeric_value,numeric_value/is_inlier
 
   "occlude_outliers/held_out/0": |-2
     patient_id,time,code,numeric_value,numeric_value/is_inlier
@@ -400,12 +507,15 @@ def test_pipeline():
             "tensorization",
         ],
         stage_configs=STAGE_CONFIG_YAML,
+        want_metadata={
+            **WANT_FIT_OUTLIERS,
+        },
         want_data={
-            **WANT_POST_FILTER,
-            **WANT_POST_TIME_DERIVED,
-            **WANT_POST_OCCLUDE_OUTLIERS,
+            **WANT_FILTER,
+            **WANT_TIME_DERIVED,
+            **WANT_OCCLUDE_OUTLIERS,
             **WANT_NRTs,
         },
         outputs_from_cohort_dir=True,
-        input_code_metadata=MEDS_CODE_METADATA_FILE,
+        input_code_metadata=MEDS_CODE_METADATA,
     )
