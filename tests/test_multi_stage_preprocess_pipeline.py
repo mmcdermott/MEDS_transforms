@@ -52,10 +52,6 @@ fit_normalization:
     - "values/n_occurrences"
     - "values/sum"
     - "values/sum_sqd"
-fit_vocabulary_indices:
-  is_metadata: true
-  ordering_method: "lexicographic"
-  output_dir: "${cohort_dir}"
 """
 
 
