@@ -27,8 +27,6 @@ description: |-
 
 # The event conversion configuration file is used throughout the pipeline to define the events to extract.
 event_conversion_config_fp: ???
-# The code modifier columns are in this pipeline only used in the aggregate_code_metadata stage.
-code_modifiers: null
 # The shards mapping is stored in the root of the final output directory.
 shards_map_fp: "${cohort_dir}/metadata/.shards.json"
 
@@ -37,7 +35,6 @@ stages:
   - split_and_shard_patients
   - convert_to_sharded_events
   - merge_to_MEDS_cohort
-  - aggregate_code_metadata
   - extract_code_metadata
   - finalize_MEDS_metadata
   - finalize_MEDS_data
@@ -45,19 +42,3 @@ stages:
 stage_configs:
   shard_events:
     data_input_dir: "${input_dir}"
-  aggregate_code_metadata:
-    description: |-
-      This stage collects some descriptive metadata about the codes in the cohort.
-
-      Args:
-        stage_cfg.aggregations: The aggregations to compute over the codes.
-          Defaults to counts of code occurrences, counts of patients with the code, and counts of value
-          occurrences per code, as well as the sum and sum of squares of values (for use in computing means
-          and variances).
-    aggregations:
-      - "code/n_occurrences"
-      - "code/n_patients"
-      - "values/n_occurrences"
-      - "values/sum"
-      - "values/sum_sqd"
-    do_summarize_over_all_codes: true # This indicates we should include overall, code-independent counts
