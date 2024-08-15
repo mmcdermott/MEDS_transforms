@@ -439,6 +439,17 @@ def single_stage_transform_tester(
                 f"Script stderr:\n{stderr}"
             ) from e
 
+        print(list(cohort_dir.glob("**/*.timing.json")))
+        for fp in cohort_dir.glob("**/*.timing.json"):
+            print(f"Timing in {fp}:")
+            print(json.loads(fp.read_text()))
+        for fp in cohort_dir.glob("**/*.memray"):
+            print(f"Memory in {fp}:")
+            import subprocess
+
+            out = subprocess.run(["memray", "summary", str(fp.resolve())], capture_output=True, check=True)
+            print(out.stdout.decode("utf-8"))
+
 
 def multi_stage_transform_tester(
     transform_scripts: list[str | Path],

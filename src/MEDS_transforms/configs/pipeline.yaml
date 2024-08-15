@@ -1,3 +1,7 @@
+defaults:
+  - /hydra/callbacks:
+      - profiler
+
 # Global IO
 input_dir: ???
 cohort_dir: ???
