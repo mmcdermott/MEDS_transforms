@@ -14,7 +14,8 @@ MEDS_PL_SCHEMA = {
     "patient_id": pl.UInt32,
     "time": pl.Datetime("us"),
     "code": pl.Utf8,
-    "numeric_value": pl.Float64,
+    "numeric_value": pl.Float32,
+    "numeric_value/is_inlier": pl.Boolean,
 }
 
 
@@ -26,10 +27,12 @@ def parse_meds_csvs(
     TODO: doctests.
     """
 
-    read_schema = {**schema}
-    read_schema["time"] = pl.Utf8
+    default_read_schema = {**schema}
+    default_read_schema["time"] = pl.Utf8
 
     def reader(csv_str: str) -> pl.DataFrame:
+        cols = csv_str.strip().split("\n")[0].split(",")
+        read_schema = {k: v for k, v in default_read_schema.items() if k in cols}
         return pl.read_csv(StringIO(csv_str), schema=read_schema).with_columns(
             pl.col("time").str.strptime(MEDS_PL_SCHEMA["time"], DEFAULT_CSV_TS_FORMAT)
         )
@@ -105,6 +108,8 @@ def run_command(
     config_name: str | None = None,
     should_error: bool = False,
     do_use_config_yaml: bool = False,
+    stage_name: str | None = None,
+    do_pass_stage_name: bool = False,
 ):
     script = ["python", str(script.resolve())] if isinstance(script, Path) else [script]
     command_parts = script
@@ -138,6 +143,11 @@ def run_command(
         if config_name is not None:
             command_parts.append(f"--config-name={config_name}")
         command_parts.append(" ".join(dict_to_hydra_kwargs(hydra_kwargs)))
+
+    if do_pass_stage_name:
+        if stage_name is None:
+            raise ValueError("stage_name must be provided if do_pass_stage_name is True.")
+        command_parts.append(f"stage={stage_name}")
 
     full_cmd = " ".join(command_parts)
     err_cmd_lines.append(f"Running command: {full_cmd}")

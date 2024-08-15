@@ -113,7 +113,7 @@ def test_filter_measurements():
         transform_script=FILTER_MEASUREMENTS_SCRIPT,
         stage_name="filter_measurements",
         transform_stage_kwargs={"min_patients_per_code": 2},
-        want_outputs=WANT_SHARDS,
+        want_data=WANT_SHARDS,
     )
 
 
@@ -223,6 +223,6 @@ def test_match_revise_filter_measurements():
                 {"_matcher": {"code": "EYE_COLOR//HAZEL"}, "min_patients_per_code": 4},
             ],
         },
-        want_outputs=MR_WANT_SHARDS,
+        want_data=MR_WANT_SHARDS,
         do_use_config_yaml=True,
     )
