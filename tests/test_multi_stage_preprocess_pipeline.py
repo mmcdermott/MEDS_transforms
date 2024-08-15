@@ -938,7 +938,104 @@ TOKENIZATION_CODE = """
 ```
 """
 
-WANT_TOKENIZATION = {}
+TOKENIZATION_EVENT_SEQS_DF_SCHEMA = {
+    "patient_id": pl.UInt32,
+    "code": pl.List(pl.List(pl.UInt8)),
+    "numeric_value": pl.List(pl.List(pl.Float32)),
+    "time_delta_days": pl.List(pl.Float32),
+}
+
+WANT_TOKENIZATION_EVENT_SEQS = {
+    "tokenization/event_seqs/train/0": pl.DataFrame(
+        {
+            "patient_id": [239684, 1195293],
+            "code": [
+                [[10, 4], [11, 2, 1, 8, 9], [11, 2, 8, 9], [12, 2, 8, 9], [12, 2, 8, 9], [12, 2, 3]],
+                [
+                    [10, 4],
+                    [12, 2, 1, 8, 9],
+                    [12, 2, 8, 9],
+                    [12, 2, 8, 9],
+                    [12, 2, 8, 9],
+                    [12, 2, 8, 9],
+                    [12, 2, 8, 9],
+                    [12, 2, 3],
+                ],
+            ],
+            "numeric_value": [
+                [
+                    [float("nan"), float("nan")],
+                    [float("nan"), float("nan"), float("nan"), float("nan"), float("nan")],
+                    [float("nan"), float("nan"), float("nan"), float("nan")],
+                    [float("nan"), float("nan"), 0.9341503977775574, float("nan")],
+                    [float("nan"), float("nan"), 0.6264293789863586, float("nan")],
+                    [float("nan"), float("nan"), float("nan")],
+                ],
+                [
+                    [float("nan"), float("nan")],
+                    [float("nan"), float("nan"), float("nan"), -0.7583094239234924, -0.0889078751206398],
+                    [float("nan"), float("nan"), 1.2034040689468384, -0.0889078751206398],
+                    [float("nan"), float("nan"), float("nan"), -0.6222330927848816],
+                    [float("nan"), float("nan"), 0.5879650115966797, -1.1555582284927368],
+                    [float("nan"), float("nan"), -1.2583553791046143, -0.0889078751206398],
+                    [float("nan"), float("nan"), -1.3352841138839722, 2.04443359375],
+                    [float("nan"), float("nan"), float("nan")],
+                ],
+            ],
+            "time_delta_days": (
+                WANT_TOKENIZATION_SCHEMAS["tokenization/schemas/train/0"]
+                .select(
+                    pl.col("time")
+                    .list.diff()
+                    .list.eval((pl.element().dt.total_seconds() / 86400).fill_null(float("nan")))
+                )["time"]
+                .to_list()
+            ),
+        },
+        schema=TOKENIZATION_EVENT_SEQS_DF_SCHEMA,
+    ),
+    "tokenization/event_seqs/train/1": pl.DataFrame(
+        {k: [] for k in ["patient_id", "code", "numeric_value", "time_delta_days"]},
+        schema=TOKENIZATION_EVENT_SEQS_DF_SCHEMA,
+    ),
+    "tokenization/event_seqs/tuning/0": pl.DataFrame(
+        {k: [] for k in ["patient_id", "code", "numeric_value", "time_delta_days"]},
+        schema=TOKENIZATION_EVENT_SEQS_DF_SCHEMA,
+    ),
+    "tokenization/event_seqs/held_out/0": pl.DataFrame(
+        {
+            "patient_id": [1500733],
+            "code": [
+                [
+                    [10, 4],
+                    [11, 2, 8, 9],
+                    [11, 2, 8, 9],
+                    [11, 2, 8, 9],
+                    [11, 2, 3],
+                ]
+            ],
+            "numeric_value": [
+                [
+                    [float("nan"), float("nan")],
+                    [float("nan"), float("nan"), float("nan"), -0.0889078751206398],
+                    [float("nan"), float("nan"), float("nan"), 1.5111083984375],
+                    [float("nan"), float("nan"), float("nan"), 0.4444173276424408],
+                    [float("nan"), float("nan"), float("nan")],
+                ]
+            ],
+            "time_delta_days": (
+                WANT_TOKENIZATION_SCHEMAS["tokenization/schemas/held_out/0"]
+                .select(
+                    pl.col("time")
+                    .list.diff()
+                    .list.eval((pl.element().dt.total_seconds() / 86400).fill_null(float("nan")))
+                )["time"]
+                .to_list()
+            ),
+        },
+        schema=TOKENIZATION_EVENT_SEQS_DF_SCHEMA,
+    ),
+}
 
 
 WANT_NRTs = {
@@ -983,6 +1080,7 @@ def test_pipeline():
             **WANT_OCCLUDE_OUTLIERS,
             **WANT_NORMALIZATION,
             **WANT_TOKENIZATION_SCHEMAS,
+            **WANT_TOKENIZATION_EVENT_SEQS,
             **WANT_NRTs,
         },
         outputs_from_cohort_dir=True,
