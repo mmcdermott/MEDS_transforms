@@ -39,9 +39,9 @@ SCHEMAS_SCHEMA = {
 
 SEQ_SCHEMA = {
     "patient_id": NORMALIZED_MEDS_SCHEMA["patient_id"],
-    "code": pl.List(pl.List(pl.Float64)),
+    "code": pl.List(pl.List(pl.UInt8)),
     "numeric_value": pl.List(pl.List(NORMALIZED_MEDS_SCHEMA["numeric_value"])),
-    "time_delta_days": pl.List(pl.Float64),
+    "time_delta_days": pl.List(pl.Float32),
 }
 
 TRAIN_0_TIMES = [
@@ -223,5 +223,5 @@ def test_tokenization():
         stage_name="tokenization",
         transform_stage_kwargs=None,
         input_shards=NORMALIZED_SHARDS,
-        want_outputs={**WANT_SCHEMAS, **WANT_EVENT_SEQS},
+        want_data={**WANT_SCHEMAS, **WANT_EVENT_SEQS},
     )
