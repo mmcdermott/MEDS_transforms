@@ -1039,8 +1039,18 @@ WANT_TOKENIZATION_EVENT_SEQS = {
 
 
 WANT_NRTs = {
+    "data/train/0.nrt": JointNestedRaggedTensorDict(
+        WANT_TOKENIZATION_EVENT_SEQS["tokenization/event_seqs/train/0"]
+        .select("time_delta_days", "code", "numeric_value")
+        .to_dict(as_series=False)
+    ),
     "data/train/1.nrt": JointNestedRaggedTensorDict({}),  # this shard was fully filtered out.
     "data/tuning/0.nrt": JointNestedRaggedTensorDict({}),  # this shard was fully filtered out.
+    "data/held_out/0.nrt": JointNestedRaggedTensorDict(
+        WANT_TOKENIZATION_EVENT_SEQS["tokenization/event_seqs/held_out/0"]
+        .select("time_delta_days", "code", "numeric_value")
+        .to_dict(as_series=False)
+    ),
 }
 
 
