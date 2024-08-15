@@ -361,9 +361,10 @@ WANT_FIT_OUTLIERS = {
 OCCLUDE_OUTLIERS_CODE = """
 ```python
 # This implies the following means and standard deviations
+>>> from tests.test_multi_stage_preprocess_pipeline import WANT_FIT_OUTLIERS as metadata_df
 >>> mean_col = pl.col("values/sum") / pl.col("values/n_occurrences")
 >>> stddev_col = (pl.col("values/sum_sqd") / pl.col("values/n_occurrences") - mean_col**2) ** 0.5
->>> post_outliers.select(
+>>> metadata_df.select(
 ...     "code",
 ...     (mean_col - stddev_col).alias("values/inlier_lower_bound"),
 ...     (mean_col + stddev_col).alias("values/inlier_upper_bound")
@@ -688,12 +689,177 @@ WANT_FIT_VOCABULARY_INDICES = {
             "code/n_occurrences": pl.UInt8,
             "code/n_patients": pl.UInt8,
             "code/vocab_index": pl.UInt8,
-            "values/n_occurrences": pl.UInt8,  # In the real stage, this is shrunk, so it differs from the ex.
+            "values/n_occurrences": pl.UInt8,
             "values/sum": pl.Float32,
             "values/sum_sqd": pl.Float32,
         },
     ).sort(by="code")
 }
+
+
+NORMALIZATION_CODE = """
+```python
+# This implies the following means and standard deviations
+>>> import polars as pl
+>>> from tests.test_multi_stage_preprocess_pipeline import WANT_FIT_VOCABULARY_INDICES as metadata_df
+>>> metadata_df = list(metadata_df.values())[0]
+>>> from tests.test_multi_stage_preprocess_pipeline import WANT_OCCLUDE_OUTLIERS as dfs
+>>> mean_col = pl.col("values/sum") / pl.col("values/n_occurrences")
+>>> stddev_col = (pl.col("values/sum_sqd") / pl.col("values/n_occurrences") - mean_col**2) ** 0.5
+>>> metadata_df = metadata_df.select(
+...     "code",
+...     "code/vocab_index",
+...     mean_col.alias("values/mean"),
+...     stddev_col.alias("values/stddev"),
+... )
+>>> metadata_df
+shape: (12, 4)
+┌──────────────────────┬──────────────────┬─────────────┬───────────────┐
+│ code                 ┆ code/vocab_index ┆ values/mean ┆ values/stddev │
+│ ---                  ┆ ---              ┆ ---         ┆ ---           │
+│ str                  ┆ u8               ┆ f32         ┆ f32           │
+╞══════════════════════╪══════════════════╪═════════════╪═══════════════╡
+│ ADMISSION//CARDIAC   ┆ 1                ┆ NaN         ┆ NaN           │
+│ AGE                  ┆ 2                ┆ 32.002979   ┆ NaN           │
+│ DISCHARGE            ┆ 3                ┆ NaN         ┆ NaN           │
+│ DOB                  ┆ 4                ┆ NaN         ┆ NaN           │
+│ EYE_COLOR//BLUE      ┆ 5                ┆ NaN         ┆ NaN           │
+│ …                    ┆ …                ┆ …           ┆ …             │
+│ HR                   ┆ 8                ┆ 110.971428  ┆ 2.599767      │
+│ TEMP                 ┆ 9                ┆ 100.01667   ┆ 0.1875        │
+│ TIME_OF_DAY//[00,06) ┆ 10               ┆ NaN         ┆ NaN           │
+│ TIME_OF_DAY//[12,18) ┆ 11               ┆ NaN         ┆ NaN           │
+│ TIME_OF_DAY//[18,24) ┆ 12               ┆ NaN         ┆ NaN           │
+└──────────────────────┴──────────────────┴─────────────┴───────────────┘
+>>> import pprint
+>>> pp = pprint.PrettyPrinter(width=80, compact=True)
+>>> for k, df in dfs.items():
+...    df = df.join(metadata_df, on="code").select(
+...        "code/vocab_index",
+...        (pl.col("numeric_value") - pl.col("values/mean")) / pl.col("values/stddev")
+...    )
+...    print("/".join(k.split("/")[1:]))
+...    pp.pprint(df.to_dict(as_series=False))
+train/0
+{'code/vocab_index': [6, 7, 10, 4, 11, 2, 1, 8, 9, 11, 2, 8, 9, 12, 2, 8, 9, 12,
+                      2, 8, 9, 12, 2, 3, 5, 7, 10, 4, 12, 2, 1, 8, 9, 12, 2, 8,
+                      9, 12, 2, 8, 9, 12, 2, 8, 9, 12, 2, 8, 9, 12, 2, 8, 9, 12,
+                      2, 3],
+ 'numeric_value': [None, None, None, None, None, None, None, None, None, None,
+                   None, None, None, None, None, 0.9341503977775574, None, None,
+                   None, 0.6264293789863586, None, None, None, None, None, None,
+                   None, None, None, nan, None, -0.7583094239234924,
+                   -0.0889078751206398, None, nan, 1.2034040689468384,
+                   -0.0889078751206398, None, nan, None, -0.6222330927848816,
+                   None, nan, 0.5879650115966797, -1.1555582284927368, None,
+                   nan, -1.2583553791046143, -0.0889078751206398, None, nan,
+                   -1.3352841138839722, 2.04443359375, None, nan, None]}
+train/1
+{'code/vocab_index': [], 'numeric_value': []}
+tuning/0
+{'code/vocab_index': [], 'numeric_value': []}
+held_out/0
+{'code/vocab_index': [6, 7, 10, 4, 11, 2, 8, 9, 11, 2, 8, 9, 11, 2, 8, 9, 11, 2,
+                      3],
+ 'numeric_value': [None, None, None, None, None, None, None,
+                   -0.0889078751206398, None, None, None, 1.5111083984375, None,
+                   None, None, 0.4444173276424408, None, None, None]}
+
+```
+"""
+
+# Note we have dropped the row in the held out shard that doesn't have a code in the vocabulary!
+WANT_NORMALIZATION = parse_shards_yaml(
+    """
+  "normalization/train/0": |-2
+    patient_id,time,code,numeric_value
+    239684,,6,
+    239684,,7,
+    239684,"12/28/1980, 00:00:00",10,
+    239684,"12/28/1980, 00:00:00",4,
+    239684,"05/11/2010, 17:41:51",11,
+    239684,"05/11/2010, 17:41:51",2,
+    239684,"05/11/2010, 17:41:51",1,
+    239684,"05/11/2010, 17:41:51",8,
+    239684,"05/11/2010, 17:41:51",9,
+    239684,"05/11/2010, 17:48:48",11,
+    239684,"05/11/2010, 17:48:48",2,
+    239684,"05/11/2010, 17:48:48",8,
+    239684,"05/11/2010, 17:48:48",9,
+    239684,"05/11/2010, 18:25:35",12,
+    239684,"05/11/2010, 18:25:35",2,
+    239684,"05/11/2010, 18:25:35",8,0.9341503977775574
+    239684,"05/11/2010, 18:25:35",9,
+    239684,"05/11/2010, 18:57:18",12,
+    239684,"05/11/2010, 18:57:18",2,
+    239684,"05/11/2010, 18:57:18",8,0.6264293789863586
+    239684,"05/11/2010, 18:57:18",9,
+    239684,"05/11/2010, 19:27:19",12,
+    239684,"05/11/2010, 19:27:19",2,
+    239684,"05/11/2010, 19:27:19",3,
+    1195293,,5,
+    1195293,,7,
+    1195293,"06/20/1978, 00:00:00",10,
+    1195293,"06/20/1978, 00:00:00",4,
+    1195293,"06/20/2010, 19:23:52",12,
+    1195293,"06/20/2010, 19:23:52",2,nan
+    1195293,"06/20/2010, 19:23:52",1,
+    1195293,"06/20/2010, 19:23:52",8,-0.7583094239234924
+    1195293,"06/20/2010, 19:23:52",9,-0.0889078751206398
+    1195293,"06/20/2010, 19:25:32",12,
+    1195293,"06/20/2010, 19:25:32",2,nan
+    1195293,"06/20/2010, 19:25:32",8,1.2034040689468384
+    1195293,"06/20/2010, 19:25:32",9,-0.0889078751206398
+    1195293,"06/20/2010, 19:45:19",12,
+    1195293,"06/20/2010, 19:45:19",2,nan
+    1195293,"06/20/2010, 19:45:19",8,
+    1195293,"06/20/2010, 19:45:19",9,-0.6222330927848816
+    1195293,"06/20/2010, 20:12:31",12,
+    1195293,"06/20/2010, 20:12:31",2,nan
+    1195293,"06/20/2010, 20:12:31",8,0.5879650115966797
+    1195293,"06/20/2010, 20:12:31",9,-1.1555582284927368
+    1195293,"06/20/2010, 20:24:44",12
+    1195293,"06/20/2010, 20:24:44",2,nan
+    1195293,"06/20/2010, 20:24:44",8,-1.2583553791046143
+    1195293,"06/20/2010, 20:24:44",9,-0.0889078751206398
+    1195293,"06/20/2010, 20:41:33",12,
+    1195293,"06/20/2010, 20:41:33",2,nan
+    1195293,"06/20/2010, 20:41:33",8,-1.3352841138839722
+    1195293,"06/20/2010, 20:41:33",9,2.04443359375
+    1195293,"06/20/2010, 20:50:04",12,
+    1195293,"06/20/2010, 20:50:04",2,nan
+    1195293,"06/20/2010, 20:50:04",3,
+
+  "normalization/train/1": |-2
+    patient_id,time,code,numeric_value
+
+  "normalization/tuning/0": |-2
+    patient_id,time,code,numeric_value
+
+  "normalization/held_out/0": |-2
+    patient_id,time,code,numeric_value
+    1500733,,6,
+    1500733,,7,
+    1500733,"07/20/1986, 00:00:00",10,
+    1500733,"07/20/1986, 00:00:00",4,
+    1500733,"06/03/2010, 14:54:38",11,
+    1500733,"06/03/2010, 14:54:38",2,
+    1500733,"06/03/2010, 14:54:38",8,
+    1500733,"06/03/2010, 14:54:38",9,-0.0889078751206398
+    1500733,"06/03/2010, 15:39:49",11,
+    1500733,"06/03/2010, 15:39:49",2,
+    1500733,"06/03/2010, 15:39:49",8,
+    1500733,"06/03/2010, 15:39:49",9,1.5111083984375
+    1500733,"06/03/2010, 16:20:49",11,
+    1500733,"06/03/2010, 16:20:49",2,
+    1500733,"06/03/2010, 16:20:49",8,
+    1500733,"06/03/2010, 16:20:49",9,0.4444173276424408
+    1500733,"06/03/2010, 16:44:26",11,
+    1500733,"06/03/2010, 16:44:26",2,
+    1500733,"06/03/2010, 16:44:26",3,
+    """,
+    code=pl.UInt8,
+)
 
 
 WANT_NRTs = {
@@ -736,6 +902,7 @@ def test_pipeline():
             **WANT_FILTER,
             **WANT_TIME_DERIVED,
             **WANT_OCCLUDE_OUTLIERS,
+            **WANT_NORMALIZATION,
             **WANT_NRTs,
         },
         outputs_from_cohort_dir=True,
