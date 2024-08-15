@@ -17,6 +17,8 @@ In this test, the following stages are run:
 The stage configuration arguments will be as given in the yaml block below:
 """
 
+from datetime import datetime
+
 import polars as pl
 from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 
@@ -861,6 +863,83 @@ WANT_NORMALIZATION = parse_shards_yaml(
     code=pl.UInt8,
 )
 
+TOKENIZATION_SCHEMA_DF_SCHEMA = {
+    "patient_id": pl.UInt32,
+    "code": pl.List(pl.UInt8),
+    "numeric_value": pl.List(pl.Float32),
+    "start_time": pl.Datetime("us"),
+    "time": pl.List(pl.Datetime("us")),
+}
+WANT_TOKENIZATION_SCHEMAS = {
+    "tokenization/schemas/train/0": pl.DataFrame(
+        {
+            "patient_id": [239684, 1195293],
+            "code": [[6, 7], [5, 7]],
+            "numeric_value": [[None, None], [None, None]],
+            "start_time": [datetime(1980, 12, 28), datetime(1978, 6, 20)],
+            "time": [
+                [
+                    datetime(1980, 12, 28, 0, 0, 0),
+                    datetime(2010, 5, 11, 17, 41, 51),
+                    datetime(2010, 5, 11, 17, 48, 48),
+                    datetime(2010, 5, 11, 18, 25, 35),
+                    datetime(2010, 5, 11, 18, 57, 18),
+                    datetime(2010, 5, 11, 19, 27, 19),
+                ],
+                [
+                    datetime(1978, 6, 20, 0, 0, 0),
+                    datetime(2010, 6, 20, 19, 23, 52),
+                    datetime(2010, 6, 20, 19, 25, 32),
+                    datetime(2010, 6, 20, 19, 45, 19),
+                    datetime(2010, 6, 20, 20, 12, 31),
+                    datetime(2010, 6, 20, 20, 24, 44),
+                    datetime(2010, 6, 20, 20, 41, 33),
+                    datetime(2010, 6, 20, 20, 50, 4),
+                ],
+            ],
+        },
+        schema=TOKENIZATION_SCHEMA_DF_SCHEMA,
+    ),
+    "tokenization/schemas/train/1": pl.DataFrame(
+        {k: [] for k in ["patient_id", "code", "numeric_value", "start_time", "time"]},
+        schema=TOKENIZATION_SCHEMA_DF_SCHEMA,
+    ),
+    "tokenization/schemas/tuning/0": pl.DataFrame(
+        {k: [] for k in ["patient_id", "code", "numeric_value", "start_time", "time"]},
+        schema=TOKENIZATION_SCHEMA_DF_SCHEMA,
+    ),
+    "tokenization/schemas/held_out/0": pl.DataFrame(
+        {
+            "patient_id": [1500733],
+            "code": [[6, 7]],
+            "numeric_value": [[None, None]],
+            "start_time": [datetime(1986, 7, 20)],
+            "time": [
+                [
+                    datetime(1986, 7, 20, 0, 0, 0),
+                    datetime(2010, 6, 3, 14, 54, 38),
+                    datetime(2010, 6, 3, 15, 39, 49),
+                    datetime(2010, 6, 3, 16, 20, 49),
+                    datetime(2010, 6, 3, 16, 44, 26),
+                ]
+            ],
+        },
+        schema=TOKENIZATION_SCHEMA_DF_SCHEMA,
+    ),
+}
+
+TOKENIZATION_CODE = """
+```python
+
+>>> import polars as pl
+>>> from tests.test_multi_stage_preprocess_pipeline import WANT_NORMALIZATION as dfs
+>>>
+
+```
+"""
+
+WANT_TOKENIZATION = {}
+
 
 WANT_NRTs = {
     "data/train/1.nrt": JointNestedRaggedTensorDict({}),  # this shard was fully filtered out.
@@ -903,6 +982,7 @@ def test_pipeline():
             **WANT_TIME_DERIVED,
             **WANT_OCCLUDE_OUTLIERS,
             **WANT_NORMALIZATION,
+            **WANT_TOKENIZATION_SCHEMAS,
             **WANT_NRTs,
         },
         outputs_from_cohort_dir=True,
