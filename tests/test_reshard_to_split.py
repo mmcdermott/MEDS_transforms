@@ -5,6 +5,8 @@ scripts.
 """
 
 
+from meds import subject_id_field
+
 from .transform_tester_base import RESHARD_TO_SPLIT_SCRIPT, single_stage_transform_tester
 from .utils import parse_meds_csvs
 
@@ -14,8 +16,8 @@ IN_SHARDS_MAP = {
     "2": [239684, 1500733],
 }
 
-IN_SHARD_0 = """
-patient_id,time,code,numeric_value
+IN_SHARD_0 = f"""
+{subject_id_field},time,code,numeric_value
 68729,,EYE_COLOR//HAZEL,
 68729,,HEIGHT,160.3953106166676
 68729,"03/09/1978, 00:00:00",DOB,
@@ -42,8 +44,8 @@ patient_id,time,code,numeric_value
 1195293,"06/20/2010, 20:50:04",DISCHARGE,
 """
 
-IN_SHARD_1 = """
-patient_id,time,code,numeric_value
+IN_SHARD_1 = f"""
+{subject_id_field},time,code,numeric_value
 754281,,EYE_COLOR//BROWN,
 754281,,HEIGHT,166.22261567137025
 754281,"12/19/1988, 00:00:00",DOB,
@@ -60,8 +62,8 @@ patient_id,time,code,numeric_value
 814703,"02/05/2010, 07:02:30",DISCHARGE,
 """
 
-IN_SHARD_2 = """
-patient_id,time,code,numeric_value
+IN_SHARD_2 = f"""
+{subject_id_field},time,code,numeric_value
 239684,,EYE_COLOR//BROWN,
 239684,,HEIGHT,175.271115221764
 239684,"12/28/1980, 00:00:00",DOB,
@@ -94,8 +96,8 @@ SPLITS = {
     "held_out": [1500733],
 }
 
-WANT_TRAIN_0 = """
-patient_id,time,code,numeric_value
+WANT_TRAIN_0 = f"""
+{subject_id_field},time,code,numeric_value
 239684,,EYE_COLOR//BROWN,
 239684,,HEIGHT,175.271115221764
 239684,"12/28/1980, 00:00:00",DOB,
@@ -128,8 +130,8 @@ patient_id,time,code,numeric_value
 1195293,"06/20/2010, 20:50:04",DISCHARGE,
 """
 
-WANT_TRAIN_1 = """
-patient_id,time,code,numeric_value
+WANT_TRAIN_1 = f"""
+{subject_id_field},time,code,numeric_value
 68729,,EYE_COLOR//HAZEL,
 68729,,HEIGHT,160.3953106166676
 68729,"03/09/1978, 00:00:00",DOB,
@@ -146,8 +148,8 @@ patient_id,time,code,numeric_value
 814703,"02/05/2010, 07:02:30",DISCHARGE,
 """
 
-WANT_TUNING_0 = """
-patient_id,time,code,numeric_value
+WANT_TUNING_0 = f"""
+{subject_id_field},time,code,numeric_value
 754281,,EYE_COLOR//BROWN,
 754281,,HEIGHT,166.22261567137025
 754281,"12/19/1988, 00:00:00",DOB,
@@ -157,8 +159,8 @@ patient_id,time,code,numeric_value
 754281,"01/03/2010, 08:22:13",DISCHARGE,
 """
 
-WANT_HELD_OUT_0 = """
-patient_id,time,code,numeric_value
+WANT_HELD_OUT_0 = f"""
+{subject_id_field},time,code,numeric_value
 1500733,,EYE_COLOR//BROWN,
 1500733,,HEIGHT,158.60131573580904
 1500733,"07/20/1986, 00:00:00",DOB,
@@ -194,7 +196,7 @@ def test_reshard_to_split():
     single_stage_transform_tester(
         transform_script=RESHARD_TO_SPLIT_SCRIPT,
         stage_name="reshard_to_split",
-        transform_stage_kwargs={"n_patients_per_shard": 2},
+        transform_stage_kwargs={"n_subjects_per_shard": 2},
         want_data=WANT_SHARDS,
         input_shards=IN_SHARDS,
         input_shards_map=IN_SHARDS_MAP,

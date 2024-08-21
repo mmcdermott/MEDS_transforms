@@ -2,6 +2,7 @@ from importlib.metadata import PackageNotFoundError, version
 from importlib.resources import files
 
 import polars as pl
+from meds import code_field, subject_id_field, time_field
 
 __package_name__ = "MEDS_transforms"
 try:
@@ -12,12 +13,12 @@ except PackageNotFoundError:
 PREPROCESS_CONFIG_YAML = files(__package_name__).joinpath("configs/preprocess.yaml")
 EXTRACT_CONFIG_YAML = files(__package_name__).joinpath("configs/extract.yaml")
 
-MANDATORY_COLUMNS = ["patient_id", "time", "code", "numeric_value"]
+MANDATORY_COLUMNS = [subject_id_field, time_field, code_field, "numeric_value"]
 
 MANDATORY_TYPES = {
-    "patient_id": pl.Int64,
-    "time": pl.Datetime("us"),
-    "code": pl.String,
+    subject_id_field: pl.Int64,
+    time_field: pl.Datetime("us"),
+    code_field: pl.String,
     "numeric_value": pl.Float32,
     "categorical_value": pl.String,
     "text_value": pl.String,
@@ -29,5 +30,5 @@ DEPRECATED_NAMES = {
     "category_value": "categoric_value",
     "textual_value": "text_value",
     "timestamp": "time",
-    "subject_id": "patient_id",
+    "patient_id": subject_id_field,
 }

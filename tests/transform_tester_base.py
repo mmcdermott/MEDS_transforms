@@ -22,6 +22,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 import rootutils
+from meds import subject_id_field
 from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 
 from .utils import MEDS_PL_SCHEMA, assert_df_equal, parse_meds_csvs, run_command
@@ -40,7 +41,7 @@ if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
 
     # Filters
     FILTER_MEASUREMENTS_SCRIPT = filters_root / "filter_measurements.py"
-    FILTER_PATIENTS_SCRIPT = filters_root / "filter_patients.py"
+    FILTER_SUBJECTS_SCRIPT = filters_root / "filter_subjects.py"
 
     # Transforms
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT = transforms_root / "add_time_derived_measurements.py"
@@ -57,7 +58,7 @@ else:
 
     # Filters
     FILTER_MEASUREMENTS_SCRIPT = "MEDS_transform-filter_measurements"
-    FILTER_PATIENTS_SCRIPT = "MEDS_transform-filter_patients"
+    FILTER_SUBJECTS_SCRIPT = "MEDS_transform-filter_subjects"
 
     # Transforms
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT = "MEDS_transform-add_time_derived_measurements"
@@ -83,7 +84,7 @@ SPLITS = {
 }
 
 MEDS_TRAIN_0 = """
-patient_id,time,code,numeric_value
+subject_id,time,code,numeric_value
 239684,,EYE_COLOR//BROWN,
 239684,,HEIGHT,175.271115221764
 239684,"12/28/1980, 00:00:00",DOB,
@@ -117,7 +118,7 @@ patient_id,time,code,numeric_value
 """
 
 MEDS_TRAIN_1 = """
-patient_id,time,code,numeric_value
+subject_id,time,code,numeric_value
 68729,,EYE_COLOR//HAZEL,
 68729,,HEIGHT,160.3953106166676
 68729,"03/09/1978, 00:00:00",DOB,
@@ -135,7 +136,7 @@ patient_id,time,code,numeric_value
 """
 
 MEDS_TUNING_0 = """
-patient_id,time,code,numeric_value
+subject_id,time,code,numeric_value
 754281,,EYE_COLOR//BROWN,
 754281,,HEIGHT,166.22261567137025
 754281,"12/19/1988, 00:00:00",DOB,
@@ -146,7 +147,7 @@ patient_id,time,code,numeric_value
 """
 
 MEDS_HELD_OUT_0 = """
-patient_id,time,code,numeric_value
+subject_id,time,code,numeric_value
 1500733,,EYE_COLOR//BROWN,
 1500733,,HEIGHT,158.60131573580904
 1500733,"07/20/1986, 00:00:00",DOB,
@@ -171,7 +172,7 @@ MEDS_SHARDS = parse_meds_csvs(
 
 
 MEDS_CODE_METADATA_CSV = """
-code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,description,parent_codes
+code,code/n_occurrences,code/n_subjects,values/n_occurrences,values/sum,values/sum_sqd,description,parent_codes
 ,44,4,28,3198.8389005974336,382968.28937288234,,
 ADMISSION//CARDIAC,2,2,0,,,,
 ADMISSION//ORTHOPEDIC,1,1,0,,,,
@@ -189,9 +190,9 @@ TEMP,12,4,12,1181.4999999999998,116373.38999999998,"Body Temperature",LOINC/8310
 MEDS_CODE_METADATA_SCHEMA = {
     "code": pl.Utf8,
     "code/n_occurrences": pl.UInt8,
-    "code/n_patients": pl.UInt8,
+    "code/n_subjects": pl.UInt8,
     "values/n_occurrences": pl.UInt8,
-    "values/n_patients": pl.UInt8,
+    "values/n_subjects": pl.UInt8,
     "values/sum": pl.Float32,
     "values/sum_sqd": pl.Float32,
     "values/n_ints": pl.UInt8,
@@ -323,11 +324,11 @@ def input_MEDS_dataset(
         if input_splits_map is None:
             input_splits_map = SPLITS
         input_splits_as_df = defaultdict(list)
-        for split_name, patient_ids in input_splits_map.items():
-            input_splits_as_df["patient_id"].extend(patient_ids)
-            input_splits_as_df["split"].extend([split_name] * len(patient_ids))
+        for split_name, subject_ids in input_splits_map.items():
+            input_splits_as_df[subject_id_field].extend(subject_ids)
+            input_splits_as_df["split"].extend([split_name] * len(subject_ids))
         input_splits_df = pl.DataFrame(input_splits_as_df)
-        input_splits_fp = MEDS_metadata_dir / "patient_splits.parquet"
+        input_splits_fp = MEDS_metadata_dir / "subject_splits.parquet"
         input_splits_df.write_parquet(input_splits_fp, use_pyarrow=True)
 
         if input_shards is None:

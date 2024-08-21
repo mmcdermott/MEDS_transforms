@@ -309,7 +309,7 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
     compute function with the ``local_arg_1=baz`` parameter. Both of these local compute functions will be
     applied to the input DataFrame in sequence, and the resulting DataFrames will be concatenated alongside
     any of the dataframe that matches no matcher (which will be left unmodified) and merged in a sorted way
-    that respects the ``patient_id``, ``time`` ordering first, then the order of the match & revise blocks
+    that respects the ``subject_id``, ``time`` ordering first, then the order of the match & revise blocks
     themselves, then the order of the rows in each match & revise block output. Each local compute function
     will also use the ``global_arg_1=foo`` parameter.
 
@@ -331,7 +331,7 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
 
     Examples:
         >>> df = pl.DataFrame({
-        ...     "patient_id": [1, 1, 1, 2, 2, 2],
+        ...     "subject_id": [1, 1, 1, 2, 2, 2],
         ...     "time": [1, 2, 2, 1, 1, 2],
         ...     "initial_idx": [0, 1, 2, 3, 4, 5],
         ...     "code": ["FINAL", "CODE//TEMP_2", "CODE//TEMP_1", "FINAL", "CODE//TEMP_2", "CODE//TEMP_1"]
@@ -353,7 +353,7 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
         >>> match_revise_fn(df.lazy()).collect()
         shape: (6, 4)
         ┌────────────┬──────┬─────────────┬────────────────┐
-        │ patient_id ┆ time ┆ initial_idx ┆ code           │
+        │ subject_id ┆ time ┆ initial_idx ┆ code           │
         │ ---        ┆ ---  ┆ ---         ┆ ---            │
         │ i64        ┆ i64  ┆ i64         ┆ str            │
         ╞════════════╪══════╪═════════════╪════════════════╡
@@ -376,7 +376,7 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
         >>> match_revise_fn(df.lazy()).collect()
         shape: (6, 4)
         ┌────────────┬──────┬─────────────┬─────────────────┐
-        │ patient_id ┆ time ┆ initial_idx ┆ code            │
+        │ subject_id ┆ time ┆ initial_idx ┆ code            │
         │ ---        ┆ ---  ┆ ---         ┆ ---             │
         │ i64        ┆ i64  ┆ i64         ┆ str             │
         ╞════════════╪══════╪═════════════╪═════════════════╡
@@ -397,7 +397,7 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
             ...
         ValueError: Missing needed columns {'missing'} for local matcher 0:
             [(col("missing")) == (String(CODE//TEMP_2))].all_horizontal()
-        Columns available: 'code', 'initial_idx', 'patient_id', 'time'
+        Columns available: 'code', 'initial_idx', 'subject_id', 'time'
         >>> stage_cfg = DictConfig({"global_code_end": "foo"})
         >>> cfg = DictConfig({"stage_cfg": stage_cfg})
         >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
@@ -439,7 +439,7 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
             revision_parts.append(local_compute_fn(matched_df))
 
         revision_parts.append(unmatched_df)
-        return pl.concat(revision_parts, how="vertical").sort(["patient_id", "time"], maintain_order=True)
+        return pl.concat(revision_parts, how="vertical").sort(["subject_id", "time"], maintain_order=True)
 
     return match_revise_fn
 
@@ -580,7 +580,7 @@ def map_over(
     start = datetime.now()
 
     train_only = cfg.stage_cfg.get("train_only", False)
-    split_fp = Path(cfg.input_dir) / "metadata" / "patient_split.parquet"
+    split_fp = Path(cfg.input_dir) / "metadata" / "subject_split.parquet"
 
     shards, includes_only_train = shard_iterator_fntr(cfg)
 
@@ -591,18 +591,18 @@ def map_over(
             )
         elif split_fp.exists():
             logger.info(f"Processing train split only by filtering read dfs via {str(split_fp.resolve())}")
-            train_patients = (
+            train_subjects = (
                 pl.scan_parquet(split_fp)
                 .filter(pl.col("split") == "train")
-                .select(pl.col("patient_id"))
+                .select(pl.col("subject_id"))
                 .collect()
                 .to_list()
             )
-            read_fn = read_and_filter_fntr(train_patients, read_fn)
+            read_fn = read_and_filter_fntr(train_subjects, read_fn)
         else:
             raise FileNotFoundError(
                 f"Train split requested, but shard prefixes can't be used and "
-                f"patient split file not found at {str(split_fp.resolve())}."
+                f"subject split file not found at {str(split_fp.resolve())}."
             )
     elif includes_only_train:
         raise ValueError("All splits should be used, but shard iterator is returning only train splits?!?")

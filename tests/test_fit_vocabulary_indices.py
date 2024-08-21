@@ -12,7 +12,7 @@ from .transform_tester_base import (
 )
 
 WANT_CSV = """
-code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,description,parent_codes,code/vocab_index
+code,code/n_occurrences,code/n_subjects,values/n_occurrences,values/sum,values/sum_sqd,description,parent_codes,code/vocab_index
 ,44,4,28,3198.8389005974336,382968.28937288234,,,1
 ADMISSION//CARDIAC,2,2,0,,,,,2
 ADMISSION//ORTHOPEDIC,1,1,0,,,,,3
