@@ -197,7 +197,15 @@ def main(cfg: DictConfig):
 
     global_done_file.touch()
 
+def load_file(path: str) -> Any:
+    with open(path, "r") as f:
+        return f.read()
+
+def load_yaml_file(path: str | None) -> dict | DictConfig:
+    return {} if path is None else OmegaConf.load(path)
+
 if __name__ == "__main__":
     OmegaConf.register_new_resolver("load_yaml_file", OmegaConf.load, replace=False)
+    OmegaConf.register_new_resolver("load_file", load_file, replace=False)
 
     main()

@@ -2,7 +2,7 @@
 pipeline_config_fp: ???
 stage_runner_fp: null
 
-_pipeline_config: ${oc.create:${load_yaml_file:${pipeline_config_fp}}}
+_pipeline_config: ${oc.create:${load_yaml_file:${oc.select:pipeline_config_fp,null}}}
 
 _default_name: "MEDS-transforms Pipeline"
 _pipeline_name: ${oc.select:_pipeline_config.etl_metadata.pipeline_name, _default_name}
