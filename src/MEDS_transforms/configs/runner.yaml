@@ -1,0 +1,40 @@
+# Global IO
+pipeline_config_fp: ???
+stage_runner_fp: null
+
+_pipeline_config: ${oc.create:${load_yaml_file:${pipeline_config_fp}}}
+
+_default_name: "MEDS-transforms Pipeline"
+_pipeline_name: ${oc.select:_pipeline_config.etl_metadata.pipeline_name, _default_name}
+_pipeline_description: ${_pipeline_config.description}
+
+log_dir: "${_pipeline_config.cohort_dir}/.logs"
+
+_stage_runners: ${oc.create:${load_yaml_file:${stage_runner_fp}}}
+stages: ${_pipeline_config.stages}
+
+do_profile: False
+
+_pipeline_help_block: |-
+
+  **${_pipeline_name} description:**
+
+  ${_pipeline_description}
+
+# Hydra #${oc.select:_pipeline_help_block,""}
+hydra:
+  job:
+    name: "${fix_str_for_path:${_pipeline_name}}_runner_${now:%Y-%m-%d_%H-%M-%S}"
+  run:
+    dir: "${log_dir}"
+  help:
+    app_name: "MEDS-Transforms Pipeline Runner"
+
+    template: |-
+      == ${hydra.help.app_name} ==
+      ${hydra.help.app_name} is a command line tool for running entire MEDS-transform pipelines in a single
+      command.
+
+      ${get_script_docstring:runner}
+
+      ${oc.select:${oc.create:${load_yaml_file:${pipeline_config_fp}}},""}

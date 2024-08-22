@@ -11,6 +11,7 @@ except PackageNotFoundError:
 
 PREPROCESS_CONFIG_YAML = files(__package_name__).joinpath("configs/preprocess.yaml")
 EXTRACT_CONFIG_YAML = files(__package_name__).joinpath("configs/extract.yaml")
+RUNNER_CONFIG_YAML = files(__package_name__).joinpath("configs/runner.yaml")
 
 MANDATORY_COLUMNS = ["patient_id", "time", "code", "numeric_value"]
 
