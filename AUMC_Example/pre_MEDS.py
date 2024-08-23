@@ -61,12 +61,15 @@ def process_patient_and_admissions(df: pl.LazyFrame) -> pl.LazyFrame:
     age_in_days = age_in_years * 365.25
     # We assume that the patient was born at the midpoint of the year as we don't know the actual birthdate
     pseudo_date_of_birth = origin_pseudotime - pl.duration(days=(age_in_days - 365.25 / 2))
+    pseudo_date_of_death = origin_pseudotime + pl.duration(milliseconds=pl.col("dateofdeath"))
+
 
     return df.filter(pl.col("admissioncount") == 1).select(
         PATIENT_ID, 
         pseudo_date_of_birth.alias("dateofbirth"),
         "gender",
         origin_pseudotime.alias("firstadmittedattime"),
+        pseudo_date_of_death.alias("dateofdeath")
     ), df.select(PATIENT_ID, ADMISSION_ID)
 
 
