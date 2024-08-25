@@ -3,10 +3,10 @@ pipeline_config_fp: ???
 stage_runner_fp: null
 
 _pipeline_config: ${oc.create:${load_yaml_file:${oc.select:pipeline_config_fp,null}}}
+_etl_metadata: ${oc.select:_pipeline_config.etl_metadata,${oc.create:{}}}
 
-_default_name: "MEDS-transforms Pipeline"
-_pipeline_name: ${oc.select:_pipeline_config.etl_metadata.pipeline_name, _default_name}
-_pipeline_description: ${_pipeline_config.description}
+_pipeline_name: ${oc.select:_etl_metadata.pipeline_name, "MEDS-transforms Pipeline"}
+_pipeline_description: ${oc.select:_pipeline_config.description, "No description provided."}
 
 log_dir: "${_pipeline_config.cohort_dir}/.logs"
 
@@ -14,12 +14,6 @@ _stage_runners: ${oc.create:${load_yaml_file:${stage_runner_fp}}}
 stages: ${_pipeline_config.stages}
 
 do_profile: False
-
-_pipeline_help_block: |-
-
-  **${_pipeline_name} description:**
-
-  ${_pipeline_description}
 
 # Hydra #${oc.select:_pipeline_help_block,""}
 hydra:
@@ -37,4 +31,6 @@ hydra:
 
       ${get_script_docstring:runner}
 
-      ${oc.select:${oc.create:${load_yaml_file:${pipeline_config_fp}}},""}
+      **${_pipeline_name} description:**
+
+      ${_pipeline_description}

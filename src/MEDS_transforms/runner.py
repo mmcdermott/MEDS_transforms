@@ -7,13 +7,16 @@ To do this effectively, this runner functionally takes a "meta configuration" fi
      stage scripts and Hydra launcher configurations for each stage to control parallelism, resources, etc.
 """
 
-import hydra
+import importlib
 from pathlib import Path
+from typing import Any
+
+import hydra
 from omegaconf import DictConfig, OmegaConf
+
 from MEDS_transforms import RUNNER_CONFIG_YAML
 from MEDS_transforms.utils import hydra_loguru_init
-import importlib
-from typing import Any
+
 
 def get_script_from_name(stage_name: str) -> str | None:
     """Returns the script name for the given stage name.
@@ -23,7 +26,6 @@ def get_script_from_name(stage_name: str) -> str | None:
 
     Returns:
         The script name for the given stage name.
-
     """
 
     try:
@@ -40,6 +42,7 @@ def get_script_from_name(stage_name: str) -> str | None:
             pass
 
     return None
+
 
 def get_parallelization_args(
     parallelization_cfg: dict | DictConfig | None, default_parallelization_cfg: dict | DictConfig
@@ -60,7 +63,6 @@ def get_parallelization_args(
         "--multirun",
         f"worker=range(0,{n_workers})",
     ]
-
 
     if "launcher" in parallelization_cfg:
         launcher = parallelization_cfg["launcher"]
@@ -96,7 +98,6 @@ def run_stage(cfg: DictConfig, stage_name: str, default_parallelization_cfg: dic
     Args:
         cfg: The configuration for the entire pipeline.
         stage_name: The name of the stage to run.
-
     """
 
     if default_parallelization_cfg is None:
@@ -125,9 +126,9 @@ def run_stage(cfg: DictConfig, stage_name: str, default_parallelization_cfg: dic
         f"stage={stage_name}",
     ]
 
-    command_parts.extend(get_parallelization_args(
-        stage_runner_config.get("parallelize", {}), default_parallelization_cfg
-    ))
+    command_parts.extend(
+        get_parallelization_args(stage_runner_config.get("parallelize", {}), default_parallelization_cfg)
+    )
 
     if do_profile:
         command_parts.append("++hydra.callbacks.profiler._target_=hydra_profiler.profiler.ProfilerCallback")
@@ -144,6 +145,7 @@ def run_stage(cfg: DictConfig, stage_name: str, default_parallelization_cfg: dic
 
     if command_out.returncode != 0:
         raise ValueError(f"Stage {stage_name} failed with return code {command_out.returncode}.\n{stderr}")
+
 
 @hydra.main(
     version_base=None, config_path=str(RUNNER_CONFIG_YAML.parent), config_name=RUNNER_CONFIG_YAML.stem
@@ -167,7 +169,7 @@ def main(cfg: DictConfig):
 
     if do_profile:
         try:
-            from hydra_profiler.profiler import ProfilerCallback
+            pass
         except ImportError as e:
             raise ValueError(
                 "You can't run in profiling mode without installing hydra-profiler. Try installing "
@@ -197,15 +199,18 @@ def main(cfg: DictConfig):
 
     global_done_file.touch()
 
+
 def load_file(path: str) -> Any:
-    with open(path, "r") as f:
+    with open(path) as f:
         return f.read()
 
+
 def load_yaml_file(path: str | None) -> dict | DictConfig:
-    return {} if path is None else OmegaConf.load(path)
+    return OmegaConf.load(path) if path else {}
+
 
 if __name__ == "__main__":
-    OmegaConf.register_new_resolver("load_yaml_file", OmegaConf.load, replace=False)
+    OmegaConf.register_new_resolver("load_yaml_file", load_yaml_file, replace=False)
     OmegaConf.register_new_resolver("load_file", load_file, replace=False)
 
     main()
