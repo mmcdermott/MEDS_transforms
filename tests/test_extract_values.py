@@ -96,11 +96,13 @@ def test_extract_values():
                     "_matcher": {"code": "BP"},
                     "numeric_value": {"extract": {"from": "text_value", "regex": r"(\d+)/.*"}},
                     "code": "{code}//SYSTOLIC",
+                    "text_value": {"literal": None},
                 },
                 {
                     "_matcher": {"code": "BP"},
                     "numeric_value": {"extract": {"from": "text_value", "regex": r".*/(\d+)"}},
                     "code": "{code}//DIASTOLIC",
+                    "text_value": {"literal": None},
                 },
             ],
         },

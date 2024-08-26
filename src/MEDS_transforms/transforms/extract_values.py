@@ -7,7 +7,7 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig
 
-from MEDS_transforms import DEPRECATED_NAMES, MANDATORY_TYPES, PREPROCESS_CONFIG_YAML
+from MEDS_transforms import DEPRECATED_NAMES, INFERRED_STAGE_KEYS, MANDATORY_TYPES, PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over
 from MEDS_transforms.parser import cfg_to_expr
 
@@ -83,6 +83,9 @@ def extract_values_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.La
     new_cols = []
     need_cols = set()
     for out_col_n, value_cfg in stage_cfg.items():
+        if out_col_n in INFERRED_STAGE_KEYS:
+            continue
+
         try:
             expr, cols = cfg_to_expr(value_cfg)
         except ValueError as e:

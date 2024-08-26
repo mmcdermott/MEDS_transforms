@@ -187,7 +187,7 @@ class ColExprType(StrEnum):
         MANDATORY_KEYS = {"from": str, "regex": str}
         ALLOWED_KEYS = {**MANDATORY_KEYS, "group_index": Annotated[int, "non-negative integer"]}
 
-        if not isinstance(cfg, dict):
+        if not isinstance(cfg, (dict, DictConfig)):
             return False, f"Extract expressions must be a dictionary. Got {cfg}"
         if not set(MANDATORY_KEYS).issubset(set(cfg.keys())):
             return False, f"Extract expressions must have a 'from' and 'regex' key. Got {list(cfg.keys())}"
@@ -244,7 +244,7 @@ class ColExprType(StrEnum):
             (False, "Column expressions must be a dictionary. Got [('col', 'foo')]")
         """
 
-        if not isinstance(expr_dict, dict):
+        if not isinstance(expr_dict, (dict, DictConfig)):
             return False, f"Column expressions must be a dictionary. Got {expr_dict}"
         if len(expr_dict) != 1:
             return False, f"Column expressions can only contain a single key-value pair. Got {expr_dict}"
@@ -582,6 +582,11 @@ def cfg_to_expr(cfg: str | ListConfig | DictConfig) -> tuple[pl.Expr, set[str]]:
         ['1//d', None, None]
         >>> sorted(cols)
         ['bar', 'baz', 'foo']
+        >>> expr, cols = cfg_to_expr({"extract": {"regex": "([ac]).*", "from": "foo"}})
+        >>> data.select(expr.alias("out"))["out"].to_list()
+        ['a', None, 'c']
+        >>> sorted(cols)
+        ['foo']
         >>> cfg = [
         ...    {"matcher": {"baz": 2}, "output": {"str": "bar//{baz}"}},
         ...    {"literal": "34.2"},
