@@ -229,7 +229,7 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
     for agg in aggregations:
         if isinstance(agg, (dict, DictConfig)):
             agg = agg.get("name", None)
-        if agg not in METADATA_FN:
+        if agg not in {fn.value for fn in METADATA_FN}:
             raise ValueError(
                 f"Metadata aggregation function {agg} not found in METADATA_FN enumeration. Values are: "
                 f"{', '.join([fn.value for fn in METADATA_FN])}"
