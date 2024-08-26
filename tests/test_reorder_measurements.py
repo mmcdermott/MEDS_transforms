@@ -111,5 +111,5 @@ def test_reorder_measurements():
         transform_script=REORDER_MEASUREMENTS_SCRIPT,
         stage_name="reorder_measurements",
         transform_stage_kwargs={"ordered_code_patterns": ORDERED_CODE_PATTERNS},
-        want_outputs=WANT_SHARDS,
+        want_data=WANT_SHARDS,
     )
