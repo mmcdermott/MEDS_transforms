@@ -23,10 +23,6 @@ INPUT_SHARDS = parse_shards_yaml(
       68729,,EYE_COLOR//HAZEL,,
       68729,"03/09/1978, 00:00:00",DOB,,
       814703,"02/05/2010, 05:55:39",HR,170.2,
-      1195293,"06/20/2010, 19:23:52",TEMP,,"37C"
-      814703,,EYE_COLOR//HAZEL,,
-      814703,"03/28/1976, 00:00:00",DOB,,
-      814703,"02/05/2010, 05:55:39",HR,170.2,
     tuning/0: |-2
       patient_id,time,code,numeric_value,text_value
       754281,,EYE_COLOR//BROWN,,
@@ -55,16 +51,12 @@ WANT_SHARDS = parse_shards_yaml(
       1195293,"06/20/1978, 00:00:00",DOB,,
       1195293,"06/20/2010, 19:23:52",BP//SYSTOLIC,144,
       1195293,"06/20/2010, 19:23:52",BP//DIASTOLIC,96,
-      1195293,"06/20/2010, 19:23:52",HR,80,
       1195293,"06/20/2010, 19:23:52",TEMP//F,100,
+      1195293,"06/20/2010, 19:23:52",HR,80,
     train/1: |-2
       patient_id,time,code,numeric_value,text_value
       68729,,EYE_COLOR//HAZEL,,
       68729,"03/09/1978, 00:00:00",DOB,,
-      814703,"02/05/2010, 05:55:39",HR,170.2,
-      1195293,"06/20/2010, 19:23:52",TEMP//C,37,
-      814703,,EYE_COLOR//HAZEL,,
-      814703,"03/28/1976, 00:00:00",DOB,,
       814703,"02/05/2010, 05:55:39",HR,170.2,
     tuning/0: |-2
       patient_id,time,code,numeric_value,text_value
@@ -78,9 +70,9 @@ WANT_SHARDS = parse_shards_yaml(
       patient_id,time,code,numeric_value,text_value
       1500733,,EYE_COLOR//BROWN,,
       1500733,"07/20/1986, 00:00:00",DOB,,
-      1500733,"06/03/2010, 14:54:38",HR,91.4,
       1500733,"06/03/2010, 14:54:38",BP//SYSTOLIC,123,
       1500733,"06/03/2010, 14:54:38",BP//DIASTOLIC,82,
+      1500733,"06/03/2010, 14:54:38",HR,91.4,
     """
 )
 
@@ -102,6 +94,18 @@ def test_extract_values():
                     "_matcher": {"code": "BP"},
                     "numeric_value": {"extract": {"from": "text_value", "regex": r".*/(\d+)"}},
                     "code": "{code}//DIASTOLIC",
+                    "text_value": {"literal": None},
+                },
+                {
+                    "_matcher": {"code": "TEMP", "text_value": {"regex": r"^[\d\.]+C$"}},
+                    "numeric_value": {"extract": {"from": "text_value", "regex": r"^([\d\.]+)C$"}},
+                    "code": "{code}//C",
+                    "text_value": {"literal": None},
+                },
+                {
+                    "_matcher": {"code": "TEMP", "text_value": {"regex": r"^[\d\.]+F$"}},
+                    "numeric_value": {"extract": {"from": "text_value", "regex": r"^([\d\.]+)F$"}},
+                    "code": "{code}//F",
                     "text_value": {"literal": None},
                 },
             ],
