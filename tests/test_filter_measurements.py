@@ -214,9 +214,7 @@ def test_match_revise_filter_measurements():
         stage_name="filter_measurements",
         transform_stage_kwargs={
             "_match_revise": [
-                {"_matcher": {"code": "ADMISSION//CARDIAC"}, "min_patients_per_code": 2},
-                {"_matcher": {"code": "ADMISSION//ORTHOPEDIC"}, "min_patients_per_code": 2},
-                {"_matcher": {"code": "ADMISSION//PULMONARY"}, "min_patients_per_code": 2},
+                {"_matcher": {"code": {"regex": "ADMISSION//.*"}}, "min_patients_per_code": 2},
                 {"_matcher": {"code": "HR"}, "min_patients_per_code": 15},
                 {"_matcher": {"code": "EYE_COLOR//BLUE"}, "min_patients_per_code": 4},
                 {"_matcher": {"code": "EYE_COLOR//BROWN"}, "min_patients_per_code": 4},

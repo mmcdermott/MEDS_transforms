@@ -3,7 +3,7 @@
 import inspect
 from collections.abc import Callable, Generator
 from datetime import datetime
-from enum import Enum, auto
+from enum import Enum, StrEnum, auto
 from functools import partial, wraps
 from pathlib import Path
 from typing import Any, NotRequired, TypedDict, TypeVar
@@ -223,6 +223,30 @@ def read_and_filter_fntr(filter_expr: pl.Expr, read_fn: Callable[[Path], DF_T]) 
 
 MATCH_REVISE_KEY = "_match_revise"
 MATCHER_KEY = "_matcher"
+MATCH_REVISE_MODE_KEY = "_match_revise_mode"
+
+
+class MatchReviseMode(StrEnum):
+    """The different modes for match and revise operations.
+
+    Future modes to be considered, match and add, multi-match and add, filter and revise, multi-filter and
+    revise.
+
+    Attributes:
+        MATCH_AND_REVISE: The match and revise mode, which iterates through the list of matcher/function pairs
+            and filters the input DataFrame for rows that match the matcher and applies a local compute
+            function to the filtered DataFrame. The DataFrame to be matched in future iterations is restricted
+            to only those rows that have not yet been matched. The unmatched dataframe at the end of the
+            operation is concatenated with the outputs of all intermediate dataframes.
+        MULTI_MATCH_AND_REVISE: The match and revise mode, which iterates through the list of matcher/function
+            pairs and filters the input DataFrame for rows that match the matcher and applies a local compute
+            function to the filtered DataFrame. The DataFrame to be matched in future iterations is the entire
+            raw dataframe, including rows that have already been matched. The portion of the dataframe that
+            didn't match anything on input is concatenated with the outputs of all intermediate dataframes.
+    """
+
+    MATCH_AND_REVISE = auto()
+    MULTI_MATCH_AND_REVISE = auto()
 
 
 def is_match_revise(stage_cfg: DictConfig) -> bool:
@@ -415,6 +439,10 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
 
     stage_cfg = hydra.utils.instantiate(stage_cfg)
 
+    match_revise_mode = stage_cfg.pop(MATCH_REVISE_MODE_KEY, "match_and_revise")
+    if match_revise_mode not in {x.value for x in MatchReviseMode}:
+        raise ValueError(f"Invalid match and revise mode: {match_revise_mode}")
+
     matchers_and_fns = []
     for match_revise_cfg in stage_cfg.pop(MATCH_REVISE_KEY):
         matcher, cols = matcher_to_expr(match_revise_cfg.pop(MATCHER_KEY))
@@ -425,10 +453,11 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
 
     @wraps(compute_fn)
     def match_revise_fn(df: DF_T) -> DF_T:
-        unmatched_df = df
+        matchable_df = df
         cols = set(df.collect_schema().names())
 
         revision_parts = []
+        final_part_filters = []
         for i, (matcher_expr, need_cols, local_compute_fn) in enumerate(matchers_and_fns):
             if not need_cols.issubset(cols):
                 cols_str = "', '".join(x for x in sorted(cols))
@@ -436,12 +465,20 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
                     f"Missing needed columns {need_cols - cols} for local matcher {i}: "
                     f"{matcher_expr}\nColumns available: '{cols_str}'"
                 )
-            matched_df = unmatched_df.filter(matcher_expr)
-            unmatched_df = unmatched_df.filter(~matcher_expr)
+            matched_df = matchable_df.filter(matcher_expr)
+
+            match match_revise_mode:
+                case MatchReviseMode.MATCH_AND_REVISE:
+                    matchable_df = matchable_df.filter(~matcher_expr)
+                case MatchReviseMode.MULTI_MATCH_AND_REVISE:
+                    final_part_filters.append(~matcher_expr)
 
             revision_parts.append(local_compute_fn(matched_df))
 
-        revision_parts.append(unmatched_df)
+        if final_part_filters:
+            revision_parts.append(matchable_df.filter(pl.all_horizontal(final_part_filters)))
+        else:
+            revision_parts.append(matchable_df)
         return pl.concat(revision_parts, how="vertical").sort(["patient_id", "time"], maintain_order=True)
 
     return match_revise_fn

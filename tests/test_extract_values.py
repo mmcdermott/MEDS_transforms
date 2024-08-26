@@ -90,7 +90,19 @@ def test_extract_values():
         transform_script=EXTRACT_VALUES_SCRIPT,
         stage_name="extract_values",
         transform_stage_kwargs={
-            # TODO
+            "_match_revise_mode": "multi_match_and_revise",
+            "_match_revise": [
+                {
+                    "_matcher": {"code": "BP"},
+                    "numeric_value": {"extract": {"from": "text_value", "regex": r"(\d+)/.*"}},
+                    "code": "{code}//SYSTOLIC",
+                },
+                {
+                    "_matcher": {"code": "BP"},
+                    "numeric_value": {"extract": {"from": "text_value", "regex": r".*/(\d+)"}},
+                    "code": "{code}//DIASTOLIC",
+                },
+            ],
         },
         input_shards=INPUT_SHARDS,
         want_data=WANT_SHARDS,
