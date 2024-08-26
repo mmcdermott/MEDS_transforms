@@ -266,7 +266,7 @@ def validate_match_revise(stage_cfg: DictConfig):
         >>> validate_match_revise(DictConfig({"_match_revise": [{"_matcher": {32: "bar"}}]}))
         Traceback (most recent call last):
             ...
-        ValueError: Match revise config 0 must contain a valid matcher in _matcher
+        ValueError: Match revise config 0 must contain a valid matcher in _matcher: ...
         >>> validate_match_revise(DictConfig({"_match_revise": [{"_matcher": {"code": "CODE//TEMP"}}]}))
     """
 
@@ -284,8 +284,11 @@ def validate_match_revise(stage_cfg: DictConfig):
         if MATCHER_KEY not in match_revise_cfg:
             raise ValueError(f"Match revise config {i} must contain a {MATCHER_KEY} key")
 
-        if not is_matcher(match_revise_cfg[MATCHER_KEY]):
-            raise ValueError(f"Match revise config {i} must contain a valid matcher in {MATCHER_KEY}")
+        matcher_valid, matcher_errs = is_matcher(match_revise_cfg[MATCHER_KEY])
+        if not matcher_valid:
+            raise ValueError(
+                f"Match revise config {i} must contain a valid matcher in {MATCHER_KEY}: {matcher_errs}"
+            )
 
 
 def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_COMPUTE_FN_T) -> COMPUTE_FN_T:

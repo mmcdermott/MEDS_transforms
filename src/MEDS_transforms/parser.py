@@ -38,7 +38,7 @@ import polars as pl
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
 
-def is_matcher(matcher_cfg: dict[str, Any]) -> bool:
+def is_matcher(matcher_cfg: dict[str, Any]) -> tuple[bool, str | None]:
     """Checks if a dictionary is a valid matcher configuration.
 
     Args:
@@ -49,17 +49,34 @@ def is_matcher(matcher_cfg: dict[str, Any]) -> bool:
 
     Examples:
         >>> is_matcher({"foo": "bar"})
-        True
+        (True, None)
         >>> is_matcher(DictConfig({"foo": "bar"}))
-        True
-        >>> is_matcher({"foo": "bar", 32: "baz"})
-        False
+        (True, None)
         >>> is_matcher(["foo", "bar"])
-        False
+        (False, "Matcher configuration must be a dictionary. Got ['foo', 'bar']")
+        >>> is_matcher({"foo": "bar", 32: "baz"})
+        (False, "Matcher configuration must be a dictionary with string keys. Got {'foo': 'bar', 32: 'baz'}")
+        >>> is_matcher({"foo": {"regex": "bar"}})
+        (True, None)
+        >>> is_matcher({"foo": {"regex": "bar", "group_index": 0}}) # doctest: +NORMALIZE_WHITESPACE
+        (False, "If the matcher spec is a dictionary, it must have only a 'regex' key.
+                 Got {'regex': 'bar', 'group_index': 0} for foo")
         >>> is_matcher({})
-        True
+        (True, None)
     """
-    return isinstance(matcher_cfg, (dict, DictConfig)) and all(isinstance(k, str) for k in matcher_cfg.keys())
+    if not isinstance(matcher_cfg, (dict, DictConfig)):
+        return False, f"Matcher configuration must be a dictionary. Got {matcher_cfg}"
+    if not all(isinstance(k, str) for k in matcher_cfg.keys()):
+        return False, f"Matcher configuration must be a dictionary with string keys. Got {matcher_cfg}"
+    for k, cfg in matcher_cfg.items():
+        if isinstance(cfg, (dict, DictConfig)) and set(cfg.keys()) != {
+            "regex",
+        }:
+            return False, (
+                f"If the matcher spec is a dictionary, it must have only a 'regex' key. Got {cfg} for {k}"
+            )
+
+    return True, None
 
 
 def matcher_to_expr(matcher_cfg: DictConfig | dict) -> tuple[pl.Expr, set[str]]:
@@ -89,15 +106,29 @@ def matcher_to_expr(matcher_cfg: DictConfig | dict) -> tuple[pl.Expr, set[str]]:
         [(col("foo")) == (String(bar))].all_horizontal([[(col("buzz")) == (String(baz))]])
         >>> sorted(cols)
         ['buzz', 'foo']
+        >>> expr, cols = matcher_to_expr(DictConfig({"foo": "bar", "buzz": {"regex": "baz"}}))
+        >>> print(expr)
+        [(col("foo")) == (String(bar))].all_horizontal([col("buzz").str.contains([String(baz)])])
+        >>> sorted(cols)
+        ['buzz', 'foo']
         >>> matcher_to_expr(["foo", "bar"])
         Traceback (most recent call last):
             ...
-        ValueError: Matcher configuration must be a dictionary with string keys. Got: ['foo', 'bar']
+        ValueError: Matcher configuration must be a dictionary. Got ['foo', 'bar']
     """
-    if not is_matcher(matcher_cfg):
-        raise ValueError(f"Matcher configuration must be a dictionary with string keys. Got: {matcher_cfg}")
+    matcher_valid, matcher_errs = is_matcher(matcher_cfg)
+    if not matcher_valid:
+        raise ValueError(matcher_errs)
 
-    return pl.all_horizontal((pl.col(k) == v) for k, v in matcher_cfg.items()), set(matcher_cfg.keys())
+    all_exprs = []
+    for k, v in matcher_cfg.items():
+        if isinstance(v, (dict, DictConfig)):
+            expr = pl.col(k).str.contains(v["regex"])
+        else:
+            expr = pl.col(k) == v
+        all_exprs.append(expr)
+
+    return pl.all_horizontal(all_exprs), set(matcher_cfg.keys())
 
 
 STR_INTERPOLATION_REGEX = r"\{([^}]+)\}"
@@ -326,17 +357,17 @@ def parse_col_expr(cfg: str | list | dict[str, str] | ListConfig | DictConfig) -
         >>> parse_col_expr({"output": "foo", "matcher": {32: "baz"}}) # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
-        ValueError: A pre-specified output/matcher configuration must have a valid matcher dictionary,
-                    which is a dictionary with string-type keys. Got cfg['matcher']={32: 'baz'}
+        ValueError: A pre-specified output/matcher configuration must have a valid matcher dictionary. Got
+                    cfg['matcher']={32: 'baz'} which has errors: ...
         >>> parse_col_expr({"foo": {"bar": "baz"}})
         {'output': {'col': 'foo'}, 'matcher': {'bar': 'baz'}}
         >>> parse_col_expr({"foo": {32: "baz"}}) # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
         ValueError: A simple-form conditional expression is expressed with a single key-value pair dict,
-                    where the key is not a column expression type and the value is a valid matcher dict,
-                    which is a dictionary with string-type keys. This config has a single key-value pair
-                    with key foo but an invalid matcher: {32: 'baz'}
+                    where the key is not a column expression type and the value is a valid matcher dict. This
+                    config has a single key-value pair with key foo but an invalid matcher: {32: 'baz'} which
+                    has errors: ...
         >>> parse_col_expr(["bar//{foo}", {"str": "bar//UNK"}])
         [{'str': 'bar//{foo}'}, {'str': 'bar//UNK'}]
         >>> parse_col_expr({"foo": "bar", "buzz": "baz", "fuzz": "fizz"}) # doctest: +NORMALIZE_WHITESPACE
@@ -380,25 +411,27 @@ def parse_col_expr(cfg: str | list | dict[str, str] | ListConfig | DictConfig) -
                 "If a list (which coalesces columns), all elements must be strings or dictionaries. "
                 f"Got: {cfg}"
             )
-        case dict() | DictConfig() if set(cfg.keys()) == {"output", "matcher"} and is_matcher(cfg["matcher"]):
-            return {"output": parse_col_expr(cfg["output"]), "matcher": cfg["matcher"]}
         case dict() | DictConfig() if set(cfg.keys()) == {"output", "matcher"}:
-            raise ValueError(
-                "A pre-specified output/matcher configuration must have a valid matcher dictionary, which is "
-                f"a dictionary with string-type keys. Got cfg['matcher']={cfg['matcher']}"
-            )
+            matcher_valid, matcher_errs = is_matcher(cfg["matcher"])
+            if not matcher_valid:
+                raise ValueError(
+                    "A pre-specified output/matcher configuration must have a valid matcher dictionary. "
+                    f"Got cfg['matcher']={cfg['matcher']} which has errors: {matcher_errs}"
+                )
+            return {"output": parse_col_expr(cfg["output"]), "matcher": cfg["matcher"]}
         case dict() | DictConfig() if len(cfg) == 1 and ColExprType.is_valid(cfg)[0]:
             return cfg
         case dict() | DictConfig() if len(cfg) == 1:
             out_cfg, matcher_cfg = next(iter(cfg.items()))
-            if is_matcher(matcher_cfg):
+            matcher_valid, matcher_errs = is_matcher(matcher_cfg)
+            if matcher_valid:
                 return {"output": parse_col_expr(out_cfg), "matcher": matcher_cfg}
             else:
                 raise ValueError(
                     "A simple-form conditional expression is expressed with a single key-value pair dict, "
-                    "where the key is not a column expression type and the value is a valid matcher dict, "
-                    "which is a dictionary with string-type keys. This config has a single key-value pair "
-                    f"with key {out_cfg} but an invalid matcher: {matcher_cfg}"
+                    "where the key is not a column expression type and the value is a valid matcher dict. "
+                    f"This config has a single key-value pair with key {out_cfg} but an invalid matcher: "
+                    f"{matcher_cfg} which has errors: {matcher_errs}"
                 )
         case dict() | DictConfig():
             raise ValueError(
@@ -461,8 +494,8 @@ def structured_expr_to_pl(cfg: dict | list[dict] | ListConfig | DictConfig) -> t
         >>> structured_expr_to_pl({"output": "foo", "matcher": {32: "baz"}}) # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
-        ValueError: A pre-specified output/matcher configuration must have a valid matcher dictionary, which
-                    is a dictionary with string-type keys. Got cfg['matcher']={32: 'baz'}
+        ValueError: A pre-specified output/matcher configuration must have a valid matcher dictionary. Got
+                    cfg['matcher']={32: 'baz'} which has errors: ...
         >>> structured_expr_to_pl({"col": 32})
         Traceback (most recent call last):
             ...
@@ -485,19 +518,21 @@ def structured_expr_to_pl(cfg: dict | list[dict] | ListConfig | DictConfig) -> t
                 component_exprs.append(expr)
                 needed_cols.update(cols)
             return pl.coalesce(*component_exprs), needed_cols
-        case dict() | DictConfig() if set(cfg.keys()) == {"output", "matcher"} and is_matcher(cfg["matcher"]):
+        case dict() | DictConfig() if set(cfg.keys()) == {"output", "matcher"}:
+            matcher_valid, matcher_errs = is_matcher(cfg["matcher"])
+            if not matcher_valid:
+                raise ValueError(
+                    "A pre-specified output/matcher configuration must have a valid matcher dictionary. "
+                    f"Got cfg['matcher']={cfg['matcher']} which has errors: {matcher_errs}"
+                )
+
             matcher_expr, matcher_cols = matcher_to_expr(cfg["matcher"])
             try:
                 out_expr, out_cols = cfg_to_expr(cfg["output"])
             except ValueError as e:
                 raise ValueError(f"Error processing output/matcher config output expression for {cfg}") from e
             return pl.when(matcher_expr).then(out_expr), out_cols | matcher_cols
-        case dict() | DictConfig() if set(cfg.keys()) == {"output", "matcher"}:
-            # TODO(mmd): DRY out this and other error messages.
-            raise ValueError(
-                "A pre-specified output/matcher configuration must have a valid matcher dictionary, which is "
-                f"a dictionary with string-type keys. Got cfg['matcher']={cfg['matcher']}"
-            )
+
         case dict() | DictConfig() if ColExprType.is_valid(cfg)[0]:
             expr_type, expr_val = next(iter(cfg.items()))
             return ColExprType.to_pl_expr(expr_type, expr_val)
