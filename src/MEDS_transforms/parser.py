@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import re
 from enum import StrEnum
-from typing import Any
+from typing import Annotated, Any
 
 import polars as pl
 from omegaconf import DictConfig, ListConfig, OmegaConf
@@ -112,11 +112,75 @@ class ColExprType(StrEnum):
             via python's f-string syntax.
         LITERAL: A column expression that is a literal value regardless of type. No interpolation is allowed
             here.
+        EXTRACT: A column expression that extracts a substring from a column using a regex pattern.
     """
 
     COL = "col"
     STR = "str"
     LITERAL = "literal"
+    EXTRACT = "extract"
+
+    @classmethod
+    def _is_valid_extract_cfg(cls, cfg: dict[Any, Any]) -> tuple[bool, str | None]:
+        """Checks if a dictionary is a valid extract configuration.
+
+        Args:
+            cfg: A dictionary of extract configuration. This is the "inner part" of an overall column
+                expression."
+
+        Returns:
+            bool: True if the input is a valid extract configuration, False otherwise.
+            str | None: The reason the input is invalid, if it is invalid.
+
+        Examples:
+            >>> ColExprType._is_valid_extract_cfg({"from": "foo", "regex": "bar"})
+            (True, None)
+            >>> ColExprType._is_valid_extract_cfg({"from": "foo", "regex": "bar", "group_index": 0})
+            (True, None)
+            >>> ColExprType._is_valid_extract_cfg(32)
+            (False, 'Extract expressions must be a dictionary. Got 32')
+            >>> ColExprType._is_valid_extract_cfg({"from": "foo"})
+            (False, "Extract expressions must have a 'from' and 'regex' key. Got ['from']")
+            >>> ColExprType._is_valid_extract_cfg({"from": ["buzz"], "regex": "bar"})
+            (False, "Extract expressions must have a <class 'str'> value for 'from'. Got ['buzz']")
+            >>> ColExprType._is_valid_extract_cfg({"from": "foo", "regex": 32})
+            (False, "Extract expressions must have a <class 'str'> value for 'regex'. Got 32")
+            >>> ColExprType._is_valid_extract_cfg({"from": "foo", "regex": "bar", "group_index": "baz"})
+            (False, "Extract expressions must have a non-negative integer value for 'group_index'. Got baz")
+            >>> ColExprType._is_valid_extract_cfg({"from": "foo", "regex": "bar", "group_index": -1})
+            (False, "Extract expressions must have a non-negative integer value for 'group_index'. Got -1")
+            >>> ColExprType._is_valid_extract_cfg({"from": "foo", "regex": "bar", "ex": "baz"})
+            (False, "Extract expressions must have only 'from', 'regex', and 'group_index' keys. Got ['ex']")
+        """
+
+        MANDATORY_KEYS = {"from": str, "regex": str}
+        ALLOWED_KEYS = {**MANDATORY_KEYS, "group_index": Annotated[int, "non-negative integer"]}
+
+        if not isinstance(cfg, dict):
+            return False, f"Extract expressions must be a dictionary. Got {cfg}"
+        if not set(MANDATORY_KEYS).issubset(set(cfg.keys())):
+            return False, f"Extract expressions must have a 'from' and 'regex' key. Got {list(cfg.keys())}"
+        if not set(ALLOWED_KEYS).issuperset(set(cfg.keys())):
+            return False, (
+                "Extract expressions must have only 'from', 'regex', and 'group_index' keys. "
+                f"Got {sorted(list(set(cfg.keys()) - set(ALLOWED_KEYS)))}"
+            )
+
+        for key, allowed_T in ALLOWED_KEYS.items():
+            if key not in cfg:
+                continue
+            val = cfg[key]
+
+            if key == "group_index":
+                if not isinstance(val, int) or val < 0:
+                    return False, (
+                        f"Extract expressions must have a non-negative integer value for '{key}'. Got {val}"
+                    )
+            else:
+                if not isinstance(val, allowed_T):
+                    return False, f"Extract expressions must have a {allowed_T} value for '{key}'. Got {val}"
+
+        return True, None
 
     @classmethod
     def is_valid(cls, expr_dict: dict[ColExprType, Any]) -> tuple[bool, str | None]:
@@ -144,7 +208,7 @@ class ColExprType(StrEnum):
             (False, "Column expressions can only contain a single key-value pair.
                     Got {'col': 'foo', 'str': 'bar'}")
             >>> ColExprType.is_valid({"foo": "bar"})
-            (False, "Column expressions must have a key in ColExprType: ['col', 'str', 'literal']. Got foo")
+            (False, "Column expressions must have a key in ColExprType: ... Got foo")
             >>> ColExprType.is_valid([("col", "foo")])
             (False, "Column expressions must be a dictionary. Got [('col', 'foo')]")
         """
@@ -166,6 +230,8 @@ class ColExprType(StrEnum):
                 return False, f"String interpolation expressions must have a string value. Got {expr_val}"
             case cls.LITERAL:
                 return True, None
+            case cls.EXTRACT:
+                return cls._is_valid_extract_cfg(expr_val)
             case _:
                 return (
                     False,
@@ -203,6 +269,11 @@ class ColExprType(StrEnum):
             ['foo', 'bar']
             >>> cols
             set()
+            >>> expr, cols = ColExprType.to_pl_expr(ColExprType.EXTRACT, {"from": "foo", "regex": "bar"})
+            >>> print(expr)
+            col("foo").str.extract([String(bar)])
+            >>> sorted(cols)
+            ['foo']
             >>> ColExprType.to_pl_expr(ColExprType.COL, 32)
             Traceback (most recent call last):
                 ...
@@ -223,6 +294,12 @@ class ColExprType(StrEnum):
                 if isinstance(expr_val, ListConfig):
                     expr_val = OmegaConf.to_object(expr_val)
                 return pl.lit(expr_val), set()
+            case cls.EXTRACT:
+                expr = pl.col(expr_val["from"]).str.extract(
+                    expr_val["regex"], group_index=expr_val.get("group_index", 1)
+                )
+                cols = {expr_val["from"]}
+                return expr, cols
 
 
 def parse_col_expr(cfg: str | list | dict[str, str] | ListConfig | DictConfig) -> dict:
@@ -362,11 +439,16 @@ def structured_expr_to_pl(cfg: dict | list[dict] | ListConfig | DictConfig) -> t
         .when([(col("bar")) == (String(baz))].all_horizontal()).then(String(foo)).otherwise(null)
         >>> sorted(cols)
         ['bar']
-        >>> expr, cols = structured_expr_to_pl({"col": "bar"})
+        >>> expr, cols = structured_expr_to_pl({"extract": {"from": "foo", "regex": r"b/(.*)"}})
         >>> print(expr)
-        col("bar")
+        col("foo").str.extract([String(b/(.*))])
         >>> sorted(cols)
-        ['bar']
+        ['foo']
+        >>> expr, cols = structured_expr_to_pl({"extract": {"from": "foo", "regex": "bar", "group_index": 0}})
+        >>> print(expr)
+        col("foo").str.extract([String(bar)])
+        >>> sorted(cols)
+        ['foo']
         >>> structured_expr_to_pl(["foo", 32])
         Traceback (most recent call last):
             ...
