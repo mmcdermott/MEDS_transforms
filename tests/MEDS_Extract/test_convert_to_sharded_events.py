@@ -222,7 +222,7 @@ def test_convert_to_sharded_events():
             "event_cfgs.yaml": EVENT_CFGS_YAML,
             "metadata/.shards.json": SHARDS_JSON,
         },
-        event_conversion_config_fp="{input_dir}/event_cfgs.yaml",  # This makes the escape pass to hydra
+        event_conversion_config_fp="{input_dir}/event_cfgs.yaml",
         shards_map_fp="{input_dir}/metadata/.shards.json",
         want_outputs=WANT_OUTPUTS,
         df_check_kwargs={"check_row_order": False, "check_column_order": False, "check_dtypes": False},

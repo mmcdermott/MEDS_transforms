@@ -128,6 +128,6 @@ def test_split_and_shard():
             "data/admit_vitals/[10-16).parquet": pl.read_csv(StringIO(ADMIT_VITALS_10_16_CSV)),
             "event_cfgs.yaml": EVENT_CFGS_YAML,
         },
-        event_conversion_config_fp="{input_dir}/event_cfgs.yaml",  # This makes the escape pass to hydra
+        event_conversion_config_fp="{input_dir}/event_cfgs.yaml",
         want_outputs={"metadata/.shards.json": EXPECTED_SPLITS},
     )
