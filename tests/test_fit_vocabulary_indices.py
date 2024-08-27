@@ -35,3 +35,11 @@ def test_fit_vocabulary_indices_with_default_stage_config():
         transform_stage_kwargs=None,
         want_metadata=parse_code_metadata_csv(WANT_CSV),
     )
+
+    single_stage_transform_tester(
+        transform_script=FIT_VOCABULARY_INDICES_SCRIPT,
+        stage_name="fit_vocabulary_indices",
+        transform_stage_kwargs={"ordering_method": "file"},
+        want_metadata=parse_code_metadata_csv(WANT_CSV),
+        should_error=True,
+    )

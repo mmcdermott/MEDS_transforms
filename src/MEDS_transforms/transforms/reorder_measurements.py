@@ -184,5 +184,5 @@ def main(cfg: DictConfig):
     map_over(cfg, reorder_by_code_fntr)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

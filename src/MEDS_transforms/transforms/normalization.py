@@ -220,5 +220,5 @@ def main(cfg: DictConfig):
     map_over(cfg, compute_fn=normalize)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

@@ -483,7 +483,7 @@ def shard_iterator(
         shards = train_shards
         includes_only_train = True
     elif train_only:
-        logger.info(
+        logger.warning(
             f"train_only={train_only} requested but no dedicated train shards found; processing all shards "
             "and relying on `subject_splits.parquet` for filtering."
         )

@@ -225,3 +225,12 @@ def test_tokenization():
         input_shards=NORMALIZED_SHARDS,
         want_data={**WANT_SCHEMAS, **WANT_EVENT_SEQS},
     )
+
+    single_stage_transform_tester(
+        transform_script=TOKENIZATION_SCRIPT,
+        stage_name="tokenization",
+        transform_stage_kwargs={"train_only": True},
+        input_shards=NORMALIZED_SHARDS,
+        want_data={**WANT_SCHEMAS, **WANT_EVENT_SEQS},
+        should_error=True,
+    )

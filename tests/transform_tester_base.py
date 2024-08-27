@@ -405,6 +405,7 @@ def single_stage_transform_tester(
     want_data: dict[str, pl.DataFrame] | None = None,
     want_metadata: pl.DataFrame | None = None,
     assert_no_other_outputs: bool = True,
+    should_error: bool = False,
     **input_data_kwargs,
 ):
     with input_MEDS_dataset(**input_data_kwargs) as (MEDS_dir, cohort_dir):
@@ -422,6 +423,7 @@ def single_stage_transform_tester(
             "script": transform_script,
             "hydra_kwargs": pipeline_config_kwargs,
             "test_name": f"Single stage transform: {stage_name}",
+            "should_error": should_error,
         }
         if do_use_config_yaml:
             run_command_kwargs["do_use_config_yaml"] = True
@@ -432,6 +434,8 @@ def single_stage_transform_tester(
 
         # Run the transform
         stderr, stdout = run_command(**run_command_kwargs)
+        if should_error:
+            return
 
         try:
             check_outputs(cohort_dir, want_data=want_data, want_metadata=want_metadata)

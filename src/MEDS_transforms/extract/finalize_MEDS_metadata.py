@@ -219,5 +219,5 @@ def main(cfg: DictConfig):
     pq.write_table(subject_splits_tbl, subject_splits_fp)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

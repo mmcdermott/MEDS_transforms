@@ -13,7 +13,7 @@ from MEDS_transforms.mapreduce.mapper import map_over
 
 
 def filter_subjects_by_num_measurements(df: pl.LazyFrame, min_measurements_per_subject: int) -> pl.LazyFrame:
-    """Filters subjects by the number of measurements they have.
+    """Filters subjects by the number of dynamic (timestamp non-null) measurements they have.
 
     Args:
         df: The input DataFrame.
@@ -24,11 +24,11 @@ def filter_subjects_by_num_measurements(df: pl.LazyFrame, min_measurements_per_s
 
     Examples:
         >>> df = pl.DataFrame({
-        ...     "subject_id": [1, 1, 1, 2, 2, 3],
-        ...     "time": [1, 2, 1, 1, 2, 1],
+        ...     "subject_id": [1, 1, 1, 2, 2, 3, 3,    4],
+        ...     "time":       [1, 2, 1, 1, 2, 1, None, None],
         ... })
         >>> filter_subjects_by_num_measurements(df, 1)
-        shape: (6, 2)
+        shape: (7, 2)
         ┌────────────┬──────┐
         │ subject_id ┆ time │
         │ ---        ┆ ---  │
@@ -40,6 +40,7 @@ def filter_subjects_by_num_measurements(df: pl.LazyFrame, min_measurements_per_s
         │ 2          ┆ 1    │
         │ 2          ┆ 2    │
         │ 3          ┆ 1    │
+        │ 3          ┆ null │
         └────────────┴──────┘
         >>> filter_subjects_by_num_measurements(df, 2)
         shape: (5, 2)
@@ -102,7 +103,8 @@ def filter_subjects_by_num_events(df: pl.LazyFrame, min_events_per_subject: int)
         ...     "subject_id": [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4],
         ...     "time": [1, 1, 1, 1, 2, 1, 1, 2, 3, None, None, 1, 2, 3],
         ... })
-        >>> filter_subjects_by_num_events(df, 1)
+        >>> with pl.Config(tbl_rows=15):
+        ...     filter_subjects_by_num_events(df, 1)
         shape: (14, 2)
         ┌────────────┬──────┐
         │ subject_id ┆ time │
@@ -124,7 +126,8 @@ def filter_subjects_by_num_events(df: pl.LazyFrame, min_events_per_subject: int)
         │ 4          ┆ 2    │
         │ 4          ┆ 3    │
         └────────────┴──────┘
-        >>> filter_subjects_by_num_events(df, 2)
+        >>> with pl.Config(tbl_rows=15):
+        ...     filter_subjects_by_num_events(df, 2)
         shape: (11, 2)
         ┌────────────┬──────┐
         │ subject_id ┆ time │
@@ -195,6 +198,35 @@ def filter_subjects_by_num_events(df: pl.LazyFrame, min_events_per_subject: int)
 
 
 def filter_subjects_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
+    """Returns a function that filters subjects by the number of measurements and events they have.
+
+    Args:
+        stage_cfg: The stage configuration. Arguments include: min_measurements_per_subject,
+            min_events_per_subject, both of which should be integers or None which specify the minimum number
+            of measurements and events a subject must have to be included, respectively.
+
+    Returns:
+        The function that filters subjects by the number of measurements and/or events they have.
+
+    Examples:
+        >>> df = pl.DataFrame({
+        ...     "subject_id": [1, 1, 1, 1, 1, 2, 2, 2, 3,    3,    4, 4, 4, 4,    5, 5, 5, 5],
+        ...     "time":       [1, 1, 1, 1, 1, 1, 2, 3, None, None, 1, 2, 2, None, 1, 2, 3, 1],
+        ... })
+        >>> stage_cfg = DictConfig({"min_measurements_per_subject": 4, "min_events_per_subject": 2})
+        >>> filter_subjects_fntr(stage_cfg)(df)
+        shape: (4, 2)
+        ┌────────────┬──────┐
+        │ subject_id ┆ time │
+        │ ---        ┆ ---  │
+        │ i64        ┆ i64  │
+        ╞════════════╪══════╡
+        │ 5          ┆ 1    │
+        │ 5          ┆ 2    │
+        │ 5          ┆ 3    │
+        │ 5          ┆ 1    │
+        └────────────┴──────┘
+    """
     compute_fns = []
     if stage_cfg.min_measurements_per_subject:
         logger.info(
@@ -233,5 +265,5 @@ def main(cfg: DictConfig):
     map_over(cfg, compute_fn=filter_subjects_fntr)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

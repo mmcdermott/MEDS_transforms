@@ -202,3 +202,14 @@ def test_reshard_to_split():
         input_shards_map=IN_SHARDS_MAP,
         input_splits_map=SPLITS,
     )
+
+    single_stage_transform_tester(
+        transform_script=RESHARD_TO_SPLIT_SCRIPT,
+        stage_name="reshard_to_split",
+        transform_stage_kwargs={"n_patients_per_shard": 2, "+train_only": True},
+        want_data=WANT_SHARDS,
+        input_shards=IN_SHARDS,
+        input_shards_map=IN_SHARDS_MAP,
+        input_splits_map=SPLITS,
+        should_error=True,
+    )
