@@ -102,21 +102,21 @@ def filter_measurements_fntr(
         >>> code_metadata_df = pl.DataFrame({
         ...     "code":               ["A", "A", "B", "C"],
         ...     "modifier1":          [1,   2,   1,   2],
-        ...     "code/n_patients":    [2,   1,   3,   2],
+        ...     "code/n_subjects":    [2,   1,   3,   2],
         ...     "code/n_occurrences": [4,   5,   3,   2],
         ... })
         >>> data = pl.DataFrame({
-        ...     "patient_id": [1,   1,   2,   2],
+        ...     "subject_id": [1,   1,   2,   2],
         ...     "code":       ["A", "B", "A", "C"],
         ...     "modifier1":  [1,   1,   2,   2],
         ...     "_row_idx":   [1,   1,   1,   1],
         ... }).lazy()
-        >>> stage_cfg = DictConfig({"min_patients_per_code": 2, "min_occurrences_per_code": 3})
+        >>> stage_cfg = DictConfig({"min_subjects_per_code": 2, "min_occurrences_per_code": 3})
         >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (2, 4)
         ┌────────────┬──────┬───────────┬──────────┐
-        │ patient_id ┆ code ┆ modifier1 ┆ _row_idx │
+        │ subject_id ┆ code ┆ modifier1 ┆ _row_idx │
         │ ---        ┆ ---  ┆ ---       ┆ ---      │
         │ i64        ┆ str  ┆ i64       ┆ i64      │
         ╞════════════╪══════╪═══════════╪══════════╡
