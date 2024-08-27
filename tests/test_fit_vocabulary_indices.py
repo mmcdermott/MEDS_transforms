@@ -4,18 +4,15 @@ Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, ra
 scripts.
 """
 
-from io import StringIO
-
-import polars as pl
 
 from .transform_tester_base import (
     FIT_VOCABULARY_INDICES_SCRIPT,
-    MEDS_CODE_METADATA_SCHEMA,
+    parse_code_metadata_csv,
     single_stage_transform_tester,
 )
 
 WANT_CSV = """
-code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,description,parent_code,code/vocab_index
+code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,description,parent_codes,code/vocab_index
 ,44,4,28,3198.8389005974336,382968.28937288234,,,1
 ADMISSION//CARDIAC,2,2,0,,,,,2
 ADMISSION//ORTHOPEDIC,1,1,0,,,,,3
@@ -30,18 +27,11 @@ HR,12,4,12,1360.5000000000002,158538.77,"Heart Rate",LOINC/8867-4,11
 TEMP,12,4,12,1181.4999999999998,116373.38999999998,"Body Temperature",LOINC/8310-5,12
 """
 
-WANT_SCHEMA = {
-    **MEDS_CODE_METADATA_SCHEMA,
-    "code/vocab_index": pl.UInt8,
-}
-
-WANT_DF = pl.read_csv(StringIO(WANT_CSV), schema=WANT_SCHEMA)
-
 
 def test_fit_vocabulary_indices_with_default_stage_config():
     single_stage_transform_tester(
         transform_script=FIT_VOCABULARY_INDICES_SCRIPT,
         stage_name="fit_vocabulary_indices",
         transform_stage_kwargs=None,
-        want_outputs=WANT_DF,
+        want_metadata=parse_code_metadata_csv(WANT_CSV),
     )

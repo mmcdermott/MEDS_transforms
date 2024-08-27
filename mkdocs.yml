@@ -8,6 +8,7 @@ nav:
   - "Pipeline Configuration": pipeline_configuration.md
   - "Pre-processing Operations": preprocessing_operation_prototypes.md
   - "Terminology": terminology.md
+  - "Tokenization & Tensorization": tokenization_tensorization.md
   - API: api/
   - Issues: https://github.com/mmcdermott/MEDS_transforms/issues
 

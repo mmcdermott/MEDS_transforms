@@ -184,27 +184,27 @@ def extract_seq_of_patient_events(df: pl.LazyFrame) -> pl.LazyFrame:
         ...         None, datetime(2021, 1, 1), datetime(2021, 1, 1), datetime(2021, 1, 13),
         ...         None, datetime(2021, 1, 2), datetime(2021, 1, 2)],
         ...     "code": [100, 101, 102, 103, 200, 201, 202],
-        ...     "numeric_value": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+        ...     "numeric_value": pl.Series([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0], dtype=pl.Float32)
         ... }).lazy()
         >>> extract_seq_of_patient_events(df).collect()
         shape: (2, 4)
-        ┌────────────┬─────────────────┬───────────────────────────┬─────────────────────┐
-        │ patient_id ┆ time_delta_days ┆ code                      ┆ numeric_value       │
-        │ ---        ┆ ---             ┆ ---                       ┆ ---                 │
-        │ i64        ┆ list[f64]       ┆ list[list[f64]]           ┆ list[list[f64]]     │
-        ╞════════════╪═════════════════╪═══════════════════════════╪═════════════════════╡
-        │ 1          ┆ [NaN, 12.0]     ┆ [[101.0, 102.0], [103.0]] ┆ [[2.0, 3.0], [4.0]] │
-        │ 2          ┆ [NaN]           ┆ [[201.0, 202.0]]          ┆ [[6.0, 7.0]]        │
-        └────────────┴─────────────────┴───────────────────────────┴─────────────────────┘
+        ┌────────────┬─────────────────┬─────────────────────┬─────────────────────┐
+        │ patient_id ┆ time_delta_days ┆ code                ┆ numeric_value       │
+        │ ---        ┆ ---             ┆ ---                 ┆ ---                 │
+        │ i64        ┆ list[f32]       ┆ list[list[i64]]     ┆ list[list[f32]]     │
+        ╞════════════╪═════════════════╪═════════════════════╪═════════════════════╡
+        │ 1          ┆ [NaN, 12.0]     ┆ [[101, 102], [103]] ┆ [[2.0, 3.0], [4.0]] │
+        │ 2          ┆ [NaN]           ┆ [[201, 202]]        ┆ [[6.0, 7.0]]        │
+        └────────────┴─────────────────┴─────────────────────┴─────────────────────┘
     """
 
     _, dynamic = split_static_and_dynamic(df)
 
-    time_delta_days_expr = (pl.col("time").diff().dt.total_seconds() / SECONDS_PER_DAY).cast(pl.Float64)
+    time_delta_days_expr = (pl.col("time").diff().dt.total_seconds() / SECONDS_PER_DAY).cast(pl.Float32)
 
     return (
         dynamic.group_by("patient_id", "time", maintain_order=True)
-        .agg(fill_to_nans("code").name.keep(), fill_to_nans("numeric_value").name.keep())
+        .agg(pl.col("code").name.keep(), fill_to_nans("numeric_value").name.keep())
         .group_by("patient_id", maintain_order=True)
         .agg(
             fill_to_nans(time_delta_days_expr).alias("time_delta_days"),
