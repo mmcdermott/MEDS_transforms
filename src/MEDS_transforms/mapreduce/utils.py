@@ -5,12 +5,14 @@ import json
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from typing import TypeVar
 
 import pyarrow.parquet as pq
 from loguru import logger
 from omegaconf import DictConfig
 
 LOCK_TIME_FMT = "%Y-%m-%dT%H:%M:%S.%f"
+DF_T = TypeVar("DF_T")
 
 
 def is_complete_parquet_file(fp: Path) -> bool:
@@ -124,9 +126,7 @@ def default_file_checker(fp: Path) -> bool:
     return fp.is_file()
 
 
-def rwlock_wrap[
-    DF_T
-](
+def rwlock_wrap(
     in_fp: Path,
     out_fp: Path,
     read_fn: Callable[[Path], DF_T],

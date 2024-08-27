@@ -7,7 +7,7 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_transforms import PREPROCESS_CONFIG_YAML
+from MEDS_transforms import INFERRED_STAGE_KEYS, PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over
 
 
@@ -365,14 +365,6 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
 
 
 def add_time_derived_measurements_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
-    INFERRED_STAGE_KEYS = {
-        "is_metadata",
-        "data_input_dir",
-        "metadata_input_dir",
-        "output_dir",
-        "reducer_output_dir",
-    }
-
     compute_fns = []
     # We use the raw stages object as the induced `stage_cfg` has extra properties like the input and output
     # directories.
