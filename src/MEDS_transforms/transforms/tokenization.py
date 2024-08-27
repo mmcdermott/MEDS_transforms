@@ -229,10 +229,9 @@ def main(cfg: DictConfig):
     )
 
     output_dir = Path(cfg.stage_cfg.output_dir)
+    if train_only := cfg.stage_cfg.get("train_only", False):
+        raise ValueError(f"train_only={train_only} is not supported for this stage.")
     shards_single_output, include_only_train = shard_iterator(cfg)
-
-    if include_only_train:
-        raise ValueError("Not supported for this stage.")
 
     for in_fp, out_fp in shards_single_output:
         sharded_path = out_fp.relative_to(output_dir)
