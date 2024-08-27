@@ -1,15 +1,16 @@
-"""Tests the filter patients script.
+"""Tests the filter subjects script.
 
 Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, rather than the installed
 scripts.
 """
 
+from meds import subject_id_field
 
-from .transform_tester_base import FILTER_PATIENTS_SCRIPT, single_stage_transform_tester
+from .transform_tester_base import FILTER_SUBJECTS_SCRIPT, single_stage_transform_tester
 from .utils import parse_meds_csvs
 
-WANT_TRAIN_0 = """
-patient_id,time,code,numeric_value
+WANT_TRAIN_0 = f"""
+{subject_id_field},time,code,numeric_value
 239684,,EYE_COLOR//BROWN,
 239684,,HEIGHT,175.271115221764
 239684,"12/28/1980, 00:00:00",DOB,
@@ -42,18 +43,18 @@ patient_id,time,code,numeric_value
 1195293,"06/20/2010, 20:50:04",DISCHARGE,
 """
 
-# All patients in this shard had only 4 events.
-WANT_TRAIN_1 = """
-patient_id,time,code,numeric_value
+# All subjects in this shard had only 4 events.
+WANT_TRAIN_1 = f"""
+{subject_id_field},time,code,numeric_value
 """
 
-# All patients in this shard had only 4 events.
-WANT_TUNING_0 = """
-patient_id,time,code,numeric_value
+# All subjects in this shard had only 4 events.
+WANT_TUNING_0 = f"""
+{subject_id_field},time,code,numeric_value
 """
 
-WANT_HELD_OUT_0 = """
-patient_id,time,code,numeric_value
+WANT_HELD_OUT_0 = f"""
+{subject_id_field},time,code,numeric_value
 1500733,,EYE_COLOR//BROWN,
 1500733,,HEIGHT,158.60131573580904
 1500733,"07/20/1986, 00:00:00",DOB,
@@ -77,10 +78,10 @@ WANT_SHARDS = parse_meds_csvs(
 )
 
 
-def test_filter_patients():
+def test_filter_subjects():
     single_stage_transform_tester(
-        transform_script=FILTER_PATIENTS_SCRIPT,
-        stage_name="filter_patients",
-        transform_stage_kwargs={"min_events_per_patient": 5},
+        transform_script=FILTER_SUBJECTS_SCRIPT,
+        stage_name="filter_subjects",
+        transform_stage_kwargs={"min_events_per_subject": 5},
         want_data=WANT_SHARDS,
     )

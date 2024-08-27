@@ -20,17 +20,17 @@ SECONDS_PER_DAY = 60 * 60 * 24
 def ts_to_time_delta_days(ts: list[list[datetime]]) -> list[list[float]]:
     """TODO: Doctests"""
     out = []
-    for patient_ts in ts:
+    for subject_ts in ts:
         out.append([float("nan")])
-        for i in range(1, len(patient_ts)):
-            out[-1].append((patient_ts[i] - patient_ts[i - 1]).total_seconds() / SECONDS_PER_DAY)
+        for i in range(1, len(subject_ts)):
+            out[-1].append((subject_ts[i] - subject_ts[i - 1]).total_seconds() / SECONDS_PER_DAY)
     return out
 
 
 # TODO: Make these schemas exportable, maybe???
 # TODO: Why is the code getting converted to a float?
 SCHEMAS_SCHEMA = {
-    "patient_id": NORMALIZED_MEDS_SCHEMA["patient_id"],
+    "subject_id": NORMALIZED_MEDS_SCHEMA["subject_id"],
     "code": pl.List(NORMALIZED_MEDS_SCHEMA["code"]),
     "numeric_value": pl.List(NORMALIZED_MEDS_SCHEMA["numeric_value"]),
     "start_time": NORMALIZED_MEDS_SCHEMA["time"],
@@ -38,7 +38,7 @@ SCHEMAS_SCHEMA = {
 }
 
 SEQ_SCHEMA = {
-    "patient_id": NORMALIZED_MEDS_SCHEMA["patient_id"],
+    "subject_id": NORMALIZED_MEDS_SCHEMA["subject_id"],
     "code": pl.List(pl.List(pl.UInt8)),
     "numeric_value": pl.List(pl.List(NORMALIZED_MEDS_SCHEMA["numeric_value"])),
     "time_delta_days": pl.List(pl.Float32),
@@ -66,7 +66,7 @@ TRAIN_0_TIMES = [
 ]
 WANT_SCHEMAS_TRAIN_0 = pl.DataFrame(
     {
-        "patient_id": [239684, 1195293],
+        "subject_id": [239684, 1195293],
         "code": [[7, 9], [6, 9]],
         "numeric_value": [[None, 1.5770268440246582], [None, 0.06802856922149658]],
         "start_time": [ts[0] for ts in TRAIN_0_TIMES],
@@ -77,7 +77,7 @@ WANT_SCHEMAS_TRAIN_0 = pl.DataFrame(
 
 WANT_EVENT_SEQ_TRAIN_0 = pl.DataFrame(
     {
-        "patient_id": [239684, 1195293],
+        "subject_id": [239684, 1195293],
         "time_delta_days": ts_to_time_delta_days(TRAIN_0_TIMES),
         "code": [
             [[5], [1, 10, 11], [10, 11], [10, 11], [10, 11], [4]],
@@ -114,7 +114,7 @@ TRAIN_1_TIMES = [
 
 WANT_SCHEMAS_TRAIN_1 = pl.DataFrame(
     {
-        "patient_id": [68729, 814703],
+        "subject_id": [68729, 814703],
         "code": [[8, 9], [8, 9]],
         "numeric_value": [[None, -0.5438239574432373], [None, -1.1012336015701294]],
         "start_time": [ts[0] for ts in TRAIN_1_TIMES],
@@ -125,7 +125,7 @@ WANT_SCHEMAS_TRAIN_1 = pl.DataFrame(
 
 WANT_EVENT_SEQ_TRAIN_1 = pl.DataFrame(
     {
-        "patient_id": [68729, 814703],
+        "subject_id": [68729, 814703],
         "time_delta_days": ts_to_time_delta_days(TRAIN_1_TIMES),
         "code": [[[5], [3, 10, 11], [4]], [[5], [2, 10, 11], [4]]],
         "numeric_value": [
@@ -140,7 +140,7 @@ TUNING_0_TIMES = [[datetime(1988, 12, 19), datetime(2010, 1, 3, 6, 27, 59), date
 
 WANT_SCHEMAS_TUNING_0 = pl.DataFrame(
     {
-        "patient_id": [754281],
+        "subject_id": [754281],
         "code": [[7, 9]],
         "numeric_value": [[None, 0.28697699308395386]],
         "start_time": [ts[0] for ts in TUNING_0_TIMES],
@@ -151,7 +151,7 @@ WANT_SCHEMAS_TUNING_0 = pl.DataFrame(
 
 WANT_EVENT_SEQ_TUNING_0 = pl.DataFrame(
     {
-        "patient_id": [754281],
+        "subject_id": [754281],
         "time_delta_days": ts_to_time_delta_days(TUNING_0_TIMES),
         "code": [[[5], [3, 10, 11], [4]]],
         "numeric_value": [
@@ -174,7 +174,7 @@ HELD_OUT_0_TIMES = [
 
 WANT_SCHEMAS_HELD_OUT_0 = pl.DataFrame(
     {
-        "patient_id": [1500733],
+        "subject_id": [1500733],
         "code": [[7, 9]],
         "numeric_value": [[None, -0.7995940446853638]],
         "start_time": [ts[0] for ts in HELD_OUT_0_TIMES],
@@ -185,7 +185,7 @@ WANT_SCHEMAS_HELD_OUT_0 = pl.DataFrame(
 
 WANT_EVENT_SEQ_HELD_OUT_0 = pl.DataFrame(
     {
-        "patient_id": [1500733],
+        "subject_id": [1500733],
         "time_delta_days": ts_to_time_delta_days(HELD_OUT_0_TIMES),
         "code": [[[5], [2, 10, 11], [10, 11], [10, 11], [4]]],
         "numeric_value": [

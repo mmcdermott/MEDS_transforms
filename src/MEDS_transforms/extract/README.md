@@ -4,8 +4,8 @@ This directory contains the scripts and functions used to extract raw data into 
 dataset is:
 
 1. Arranged in a series of files on disk of an allowed format (e.g., `.csv`, `.csv.gz`, `.parquet`)...
-2. Such that each file stores a dataframe containing data about patients such that each row of any given
-    table corresponds to zero or more observations about a patient at a given time...
+2. Such that each file stores a dataframe containing data about subjects such that each row of any given
+    table corresponds to zero or more observations about a subject at a given time...
 3. And you can configure how to extract those observations in the time, code, and numeric value
     format of MEDS in the event conversion `yaml` file format specified below, then...
     this tool can automatically extract your raw data into a MEDS dataset for you in an efficient, reproducible,
@@ -53,7 +53,7 @@ step](#step-0-pre-meds) and the [Data Cleaning step](#step-3-data-cleanup), for 
 ### Event Conversion Configuration
 
 The event conversion configuration file tells MEDS Extract how to convert each row of a file among your raw
-data files into one or more MEDS measurements (meaning a tuple of a patient ID, a time, a categorical
+data files into one or more MEDS measurements (meaning a tuple of a subject ID, a time, a categorical
 code, and/or various other value or properties columns, most commonly a numeric value). This file is written
 in yaml and has the following format:
 
@@ -93,11 +93,11 @@ each row of the file will be converted into a MEDS event according to the logic 
     here, as string literals _cannot_ be used for these columns.
 
 There are several more nuanced aspects to the configuration file that have not yet been discussed. First, the
-configuration file also specifies how to identify the patient ID from the raw data. This can be done either by
-specifying a global `patient_id_col` field at the top level of the configuration file, or by specifying a
-`patient_id_col` field at the per-file or per-event level. Multiple specifications can be used simultaneously,
-with the most local taking precedent. If no patient ID column is specified, the patient ID will be assumed to
-be stored in a `patient_id` column. If the patient ID column is not found, an error will be raised.
+configuration file also specifies how to identify the subject ID from the raw data. This can be done either by
+specifying a global `subject_id_col` field at the top level of the configuration file, or by specifying a
+`subject_id_col` field at the per-file or per-event level. Multiple specifications can be used simultaneously,
+with the most local taking precedent. If no subject ID column is specified, the subject ID will be assumed to
+be stored in a `subject_id` column. If the subject ID column is not found, an error will be raised.
 
 Second, you can also specify how to link the codes constructed for each event block to code-specific metadata
 in these blocks. This is done by specifying a `_metadata` block in the event block. The format of this block
@@ -117,7 +117,7 @@ the [Partial MIMIC-IV Example](#partial-mimic-iv-example) below for an example o
 
 ```yaml
 subjects:
-  patient_id_col: MRN
+  subject_id_col: MRN
   eye_color:
     code:
       - EYE_COLOR
@@ -144,7 +144,7 @@ admit_vitals:
 ##### Partial MIMIC-IV Example
 
 ```yaml
-patient_id_col: subject_id
+subject_id_col: subject_id
 hosp/admissions:
   admission:
     code:
@@ -259,4 +259,4 @@ Note that this tool is _not_:
 TODO: Add issues for all of these.
 
 1. Single event blocks for files should be specifiable directly, without an event block name.
-2. Time format should be specifiable at the file or global level, like patient ID.
+2. Time format should be specifiable at the file or global level, like subject ID.

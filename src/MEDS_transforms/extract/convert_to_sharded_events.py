@@ -97,7 +97,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
     """Extracts a single event dataframe from the raw data.
 
     Args:
-        df: The raw data DataFrame. This must have a `"patient_id"` column containing the patient ID. The
+        df: The raw data DataFrame. This must have a `"subject_id"` column containing the subject ID. The
             other columns it must have are determined by the `event_cfg` configuration dictionary.
         event_cfg: A dictionary containing the configuration for the event. This must contain two critical
             keys (`"code"` and `"time"`) and may contain additional keys for other columns to include
@@ -128,7 +128,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         A DataFrame containing the event data extracted from the raw data, containing only unique rows across
         all columns. If the raw data has no duplicates when considering the event column space, the output
         dataframe will have the same number of rows as the raw data and be in the same order. The output
-        dataframe will contain at least three columns: `"patient_id"`, `"code"`, and `"time"`. If the
+        dataframe will contain at least three columns: `"subject_id"`, `"code"`, and `"time"`. If the
         event has additional columns, they will be included in the output dataframe as well. **_Events that
         would be extracted with a null code or a time that should be specified via a column with or
         without a formatting option but in practice is null will be dropped._** Note that this dropping logic
@@ -145,7 +145,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         >>> _ = pl.Config.set_tbl_rows(20)
         >>> _ = pl.Config.set_tbl_cols(20)
         >>> raw_data = pl.DataFrame({
-        ...     "patient_id": [1, 1, 2, 2],
+        ...     "subject_id": [1, 1, 2, 2],
         ...     "code": ["A", "B", "C", "D"],
         ...     "code_modifier": ["1", "2", "3", "4"],
         ...     "time": ["2021-01-01", "2021-01-02", "2021-01-03", "2021-01-04"],
@@ -160,7 +160,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         >>> extract_event(raw_data, event_cfg)
         shape: (4, 4)
         ┌────────────┬───────────┬─────────────────────┬───────────────┐
-        │ patient_id ┆ code      ┆ time                ┆ numeric_value │
+        │ subject_id ┆ code      ┆ time                ┆ numeric_value │
         │ ---        ┆ ---       ┆ ---                 ┆ ---           │
         │ i64        ┆ str       ┆ datetime[μs]        ┆ i64           │
         ╞════════════╪═══════════╪═════════════════════╪═══════════════╡
@@ -170,7 +170,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         │ 2          ┆ FOO//D//4 ┆ 2021-01-04 00:00:00 ┆ 4             │
         └────────────┴───────────┴─────────────────────┴───────────────┘
         >>> data_with_nulls = pl.DataFrame({
-        ...     "patient_id": [1, 1, 2, 2],
+        ...     "subject_id": [1, 1, 2, 2],
         ...     "code": ["A", None, "C", "D"],
         ...     "code_modifier": ["1", "2", "3", None],
         ...     "time": [None, "2021-01-02", "2021-01-03", "2021-01-04"],
@@ -185,7 +185,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         >>> extract_event(data_with_nulls, event_cfg)
         shape: (2, 4)
         ┌────────────┬────────┬─────────────────────┬───────────────┐
-        │ patient_id ┆ code   ┆ time                ┆ numeric_value │
+        │ subject_id ┆ code   ┆ time                ┆ numeric_value │
         │ ---        ┆ ---    ┆ ---                 ┆ ---           │
         │ i64        ┆ str    ┆ datetime[μs]        ┆ i64           │
         ╞════════════╪════════╪═════════════════════╪═══════════════╡
@@ -195,7 +195,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         >>> from datetime import datetime
         >>> complex_raw_data = pl.DataFrame(
         ...     {
-        ...         "patient_id": [1, 1, 2, 2, 2, 3],
+        ...         "subject_id": [1, 1, 2, 2, 2, 3],
         ...         "admission_time": [
         ...             "2021-01-01 00:00:00",
         ...             "2021-01-02 00:00:00",
@@ -227,7 +227,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         ...         "eye_color": ["blue", "blue", "green", "green", "green", "brown"],
         ...     },
         ...     schema={
-        ...         "patient_id": pl.UInt8,
+        ...         "subject_id": pl.UInt8,
         ...         "admission_time": pl.Utf8,
         ...         "discharge_time": pl.Datetime,
         ...         "admission_type": pl.Utf8,
@@ -263,7 +263,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         >>> complex_raw_data
         shape: (6, 9)
         ┌────────────┬─────────────────────┬─────────────────────┬────────────────┬────────────────────┬──────────────────┬────────────────┬────────────┬───────────┐
-        │ patient_id ┆ admission_time      ┆ discharge_time      ┆ admission_type ┆ discharge_location ┆ discharge_status ┆ severity_score ┆ death_time ┆ eye_color │
+        │ subject_id ┆ admission_time      ┆ discharge_time      ┆ admission_type ┆ discharge_location ┆ discharge_status ┆ severity_score ┆ death_time ┆ eye_color │
         │ ---        ┆ ---                 ┆ ---                 ┆ ---            ┆ ---                ┆ ---              ┆ ---            ┆ ---        ┆ ---       │
         │ u8         ┆ str                 ┆ datetime[μs]        ┆ str            ┆ cat                ┆ str              ┆ f64            ┆ str        ┆ cat       │
         ╞════════════╪═════════════════════╪═════════════════════╪════════════════╪════════════════════╪══════════════════╪════════════════╪════════════╪═══════════╡
@@ -277,7 +277,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         >>> extract_event(complex_raw_data, valid_admission_event_cfg)
         shape: (6, 4)
         ┌────────────┬──────────────┬─────────────────────┬───────────────┐
-        │ patient_id ┆ code         ┆ time                ┆ numeric_value │
+        │ subject_id ┆ code         ┆ time                ┆ numeric_value │
         │ ---        ┆ ---          ┆ ---                 ┆ ---           │
         │ u8         ┆ str          ┆ datetime[μs]        ┆ f64           │
         ╞════════════╪══════════════╪═════════════════════╪═══════════════╡
@@ -294,7 +294,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         ... )
         shape: (6, 4)
         ┌────────────┬──────────────┬─────────────────────┬───────────────┐
-        │ patient_id ┆ code         ┆ time                ┆ numeric_value │
+        │ subject_id ┆ code         ┆ time                ┆ numeric_value │
         │ ---        ┆ ---          ┆ ---                 ┆ ---           │
         │ u8         ┆ str          ┆ datetime[μs]        ┆ f64           │
         ╞════════════╪══════════════╪═════════════════════╪═══════════════╡
@@ -311,7 +311,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         ... )
         shape: (6, 4)
         ┌────────────┬──────────────┬─────────────────────┬───────────────┐
-        │ patient_id ┆ code         ┆ time                ┆ numeric_value │
+        │ subject_id ┆ code         ┆ time                ┆ numeric_value │
         │ ---        ┆ ---          ┆ ---                 ┆ ---           │
         │ u8         ┆ str          ┆ datetime[μs]        ┆ f64           │
         ╞════════════╪══════════════╪═════════════════════╪═══════════════╡
@@ -325,7 +325,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         >>> extract_event(complex_raw_data, valid_discharge_event_cfg)
         shape: (6, 5)
         ┌────────────┬─────────────────┬─────────────────────┬───────────────────┬────────────┐
-        │ patient_id ┆ code            ┆ time                ┆ categorical_value ┆ text_value │
+        │ subject_id ┆ code            ┆ time                ┆ categorical_value ┆ text_value │
         │ ---        ┆ ---             ┆ ---                 ┆ ---               ┆ ---        │
         │ u8         ┆ str             ┆ datetime[μs]        ┆ str               ┆ str        │
         ╞════════════╪═════════════════╪═════════════════════╪═══════════════════╪════════════╡
@@ -339,7 +339,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         >>> extract_event(complex_raw_data, valid_death_event_cfg)
         shape: (3, 3)
         ┌────────────┬───────┬─────────────────────┐
-        │ patient_id ┆ code  ┆ time                │
+        │ subject_id ┆ code  ┆ time                │
         │ ---        ┆ ---   ┆ ---                 │
         │ u8         ┆ str   ┆ datetime[μs]        │
         ╞════════════╪═══════╪═════════════════════╡
@@ -351,7 +351,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         >>> extract_event(complex_raw_data, valid_static_event_cfg)
         shape: (3, 3)
         ┌────────────┬──────────────────┬──────────────┐
-        │ patient_id ┆ code             ┆ time         │
+        │ subject_id ┆ code             ┆ time         │
         │ ---        ┆ ---              ┆ ---          │
         │ u8         ┆ str              ┆ datetime[μs] │
         ╞════════════╪══════════════════╪══════════════╡
@@ -371,10 +371,10 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         Traceback (most recent call last):
             ...
         ValueError: Invalid time literal: 12-01-23
-        >>> extract_event(complex_raw_data, {"code": "test", "time": None, "patient_id": 3})
+        >>> extract_event(complex_raw_data, {"code": "test", "time": None, "subject_id": 3})
         Traceback (most recent call last):
             ...
-        KeyError: "Event column name 'patient_id' cannot be overridden."
+        KeyError: "Event column name 'subject_id' cannot be overridden."
         >>> extract_event(complex_raw_data, {"code": "test", "time": None, "foobar": "fuzz"})
         Traceback (most recent call last):
             ...
@@ -389,7 +389,7 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         ValueError: Source column 'discharge_time' for event column foobar is not numeric, string, or categorical! Cannot be used as an event col.
     """  # noqa: E501
     event_cfg = copy.deepcopy(event_cfg)
-    event_exprs = {"patient_id": pl.col("patient_id")}
+    event_exprs = {"subject_id": pl.col("subject_id")}
 
     if "code" not in event_cfg:
         raise KeyError(
@@ -401,8 +401,8 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
             "Event configuration dictionary must contain 'time' key. "
             f"Got: [{', '.join(event_cfg.keys())}]."
         )
-    if "patient_id" in event_cfg:
-        raise KeyError("Event column name 'patient_id' cannot be overridden.")
+    if "subject_id" in event_cfg:
+        raise KeyError("Event column name 'subject_id' cannot be overridden.")
 
     code_expr, code_null_filter_expr, needed_cols = get_code_expr(event_cfg.pop("code"))
 
@@ -502,7 +502,7 @@ def convert_to_events(
     """Converts a DataFrame of raw data into a DataFrame of events.
 
     Args:
-        df: The raw data DataFrame. This must have a `"patient_id"` column containing the patient ID. The
+        df: The raw data DataFrame. This must have a `"subject_id"` column containing the subject ID. The
             other columns it must have are determined by the `event_cfgs` configuration dictionary.
             For the precise mechanism of column determination, see the `extract_event` function.
         event_cfgs: A dictionary containing the configurations for the events to extract. The keys of this
@@ -518,7 +518,7 @@ def convert_to_events(
         events extracted from the raw data, with the rows from each event DataFrame concatenated together.
         After concatenation, this dataframe will not be deduplicated, so if the raw data results in duplicates
         across events of different name, these will be preserved in the output DataFrame.
-        The output DataFrame will contain at least three columns: `"patient_id"`, `"code"`, and `"time"`.
+        The output DataFrame will contain at least three columns: `"subject_id"`, `"code"`, and `"time"`.
         If any events have additional columns, these will be included in the output DataFrame as well. All
         columns across all event configurations will be included in the output DataFrame, with `null` values
         filled in for events that do not have a particular column.
@@ -533,7 +533,7 @@ def convert_to_events(
         >>> from datetime import datetime
         >>> complex_raw_data = pl.DataFrame(
         ...     {
-        ...         "patient_id": [1, 1, 2, 2, 2, 3],
+        ...         "subject_id": [1, 1, 2, 2, 2, 3],
         ...         "admission_time": [
         ...             "2021-01-01 00:00:00",
         ...             "2021-01-02 00:00:00",
@@ -564,7 +564,7 @@ def convert_to_events(
         ...         "eye_color": ["blue", "blue", "green", "green", "green", "brown"],
         ...     },
         ...     schema={
-        ...         "patient_id": pl.UInt8,
+        ...         "subject_id": pl.UInt8,
         ...         "admission_time": pl.Utf8,
         ...         "discharge_time": pl.Datetime,
         ...         "admission_type": pl.Utf8,
@@ -602,7 +602,7 @@ def convert_to_events(
         >>> complex_raw_data
         shape: (6, 8)
         ┌────────────┬─────────────────────┬─────────────────────┬────────────────┬────────────────────┬────────────────┬────────────┬───────────┐
-        │ patient_id ┆ admission_time      ┆ discharge_time      ┆ admission_type ┆ discharge_location ┆ severity_score ┆ death_time ┆ eye_color │
+        │ subject_id ┆ admission_time      ┆ discharge_time      ┆ admission_type ┆ discharge_location ┆ severity_score ┆ death_time ┆ eye_color │
         │ ---        ┆ ---                 ┆ ---                 ┆ ---            ┆ ---                ┆ ---            ┆ ---        ┆ ---       │
         │ u8         ┆ str                 ┆ datetime[μs]        ┆ str            ┆ cat                ┆ f64            ┆ str        ┆ cat       │
         ╞════════════╪═════════════════════╪═════════════════════╪════════════════╪════════════════════╪════════════════╪════════════╪═══════════╡
@@ -616,7 +616,7 @@ def convert_to_events(
         >>> convert_to_events(complex_raw_data, event_cfgs)
         shape: (18, 7)
         ┌────────────┬───────────┬─────────────────────┬────────────────┬───────────────────────┬────────────────────┬───────────┐
-        │ patient_id ┆ code      ┆ time                ┆ admission_type ┆ severity_on_admission ┆ discharge_location ┆ eye_color │
+        │ subject_id ┆ code      ┆ time                ┆ admission_type ┆ severity_on_admission ┆ discharge_location ┆ eye_color │
         │ ---        ┆ ---       ┆ ---                 ┆ ---            ┆ ---                   ┆ ---                ┆ ---       │
         │ u8         ┆ str       ┆ datetime[μs]        ┆ str            ┆ f64                   ┆ cat                ┆ cat       │
         ╞════════════╪═══════════╪═════════════════════╪════════════════╪═══════════════════════╪════════════════════╪═══════════╡
@@ -666,7 +666,7 @@ def convert_to_events(
 
 @hydra.main(version_base=None, config_path=str(CONFIG_YAML.parent), config_name=CONFIG_YAML.stem)
 def main(cfg: DictConfig):
-    """Converts the event-sharded raw data into MEDS events and storing them in patient subsharded flat files.
+    """Converts the event-sharded raw data into MEDS events and storing them in subject subsharded flat files.
 
     All arguments are specified through the command line into the `cfg` object through Hydra.
 
@@ -680,7 +680,7 @@ def main(cfg: DictConfig):
     file.
     """
 
-    input_dir, patient_subsharded_dir, metadata_input_dir = stage_init(cfg)
+    input_dir, subject_subsharded_dir, metadata_input_dir = stage_init(cfg)
 
     shards = json.loads(Path(cfg.shards_map_fp).read_text())
 
@@ -694,13 +694,13 @@ def main(cfg: DictConfig):
     event_conversion_cfg = OmegaConf.load(event_conversion_cfg_fp)
     logger.info(f"Event conversion config:\n{OmegaConf.to_yaml(event_conversion_cfg)}")
 
-    default_patient_id_col = event_conversion_cfg.pop("patient_id_col", "patient_id")
+    default_subject_id_col = event_conversion_cfg.pop("subject_id_col", "subject_id")
 
-    patient_subsharded_dir.mkdir(parents=True, exist_ok=True)
-    OmegaConf.save(event_conversion_cfg, patient_subsharded_dir / "event_conversion_config.yaml")
+    subject_subsharded_dir.mkdir(parents=True, exist_ok=True)
+    OmegaConf.save(event_conversion_cfg, subject_subsharded_dir / "event_conversion_config.yaml")
 
-    patient_splits = list(shards.items())
-    random.shuffle(patient_splits)
+    subject_splits = list(shards.items())
+    random.shuffle(subject_splits)
 
     event_configs = list(event_conversion_cfg.items())
     random.shuffle(event_configs)
@@ -708,28 +708,28 @@ def main(cfg: DictConfig):
     # Here, we'll be reading files directly, so we'll turn off globbing
     read_fn = partial(pl.scan_parquet, glob=False)
 
-    for sp, patients in patient_splits:
+    for sp, subjects in subject_splits:
         for input_prefix, event_cfgs in event_configs:
             event_cfgs = copy.deepcopy(event_cfgs)
-            input_patient_id_column = event_cfgs.pop("patient_id_col", default_patient_id_col)
+            input_subject_id_column = event_cfgs.pop("subject_id_col", default_subject_id_col)
 
             event_shards = list((input_dir / input_prefix).glob("*.parquet"))
             random.shuffle(event_shards)
 
             for shard_fp in event_shards:
-                out_fp = patient_subsharded_dir / sp / input_prefix / shard_fp.name
+                out_fp = subject_subsharded_dir / sp / input_prefix / shard_fp.name
                 logger.info(f"Converting {shard_fp} to events and saving to {out_fp}")
 
                 def compute_fn(df: pl.LazyFrame) -> pl.LazyFrame:
-                    typed_patients = pl.Series(patients, dtype=df.schema[input_patient_id_column])
+                    typed_subjects = pl.Series(subjects, dtype=df.schema[input_subject_id_column])
 
-                    if input_patient_id_column != "patient_id":
-                        df = df.rename({input_patient_id_column: "patient_id"})
+                    if input_subject_id_column != "subject_id":
+                        df = df.rename({input_subject_id_column: "subject_id"})
 
                     try:
                         logger.info(f"Extracting events for {input_prefix}/{shard_fp.name}")
                         return convert_to_events(
-                            df.filter(pl.col("patient_id").is_in(typed_patients)),
+                            df.filter(pl.col("subject_id").is_in(typed_subjects)),
                             event_cfgs=copy.deepcopy(event_cfgs),
                         )
                     except Exception as e:

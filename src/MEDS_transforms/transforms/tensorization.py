@@ -32,7 +32,7 @@ def convert_to_NRT(df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
 
     Examples:
         >>> df = pl.DataFrame({
-        ...     "patient_id": [1, 2],
+        ...     "subject_id": [1, 2],
         ...     "time_delta_days": [[float("nan"), 12.0], [float("nan")]],
         ...     "code": [[[101.0, 102.0], [103.0]], [[201.0, 202.0]]],
         ...     "numeric_value": [[[2.0, 3.0], [4.0]], [[6.0, 7.0]]]
@@ -40,7 +40,7 @@ def convert_to_NRT(df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
         >>> df
         shape: (2, 4)
         ┌────────────┬─────────────────┬───────────────────────────┬─────────────────────┐
-        │ patient_id ┆ time_delta_days ┆ code                      ┆ numeric_value       │
+        │ subject_id ┆ time_delta_days ┆ code                      ┆ numeric_value       │
         │ ---        ┆ ---             ┆ ---                       ┆ ---                 │
         │ i64        ┆ list[f64]       ┆ list[list[f64]]           ┆ list[list[f64]]     │
         ╞════════════╪═════════════════╪═══════════════════════════╪═════════════════════╡

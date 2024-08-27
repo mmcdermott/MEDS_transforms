@@ -11,6 +11,7 @@ from pathlib import Path
 import hydra
 import polars as pl
 from loguru import logger
+from meds import subject_id_field
 from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms.extract import CONFIG_YAML
@@ -169,7 +170,7 @@ def retrieve_columns(event_conversion_cfg: DictConfig) -> dict[str, list[str]]:
     event conversion configurations that are specific to each file based on its
     stem (filename without the extension). It compiles a list of column names
     needed for each file from the configuration, which includes both general
-    columns like row index and patient ID, as well as specific columns defined
+    columns like row index and subject ID, as well as specific columns defined
     for medical events and times formatted in a special 'col(column_name)' syntax.
 
     Args:
@@ -185,7 +186,7 @@ def retrieve_columns(event_conversion_cfg: DictConfig) -> dict[str, list[str]]:
 
     Examples:
         >>> cfg = DictConfig({
-        ...     "patient_id_col": "patient_id_global",
+        ...     "subject_id_col": "subject_id_global",
         ...     "hosp/patients": {
         ...         "eye_color": {
         ...             "code": ["EYE_COLOR", "col(eye_color)"], "time": None, "mod": "mod_col"
@@ -195,7 +196,7 @@ def retrieve_columns(event_conversion_cfg: DictConfig) -> dict[str, list[str]]:
         ...         }
         ...     },
         ...     "icu/chartevents": {
-        ...         "patient_id_col": "patient_id_icu",
+        ...         "subject_id_col": "subject_id_icu",
         ...         "heart_rate": {
         ...             "code": "HEART_RATE", "time": "charttime", "numeric_value": "HR"
         ...         },
@@ -212,19 +213,19 @@ def retrieve_columns(event_conversion_cfg: DictConfig) -> dict[str, list[str]]:
         ...     }
         ... })
         >>> retrieve_columns(cfg) # doctest: +NORMALIZE_WHITESPACE
-        {'hosp/patients': ['eye_color', 'height', 'mod_col', 'patient_id_global'],
-         'icu/chartevents': ['HR', 'charttime', 'itemid', 'mod_lab', 'patient_id_icu', 'value', 'valuenum',
+        {'hosp/patients': ['eye_color', 'height', 'mod_col', 'subject_id_global'],
+         'icu/chartevents': ['HR', 'charttime', 'itemid', 'mod_lab', 'subject_id_icu', 'value', 'valuenum',
                              'valueuom'],
-         'icu/meds': ['medication', 'medtime', 'patient_id_global']}
+         'icu/meds': ['medication', 'medtime', 'subject_id_global']}
         >>> cfg = DictConfig({
         ...     "subjects": {
-        ...         "patient_id_col": "MRN",
+        ...         "subject_id_col": "MRN",
         ...         "eye_color": {"code": ["col(eye_color)"], "time": None},
         ...     },
         ...     "labs": {"lab": {"code": "col(labtest)", "time": "charttime"}},
         ... })
         >>> retrieve_columns(cfg)
-        {'subjects': ['MRN', 'eye_color'], 'labs': ['charttime', 'labtest', 'patient_id']}
+        {'subjects': ['MRN', 'eye_color'], 'labs': ['charttime', 'labtest', 'subject_id']}
     """
 
     event_conversion_cfg = copy.deepcopy(event_conversion_cfg)
@@ -232,11 +233,11 @@ def retrieve_columns(event_conversion_cfg: DictConfig) -> dict[str, list[str]]:
     # Initialize a dictionary to store file paths as keys and lists of column names as values.
     prefix_to_columns = {}
 
-    default_patient_id_col = event_conversion_cfg.pop("patient_id_col", "patient_id")
+    default_subject_id_col = event_conversion_cfg.pop("subject_id_col", subject_id_field)
     for input_prefix, event_cfgs in event_conversion_cfg.items():
-        input_patient_id_column = event_cfgs.pop("patient_id_col", default_patient_id_col)
+        input_subject_id_column = event_cfgs.pop("subject_id_col", default_subject_id_col)
 
-        prefix_to_columns[input_prefix] = {input_patient_id_column}
+        prefix_to_columns[input_prefix] = {input_subject_id_column}
 
         for event_cfg in event_cfgs.values():
             # If the config has a 'code' key and it contains column fields, parse and add them.

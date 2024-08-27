@@ -1,7 +1,7 @@
-# Note that there is no "patient_id" for eICU -- patients are only differentiable during the course of a
+# Note that there is no "subject_id" for eICU -- patients are only differentiable during the course of a
 # single health system stay. Accordingly, we set the "patient" id here as the "patientHealthSystemStayID"
 
-patient_id_col: patienthealthsystemstayid
+subject_id_col: patienthealthsystemstayid
 
 patient:
   dob:
@@ -131,7 +131,7 @@ infusionDrug:
     volume_of_fluid: "volumeoffluid"
   patient_weight:
     code:
-      - "INFUSION_PATIENT_WEIGHT"
+      - "INFUSION_SUBJECT_WEIGHT"
     time: col(infusionEnteredTimestamp)
     numeric_value: "patientweight"
 
