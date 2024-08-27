@@ -19,7 +19,31 @@ from MEDS_transforms.utils import stage_init, write_lazyframe
 
 
 def valid_json_file(fp: Path) -> bool:
-    """Check if a file is a valid JSON file."""
+    """Check if a file is a valid JSON file.
+
+    Args:
+        fp: Path to the file.
+
+    Returns:
+        True if the file is a valid JSON file, False otherwise.
+
+    Examples:
+        >>> import tempfile
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     fp = Path(tmpdir) / "test.json"
+        ...     valid_json_file(fp)
+        False
+        >>> with tempfile.NamedTemporaryFile(suffix=".json") as tmpfile:
+        ...     fp = Path(tmpfile.name)
+        ...     _ = fp.write_text("foobar not a json file.\tHello, world!")
+        ...     valid_json_file(fp)
+        False
+        >>> with tempfile.NamedTemporaryFile(suffix=".json") as tmpfile:
+        ...     fp = Path(tmpfile.name)
+        ...     _ = fp.write_text('{"foo": "bar"}')
+        ...     valid_json_file(fp)
+        True
+    """
     if not fp.is_file():
         return False
     try:
@@ -30,6 +54,7 @@ def valid_json_file(fp: Path) -> bool:
 
 
 def make_new_shards_fn(df: pl.DataFrame, cfg: DictConfig, stage_cfg: DictConfig) -> dict[str, list[str]]:
+    """This function creates a new sharding scheme for the MEDS cohort."""
     splits_map = defaultdict(list)
     for pt_id, sp in df.iter_rows():
         splits_map[sp].append(pt_id)
@@ -44,6 +69,20 @@ def make_new_shards_fn(df: pl.DataFrame, cfg: DictConfig, stage_cfg: DictConfig)
 
 
 def write_json(d: dict, fp: Path) -> None:
+    """Write a dictionary to a JSON file.
+
+    Args:
+        d: Dictionary to write.
+        fp: Path to the file.
+
+    Examples:
+        >>> import tempfile
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     fp = Path(tmpdir) / "test.json"
+        ...     write_json({"foo": "bar"}, fp)
+        ...     fp.read_text()
+        '{"foo": "bar"}'
+    """
     fp.write_text(json.dumps(d))
 
 
@@ -79,9 +118,10 @@ def main(cfg: DictConfig):
 
     new_sharded_splits = json.loads(shards_fp.read_text())
 
-    orig_shards_iter, include_only_train = shard_iterator(cfg, out_suffix="")
-    if include_only_train:
-        raise ValueError("This stage does not support include_only_train=True")
+    if cfg.stage_cfg.get("train_only", False):
+        raise ValueError("This stage does not support train_only=True")
+
+    orig_shards_iter, _ = shard_iterator(cfg, out_suffix="")
 
     orig_shards_iter = [(in_fp, out_fp.relative_to(output_dir)) for in_fp, out_fp in orig_shards_iter]
 
@@ -125,5 +165,5 @@ def main(cfg: DictConfig):
     logger.info(f"Done with {cfg.stage}")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

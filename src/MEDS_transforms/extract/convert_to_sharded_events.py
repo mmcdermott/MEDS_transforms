@@ -744,5 +744,5 @@ def main(cfg: DictConfig):
     logger.info("Subsharded into converted events.")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

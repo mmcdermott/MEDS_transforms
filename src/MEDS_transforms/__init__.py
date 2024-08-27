@@ -6,7 +6,7 @@ import polars as pl
 __package_name__ = "MEDS_transforms"
 try:
     __version__ = version(__package_name__)
-except PackageNotFoundError:
+except PackageNotFoundError:  # pragma: no cover
     __version__ = "unknown"
 
 PREPROCESS_CONFIG_YAML = files(__package_name__).joinpath("configs/preprocess.yaml")

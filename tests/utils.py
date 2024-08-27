@@ -70,6 +70,8 @@ def dict_to_hydra_kwargs(d: dict[str, str]) -> str:
         ValueError: Unexpected type for value for key a: <class 'datetime.datetime'>: 2021-11-01 00:00:00
     """
 
+    modifier_chars = ["~", "'", "++", "+"]
+
     out = []
     for k, v in d.items():
         if not isinstance(k, str):
@@ -86,11 +88,13 @@ def dict_to_hydra_kwargs(d: dict[str, str]) -> str:
             case dict():
                 inner_kwargs = dict_to_hydra_kwargs(v)
                 for inner_kv in inner_kwargs:
-                    if inner_kv.startswith("~"):
-                        out.append(f"~{k}.{inner_kv[1:]}")
-                    elif inner_kv.startswith("'"):
-                        out.append(f"'{k}.{inner_kv[1:]}")
-                    else:
+                    handled = False
+                    for mod in modifier_chars:
+                        if inner_kv.startswith(mod):
+                            out.append(f"{mod}{k}.{inner_kv[len(mod):]}")
+                            handled = True
+                            break
+                    if not handled:
                         out.append(f"{k}.{inner_kv}")
             case list() | tuple():
                 v = list(v)

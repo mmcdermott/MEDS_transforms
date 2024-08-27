@@ -398,5 +398,5 @@ def main(cfg: DictConfig):
     map_over(cfg, compute_fn=add_time_derived_measurements_fntr)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

@@ -449,5 +449,5 @@ def main(cfg: DictConfig):
     logger.info(f"Finished reduction in {datetime.now() - start}")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

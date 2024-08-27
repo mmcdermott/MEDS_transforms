@@ -110,5 +110,5 @@ def main(cfg: DictConfig):
     map_over(cfg, compute_fn=occlude_outliers_fntr)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
