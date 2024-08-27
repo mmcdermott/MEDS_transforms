@@ -55,6 +55,11 @@ def parse_meds_csvs(
         return {k: reader(v) for k, v in csvs.items()}
 
 
+def parse_shards_yaml(yaml_str: str, **schema_updates) -> pl.DataFrame:
+    schema = {**MEDS_PL_SCHEMA, **schema_updates}
+    return parse_meds_csvs(load_yaml(yaml_str, Loader=Loader), schema=schema)
+
+
 def dict_to_hydra_kwargs(d: dict[str, str]) -> str:
     """Converts a dictionary to a hydra kwargs string for testing purposes.
 

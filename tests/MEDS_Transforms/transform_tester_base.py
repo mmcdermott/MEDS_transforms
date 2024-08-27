@@ -4,12 +4,11 @@ Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, ra
 scripts.
 """
 
-from yaml import load as load_yaml
 
 try:
-    from yaml import CLoader as Loader
+    pass
 except ImportError:
-    from yaml import Loader
+    pass
 
 from collections import defaultdict
 from io import StringIO
@@ -18,7 +17,10 @@ from pathlib import Path
 import polars as pl
 from meds import subject_id_field
 
-from tests.utils import FILE_T, MEDS_PL_SCHEMA, multi_stage_tester, parse_meds_csvs, single_stage_tester
+from tests.utils import FILE_T, multi_stage_tester, parse_meds_csvs, parse_shards_yaml, single_stage_tester
+
+# So it can be imported from here
+parse_shards_yaml = parse_shards_yaml
 
 # Test MEDS data (inputs)
 
@@ -154,11 +156,6 @@ MEDS_CODE_METADATA_SCHEMA = {
     "parent_codes": pl.Utf8,
     "code/vocab_index": pl.UInt8,
 }
-
-
-def parse_shards_yaml(yaml_str: str, **schema_updates) -> pl.DataFrame:
-    schema = {**MEDS_PL_SCHEMA, **schema_updates}
-    return parse_meds_csvs(load_yaml(yaml_str, Loader=Loader), schema=schema)
 
 
 def parse_code_metadata_csv(csv_str: str) -> pl.DataFrame:

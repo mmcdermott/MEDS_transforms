@@ -45,12 +45,6 @@ subject_id,admit_date,disch_date,department,vitals_date,HR,temp
 1500733,"06/03/2010, 14:54:38","06/03/2010, 16:44:26",ORTHOPEDIC,"06/03/2010, 15:39:49",84.4,100.3
 """
 
-INPUTS = {
-    "data/subjects/[0-6).parquet": pl.read_csv(StringIO(SUBJECTS_CSV)),
-    "data/admit_vitals/[0-10).parquet": pl.read_csv(StringIO(ADMIT_VITALS_0_10_CSV)),
-    "data/admit_vitals/[10-16).parquet": pl.read_csv(StringIO(ADMIT_VITALS_10_16_CSV)),
-}
-
 EVENT_CFGS_YAML = """
 subjects:
   subject_id_col: MRN
@@ -128,7 +122,12 @@ def test_split_and_shard():
             "n_subjects_per_shard": 2,
         },
         config_name="extract",
-        input_files={**INPUTS, "event_cfgs.yaml": EVENT_CFGS_YAML},
+        input_files={
+            "data/subjects/[0-6).parquet": pl.read_csv(StringIO(SUBJECTS_CSV)),
+            "data/admit_vitals/[0-10).parquet": pl.read_csv(StringIO(ADMIT_VITALS_0_10_CSV)),
+            "data/admit_vitals/[10-16).parquet": pl.read_csv(StringIO(ADMIT_VITALS_10_16_CSV)),
+            "event_cfgs.yaml": EVENT_CFGS_YAML,
+        },
         event_conversion_config_fp="{input_dir}/event_cfgs.yaml",  # This makes the escape pass to hydra
         want_outputs={"metadata/.shards.json": EXPECTED_SPLITS},
     )
