@@ -334,6 +334,14 @@ def check_outputs(
                 check_df_output(output_fp, want)
             case ".nrt":
                 check_NRT_output(output_fp, want)
+            case ".json":
+                with open(output_fp) as f:
+                    got = json.load(f)
+                assert got == want, (
+                    f"Expected JSON at {output_fp} to be equal to the target.\n"
+                    f"Wanted:\n{want}\n"
+                    f"Got:\n{got}"
+                )
             case _:
                 raise ValueError(f"Unknown file suffix: {file_suffix}")
 
