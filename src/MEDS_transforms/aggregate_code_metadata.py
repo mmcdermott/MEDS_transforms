@@ -730,5 +730,5 @@ def main(cfg: DictConfig):
     run_map_reduce(cfg)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

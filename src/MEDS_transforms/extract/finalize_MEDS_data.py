@@ -134,5 +134,5 @@ def main(cfg: DictConfig):
     map_over(cfg, compute_fn=get_and_validate_data_schema, write_fn=pq.write_table)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
