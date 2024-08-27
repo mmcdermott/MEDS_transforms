@@ -1089,6 +1089,5 @@ def test_pipeline():
             **WANT_TOKENIZATION_EVENT_SEQS,
             **WANT_NRTs,
         },
-        outputs_from_cohort_dir=True,
         input_code_metadata=MEDS_CODE_METADATA,
     )

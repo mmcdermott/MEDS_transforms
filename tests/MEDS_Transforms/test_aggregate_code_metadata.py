@@ -186,4 +186,5 @@ def test_aggregate_code_metadata():
         want_metadata=WANT_OUTPUT_CODE_METADATA_FILE,
         input_code_metadata=MEDS_CODE_METADATA_FILE,
         do_use_config_yaml=True,
+        assert_no_other_outputs=False,
     )
