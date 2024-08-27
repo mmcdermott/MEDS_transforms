@@ -226,6 +226,7 @@ def test_tokenization():
         transform_stage_kwargs=None,
         input_shards=NORMALIZED_SHARDS,
         want_data={**WANT_SCHEMAS, **WANT_EVENT_SEQS},
+        df_check_kwargs={"check_column_order": False},
     )
 
     single_stage_transform_tester(

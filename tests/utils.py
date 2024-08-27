@@ -203,19 +203,14 @@ def assert_df_equal(want: pl.DataFrame, got: pl.DataFrame, msg: str = None, **kw
         assert_frame_equal(want, got, **kwargs)
     except AssertionError as e:
         pl.Config.set_tbl_rows(-1)
-        print(f"DFs are not equal: {msg}\nwant:")
-        print(want)
-        print("got:")
-        print(got)
-        raise AssertionError(f"{msg}\n{e}") from e
+        raise AssertionError(f"{msg}:\nWant:\n{want}\nGot:\n{got}\n{e}") from e
 
 
 def check_NRT_output(
     output_fp: Path,
     want_nrt: JointNestedRaggedTensorDict,
+    msg: str,
 ):
-    assert output_fp.is_file(), f"Expected {output_fp} to exist."
-
     got_nrt = JointNestedRaggedTensorDict.load(output_fp)
 
     # assert got_nrt.schema == want_nrt.schema, (
@@ -228,20 +223,16 @@ def check_NRT_output(
     got_tensors = got_nrt.tensors
 
     assert got_tensors.keys() == want_tensors.keys(), (
-        f"Expected the keys of the NRT at {output_fp} to be equal to the target.\n"
-        f"Wanted:\n{list(want_tensors.keys())}\n"
-        f"Got:\n{list(got_tensors.keys())}"
+        f"{msg}:\n" f"Wanted:\n{list(want_tensors.keys())}\n" f"Got:\n{list(got_tensors.keys())}"
     )
 
     for k in want_tensors.keys():
         want_v = want_tensors[k]
         got_v = got_tensors[k]
 
-        assert type(want_v) is type(got_v), (
-            f"Expected tensor {k} of the NRT at {output_fp} to be of the same type as the target.\n"
-            f"Wanted:\n{type(want_v)}\n"
-            f"Got:\n{type(got_v)}"
-        )
+        assert type(want_v) is type(
+            got_v
+        ), f"{msg}: Wanted {k} to be of type {type(want_v)}, got {type(got_v)}."
 
         if isinstance(want_v, list):
             assert len(want_v) == len(got_v), (
@@ -261,26 +252,6 @@ def check_NRT_output(
                 f"Wanted:\n{want_v}\n"
                 f"Got:\n{got_v}"
             )
-
-
-def check_df_output(
-    output_fp: Path,
-    want_df: pl.DataFrame,
-    check_column_order: bool = False,
-    check_row_order: bool = True,
-    **kwargs,
-):
-    assert output_fp.is_file(), f"Expected {output_fp} to exist."
-
-    got_df = pl.read_parquet(output_fp, glob=False)
-    assert_df_equal(
-        want_df,
-        got_df,
-        (f"Expected the dataframe at {output_fp} to be equal to the target.\n"),
-        check_column_order=check_column_order,
-        check_row_order=check_row_order,
-        **kwargs,
-    )
 
 
 FILE_T = pl.DataFrame | dict[str, Any] | str
@@ -319,6 +290,7 @@ def check_outputs(
     cohort_dir: Path,
     want_outputs: dict[str, pl.DataFrame],
     assert_no_other_outputs: bool = True,
+    **df_check_kwargs,
 ):
     all_file_suffixes = set()
 
@@ -331,19 +303,27 @@ def check_outputs(
 
         output_fp = cohort_dir / output_name
 
+        files_found = [str(fp.relative_to(cohort_dir)) for fp in cohort_dir.glob("**/*{file_suffix}")]
+
         if not output_fp.is_file():
-            raise AssertionError(f"Expected {output_fp} to exist.")
+            raise AssertionError(
+                f"Wanted {output_fp.relative_to(cohort_dir)} to exist. "
+                f"{len(files_found)} {file_suffix} files found: {', '.join(files_found)}"
+            )
+
+        msg = f"Expected {output_fp.relative_to(cohort_dir)} to be equal to the target"
 
         match file_suffix:
             case ".parquet":
-                check_df_output(output_fp, want)
+                got_df = pl.read_parquet(output_fp, glob=False)
+                assert_df_equal(want, got_df, msg=msg, **df_check_kwargs)
             case ".nrt":
-                check_NRT_output(output_fp, want)
+                check_NRT_output(output_fp, want, msg=msg)
             case ".json":
                 with open(output_fp) as f:
                     got = json.load(f)
                 assert got == want, (
-                    f"Expected JSON at {output_fp} to be equal to the target.\n"
+                    f"Expected JSON at {output_fp.relative_to(cohort_dir)} to be equal to the target.\n"
                     f"Wanted:\n{want}\n"
                     f"Got:\n{got}"
                 )
@@ -371,8 +351,12 @@ def single_stage_tester(
     should_error: bool = False,
     config_name: str = "preprocess",
     input_files: dict[str, FILE_T] | None = None,
+    df_check_kwargs: dict | None = None,
     **pipeline_kwargs,
 ):
+    if df_check_kwargs is None:
+        df_check_kwargs = {}
+
     with input_dataset(input_files) as (input_dir, cohort_dir):
         for k, v in pipeline_kwargs.items():
             if type(v) is str and "{input_dir}" in v:
@@ -409,13 +393,16 @@ def single_stage_tester(
 
         try:
             check_outputs(
-                cohort_dir, want_outputs=want_outputs, assert_no_other_outputs=assert_no_other_outputs
+                cohort_dir,
+                want_outputs=want_outputs,
+                assert_no_other_outputs=assert_no_other_outputs,
+                **df_check_kwargs,
             )
         except Exception as e:
             raise AssertionError(
-                f"Single stage transform {stage_name} failed.\n"
+                f"Single stage transform {stage_name} failed -- {e}:\n"
                 f"Script stdout:\n{stdout}\n"
-                f"Script stderr:\n{stderr}"
+                f"Script stderr:\n{stderr}\n"
             ) from e
 
 
@@ -473,8 +460,12 @@ def multi_stage_tester(
                 do_pass_stage_name=do_pass_stage_name[stage],
             )
 
-        check_outputs(
-            cohort_dir,
-            want_outputs=want_outputs,
-            assert_no_other_outputs=assert_no_other_outputs,
-        )
+        try:
+            check_outputs(
+                cohort_dir,
+                want_outputs=want_outputs,
+                assert_no_other_outputs=assert_no_other_outputs,
+                check_column_order=False,
+            )
+        except Exception as e:
+            raise AssertionError(f"{n_stages}-stage pipeline ({stage_names}) failed--{e}") from e

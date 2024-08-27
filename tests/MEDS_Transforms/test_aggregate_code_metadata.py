@@ -184,4 +184,5 @@ def test_aggregate_code_metadata():
         input_code_metadata=MEDS_CODE_METADATA_FILE,
         do_use_config_yaml=True,
         assert_no_other_outputs=False,
+        df_check_kwargs={"check_column_order": False},
     )

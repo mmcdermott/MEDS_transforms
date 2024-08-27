@@ -110,4 +110,5 @@ def test_shard_events():
             "data/admit_vitals/[0-10).parquet": pl.read_csv(StringIO(ADMIT_VITALS_CSV))[:10],
             "data/admit_vitals/[10-16).parquet": pl.read_csv(StringIO(ADMIT_VITALS_CSV))[10:],
         },
+        df_check_kwargs={"check_column_order": False},
     )

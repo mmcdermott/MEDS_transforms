@@ -221,8 +221,12 @@ def single_stage_transform_tester(
     want_metadata: pl.DataFrame | None = None,
     assert_no_other_outputs: bool = True,
     should_error: bool = False,
+    df_check_kwargs: dict | None = None,
     **input_data_kwargs,
 ):
+    if df_check_kwargs is None:
+        df_check_kwargs = {}
+
     base_kwargs = {
         "script": transform_script,
         "stage_name": stage_name,
@@ -233,6 +237,7 @@ def single_stage_transform_tester(
         "should_error": should_error,
         "config_name": "preprocess",
         "input_files": remap_inputs_for_transform(**input_data_kwargs),
+        "df_check_kwargs": df_check_kwargs,
     }
 
     want_outputs = {}
