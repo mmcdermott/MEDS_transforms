@@ -31,3 +31,11 @@ DEPRECATED_NAMES = {
     "timestamp": "time",
     "subject_id": "patient_id",
 }
+
+INFERRED_STAGE_KEYS = {
+    "is_metadata",
+    "data_input_dir",
+    "metadata_input_dir",
+    "output_dir",
+    "reducer_output_dir",
+}

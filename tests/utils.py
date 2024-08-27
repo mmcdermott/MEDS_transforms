@@ -13,9 +13,10 @@ DEFAULT_CSV_TS_FORMAT = "%m/%d/%Y, %H:%M:%S"
 MEDS_PL_SCHEMA = {
     "patient_id": pl.UInt32,
     "time": pl.Datetime("us"),
-    "code": pl.Utf8,
+    "code": pl.String,
     "numeric_value": pl.Float32,
     "numeric_value/is_inlier": pl.Boolean,
+    "text_value": pl.String,
 }
 
 
