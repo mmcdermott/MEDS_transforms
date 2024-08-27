@@ -13,7 +13,7 @@ pypi installation, which is covered below, so make sure you are in a suitable di
 ```bash
 conda create -n MEDS python=3.12
 conda activate MEDS
-pip install MEDS_transforms[examples,local_parallelism]
+pip install "MEDS_transforms[local_parallelism]"
 mkdir MIMIC-IV_Example
 cd MIMIC-IV_Example
 wget https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/main/MIMIC-IV_Example/joint_script.sh
@@ -32,7 +32,7 @@ git clone git@github.com:mmcdermott/MEDS_transforms.git
 cd MEDS_transforms
 conda create -n MEDS python=3.12
 conda activate MEDS
-pip install .[examples,local_parallelism]
+pip install .[local_parallelism]
 ```
 
 ## Step 1: Download MIMIC-IV

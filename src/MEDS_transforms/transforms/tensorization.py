@@ -5,6 +5,7 @@ from functools import partial
 
 import hydra
 import polars as pl
+from loguru import logger
 from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 from omegaconf import DictConfig
 
@@ -87,9 +88,17 @@ def convert_to_NRT(df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
 
     time_delta_col = time_delta_cols[0]
 
-    return JointNestedRaggedTensorDict(
-        df.select(time_delta_col, "code", "numeric_value").collect().to_dict(as_series=False)
-    )
+    tensors_dict = df.select(time_delta_col, "code", "numeric_value").collect().to_dict(as_series=False)
+
+    if all((not v) for v in tensors_dict.values()):
+        logger.warning("All columns are empty. Returning an empty tensor dict.")
+        return JointNestedRaggedTensorDict({})
+
+    for k, v in tensors_dict.items():
+        if not v:
+            raise ValueError(f"Column {k} is empty")
+
+    return JointNestedRaggedTensorDict(tensors_dict)
 
 
 @hydra.main(

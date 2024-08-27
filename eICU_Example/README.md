@@ -28,14 +28,20 @@ up from this one).
 
 ## Step 0: Installation
 
-Download this repository and install the requirements:
+Install the requirements and source the requisite scripts
 
 ```bash
-git clone git@github.com:mmcdermott/MEDS_transforms.git
-cd MEDS_transforms
 conda create -n MEDS python=3.12
 conda activate MEDS
-pip install .[examples]
+pip install "MEDS_transforms[local_parallelism]"
+mkdir eICU_Example
+cd eICU_Example
+wget https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/main/eICU_Example/joint_script.sh
+wget https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/main/eICU_Example/pre_MEDS.py
+chmod +x joint_script.sh
+chmod +x joint_script_slurm.sh
+chmod +x pre_MEDS.py
+cd ..
 ```
 
 ## Step 1: Download eICU

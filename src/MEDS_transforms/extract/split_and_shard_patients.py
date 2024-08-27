@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import json
+import math
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -13,15 +14,13 @@ from MEDS_transforms.extract import CONFIG_YAML
 from MEDS_transforms.utils import stage_init
 
 
-def shard_patients[
-    SUBJ_ID_T
-](
+def shard_patients(
     patients: np.ndarray,
     n_patients_per_shard: int = 50000,
-    external_splits: dict[str, Sequence[SUBJ_ID_T]] | None = None,
+    external_splits: dict[str, Sequence[int]] | None = None,
     split_fracs_dict: dict[str, float] | None = {"train": 0.8, "tuning": 0.1, "held_out": 0.1},
     seed: int = 1,
-) -> dict[str, list[SUBJ_ID_T]]:
+) -> dict[str, list[int]]:
     """Shard a list of patients, nested within train/tuning/held-out splits.
 
     This function takes a list of patients and shards them into train/tuning/held-out splits, with the shards
@@ -72,7 +71,7 @@ def shard_patients[
         >>> shard_patients(patients, n_patients_per_shard=3, split_fracs_dict={'train': 0.5})
         Traceback (most recent call last):
             ...
-        ValueError: The sum of the split fractions must be equal to 1.
+        ValueError: The sum of the split fractions must be equal to 1. Got 0.5 through {'train': 0.5}.
         >>> shard_patients([1, 2], n_patients_per_shard=3)
         Traceback (most recent call last):
             ...
@@ -107,10 +106,15 @@ def shard_patients[
 
     splits = external_splits
 
+    splits_cover = sum(split_fracs_dict.values()) if split_fracs_dict else 0
+
     rng = np.random.default_rng(seed)
     if n_patients := len(patient_ids_to_split):
-        if sum(split_fracs_dict.values()) != 1:
-            raise ValueError("The sum of the split fractions must be equal to 1.")
+        if not math.isclose(splits_cover, 1):
+            raise ValueError(
+                f"The sum of the split fractions must be equal to 1. Got {splits_cover} "
+                f"through {split_fracs_dict}."
+            )
         split_names_idx = rng.permutation(len(split_fracs_dict))
         split_names = np.array(list(split_fracs_dict.keys()))[split_names_idx]
         split_fracs = np.array([split_fracs_dict[k] for k in split_names])

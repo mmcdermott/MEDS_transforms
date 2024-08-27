@@ -135,8 +135,7 @@ def lexicographic_indices(code_metadata: pl.DataFrame, code_modifiers: list[str]
         ...     "modifier2": [None, None, None, None, 2,   1],
         ... })
         >>> code_modifiers = ["modifier1", "modifier2"]
-        >>> expr = lexicographic_indices(code_metadata, code_modifiers)
-        >>> code_metadata.with_columns(expr)
+        >>> lexicographic_indices(code_metadata, code_modifiers)
         shape: (6, 4)
         ┌──────┬───────────┬───────────┬──────────────────┐
         │ code ┆ modifier1 ┆ modifier2 ┆ code/vocab_index │
