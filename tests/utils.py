@@ -278,7 +278,7 @@ def check_df_output(
     )
 
 
-FILE_T = pl.DataFrame | dict[str, Any]
+FILE_T = pl.DataFrame | dict[str, Any] | str
 
 
 @contextmanager
@@ -296,10 +296,14 @@ def input_dataset(input_files: dict[str, FILE_T] | None = None):
                     data.write_parquet(fp.with_suffix(".parquet"), use_pyarrow=True)
                 case pl.DataFrame() if fp.suffix == ".parquet":
                     data.write_parquet(fp, use_pyarrow=True)
+                case pl.DataFrame() if fp.suffix == ".csv":
+                    data.write_csv(fp)
                 case dict() if fp.suffix == "":
                     fp.with_suffix(".json").write_text(json.dumps(data))
                 case dict() if fp.suffix.endswith(".json"):
                     fp.write_text(json.dumps(data))
+                case str():
+                    fp.write_text(data.strip())
                 case _:
                     raise ValueError(f"Unknown data type {type(data)} for file {fp.relative_to(input_dir)}")
 
@@ -354,13 +358,19 @@ def single_stage_tester(
     should_error: bool = False,
     config_name: str = "preprocess",
     input_files: dict[str, FILE_T] | None = None,
+    **pipeline_kwargs,
 ):
     with input_dataset(input_files) as (input_dir, cohort_dir):
+        for k, v in pipeline_kwargs.items():
+            if type(v) is str and "{input_dir}" in v:
+                pipeline_kwargs[k] = v.format(input_dir=str(input_dir.resolve()))
+
         pipeline_config_kwargs = {
             "input_dir": str(input_dir.resolve()),
             "cohort_dir": str(cohort_dir.resolve()),
             "stages": [stage_name],
             "hydra.verbose": True,
+            **pipeline_kwargs,
         }
 
         if stage_kwargs:
@@ -372,9 +382,8 @@ def single_stage_tester(
             "test_name": f"Single stage transform: {stage_name}",
             "should_error": should_error,
             "config_name": config_name,
+            "do_use_config_yaml": do_use_config_yaml,
         }
-        if do_use_config_yaml:
-            run_command_kwargs["do_use_config_yaml"] = True
 
         if do_pass_stage_name:
             run_command_kwargs["stage"] = stage_name
