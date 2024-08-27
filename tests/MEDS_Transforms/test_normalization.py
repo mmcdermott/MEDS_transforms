@@ -5,11 +5,9 @@ scripts.
 """
 
 import polars as pl
-import rootutils
 
-root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
-
-from tests.MEDS_Transforms.transform_tester_base import NORMALIZATION_SCRIPT, single_stage_transform_tester
+from tests.MEDS_Transforms import NORMALIZATION_SCRIPT
+from tests.MEDS_Transforms.transform_tester_base import single_stage_transform_tester
 from tests.utils import MEDS_PL_SCHEMA, parse_meds_csvs
 
 # This is the code metadata file we'll use in this transform test. It is different than the default as we need

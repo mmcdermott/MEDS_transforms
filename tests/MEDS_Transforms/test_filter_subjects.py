@@ -4,12 +4,10 @@ Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, ra
 scripts.
 """
 
-import rootutils
 from meds import subject_id_field
 
-root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
-
-from tests.MEDS_Transforms.transform_tester_base import FILTER_SUBJECTS_SCRIPT, single_stage_transform_tester
+from tests.MEDS_Transforms import FILTER_SUBJECTS_SCRIPT
+from tests.MEDS_Transforms.transform_tester_base import single_stage_transform_tester
 from tests.utils import parse_meds_csvs
 
 WANT_TRAIN_0 = f"""

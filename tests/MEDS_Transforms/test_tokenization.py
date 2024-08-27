@@ -10,9 +10,11 @@ from datetime import datetime
 
 import polars as pl
 
+from tests.MEDS_Transforms import TOKENIZATION_SCRIPT
+
 from .test_normalization import NORMALIZED_MEDS_SCHEMA
 from .test_normalization import WANT_SHARDS as NORMALIZED_SHARDS
-from .transform_tester_base import TOKENIZATION_SCRIPT, single_stage_transform_tester
+from .transform_tester_base import single_stage_transform_tester
 
 SECONDS_PER_DAY = 60 * 60 * 24
 

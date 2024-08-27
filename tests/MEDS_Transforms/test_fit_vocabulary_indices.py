@@ -4,16 +4,9 @@ Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, ra
 scripts.
 """
 
-import rootutils
 
-root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
-
-
-from tests.MEDS_Transforms.transform_tester_base import (
-    FIT_VOCABULARY_INDICES_SCRIPT,
-    parse_code_metadata_csv,
-    single_stage_transform_tester,
-)
+from tests.MEDS_Transforms import FIT_VOCABULARY_INDICES_SCRIPT
+from tests.MEDS_Transforms.transform_tester_base import parse_code_metadata_csv, single_stage_transform_tester
 
 WANT_CSV = """
 code,code/n_occurrences,code/n_subjects,values/n_occurrences,values/sum,values/sum_sqd,description,parent_codes,code/vocab_index

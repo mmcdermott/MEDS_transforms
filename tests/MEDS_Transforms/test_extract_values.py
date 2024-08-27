@@ -4,15 +4,8 @@ Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, ra
 scripts.
 """
 
-import rootutils
-
-root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
-
-from tests.MEDS_Transforms.transform_tester_base import (
-    EXTRACT_VALUES_SCRIPT,
-    parse_shards_yaml,
-    single_stage_transform_tester,
-)
+from tests.MEDS_Transforms import EXTRACT_VALUES_SCRIPT
+from tests.MEDS_Transforms.transform_tester_base import parse_shards_yaml, single_stage_transform_tester
 
 INPUT_SHARDS = parse_shards_yaml(
     """

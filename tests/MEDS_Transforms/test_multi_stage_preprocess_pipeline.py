@@ -17,9 +17,6 @@ In this test, the following stages are run:
 The stage configuration arguments will be as given in the yaml block below:
 """
 
-import rootutils
-
-root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
 from datetime import datetime
 
@@ -27,7 +24,7 @@ import polars as pl
 from meds import subject_id_field
 from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 
-from tests.MEDS_Transforms.transform_tester_base import (
+from tests.MEDS_Transforms import (
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT,
     AGGREGATE_CODE_METADATA_SCRIPT,
     FILTER_SUBJECTS_SCRIPT,
@@ -36,9 +33,8 @@ from tests.MEDS_Transforms.transform_tester_base import (
     OCCLUDE_OUTLIERS_SCRIPT,
     TENSORIZATION_SCRIPT,
     TOKENIZATION_SCRIPT,
-    multi_stage_transform_tester,
-    parse_shards_yaml,
 )
+from tests.MEDS_Transforms.transform_tester_base import multi_stage_transform_tester, parse_shards_yaml
 
 MEDS_CODE_METADATA = pl.DataFrame(
     {

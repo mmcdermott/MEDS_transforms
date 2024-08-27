@@ -6,14 +6,12 @@ Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, ra
 scripts.
 """
 
-import rootutils
-
-root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
 from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 
+from tests.MEDS_Transforms import TENSORIZATION_SCRIPT
 from tests.MEDS_Transforms.test_tokenization import WANT_EVENT_SEQS as TOKENIZED_SHARDS
-from tests.MEDS_Transforms.transform_tester_base import TENSORIZATION_SCRIPT, single_stage_transform_tester
+from tests.MEDS_Transforms.transform_tester_base import single_stage_transform_tester
 
 WANT_NRTS = {
     f'{k.replace("event_seqs/", "")}.nrt': JointNestedRaggedTensorDict(
