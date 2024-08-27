@@ -17,13 +17,17 @@ In this test, the following stages are run:
 The stage configuration arguments will be as given in the yaml block below:
 """
 
+import rootutils
+
+root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
+
 from datetime import datetime
 
 import polars as pl
 from meds import subject_id_field
 from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 
-from .transform_tester_base import (
+from tests.MEDS_Transforms.transform_tester_base import (
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT,
     AGGREGATE_CODE_METADATA_SCRIPT,
     FILTER_SUBJECTS_SCRIPT,

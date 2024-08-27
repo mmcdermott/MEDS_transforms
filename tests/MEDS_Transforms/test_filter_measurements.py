@@ -3,10 +3,16 @@
 Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, rather than the installed
 scripts.
 """
+import rootutils
+
+root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
 
-from .transform_tester_base import FILTER_MEASUREMENTS_SCRIPT, single_stage_transform_tester
-from .utils import parse_meds_csvs
+from tests.MEDS_Transforms.transform_tester_base import (
+    FILTER_MEASUREMENTS_SCRIPT,
+    single_stage_transform_tester,
+)
+from tests.utils import parse_meds_csvs
 
 # This is the code metadata
 # MEDS_CODE_METADATA_CSV = """

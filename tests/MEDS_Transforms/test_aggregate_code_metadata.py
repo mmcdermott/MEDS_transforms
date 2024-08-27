@@ -3,10 +3,13 @@
 Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, rather than the installed
 scripts.
 """
+import rootutils
+
+root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
 import polars as pl
 
-from .transform_tester_base import (
+from tests.MEDS_Transforms.transform_tester_base import (
     AGGREGATE_CODE_METADATA_SCRIPT,
     MEDS_CODE_METADATA_SCHEMA,
     single_stage_transform_tester,

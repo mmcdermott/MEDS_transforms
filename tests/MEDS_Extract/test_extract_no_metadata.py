@@ -38,7 +38,7 @@ from pathlib import Path
 import polars as pl
 from meds import __version__ as MEDS_VERSION
 
-from .utils import assert_df_equal, run_command
+from tests.utils import assert_df_equal, run_command
 
 # Test data (inputs)
 
@@ -94,9 +94,6 @@ subjects:
       - EYE_COLOR
       - col(eye_color)
     time: null
-    _metadata:
-      demo_metadata:
-        description: description
   height:
     code: HEIGHT
     time: null
@@ -121,19 +118,11 @@ admit_vitals:
     time: col(vitals_date)
     time_format: "%m/%d/%Y, %H:%M:%S"
     numeric_value: HR
-    _metadata:
-      input_metadata:
-        description: {"title": {"lab_code": "HR"}}
-        parent_codes: {"LOINC/{loinc}": {"lab_code": "HR"}}
   temp:
     code: TEMP
     time: col(vitals_date)
     time_format: "%m/%d/%Y, %H:%M:%S"
     numeric_value: temp
-    _metadata:
-      input_metadata:
-        description: {"title": {"lab_code": "temp"}}
-        parent_codes: {"LOINC/{loinc}": {"lab_code": "temp"}}
 """
 
 # Test data (expected outputs) -- ALL OF THIS MAY CHANGE IF THE SEED OR DATA CHANGES
@@ -261,11 +250,6 @@ subject_id,time,code,numeric_value
 
 MEDS_OUTPUT_CODE_METADATA_FILE = """
 code,description,parent_codes
-EYE_COLOR//BLUE,"Blue Eyes. Less common than brown.",
-EYE_COLOR//BROWN,"Brown Eyes. The most common eye color.",
-EYE_COLOR//HAZEL,"Hazel eyes. These are uncommon",
-HR,"Heart Rate",LOINC/8867-4
-TEMP,"Body Temperature",LOINC/8310-5
 """
 
 MEDS_OUTPUT_DATASET_METADATA_JSON = {
@@ -537,26 +521,9 @@ def test_extraction():
         full_stdout = "\n".join(all_stdouts)
 
         output_file = MEDS_cohort_dir / "extract_code_metadata" / "codes.parquet"
-        assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
-
-        got_df = pl.read_parquet(output_file, glob=False)
-
-        want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE)).with_columns(
-            pl.col("code"),
-            pl.col("parent_codes").cast(pl.List(pl.Utf8)),
-        )
-
-        # We collapse the list type as it throws an error in the assert_df_equal otherwise
-        got_df = got_df.with_columns(pl.col("parent_codes").list.join("||"))
-        want_df = want_df.with_columns(pl.col("parent_codes").list.join("||"))
-
-        assert_df_equal(
-            want=want_df,
-            got=got_df,
-            msg="Code metadata with descriptions differs!",
-            check_column_order=False,
-            check_row_order=False,
-        )
+        assert (
+            not output_file.is_file()
+        ), f"Expected {output_file} to not  exist: stderr:\n{stderr}\nstdout:\n{stdout}"
 
         # Stage 7: Finalize the MEDS data
         stderr, stdout = run_command(

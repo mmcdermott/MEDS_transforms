@@ -25,7 +25,7 @@ import rootutils
 from meds import subject_id_field
 from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 
-from .utils import MEDS_PL_SCHEMA, assert_df_equal, parse_meds_csvs, run_command
+from tests.utils import MEDS_PL_SCHEMA, assert_df_equal, parse_meds_csvs, run_command
 
 root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
