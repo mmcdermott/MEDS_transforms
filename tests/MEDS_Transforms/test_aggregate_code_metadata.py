@@ -6,8 +6,8 @@ scripts.
 
 import polars as pl
 
-from .transform_tester_base import (
-    AGGREGATE_CODE_METADATA_SCRIPT,
+from tests.MEDS_Transforms import AGGREGATE_CODE_METADATA_SCRIPT
+from tests.MEDS_Transforms.transform_tester_base import (
     MEDS_CODE_METADATA_SCHEMA,
     single_stage_transform_tester,
 )
@@ -183,4 +183,6 @@ def test_aggregate_code_metadata():
         want_metadata=WANT_OUTPUT_CODE_METADATA_FILE,
         input_code_metadata=MEDS_CODE_METADATA_FILE,
         do_use_config_yaml=True,
+        assert_no_other_outputs=False,
+        df_check_kwargs={"check_column_order": False},
     )

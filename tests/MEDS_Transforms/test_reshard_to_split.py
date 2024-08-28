@@ -7,8 +7,9 @@ scripts.
 
 from meds import subject_id_field
 
-from .transform_tester_base import RESHARD_TO_SPLIT_SCRIPT, single_stage_transform_tester
-from .utils import parse_meds_csvs
+from tests.MEDS_Transforms import RESHARD_TO_SPLIT_SCRIPT
+from tests.MEDS_Transforms.transform_tester_base import single_stage_transform_tester
+from tests.utils import parse_meds_csvs
 
 IN_SHARDS_MAP = {
     "0": [68729, 1195293],

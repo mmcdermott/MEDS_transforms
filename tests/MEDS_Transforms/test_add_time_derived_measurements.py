@@ -6,8 +6,9 @@ scripts.
 
 from meds import subject_id_field
 
-from .transform_tester_base import ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT, single_stage_transform_tester
-from .utils import parse_meds_csvs
+from tests.MEDS_Transforms import ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT
+from tests.MEDS_Transforms.transform_tester_base import single_stage_transform_tester
+from tests.utils import parse_meds_csvs
 
 AGE_CALCULATION_STR = """
 See `add_time_derived_measurements.py` for the source of the constant value.
