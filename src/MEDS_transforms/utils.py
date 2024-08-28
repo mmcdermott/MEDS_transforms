@@ -1,7 +1,7 @@
 """Core utilities for MEDS pipelines built with these tools."""
 
-import inspect
 import importlib
+import inspect
 import os
 import sys
 from pathlib import Path

@@ -57,7 +57,7 @@ def parse_meds_csvs(
 
 def parse_shards_yaml(yaml_str: str, **schema_updates) -> pl.DataFrame:
     schema = {**MEDS_PL_SCHEMA, **schema_updates}
-    return parse_meds_csvs(load_yaml(yaml_str, Loader=Loader), schema=schema)
+    return parse_meds_csvs(load_yaml(yaml_str.strip(), Loader=Loader), schema=schema)
 
 
 def dict_to_hydra_kwargs(d: dict[str, str]) -> str:
@@ -271,6 +271,10 @@ def check_NRT_output(
 FILE_T = pl.DataFrame | dict[str, Any] | str
 
 
+def add_params(templ_str: str, **kwargs):
+    return templ_str.format(**kwargs)
+
+
 @contextmanager
 def input_dataset(input_files: dict[str, FILE_T] | None = None):
     with tempfile.TemporaryDirectory() as d:
@@ -294,6 +298,12 @@ def input_dataset(input_files: dict[str, FILE_T] | None = None):
                     fp.write_text(json.dumps(data))
                 case str():
                     fp.write_text(data.strip())
+                case _ if callable(data):
+                    data_str = data(
+                        input_dir=str(input_dir.resolve()),
+                        cohort_dir=str(cohort_dir.resolve()),
+                    )
+                    fp.write_text(data_str)
                 case _:
                     raise ValueError(f"Unknown data type {type(data)} for file {fp.relative_to(input_dir)}")
 
@@ -356,7 +366,7 @@ def check_outputs(
 
 def single_stage_tester(
     script: str | Path,
-    stage_name: str,
+    stage_name: str | None,
     stage_kwargs: dict[str, str] | None,
     do_pass_stage_name: bool = False,
     do_use_config_yaml: bool = False,
@@ -366,8 +376,13 @@ def single_stage_tester(
     config_name: str = "preprocess",
     input_files: dict[str, FILE_T] | None = None,
     df_check_kwargs: dict | None = None,
+    test_name: str | None = None,
+    do_include_dirs: bool = True,
     **pipeline_kwargs,
 ):
+    if test_name is None:
+        test_name = f"Single stage transform: {stage_name}"
+
     if df_check_kwargs is None:
         df_check_kwargs = {}
 
@@ -377,20 +392,23 @@ def single_stage_tester(
                 pipeline_kwargs[k] = v.format(input_dir=str(input_dir.resolve()))
 
         pipeline_config_kwargs = {
-            "input_dir": str(input_dir.resolve()),
-            "cohort_dir": str(cohort_dir.resolve()),
-            "stages": [stage_name],
             "hydra.verbose": True,
             **pipeline_kwargs,
         }
 
+        if do_include_dirs:
+            pipeline_config_kwargs["input_dir"] = str(input_dir.resolve())
+            pipeline_config_kwargs["cohort_dir"] = str(cohort_dir.resolve())
+
+        if stage_name is not None:
+            pipeline_config_kwargs["stages"] = [stage_name]
         if stage_kwargs:
             pipeline_config_kwargs["stage_configs"] = {stage_name: stage_kwargs}
 
         run_command_kwargs = {
             "script": script,
             "hydra_kwargs": pipeline_config_kwargs,
-            "test_name": f"Single stage transform: {stage_name}",
+            "test_name": test_name,
             "should_error": should_error,
             "config_name": config_name,
             "do_use_config_yaml": do_use_config_yaml,
