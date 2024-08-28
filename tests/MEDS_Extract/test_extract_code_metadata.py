@@ -145,6 +145,7 @@ admit_vitals:
       input_metadata:
         description: {"title": {"lab_code": "HR"}}
         parent_codes: {"LOINC/{loinc}": {"lab_code": "HR"}}
+        valueuom: {"valueuom": {"lab_code": "HR"}} # If we didn't have this valueuom would be null for HR rows
   temp:
     code: TEMP
     time: col(vitals_date)
