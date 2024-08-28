@@ -416,15 +416,15 @@ def is_col_field(field: str | None) -> bool:
         bool: True if the field is formatted as "col(column_name)", False otherwise.
 
     Examples:
-        >>> is_col_field("col(patient_id)")
+        >>> is_col_field("col(subject_id)")
         True
-        >>> is_col_field("col(patient_id")
+        >>> is_col_field("col(subject_id")
         False
-        >>> is_col_field("patient_id)")
+        >>> is_col_field("subject_id)")
         False
-        >>> is_col_field("column(patient_id)")
+        >>> is_col_field("column(subject_id)")
         False
-        >>> is_col_field("patient_id")
+        >>> is_col_field("subject_id")
         False
         >>> is_col_field(None)
         False
@@ -444,16 +444,16 @@ def parse_col_field(field: str) -> str:
         ValueError: If the input string does not match the expected format.
 
     Examples:
-        >>> parse_col_field("col(patient_id)")
-        'patient_id'
-        >>> parse_col_field("col(patient_id")
+        >>> parse_col_field("col(subject_id)")
+        'subject_id'
+        >>> parse_col_field("col(subject_id")
         Traceback (most recent call last):
         ...
-        ValueError: Invalid column field: col(patient_id
-        >>> parse_col_field("column(patient_id)")
+        ValueError: Invalid column field: col(subject_id
+        >>> parse_col_field("column(subject_id)")
         Traceback (most recent call last):
         ...
-        ValueError: Invalid column field: column(patient_id)
+        ValueError: Invalid column field: column(subject_id)
     """
     if not is_col_field(field):
         raise ValueError(f"Invalid column field: {field}")

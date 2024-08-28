@@ -6,13 +6,14 @@ scripts.
 
 import polars as pl
 
-from .transform_tester_base import NORMALIZATION_SCRIPT, single_stage_transform_tester
-from .utils import MEDS_PL_SCHEMA, parse_meds_csvs
+from tests.MEDS_Transforms import NORMALIZATION_SCRIPT
+from tests.MEDS_Transforms.transform_tester_base import single_stage_transform_tester
+from tests.utils import MEDS_PL_SCHEMA, parse_meds_csvs
 
 # This is the code metadata file we'll use in this transform test. It is different than the default as we need
 # a code/vocab_index
 MEDS_CODE_METADATA_CSV = """
-code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,code/vocab_index
+code,code/n_occurrences,code/n_subjects,values/n_occurrences,values/sum,values/sum_sqd,code/vocab_index
 ADMISSION//CARDIAC,2,2,0,,,1
 ADMISSION//ORTHOPEDIC,1,1,0,,,2
 ADMISSION//PULMONARY,1,1,0,,,3
@@ -129,7 +130,7 @@ Code: HEIGHT
 #     TEMP: 11
 
 WANT_TRAIN_0 = """
-patient_id,time,code,numeric_value
+subject_id,time,code,numeric_value
 239684,,7,
 239684,,9,1.5770268440246582
 239684,"12/28/1980, 00:00:00",5,
@@ -163,7 +164,7 @@ patient_id,time,code,numeric_value
 """
 
 WANT_TRAIN_1 = """
-patient_id,time,code,numeric_value
+subject_id,time,code,numeric_value
 68729,,8,
 68729,,9,-0.5438239574432373
 68729,"03/09/1978, 00:00:00",5,
@@ -181,7 +182,7 @@ patient_id,time,code,numeric_value
 """
 
 WANT_TUNING_0 = """
-patient_id,time,code,numeric_value
+subject_id,time,code,numeric_value
 754281,,7,
 754281,,9,0.28697699308395386
 754281,"12/19/1988, 00:00:00",5,
@@ -192,7 +193,7 @@ patient_id,time,code,numeric_value
 """
 
 WANT_HELD_OUT_0 = """
-patient_id,time,code,numeric_value
+subject_id,time,code,numeric_value
 1500733,,7,
 1500733,,9,-0.7995940446853638
 1500733,"07/20/1986, 00:00:00",5,

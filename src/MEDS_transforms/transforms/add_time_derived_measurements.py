@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Transformations for adding time-derived measurements (e.g., a patient's age) to a MEDS dataset."""
+"""Transformations for adding time-derived measurements (e.g., a subject's age) to a MEDS dataset."""
 from collections.abc import Callable
 
 import hydra
@@ -7,7 +7,7 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_transforms import PREPROCESS_CONFIG_YAML
+from MEDS_transforms import INFERRED_STAGE_KEYS, PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over
 
 
@@ -25,7 +25,7 @@ def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[
         >>> from datetime import datetime
         >>> df = pl.DataFrame(
         ...     {
-        ...         "patient_id": [1, 1, 1, 1, 2, 2, 3, 3],
+        ...         "subject_id": [1, 1, 1, 1, 2, 2, 3, 3],
         ...         "time": [
         ...             None,
         ...             datetime(1990, 1, 1),
@@ -38,12 +38,12 @@ def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[
         ...         ],
         ...         "code": ["static", "DOB", "lab//A", "lab//B", "DOB", "lab//A", "lab//B", "dx//1"],
         ...     },
-        ...     schema={"patient_id": pl.UInt32, "time": pl.Datetime, "code": pl.Utf8},
+        ...     schema={"subject_id": pl.UInt32, "time": pl.Datetime, "code": pl.Utf8},
         ... )
         >>> df
         shape: (8, 3)
         ┌────────────┬─────────────────────┬────────┐
-        │ patient_id ┆ time                ┆ code   │
+        │ subject_id ┆ time                ┆ code   │
         │ ---        ┆ ---                 ┆ ---    │
         │ u32        ┆ datetime[μs]        ┆ str    │
         ╞════════════╪═════════════════════╪════════╡
@@ -62,7 +62,7 @@ def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[
         >>> age_fn(df)
         shape: (2, 4)
         ┌────────────┬─────────────────────┬──────┬───────────────┐
-        │ patient_id ┆ time                ┆ code ┆ numeric_value │
+        │ subject_id ┆ time                ┆ code ┆ numeric_value │
         │ ---        ┆ ---                 ┆ ---  ┆ ---           │
         │ u32        ┆ datetime[μs]        ┆ str  ┆ f32           │
         ╞════════════╪═════════════════════╪══════╪═══════════════╡
@@ -74,7 +74,7 @@ def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[
         >>> add_age_fn(df)
         shape: (10, 4)
         ┌────────────┬─────────────────────┬────────┬───────────────┐
-        │ patient_id ┆ time                ┆ code   ┆ numeric_value │
+        │ subject_id ┆ time                ┆ code   ┆ numeric_value │
         │ ---        ┆ ---                 ┆ ---    ┆ ---           │
         │ u32        ┆ datetime[μs]        ┆ str    ┆ f32           │
         ╞════════════╪═════════════════════╪════════╪═══════════════╡
@@ -96,7 +96,7 @@ def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[
         df = df.with_row_index("__idx")
         new_events = new_events.with_columns(pl.lit(0, dtype=df.schema["__idx"]).alias("__idx"))
         return (
-            pl.concat([df, new_events], how="diagonal").sort(by=["patient_id", "time", "__idx"]).drop("__idx")
+            pl.concat([df, new_events], how="diagonal").sort(by=["subject_id", "time", "__idx"]).drop("__idx")
         )
 
     return out_fn
@@ -170,7 +170,7 @@ def normalize_time_unit(unit: str) -> tuple[str, float]:
 
 
 def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
-    """Create a function that adds a patient's age to a DataFrame.
+    """Create a function that adds a subject's age to a DataFrame.
 
     Args:
         cfg: The configuration for the age function. This must contain the following mandatory keys:
@@ -179,8 +179,8 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
             - "age_unit": The unit for the age event when converted to a numeric value in the output data.
 
     Returns:
-        A function that returns the to-be-added "age" events with the patient's age for all input events with
-        unique, non-null times in the data, for all patients who have an observed date of birth. It does
+        A function that returns the to-be-added "age" events with the subject's age for all input events with
+        unique, non-null times in the data, for all subjects who have an observed date of birth. It does
         not add an event for times that are equal to the date of birth.
 
     Raises:
@@ -190,7 +190,7 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         >>> from datetime import datetime
         >>> df = pl.DataFrame(
         ...     {
-        ...         "patient_id": [1, 1, 1, 1, 1, 2, 2, 3, 3],
+        ...         "subject_id": [1, 1, 1, 1, 1, 2, 2, 3, 3],
         ...         "time": [
         ...             None,
         ...             datetime(1990, 1, 1),
@@ -204,12 +204,12 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         ...         ],
         ...         "code": ["static", "DOB", "lab//A", "lab//B", "rx", "DOB", "lab//A", "lab//B", "dx//1"],
         ...     },
-        ...     schema={"patient_id": pl.UInt32, "time": pl.Datetime, "code": pl.Utf8},
+        ...     schema={"subject_id": pl.UInt32, "time": pl.Datetime, "code": pl.Utf8},
         ... )
         >>> df
         shape: (9, 3)
         ┌────────────┬─────────────────────┬────────┐
-        │ patient_id ┆ time                ┆ code   │
+        │ subject_id ┆ time                ┆ code   │
         │ ---        ┆ ---                 ┆ ---    │
         │ u32        ┆ datetime[μs]        ┆ str    │
         ╞════════════╪═════════════════════╪════════╡
@@ -228,7 +228,7 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         >>> age_fn(df)
         shape: (3, 4)
         ┌────────────┬─────────────────────┬──────┬───────────────┐
-        │ patient_id ┆ time                ┆ code ┆ numeric_value │
+        │ subject_id ┆ time                ┆ code ┆ numeric_value │
         │ ---        ┆ ---                 ┆ ---  ┆ ---           │
         │ u32        ┆ datetime[μs]        ┆ str  ┆ f32           │
         ╞════════════╪═════════════════════╪══════╪═══════════════╡
@@ -248,15 +248,15 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
     microseconds_in_unit = int(1e6) * seconds_in_unit
 
     def fn(df: pl.LazyFrame) -> pl.LazyFrame:
-        dob_expr = pl.when(pl.col("code") == cfg.DOB_code).then(pl.col("time")).min().over("patient_id")
+        dob_expr = pl.when(pl.col("code") == cfg.DOB_code).then(pl.col("time")).min().over("subject_id")
         age_expr = (pl.col("time") - dob_expr).dt.total_microseconds() / microseconds_in_unit
         age_expr = age_expr.cast(pl.Float32, strict=False)
 
         return (
             df.drop_nulls(subset=["time"])
-            .unique(subset=["patient_id", "time"], maintain_order=True)
+            .unique(subset=["subject_id", "time"], maintain_order=True)
             .select(
-                "patient_id",
+                "subject_id",
                 "time",
                 pl.lit(cfg.age_code, dtype=df.schema["code"]).alias("code"),
                 age_expr.alias("numeric_value"),
@@ -283,7 +283,7 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         >>> from datetime import datetime
         >>> df = pl.DataFrame(
         ...     {
-        ...         "patient_id": [1, 1, 1, 1, 2, 2, 3, 3],
+        ...         "subject_id": [1, 1, 1, 1, 2, 2, 3, 3],
         ...         "time": [
         ...             None,
         ...             datetime(1990, 1, 1, 1, 0),
@@ -296,12 +296,12 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         ...         ],
         ...         "code": ["static", "DOB", "lab//A", "lab//B", "DOB", "lab//A", "lab//B", "dx//1"],
         ...     },
-        ...     schema={"patient_id": pl.UInt32, "time": pl.Datetime, "code": pl.Utf8},
+        ...     schema={"subject_id": pl.UInt32, "time": pl.Datetime, "code": pl.Utf8},
         ... )
         >>> df
         shape: (8, 3)
         ┌────────────┬─────────────────────┬────────┐
-        │ patient_id ┆ time                ┆ code   │
+        │ subject_id ┆ time                ┆ code   │
         │ ---        ┆ ---                 ┆ ---    │
         │ u32        ┆ datetime[μs]        ┆ str    │
         ╞════════════╪═════════════════════╪════════╡
@@ -319,7 +319,7 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         >>> time_of_day_fn(df)
         shape: (6, 3)
         ┌────────────┬─────────────────────┬──────────────────────┐
-        │ patient_id ┆ time                ┆ code                 │
+        │ subject_id ┆ time                ┆ code                 │
         │ ---        ┆ ---                 ┆ ---                  │
         │ u32        ┆ datetime[μs]        ┆ str                  │
         ╞════════════╪═════════════════════╪══════════════════════╡
@@ -357,22 +357,14 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         time_of_day = time_of_day.when(hour >= end).then(tod_code(end, 24))
         return (
             df.drop_nulls(subset=["time"])
-            .unique(subset=["patient_id", "time"], maintain_order=True)
-            .select("patient_id", "time", time_of_day.alias("code"))
+            .unique(subset=["subject_id", "time"], maintain_order=True)
+            .select("subject_id", "time", time_of_day.alias("code"))
         )
 
     return fn
 
 
 def add_time_derived_measurements_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
-    INFERRED_STAGE_KEYS = {
-        "is_metadata",
-        "data_input_dir",
-        "metadata_input_dir",
-        "output_dir",
-        "reducer_output_dir",
-    }
-
     compute_fns = []
     # We use the raw stages object as the induced `stage_cfg` has extra properties like the input and output
     # directories.
@@ -406,5 +398,5 @@ def main(cfg: DictConfig):
     map_over(cfg, compute_fn=add_time_derived_measurements_fntr)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

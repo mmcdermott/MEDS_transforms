@@ -3,7 +3,7 @@
 import inspect
 from collections.abc import Callable, Generator
 from datetime import datetime
-from enum import Enum, auto
+from enum import Enum, StrEnum, auto
 from functools import partial, wraps
 from pathlib import Path
 from typing import Any, NotRequired, TypedDict, TypeVar
@@ -11,6 +11,7 @@ from typing import Any, NotRequired, TypedDict, TypeVar
 import hydra
 import polars as pl
 from loguru import logger
+from meds import subject_id_field
 from omegaconf import DictConfig, ListConfig
 
 from ..parser import is_matcher, matcher_to_expr
@@ -223,6 +224,30 @@ def read_and_filter_fntr(filter_expr: pl.Expr, read_fn: Callable[[Path], DF_T]) 
 
 MATCH_REVISE_KEY = "_match_revise"
 MATCHER_KEY = "_matcher"
+MATCH_REVISE_MODE_KEY = "_match_revise_mode"
+
+
+class MatchReviseMode(StrEnum):
+    """The different modes for match and revise operations.
+
+    Future modes to be considered, match and add, multi-match and add, filter and revise, multi-filter and
+    revise.
+
+    Attributes:
+        MATCH_AND_REVISE: The match and revise mode, which iterates through the list of matcher/function pairs
+            and filters the input DataFrame for rows that match the matcher and applies a local compute
+            function to the filtered DataFrame. The DataFrame to be matched in future iterations is restricted
+            to only those rows that have not yet been matched. The unmatched dataframe at the end of the
+            operation is concatenated with the outputs of all intermediate dataframes.
+        MULTI_MATCH_AND_REVISE: The match and revise mode, which iterates through the list of matcher/function
+            pairs and filters the input DataFrame for rows that match the matcher and applies a local compute
+            function to the filtered DataFrame. The DataFrame to be matched in future iterations is the entire
+            raw dataframe, including rows that have already been matched. The portion of the dataframe that
+            didn't match anything on input is concatenated with the outputs of all intermediate dataframes.
+    """
+
+    MATCH_AND_REVISE = auto()
+    MULTI_MATCH_AND_REVISE = auto()
 
 
 def is_match_revise(stage_cfg: DictConfig) -> bool:
@@ -266,7 +291,7 @@ def validate_match_revise(stage_cfg: DictConfig):
         >>> validate_match_revise(DictConfig({"_match_revise": [{"_matcher": {32: "bar"}}]}))
         Traceback (most recent call last):
             ...
-        ValueError: Match revise config 0 must contain a valid matcher in _matcher
+        ValueError: Match revise config 0 must contain a valid matcher in _matcher: ...
         >>> validate_match_revise(DictConfig({"_match_revise": [{"_matcher": {"code": "CODE//TEMP"}}]}))
     """
 
@@ -284,8 +309,11 @@ def validate_match_revise(stage_cfg: DictConfig):
         if MATCHER_KEY not in match_revise_cfg:
             raise ValueError(f"Match revise config {i} must contain a {MATCHER_KEY} key")
 
-        if not is_matcher(match_revise_cfg[MATCHER_KEY]):
-            raise ValueError(f"Match revise config {i} must contain a valid matcher in {MATCHER_KEY}")
+        matcher_valid, matcher_errs = is_matcher(match_revise_cfg[MATCHER_KEY])
+        if not matcher_valid:
+            raise ValueError(
+                f"Match revise config {i} must contain a valid matcher in {MATCHER_KEY}: {matcher_errs}"
+            )
 
 
 def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_COMPUTE_FN_T) -> COMPUTE_FN_T:
@@ -309,7 +337,7 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
     compute function with the ``local_arg_1=baz`` parameter. Both of these local compute functions will be
     applied to the input DataFrame in sequence, and the resulting DataFrames will be concatenated alongside
     any of the dataframe that matches no matcher (which will be left unmodified) and merged in a sorted way
-    that respects the ``patient_id``, ``time`` ordering first, then the order of the match & revise blocks
+    that respects the ``subject_id``, ``time`` ordering first, then the order of the match & revise blocks
     themselves, then the order of the rows in each match & revise block output. Each local compute function
     will also use the ``global_arg_1=foo`` parameter.
 
@@ -331,7 +359,7 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
 
     Examples:
         >>> df = pl.DataFrame({
-        ...     "patient_id": [1, 1, 1, 2, 2, 2],
+        ...     "subject_id": [1, 1, 1, 2, 2, 2],
         ...     "time": [1, 2, 2, 1, 1, 2],
         ...     "initial_idx": [0, 1, 2, 3, 4, 5],
         ...     "code": ["FINAL", "CODE//TEMP_2", "CODE//TEMP_1", "FINAL", "CODE//TEMP_2", "CODE//TEMP_1"]
@@ -353,7 +381,7 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
         >>> match_revise_fn(df.lazy()).collect()
         shape: (6, 4)
         ┌────────────┬──────┬─────────────┬────────────────┐
-        │ patient_id ┆ time ┆ initial_idx ┆ code           │
+        │ subject_id ┆ time ┆ initial_idx ┆ code           │
         │ ---        ┆ ---  ┆ ---         ┆ ---            │
         │ i64        ┆ i64  ┆ i64         ┆ str            │
         ╞════════════╪══════╪═════════════╪════════════════╡
@@ -376,7 +404,7 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
         >>> match_revise_fn(df.lazy()).collect()
         shape: (6, 4)
         ┌────────────┬──────┬─────────────┬─────────────────┐
-        │ patient_id ┆ time ┆ initial_idx ┆ code            │
+        │ subject_id ┆ time ┆ initial_idx ┆ code            │
         │ ---        ┆ ---  ┆ ---         ┆ ---             │
         │ i64        ┆ i64  ┆ i64         ┆ str             │
         ╞════════════╪══════╪═════════════╪═════════════════╡
@@ -397,7 +425,7 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
             ...
         ValueError: Missing needed columns {'missing'} for local matcher 0:
             [(col("missing")) == (String(CODE//TEMP_2))].all_horizontal()
-        Columns available: 'code', 'initial_idx', 'patient_id', 'time'
+        Columns available: 'code', 'initial_idx', 'subject_id', 'time'
         >>> stage_cfg = DictConfig({"global_code_end": "foo"})
         >>> cfg = DictConfig({"stage_cfg": stage_cfg})
         >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
@@ -412,6 +440,10 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
 
     stage_cfg = hydra.utils.instantiate(stage_cfg)
 
+    match_revise_mode = stage_cfg.pop(MATCH_REVISE_MODE_KEY, "match_and_revise")
+    if match_revise_mode not in {x.value for x in MatchReviseMode}:
+        raise ValueError(f"Invalid match and revise mode: {match_revise_mode}")
+
     matchers_and_fns = []
     for match_revise_cfg in stage_cfg.pop(MATCH_REVISE_KEY):
         matcher, cols = matcher_to_expr(match_revise_cfg.pop(MATCHER_KEY))
@@ -422,10 +454,11 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
 
     @wraps(compute_fn)
     def match_revise_fn(df: DF_T) -> DF_T:
-        unmatched_df = df
+        matchable_df = df
         cols = set(df.collect_schema().names())
 
         revision_parts = []
+        final_part_filters = []
         for i, (matcher_expr, need_cols, local_compute_fn) in enumerate(matchers_and_fns):
             if not need_cols.issubset(cols):
                 cols_str = "', '".join(x for x in sorted(cols))
@@ -433,13 +466,21 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
                     f"Missing needed columns {need_cols - cols} for local matcher {i}: "
                     f"{matcher_expr}\nColumns available: '{cols_str}'"
                 )
-            matched_df = unmatched_df.filter(matcher_expr)
-            unmatched_df = unmatched_df.filter(~matcher_expr)
+            matched_df = matchable_df.filter(matcher_expr)
+
+            match match_revise_mode:
+                case MatchReviseMode.MATCH_AND_REVISE:
+                    matchable_df = matchable_df.filter(~matcher_expr)
+                case MatchReviseMode.MULTI_MATCH_AND_REVISE:
+                    final_part_filters.append(~matcher_expr)
 
             revision_parts.append(local_compute_fn(matched_df))
 
-        revision_parts.append(unmatched_df)
-        return pl.concat(revision_parts, how="vertical").sort(["patient_id", "time"], maintain_order=True)
+        if final_part_filters:
+            revision_parts.append(matchable_df.filter(pl.all_horizontal(final_part_filters)))
+        else:
+            revision_parts.append(matchable_df)
+        return pl.concat(revision_parts, how="vertical").sort([subject_id_field, "time"], maintain_order=True)
 
     return match_revise_fn
 
@@ -580,7 +621,7 @@ def map_over(
     start = datetime.now()
 
     train_only = cfg.stage_cfg.get("train_only", False)
-    split_fp = Path(cfg.input_dir) / "metadata" / "patient_split.parquet"
+    split_fp = Path(cfg.input_dir) / "metadata" / "subject_split.parquet"
 
     shards, includes_only_train = shard_iterator_fntr(cfg)
 
@@ -591,18 +632,18 @@ def map_over(
             )
         elif split_fp.exists():
             logger.info(f"Processing train split only by filtering read dfs via {str(split_fp.resolve())}")
-            train_patients = (
+            train_subjects = (
                 pl.scan_parquet(split_fp)
                 .filter(pl.col("split") == "train")
-                .select(pl.col("patient_id"))
+                .select(subject_id_field)
                 .collect()
                 .to_list()
             )
-            read_fn = read_and_filter_fntr(train_patients, read_fn)
+            read_fn = read_and_filter_fntr(train_subjects, read_fn)
         else:
             raise FileNotFoundError(
                 f"Train split requested, but shard prefixes can't be used and "
-                f"patient split file not found at {str(split_fp.resolve())}."
+                f"subject split file not found at {str(split_fp.resolve())}."
             )
     elif includes_only_train:
         raise ValueError("All splits should be used, but shard iterator is returning only train splits?!?")

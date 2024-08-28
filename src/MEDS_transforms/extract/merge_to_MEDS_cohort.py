@@ -30,8 +30,8 @@ def merge_subdirs_and_sort(
             warning is logged, but an error is *not* raised. Which rows are retained if the uniqeu-by columns
             are not all columns is not guaranteed, but is also *not* random, so this may have statistical
             implications.
-        additional_sort_by: Additional columns to sort by, in addition to the default sorting by patient ID
-            and time. If `None`, only patient ID and time are used. If a list of strings, these
+        additional_sort_by: Additional columns to sort by, in addition to the default sorting by subject ID
+            and time. If `None`, only subject ID and time are used. If a list of strings, these
             columns are used in addition to the default sorting. If a column is not found in the dataframe, it
             is omitted from the sort-by, a warning is logged, but an error is *not* raised. This functionality
             is useful both for deterministic testing and in cases where a data owner wants to impose
@@ -41,7 +41,7 @@ def merge_subdirs_and_sort(
         A single dataframe containing all the data from the parquet files in the subdirs of `sp_dir`. These
         files will be concatenated diagonally, taking the union of all rows in all dataframes and all unique
         columns in all dataframes to form the merged output. The returned dataframe will be made unique by the
-        columns specified in `unique_by` and sorted by first patient ID, then time, then all columns in
+        columns specified in `unique_by` and sorted by first subject ID, then time, then all columns in
         `additional_sort_by`, if any.
 
     Raises:
@@ -50,15 +50,15 @@ def merge_subdirs_and_sort(
 
     Examples:
         >>> from tempfile import TemporaryDirectory
-        >>> df1 = pl.DataFrame({"patient_id": [1, 2], "time": [10, 20], "code": ["A", "B"]})
+        >>> df1 = pl.DataFrame({"subject_id": [1, 2], "time": [10, 20], "code": ["A", "B"]})
         >>> df2 = pl.DataFrame({
-        ...     "patient_id":      [1,   1,    3],
+        ...     "subject_id":      [1,   1,    3],
         ...     "time":       [2,   1,    8],
         ...     "code":            ["C", "D",  "E"],
         ...     "numeric_value": [None, 2.0, None],
         ... })
         >>> df3 = pl.DataFrame({
-        ...     "patient_id":      [1,   1,    3],
+        ...     "subject_id":      [1,   1,    3],
         ...     "time":       [2,   2,    8],
         ...     "code":            ["C", "D",  "E"],
         ...     "numeric_value": [6.2, 2.0, None],
@@ -84,7 +84,7 @@ def merge_subdirs_and_sort(
         ...     ).collect()
         shape: (8, 4)
         ┌────────────┬──────┬──────┬───────────────┐
-        │ patient_id ┆ time ┆ code ┆ numeric_value │
+        │ subject_id ┆ time ┆ code ┆ numeric_value │
         │ ---        ┆ ---  ┆ ---  ┆ ---           │
         │ i64        ┆ i64  ┆ str  ┆ f64           │
         ╞════════════╪══════╪══════╪═══════════════╡
@@ -112,7 +112,7 @@ def merge_subdirs_and_sort(
         ...     ).collect()
         shape: (7, 4)
         ┌────────────┬──────┬──────┬───────────────┐
-        │ patient_id ┆ time ┆ code ┆ numeric_value │
+        │ subject_id ┆ time ┆ code ┆ numeric_value │
         │ ---        ┆ ---  ┆ ---  ┆ ---           │
         │ i64        ┆ i64  ┆ str  ┆ f64           │
         ╞════════════╪══════╪══════╪═══════════════╡
@@ -131,18 +131,18 @@ def merge_subdirs_and_sort(
         ...     df2.write_parquet(sp_dir / "subdir1" / "file2.parquet")
         ...     (sp_dir / "subdir2").mkdir()
         ...     df3.write_parquet(sp_dir / "subdir2" / "df.parquet")
-        ...     # We just display the patient ID, time, and code columns as the numeric value column
+        ...     # We just display the subject ID, time, and code columns as the numeric value column
         ...     # is not guaranteed to be deterministic in the output given some rows will be dropped due to
         ...     # the unique-by constraint.
         ...     merge_subdirs_and_sort(
         ...         sp_dir,
         ...         event_subsets=["subdir1", "subdir2"],
-        ...         unique_by=["patient_id", "time", "code"],
+        ...         unique_by=["subject_id", "time", "code"],
         ...         additional_sort_by=["code", "numeric_value"]
-        ...     ).select("patient_id", "time", "code").collect()
+        ...     ).select("subject_id", "time", "code").collect()
         shape: (6, 3)
         ┌────────────┬──────┬──────┐
-        │ patient_id ┆ time ┆ code │
+        │ subject_id ┆ time ┆ code │
         │ ---        ┆ ---  ┆ ---  │
         │ i64        ┆ i64  ┆ str  │
         ╞════════════╪══════╪══════╡
@@ -188,7 +188,7 @@ def merge_subdirs_and_sort(
         case _:
             raise ValueError(f"Invalid unique_by value: {unique_by}")
 
-    sort_by = ["patient_id", "time"]
+    sort_by = ["subject_id", "time"]
     if additional_sort_by is not None:
         for s in additional_sort_by:
             if s in df_columns:
@@ -201,12 +201,12 @@ def merge_subdirs_and_sort(
 
 @hydra.main(version_base=None, config_path=str(CONFIG_YAML.parent), config_name=CONFIG_YAML.stem)
 def main(cfg: DictConfig):
-    """Merges the patient sub-sharded events into a single parquet file per patient shard.
+    """Merges the subject sub-sharded events into a single parquet file per subject shard.
 
     This function takes all dataframes (in parquet files) in any subdirs of the `cfg.stage_cfg.input_dir` and
     merges them into a single dataframe. All dataframes in the subdirs are assumed to be in the unnested, MEDS
-    format, and cover the same group of patients (specific to the shard being processed). The merged dataframe
-    will also be sorted by patient ID and time.
+    format, and cover the same group of subjects (specific to the shard being processed). The merged dataframe
+    will also be sorted by subject ID and time.
 
     All arguments are specified through the command line into the `cfg` object through Hydra.
 
@@ -219,14 +219,14 @@ def main(cfg: DictConfig):
         stage_configs.merge_to_MEDS_cohort.unique_by: The list of columns that should be ensured to be unique
             after the dataframes are merged. Defaults to `"*"`, which means all columns are used.
         stage_configs.merge_to_MEDS_cohort.additional_sort_by: Additional columns to sort by, in addition to
-            the default sorting by patient ID and time. Defaults to `None`, which means only patient ID
+            the default sorting by subject ID and time. Defaults to `None`, which means only subject ID
             and time are used.
 
     Returns:
         Writes the merged dataframes to the shard-specific output filepath in the `cfg.stage_cfg.output_dir`.
     """
     event_conversion_cfg = OmegaConf.load(cfg.event_conversion_config_fp)
-    event_conversion_cfg.pop("patient_id_col", None)
+    event_conversion_cfg.pop("subject_id_col", None)
 
     read_fn = partial(
         merge_subdirs_and_sort,
@@ -242,5 +242,5 @@ def main(cfg: DictConfig):
     )
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

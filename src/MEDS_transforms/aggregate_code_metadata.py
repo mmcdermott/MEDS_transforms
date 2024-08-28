@@ -12,6 +12,7 @@ import hydra
 import polars as pl
 import polars.selectors as cs
 from loguru import logger
+from meds import subject_id_field
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
@@ -26,7 +27,7 @@ class METADATA_FN(StrEnum):
     This enumeration contains the supported code-metadata collection and aggregation function names that can
     be applied to codes (or, rather, unique code & modifier units) in a MEDS cohort. Each function name is
     mapped, in the below `CODE_METADATA_AGGREGATIONS` dictionary, to mapper and reducer functions that (a)
-    collect the raw data at a per code-modifier level from MEDS patient-level shards and (b) aggregates two or
+    collect the raw data at a per code-modifier level from MEDS subject-level shards and (b) aggregates two or
     more per-shard metadata files into a single metadata file, which can be used to merge metadata across all
     shards into a single file.
 
@@ -45,14 +46,14 @@ class METADATA_FN(StrEnum):
     or on the command line.
 
     Args:
-        "code/n_patients": Collects the number of unique patients who have (anywhere in their record) the code
+        "code/n_subjects": Collects the number of unique subjects who have (anywhere in their record) the code
             & modifiers group.
         "code/n_occurrences": Collects the total number of occurrences of the code & modifiers group across
-            all observations for all patients.
-        "values/n_patients": Collects the number of unique patients who have a non-null, non-nan
+            all observations for all subjects.
+        "values/n_subjects": Collects the number of unique subjects who have a non-null, non-nan
             numeric_value field for the code & modifiers group.
         "values/n_occurrences": Collects the total number of non-null, non-nan numeric_value occurrences for
-            the code & modifiers group across all observations for all patients.
+            the code & modifiers group across all observations for all subjects.
         "values/n_ints": Collects the number of times the observed, non-null numeric_value for the code &
             modifiers group is an integral value (i.e., a whole number, not an integral type).
         "values/sum": Collects the sum of the non-null, non-nan numeric_value values for the code &
@@ -67,9 +68,9 @@ class METADATA_FN(StrEnum):
             the configuration file using the dictionary syntax for the aggregation.
     """
 
-    CODE_N_PATIENTS = "code/n_patients"
+    CODE_N_PATIENTS = "code/n_subjects"
     CODE_N_OCCURRENCES = "code/n_occurrences"
-    VALUES_N_PATIENTS = "values/n_patients"
+    VALUES_N_PATIENTS = "values/n_subjects"
     VALUES_N_OCCURRENCES = "values/n_occurrences"
     VALUES_N_INTS = "values/n_ints"
     VALUES_SUM = "values/sum"
@@ -157,10 +158,10 @@ IS_INT: pl.Expr = VAL.round() == VAL
 PRESENT_VALS = VAL.filter(VAL_PRESENT)
 
 CODE_METADATA_AGGREGATIONS: dict[METADATA_FN, MapReducePair] = {
-    METADATA_FN.CODE_N_PATIENTS: MapReducePair(pl.col("patient_id").n_unique(), pl.sum_horizontal),
+    METADATA_FN.CODE_N_PATIENTS: MapReducePair(pl.col(subject_id_field).n_unique(), pl.sum_horizontal),
     METADATA_FN.CODE_N_OCCURRENCES: MapReducePair(pl.len(), pl.sum_horizontal),
     METADATA_FN.VALUES_N_PATIENTS: MapReducePair(
-        pl.col("patient_id").filter(VAL_PRESENT).n_unique(), pl.sum_horizontal
+        pl.col(subject_id_field).filter(VAL_PRESENT).n_unique(), pl.sum_horizontal
     ),
     METADATA_FN.VALUES_N_OCCURRENCES: MapReducePair(PRESENT_VALS.len(), pl.sum_horizontal),
     METADATA_FN.VALUES_N_INTS: MapReducePair(VAL.filter(VAL_PRESENT & IS_INT).len(), pl.sum_horizontal),
@@ -203,9 +204,9 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
         Traceback (most recent call last):
             ...
         ValueError: Metadata aggregation function INVALID not found in METADATA_FN enumeration. Values are:
-            code/n_patients, code/n_occurrences, values/n_patients, values/n_occurrences, values/n_ints,
+            code/n_subjects, code/n_occurrences, values/n_subjects, values/n_occurrences, values/n_ints,
             values/sum, values/sum_sqd, values/min, values/max, values/quantiles
-        >>> valid_cfg = DictConfig({"aggregations": ["code/n_patients", {"name": "values/n_ints"}]})
+        >>> valid_cfg = DictConfig({"aggregations": ["code/n_subjects", {"name": "values/n_ints"}]})
         >>> validate_args_and_get_code_cols(valid_cfg, 33)
         Traceback (most recent call last):
             ...
@@ -229,7 +230,7 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
     for agg in aggregations:
         if isinstance(agg, (dict, DictConfig)):
             agg = agg.get("name", None)
-        if agg not in METADATA_FN:
+        if agg not in {fn.value for fn in METADATA_FN}:
             raise ValueError(
                 f"Metadata aggregation function {agg} not found in METADATA_FN enumeration. Values are: "
                 f"{', '.join([fn.value for fn in METADATA_FN])}"
@@ -264,7 +265,7 @@ def mapper_fntr(
         A function that extracts the specified metadata from a MEDS cohort shard after grouping by the
         specified code & modifier columns. **Note**: The output of this function will, if
         ``stage_cfg.do_summarize_over_all_codes`` is True, contain the metadata summarizing all observations
-        across all codes and patients in the shard, with both ``code`` and all ``code_modifiers`` set
+        across all codes and subjects in the shard, with both ``code`` and all ``code_modifiers`` set
         to `None` in the output dataframe, in the same format as the code/modifier specific rows with non-null
         values.
 
@@ -274,13 +275,13 @@ def mapper_fntr(
         ...     "code":             ["A", "B", "A", "B", "C", "A", "C", "B",          "D"],
         ...     "modifier1":        [1,   2,   1,   2,   1,   2,   1,   2,            None],
         ...     "modifier_ignored": [3,   3,   4,   4,   5,   5,   6,   6,            7],
-        ...     "patient_id":       [1,   2,   1,   3,   1,   2,   2,   2,            1],
+        ...     "subject_id":       [1,   2,   1,   3,   1,   2,   2,   2,            1],
         ...     "numeric_value":    [1.1, 2.,  1.1, 4.,  5.,  6.,  7.5, float('nan'), None],
         ... })
         >>> df
         shape: (9, 5)
         ┌──────┬───────────┬──────────────────┬────────────┬───────────────┐
-        │ code ┆ modifier1 ┆ modifier_ignored ┆ patient_id ┆ numeric_value │
+        │ code ┆ modifier1 ┆ modifier_ignored ┆ subject_id ┆ numeric_value │
         │ ---  ┆ ---       ┆ ---              ┆ ---        ┆ ---           │
         │ str  ┆ i64       ┆ i64              ┆ i64        ┆ f64           │
         ╞══════╪═══════════╪══════════════════╪════════════╪═══════════════╡
@@ -295,14 +296,14 @@ def mapper_fntr(
         │ D    ┆ null      ┆ 7                ┆ 1          ┆ null          │
         └──────┴───────────┴──────────────────┴────────────┴───────────────┘
         >>> stage_cfg = DictConfig({
-        ...     "aggregations": ["code/n_patients", "values/n_ints"],
+        ...     "aggregations": ["code/n_subjects", "values/n_ints"],
         ...     "do_summarize_over_all_codes": True
         ... })
         >>> mapper = mapper_fntr(stage_cfg, None)
         >>> mapper(df.lazy()).collect()
         shape: (5, 3)
         ┌──────┬─────────────────┬───────────────┐
-        │ code ┆ code/n_patients ┆ values/n_ints │
+        │ code ┆ code/n_subjects ┆ values/n_ints │
         │ ---  ┆ ---             ┆ ---           │
         │ str  ┆ u32             ┆ u32           │
         ╞══════╪═════════════════╪═══════════════╡
@@ -312,12 +313,12 @@ def mapper_fntr(
         │ C    ┆ 2               ┆ 1             │
         │ D    ┆ 1               ┆ 0             │
         └──────┴─────────────────┴───────────────┘
-        >>> stage_cfg = DictConfig({"aggregations": ["code/n_patients", "values/n_ints"]})
+        >>> stage_cfg = DictConfig({"aggregations": ["code/n_subjects", "values/n_ints"]})
         >>> mapper = mapper_fntr(stage_cfg, None)
         >>> mapper(df.lazy()).collect()
         shape: (4, 3)
         ┌──────┬─────────────────┬───────────────┐
-        │ code ┆ code/n_patients ┆ values/n_ints │
+        │ code ┆ code/n_subjects ┆ values/n_ints │
         │ ---  ┆ ---             ┆ ---           │
         │ str  ┆ u32             ┆ u32           │
         ╞══════╪═════════════════╪═══════════════╡
@@ -327,12 +328,12 @@ def mapper_fntr(
         │ D    ┆ 1               ┆ 0             │
         └──────┴─────────────────┴───────────────┘
         >>> code_modifiers = ["modifier1"]
-        >>> stage_cfg = DictConfig({"aggregations": ["code/n_patients", "values/n_ints"]})
+        >>> stage_cfg = DictConfig({"aggregations": ["code/n_subjects", "values/n_ints"]})
         >>> mapper = mapper_fntr(stage_cfg, ListConfig(code_modifiers))
         >>> mapper(df.lazy()).collect()
         shape: (5, 4)
         ┌──────┬───────────┬─────────────────┬───────────────┐
-        │ code ┆ modifier1 ┆ code/n_patients ┆ values/n_ints │
+        │ code ┆ modifier1 ┆ code/n_subjects ┆ values/n_ints │
         │ ---  ┆ ---       ┆ ---             ┆ ---           │
         │ str  ┆ i64       ┆ u32             ┆ u32           │
         ╞══════╪═══════════╪═════════════════╪═══════════════╡
@@ -376,12 +377,12 @@ def mapper_fntr(
         │ C    ┆ 1         ┆ 2                  ┆ 12.5       │
         │ D    ┆ null      ┆ 1                  ┆ 0.0        │
         └──────┴───────────┴────────────────────┴────────────┘
-        >>> stage_cfg = DictConfig({"aggregations": ["values/n_patients", "values/n_occurrences"]})
+        >>> stage_cfg = DictConfig({"aggregations": ["values/n_subjects", "values/n_occurrences"]})
         >>> mapper = mapper_fntr(stage_cfg, code_modifiers)
         >>> mapper(df.lazy()).collect()
         shape: (5, 4)
         ┌──────┬───────────┬───────────────────┬──────────────────────┐
-        │ code ┆ modifier1 ┆ values/n_patients ┆ values/n_occurrences │
+        │ code ┆ modifier1 ┆ values/n_subjects ┆ values/n_occurrences │
         │ ---  ┆ ---       ┆ ---               ┆ ---                  │
         │ str  ┆ i64       ┆ u32               ┆ u32                  │
         ╞══════╪═══════════╪═══════════════════╪══════════════════════╡
@@ -455,7 +456,7 @@ def mapper_fntr(
     def by_code_mapper(df: pl.LazyFrame) -> pl.LazyFrame:
         return df.group_by(code_key_columns).agg(**agg_operations).sort(code_key_columns)
 
-    def all_patients_mapper(df: pl.LazyFrame) -> pl.LazyFrame:
+    def all_subjects_mapper(df: pl.LazyFrame) -> pl.LazyFrame:
         local_agg_operations = agg_operations.copy()
         if METADATA_FN.VALUES_QUANTILES in agg_operations:
             local_agg_operations[METADATA_FN.VALUES_QUANTILES] = agg_operations[
@@ -467,8 +468,8 @@ def mapper_fntr(
 
         def mapper(df: pl.LazyFrame) -> pl.LazyFrame:
             by_code = by_code_mapper(df)
-            all_patients = all_patients_mapper(df)
-            return pl.concat([all_patients, by_code], how="diagonal_relaxed").select(
+            all_subjects = all_subjects_mapper(df)
+            return pl.concat([all_subjects, by_code], how="diagonal_relaxed").select(
                 *code_key_columns, *agg_operations.keys()
             )
 
@@ -502,9 +503,9 @@ def reducer_fntr(
         >>> df_1 = pl.DataFrame({
         ...     "code": [None, "A", "A", "B", "C"],
         ...     "modifier1": [None, 1, 2, 1, 2],
-        ...     "code/n_patients":  [10, 1, 1, 2, 2],
+        ...     "code/n_subjects":  [10, 1, 1, 2, 2],
         ...     "code/n_occurrences": [13, 2, 1, 3, 2],
-        ...     "values/n_patients":  [8, 1, 1, 2, 2],
+        ...     "values/n_subjects":  [8, 1, 1, 2, 2],
         ...     "values/n_occurrences": [12, 2, 1, 3, 2],
         ...     "values/n_ints": [4, 0, 1, 3, 1],
         ...     "values/sum": [13.2, 2.2, 6.0, 14.0, 12.5],
@@ -516,9 +517,9 @@ def reducer_fntr(
         >>> df_2 = pl.DataFrame({
         ...     "code": ["A", "A", "B", "C"],
         ...     "modifier1": [1, 2, 1, None],
-        ...     "code/n_patients":  [3, 3, 4, 4],
+        ...     "code/n_subjects":  [3, 3, 4, 4],
         ...     "code/n_occurrences": [10, 11, 8, 11],
-        ...     "values/n_patients":  [0, 1, 2, 2],
+        ...     "values/n_subjects":  [0, 1, 2, 2],
         ...     "values/n_occurrences": [0, 4, 3, 2],
         ...     "values/n_ints": [0, 1, 3, 1],
         ...     "values/sum": [0., 7.0, 14.0, 12.5],
@@ -530,9 +531,9 @@ def reducer_fntr(
         >>> df_3 = pl.DataFrame({
         ...     "code": ["D"],
         ...     "modifier1": [1],
-        ...     "code/n_patients": [2],
+        ...     "code/n_subjects": [2],
         ...     "code/n_occurrences": [2],
-        ...     "values/n_patients": [1],
+        ...     "values/n_subjects": [1],
         ...     "values/n_occurrences": [3],
         ...     "values/n_ints": [3],
         ...     "values/sum": [2],
@@ -542,12 +543,12 @@ def reducer_fntr(
         ...     "values/quantiles": [[]],
         ... })
         >>> code_modifiers = ["modifier1"]
-        >>> stage_cfg = DictConfig({"aggregations": ["code/n_patients", "values/n_ints"]})
+        >>> stage_cfg = DictConfig({"aggregations": ["code/n_subjects", "values/n_ints"]})
         >>> reducer = reducer_fntr(stage_cfg, code_modifiers)
         >>> reducer(df_1, df_2, df_3)
         shape: (7, 4)
         ┌──────┬───────────┬─────────────────┬───────────────┐
-        │ code ┆ modifier1 ┆ code/n_patients ┆ values/n_ints │
+        │ code ┆ modifier1 ┆ code/n_subjects ┆ values/n_ints │
         │ ---  ┆ ---       ┆ ---             ┆ ---           │
         │ str  ┆ i64       ┆ i64             ┆ i64           │
         ╞══════╪═══════════╪═════════════════╪═══════════════╡
@@ -562,9 +563,9 @@ def reducer_fntr(
         >>> cfg = DictConfig({
         ...     "code_modifiers": ["modifier1"],
         ...     "code_processing_stages": {
-        ...         "stage1": ["code/n_patients", "values/n_ints"],
+        ...         "stage1": ["code/n_subjects", "values/n_ints"],
         ...         "stage2": ["code/n_occurrences", "values/sum"],
-        ...         "stage3.A": ["values/n_patients", "values/n_occurrences"],
+        ...         "stage3.A": ["values/n_subjects", "values/n_occurrences"],
         ...         "stage3.B": ["values/sum_sqd", "values/min", "values/max"],
         ...         "stage4": ["INVALID"],
         ...     }
@@ -586,12 +587,12 @@ def reducer_fntr(
         │ C    ┆ 2         ┆ 2                  ┆ 12.5       │
         │ D    ┆ 1         ┆ 2                  ┆ 2.0        │
         └──────┴───────────┴────────────────────┴────────────┘
-        >>> stage_cfg = DictConfig({"aggregations": ["values/n_patients", "values/n_occurrences"]})
+        >>> stage_cfg = DictConfig({"aggregations": ["values/n_subjects", "values/n_occurrences"]})
         >>> reducer = reducer_fntr(stage_cfg, code_modifiers)
         >>> reducer(df_1, df_2, df_3)
         shape: (7, 4)
         ┌──────┬───────────┬───────────────────┬──────────────────────┐
-        │ code ┆ modifier1 ┆ values/n_patients ┆ values/n_occurrences │
+        │ code ┆ modifier1 ┆ values/n_subjects ┆ values/n_occurrences │
         │ ---  ┆ ---       ┆ ---               ┆ ---                  │
         │ str  ┆ i64       ┆ i64               ┆ i64                  │
         ╞══════╪═══════════╪═══════════════════╪══════════════════════╡
@@ -730,5 +731,5 @@ def main(cfg: DictConfig):
     run_map_reduce(cfg)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

@@ -4,13 +4,13 @@ Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, ra
 scripts.
 """
 
-
-from .transform_tester_base import FILTER_MEASUREMENTS_SCRIPT, single_stage_transform_tester
-from .utils import parse_meds_csvs
+from tests.MEDS_Transforms import FILTER_MEASUREMENTS_SCRIPT
+from tests.MEDS_Transforms.transform_tester_base import single_stage_transform_tester
+from tests.utils import parse_meds_csvs
 
 # This is the code metadata
 # MEDS_CODE_METADATA_CSV = """
-# code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,description,parent_code
+# code,code/n_occurrences,code/n_subjects,values/n_occurrences,values/sum,values/sum_sqd,description,parent_code
 # ,44,4,28,3198.8389005974336,382968.28937288234,,
 # ADMISSION//CARDIAC,2,2,0,,,,
 # ADMISSION//ORTHOPEDIC,1,1,0,,,,
@@ -25,11 +25,11 @@ from .utils import parse_meds_csvs
 # TEMP,12,4,12,1181.4999999999998,116373.38999999998,"Body Temperature",LOINC/8310-5
 # """
 #
-# We'll keep only the codes that occur for at least 2 patients, which are: ADMISSION//CARDIAC, DISCHARGE, DOB,
+# We'll keep only the codes that occur for at least 2 subjects, which are: ADMISSION//CARDIAC, DISCHARGE, DOB,
 # EYE_COLOR//HAZEL, HEIGHT, HR, TEMP
 
 WANT_TRAIN_0 = """
-patient_id,time,code,numeric_value
+subject_id,time,code,numeric_value
 239684,,HEIGHT,175.271115221764
 239684,"12/28/1980, 00:00:00",DOB,
 239684,"05/11/2010, 17:41:51",ADMISSION//CARDIAC,
@@ -61,7 +61,7 @@ patient_id,time,code,numeric_value
 """
 
 WANT_TRAIN_1 = """
-patient_id,time,code,numeric_value
+subject_id,time,code,numeric_value
 68729,,EYE_COLOR//HAZEL,
 68729,,HEIGHT,160.3953106166676
 68729,"03/09/1978, 00:00:00",DOB,
@@ -77,7 +77,7 @@ patient_id,time,code,numeric_value
 """
 
 WANT_TUNING_0 = """
-patient_id,time,code,numeric_value
+subject_id,time,code,numeric_value
 754281,,HEIGHT,166.22261567137025
 754281,"12/19/1988, 00:00:00",DOB,
 754281,"01/03/2010, 06:27:59",HR,142.0
@@ -86,7 +86,7 @@ patient_id,time,code,numeric_value
 """
 
 WANT_HELD_OUT_0 = """
-patient_id,time,code,numeric_value
+subject_id,time,code,numeric_value
 1500733,,HEIGHT,158.60131573580904
 1500733,"07/20/1986, 00:00:00",DOB,
 1500733,"06/03/2010, 14:54:38",HR,91.4
@@ -112,14 +112,14 @@ def test_filter_measurements():
     single_stage_transform_tester(
         transform_script=FILTER_MEASUREMENTS_SCRIPT,
         stage_name="filter_measurements",
-        transform_stage_kwargs={"min_patients_per_code": 2},
+        transform_stage_kwargs={"min_subjects_per_code": 2},
         want_data=WANT_SHARDS,
     )
 
 
 # This is the code metadata
 # MEDS_CODE_METADATA_CSV = """
-# code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,description,parent_code
+# code,code/n_occurrences,code/n_subjects,values/n_occurrences,values/sum,values/sum_sqd,description,parent_code
 # ,44,4,28,3198.8389005974336,382968.28937288234,,
 # ADMISSION//CARDIAC,2,2,0,,,,
 # ADMISSION//ORTHOPEDIC,1,1,0,,,,
@@ -144,7 +144,7 @@ def test_filter_measurements():
 #   - Other codes won't be filtered, so we will retain HEIGHT, DISCHARGE, DOB, TEMP
 
 MR_WANT_TRAIN_0 = """
-patient_id,time,code,numeric_value
+subject_id,time,code,numeric_value
 239684,,HEIGHT,175.271115221764
 239684,"12/28/1980, 00:00:00",DOB,
 239684,"05/11/2010, 17:41:51",ADMISSION//CARDIAC,
@@ -166,7 +166,7 @@ patient_id,time,code,numeric_value
 """
 
 MR_WANT_TRAIN_1 = """
-patient_id,time,code,numeric_value
+subject_id,time,code,numeric_value
 68729,,HEIGHT,160.3953106166676
 68729,"03/09/1978, 00:00:00",DOB,
 68729,"05/26/2010, 02:30:56",TEMP,97.8
@@ -178,7 +178,7 @@ patient_id,time,code,numeric_value
 """
 
 MR_WANT_TUNING_0 = """
-patient_id,time,code,numeric_value
+subject_id,time,code,numeric_value
 754281,,HEIGHT,166.22261567137025
 754281,"12/19/1988, 00:00:00",DOB,
 754281,"01/03/2010, 06:27:59",TEMP,99.8
@@ -186,7 +186,7 @@ patient_id,time,code,numeric_value
 """
 
 MR_WANT_HELD_OUT_0 = """
-patient_id,time,code,numeric_value
+subject_id,time,code,numeric_value
 1500733,,HEIGHT,158.60131573580904
 1500733,"07/20/1986, 00:00:00",DOB,
 1500733,"06/03/2010, 14:54:38",TEMP,100.0
@@ -214,13 +214,11 @@ def test_match_revise_filter_measurements():
         stage_name="filter_measurements",
         transform_stage_kwargs={
             "_match_revise": [
-                {"_matcher": {"code": "ADMISSION//CARDIAC"}, "min_patients_per_code": 2},
-                {"_matcher": {"code": "ADMISSION//ORTHOPEDIC"}, "min_patients_per_code": 2},
-                {"_matcher": {"code": "ADMISSION//PULMONARY"}, "min_patients_per_code": 2},
-                {"_matcher": {"code": "HR"}, "min_patients_per_code": 15},
-                {"_matcher": {"code": "EYE_COLOR//BLUE"}, "min_patients_per_code": 4},
-                {"_matcher": {"code": "EYE_COLOR//BROWN"}, "min_patients_per_code": 4},
-                {"_matcher": {"code": "EYE_COLOR//HAZEL"}, "min_patients_per_code": 4},
+                {"_matcher": {"code": {"regex": "ADMISSION//.*"}}, "min_subjects_per_code": 2},
+                {"_matcher": {"code": "HR"}, "min_subjects_per_code": 15},
+                {"_matcher": {"code": "EYE_COLOR//BLUE"}, "min_subjects_per_code": 4},
+                {"_matcher": {"code": "EYE_COLOR//BROWN"}, "min_subjects_per_code": 4},
+                {"_matcher": {"code": "EYE_COLOR//HAZEL"}, "min_subjects_per_code": 4},
             ],
         },
         want_data=MR_WANT_SHARDS,

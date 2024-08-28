@@ -8,7 +8,7 @@ function display_help() {
     echo "Usage: $0 <MIMICIV_RAW_DIR> <MIMICIV_PREMEDS_DIR> <MIMICIV_MEDS_DIR> <N_PARALLEL_WORKERS>"
     echo
     echo "This script processes MIMIC-IV data through several steps, handling raw data conversion,"
-    echo "sharding events, splitting patients, converting to sharded events, and merging into a MEDS cohort."
+    echo "sharding events, splitting subjects, converting to sharded events, and merging into a MEDS cohort."
     echo
     echo "Arguments:"
     echo "  MIMICIV_RAW_DIR                               Directory containing raw MIMIC-IV data files."
@@ -88,11 +88,11 @@ MEDS_extract-shard_events \
     etl_metadata.dataset_version="2.2" \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"
 
-echo "Splitting patients in serial"
-MEDS_extract-split_and_shard_patients \
+echo "Splitting subjects in serial"
+MEDS_extract-split_and_shard_subjects \
     input_dir="$MIMICIV_PREMEDS_DIR" \
     cohort_dir="$MIMICIV_MEDS_DIR" \
-    stage="split_and_shard_patients" \
+    stage="split_and_shard_subjects" \
     etl_metadata.dataset_name="MIMIC-IV" \
     etl_metadata.dataset_version="2.2" \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml "$@"

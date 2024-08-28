@@ -4,7 +4,7 @@ Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, ra
 scripts.
 
 In this test, the following stages are run:
-  - filter_patients
+  - filter_subjects
   - add_time_derived_measurements
   - fit_outlier_detection
   - occlude_outliers
@@ -17,23 +17,24 @@ In this test, the following stages are run:
 The stage configuration arguments will be as given in the yaml block below:
 """
 
+
 from datetime import datetime
 
 import polars as pl
+from meds import subject_id_field
 from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 
-from .transform_tester_base import (
+from tests.MEDS_Transforms import (
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT,
     AGGREGATE_CODE_METADATA_SCRIPT,
-    FILTER_PATIENTS_SCRIPT,
+    FILTER_SUBJECTS_SCRIPT,
     FIT_VOCABULARY_INDICES_SCRIPT,
     NORMALIZATION_SCRIPT,
     OCCLUDE_OUTLIERS_SCRIPT,
     TENSORIZATION_SCRIPT,
     TOKENIZATION_SCRIPT,
-    multi_stage_transform_tester,
-    parse_shards_yaml,
 )
+from tests.MEDS_Transforms.transform_tester_base import multi_stage_transform_tester, parse_shards_yaml
 
 MEDS_CODE_METADATA = pl.DataFrame(
     {
@@ -51,8 +52,8 @@ MEDS_CODE_METADATA = pl.DataFrame(
 )
 
 STAGE_CONFIG_YAML = """
-filter_patients:
-  min_events_per_patient: 5
+filter_subjects:
+  min_events_per_subject: 5
 add_time_derived_measurements:
   age:
     DOB_code: "DOB" # This is the MEDS official code for BIRTH
@@ -71,17 +72,17 @@ occlude_outliers:
 fit_normalization:
   aggregations:
     - "code/n_occurrences"
-    - "code/n_patients"
+    - "code/n_subjects"
     - "values/n_occurrences"
     - "values/sum"
     - "values/sum_sqd"
 """
 
-# After filtering out patients with fewer than 5 events:
+# After filtering out subjects with fewer than 5 events:
 WANT_FILTER = parse_shards_yaml(
-    """
-  "filter_patients/train/0": |-2
-    patient_id,time,code,numeric_value
+    f"""
+  "filter_subjects/train/0": |-2
+    {subject_id_field},time,code,numeric_value
     239684,,EYE_COLOR//BROWN,
     239684,,HEIGHT,175.271115221764
     239684,"12/28/1980, 00:00:00",DOB,
@@ -113,14 +114,14 @@ WANT_FILTER = parse_shards_yaml(
     1195293,"06/20/2010, 20:41:33",TEMP,100.4
     1195293,"06/20/2010, 20:50:04",DISCHARGE,
 
-  "filter_patients/train/1": |-2
-    patient_id,time,code,numeric_value
+  "filter_subjects/train/1": |-2
+    {subject_id_field},time,code,numeric_value
 
-  "filter_patients/tuning/0": |-2
-    patient_id,time,code,numeric_value
+  "filter_subjects/tuning/0": |-2
+    {subject_id_field},time,code,numeric_value
 
-  "filter_patients/held_out/0": |-2
-    patient_id,time,code,numeric_value
+  "filter_subjects/held_out/0": |-2
+    {subject_id_field},time,code,numeric_value
     1500733,,EYE_COLOR//BROWN,
     1500733,,HEIGHT,158.60131573580904
     1500733,"07/20/1986, 00:00:00",DOB,
@@ -136,9 +137,9 @@ WANT_FILTER = parse_shards_yaml(
 )
 
 WANT_TIME_DERIVED = parse_shards_yaml(
-    """
+    f"""
   "add_time_derived_measurements/train/0": |-2
-    patient_id,time,code,numeric_value
+    {subject_id_field},time,code,numeric_value
     239684,,EYE_COLOR//BROWN,
     239684,,HEIGHT,175.271115221764
     239684,"12/28/1980, 00:00:00","TIME_OF_DAY//[00,06)",
@@ -197,13 +198,13 @@ WANT_TIME_DERIVED = parse_shards_yaml(
     1195293,"06/20/2010, 20:50:04",DISCHARGE,
 
   "add_time_derived_measurements/train/1": |-2
-    patient_id,time,code,numeric_value
+    {subject_id_field},time,code,numeric_value
 
   "add_time_derived_measurements/tuning/0": |-2
-    patient_id,time,code,numeric_value
+    {subject_id_field},time,code,numeric_value
 
   "add_time_derived_measurements/held_out/0": |-2
-    patient_id,time,code,numeric_value
+    {subject_id_field},time,code,numeric_value
     1500733,,EYE_COLOR//BROWN,
     1500733,,HEIGHT,158.60131573580904
     1500733,"07/20/1986, 00:00:00","TIME_OF_DAY//[00,06)",
@@ -387,9 +388,9 @@ shape: (4, 3)
 """
 
 WANT_OCCLUDE_OUTLIERS = parse_shards_yaml(
-    """
+    f"""
   "occlude_outliers/train/0": |-2
-    patient_id,time,code,numeric_value,numeric_value/is_inlier
+    {subject_id_field},time,code,numeric_value,numeric_value/is_inlier
     239684,,EYE_COLOR//BROWN,,
     239684,,HEIGHT,,false
     239684,"12/28/1980, 00:00:00","TIME_OF_DAY//[00,06)",,
@@ -448,13 +449,13 @@ WANT_OCCLUDE_OUTLIERS = parse_shards_yaml(
     1195293,"06/20/2010, 20:50:04",DISCHARGE,,
 
   "occlude_outliers/train/1": |-2
-    patient_id,time,code,numeric_value,numeric_value/is_inlier
+    {subject_id_field},time,code,numeric_value,numeric_value/is_inlier
 
   "occlude_outliers/tuning/0": |-2
-    patient_id,time,code,numeric_value,numeric_value/is_inlier
+    {subject_id_field},time,code,numeric_value,numeric_value/is_inlier
 
   "occlude_outliers/held_out/0": |-2
-    patient_id,time,code,numeric_value,numeric_value/is_inlier
+    {subject_id_field},time,code,numeric_value,numeric_value/is_inlier
     1500733,,EYE_COLOR//BROWN,,
     1500733,,HEIGHT,,false
     1500733,"07/20/1986, 00:00:00","TIME_OF_DAY//[00,06)",,
@@ -488,7 +489,7 @@ FIT_NORMALIZATION_CODE = """
 ...     .group_by("code")
 ...     .agg(
 ...         pl.len().alias("code/n_occurrences"),
-...         pl.col("patient_id").n_unique().alias("code/n_patients"),
+...         pl.col("subject_id").n_unique().alias("code/n_subjects"),
 ...         VALS.len().alias("values/n_occurrences"),
 ...         VALS.sum().alias("values/sum"),
 ...         (VALS**2).sum().alias("values/sum_sqd")
@@ -497,7 +498,7 @@ FIT_NORMALIZATION_CODE = """
 >>> post_transform.filter(pl.col("values/n_occurrences") > 0)
 shape: (3, 6)
 ┌──────┬────────────────────┬─────────────────┬──────────────────────┬────────────┬────────────────┐
-│ code ┆ code/n_occurrences ┆ code/n_patients ┆ values/n_occurrences ┆ values/sum ┆ values/sum_sqd │
+│ code ┆ code/n_occurrences ┆ code/n_subjects ┆ values/n_occurrences ┆ values/sum ┆ values/sum_sqd │
 │ ---  ┆ ---                ┆ ---             ┆ ---                  ┆ ---        ┆ ---            │
 │ str  ┆ u32                ┆ u32             ┆ u32                  ┆ f32        ┆ f32            │
 ╞══════╪════════════════════╪═════════════════╪══════════════════════╪════════════╪════════════════╡
@@ -508,7 +509,7 @@ shape: (3, 6)
 >>> print(post_transform.filter(pl.col("values/n_occurrences") > 0).to_dict(as_series=False))
 {'code': ['HR', 'TEMP', 'AGE'],
  'code/n_occurrences': [10, 10, 12],
- 'code/n_patients': [2, 2, 2],
+ 'code/n_subjects': [2, 2, 2],
  'values/n_occurrences': [7, 6, 7],
  'values/sum': [776.7999877929688, 600.1000366210938, 224.02084350585938],
  'values/sum_sqd': [86249.921875, 60020.21484375, 7169.33349609375]}
@@ -533,7 +534,7 @@ WANT_FIT_NORMALIZATION = {
                 "DOB",
             ],
             "code/n_occurrences": [1, 1, 10, 10, 12, 2, 10, 2, 2, 2, 2, 2],
-            "code/n_patients": [1, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2],
+            "code/n_subjects": [1, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2],
             "values/n_occurrences": [0, 0, 7, 6, 7, 0, 0, 0, 0, 0, 0, 0],
             "values/sum": [
                 0.0,
@@ -597,7 +598,7 @@ WANT_FIT_NORMALIZATION = {
             "description": pl.String,
             "parent_codes": pl.List(pl.String),
             "code/n_occurrences": pl.UInt8,
-            "code/n_patients": pl.UInt8,
+            "code/n_subjects": pl.UInt8,
             "values/n_occurrences": pl.UInt8,  # In the real stage, this is shrunk, so it differs from the ex.
             "values/sum": pl.Float32,
             "values/sum_sqd": pl.Float32,
@@ -625,7 +626,7 @@ WANT_FIT_VOCABULARY_INDICES = {
             ],
             "code/vocab_index": [5, 6, 8, 9, 2, 7, 12, 11, 10, 1, 3, 4],
             "code/n_occurrences": [1, 1, 10, 10, 12, 2, 10, 2, 2, 2, 2, 2],
-            "code/n_patients": [1, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2],
+            "code/n_subjects": [1, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2],
             "values/n_occurrences": [0, 0, 7, 6, 7, 0, 0, 0, 0, 0, 0, 0],
             "values/sum": [
                 0.0,
@@ -689,7 +690,7 @@ WANT_FIT_VOCABULARY_INDICES = {
             "description": pl.String,
             "parent_codes": pl.List(pl.String),
             "code/n_occurrences": pl.UInt8,
-            "code/n_patients": pl.UInt8,
+            "code/n_subjects": pl.UInt8,
             "code/vocab_index": pl.UInt8,
             "values/n_occurrences": pl.UInt8,
             "values/sum": pl.Float32,
@@ -772,9 +773,9 @@ held_out/0
 
 # Note we have dropped the row in the held out shard that doesn't have a code in the vocabulary!
 WANT_NORMALIZATION = parse_shards_yaml(
-    """
+    f"""
   "normalization/train/0": |-2
-    patient_id,time,code,numeric_value
+    {subject_id_field},time,code,numeric_value
     239684,,6,
     239684,,7,
     239684,"12/28/1980, 00:00:00",10,
@@ -833,13 +834,13 @@ WANT_NORMALIZATION = parse_shards_yaml(
     1195293,"06/20/2010, 20:50:04",3,
 
   "normalization/train/1": |-2
-    patient_id,time,code,numeric_value
+    {subject_id_field},time,code,numeric_value
 
   "normalization/tuning/0": |-2
-    patient_id,time,code,numeric_value
+    {subject_id_field},time,code,numeric_value
 
   "normalization/held_out/0": |-2
-    patient_id,time,code,numeric_value
+    {subject_id_field},time,code,numeric_value
     1500733,,6,
     1500733,,7,
     1500733,"07/20/1986, 00:00:00",10,
@@ -864,7 +865,7 @@ WANT_NORMALIZATION = parse_shards_yaml(
 )
 
 TOKENIZATION_SCHEMA_DF_SCHEMA = {
-    "patient_id": pl.UInt32,
+    subject_id_field: pl.Int64,
     "code": pl.List(pl.UInt8),
     "numeric_value": pl.List(pl.Float32),
     "start_time": pl.Datetime("us"),
@@ -873,7 +874,7 @@ TOKENIZATION_SCHEMA_DF_SCHEMA = {
 WANT_TOKENIZATION_SCHEMAS = {
     "tokenization/schemas/train/0": pl.DataFrame(
         {
-            "patient_id": [239684, 1195293],
+            subject_id_field: [239684, 1195293],
             "code": [[6, 7], [5, 7]],
             "numeric_value": [[None, None], [None, None]],
             "start_time": [datetime(1980, 12, 28), datetime(1978, 6, 20)],
@@ -901,16 +902,16 @@ WANT_TOKENIZATION_SCHEMAS = {
         schema=TOKENIZATION_SCHEMA_DF_SCHEMA,
     ),
     "tokenization/schemas/train/1": pl.DataFrame(
-        {k: [] for k in ["patient_id", "code", "numeric_value", "start_time", "time"]},
+        {k: [] for k in [subject_id_field, "code", "numeric_value", "start_time", "time"]},
         schema=TOKENIZATION_SCHEMA_DF_SCHEMA,
     ),
     "tokenization/schemas/tuning/0": pl.DataFrame(
-        {k: [] for k in ["patient_id", "code", "numeric_value", "start_time", "time"]},
+        {k: [] for k in [subject_id_field, "code", "numeric_value", "start_time", "time"]},
         schema=TOKENIZATION_SCHEMA_DF_SCHEMA,
     ),
     "tokenization/schemas/held_out/0": pl.DataFrame(
         {
-            "patient_id": [1500733],
+            subject_id_field: [1500733],
             "code": [[6, 7]],
             "numeric_value": [[None, None]],
             "start_time": [datetime(1986, 7, 20)],
@@ -928,18 +929,9 @@ WANT_TOKENIZATION_SCHEMAS = {
     ),
 }
 
-TOKENIZATION_CODE = """
-```python
-
->>> import polars as pl
->>> from tests.test_multi_stage_preprocess_pipeline import WANT_NORMALIZATION as dfs
->>>
-
-```
-"""
 
 TOKENIZATION_EVENT_SEQS_DF_SCHEMA = {
-    "patient_id": pl.UInt32,
+    subject_id_field: pl.Int64,
     "code": pl.List(pl.List(pl.UInt8)),
     "numeric_value": pl.List(pl.List(pl.Float32)),
     "time_delta_days": pl.List(pl.Float32),
@@ -948,7 +940,7 @@ TOKENIZATION_EVENT_SEQS_DF_SCHEMA = {
 WANT_TOKENIZATION_EVENT_SEQS = {
     "tokenization/event_seqs/train/0": pl.DataFrame(
         {
-            "patient_id": [239684, 1195293],
+            subject_id_field: [239684, 1195293],
             "code": [
                 [[10, 4], [11, 2, 1, 8, 9], [11, 2, 8, 9], [12, 2, 8, 9], [12, 2, 8, 9], [12, 2, 3]],
                 [
@@ -995,16 +987,16 @@ WANT_TOKENIZATION_EVENT_SEQS = {
         schema=TOKENIZATION_EVENT_SEQS_DF_SCHEMA,
     ),
     "tokenization/event_seqs/train/1": pl.DataFrame(
-        {k: [] for k in ["patient_id", "code", "numeric_value", "time_delta_days"]},
+        {k: [] for k in [subject_id_field, "code", "numeric_value", "time_delta_days"]},
         schema=TOKENIZATION_EVENT_SEQS_DF_SCHEMA,
     ),
     "tokenization/event_seqs/tuning/0": pl.DataFrame(
-        {k: [] for k in ["patient_id", "code", "numeric_value", "time_delta_days"]},
+        {k: [] for k in [subject_id_field, "code", "numeric_value", "time_delta_days"]},
         schema=TOKENIZATION_EVENT_SEQS_DF_SCHEMA,
     ),
     "tokenization/event_seqs/held_out/0": pl.DataFrame(
         {
-            "patient_id": [1500733],
+            subject_id_field: [1500733],
             "code": [
                 [
                     [10, 4],
@@ -1057,7 +1049,7 @@ WANT_NRTs = {
 def test_pipeline():
     multi_stage_transform_tester(
         transform_scripts=[
-            FILTER_PATIENTS_SCRIPT,
+            FILTER_SUBJECTS_SCRIPT,
             ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT,
             AGGREGATE_CODE_METADATA_SCRIPT,
             OCCLUDE_OUTLIERS_SCRIPT,
@@ -1068,7 +1060,7 @@ def test_pipeline():
             TENSORIZATION_SCRIPT,
         ],
         stage_names=[
-            "filter_patients",
+            "filter_subjects",
             "add_time_derived_measurements",
             "fit_outlier_detection",
             "occlude_outliers",
@@ -1093,6 +1085,5 @@ def test_pipeline():
             **WANT_TOKENIZATION_EVENT_SEQS,
             **WANT_NRTs,
         },
-        outputs_from_cohort_dir=True,
         input_code_metadata=MEDS_CODE_METADATA,
     )
