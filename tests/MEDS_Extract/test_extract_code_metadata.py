@@ -161,15 +161,6 @@ SHARDS_JSON = {
     "held_out/0": [1500733],
 }
 
-MEDS_OUTPUT_CODE_METADATA_FILE = """
-code,description,parent_codes
-EYE_COLOR//BLUE,"Blue Eyes. Less common than brown.",
-EYE_COLOR//BROWN,"Brown Eyes. The most common eye color.",
-EYE_COLOR//HAZEL,"Hazel eyes. These are uncommon",
-HR,"Heart Rate",LOINC/8867-4
-TEMP,"Body Temperature",LOINC/8310-5
-"""
-
 WANT_OUTPUTS = {
     "metadata/codes": pl.DataFrame(
         {
