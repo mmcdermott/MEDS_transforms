@@ -76,10 +76,10 @@ This is a step in a few parts:
     - the `hosp/diagnoses_icd` table with the `hosp/admissions` table to get the `dischtime` for each
         `hadm_id`.
     - the `hosp/drgcodes` table with the `hosp/admissions` table to get the `dischtime` for each `hadm_id`.
-2. Convert the patient's static data to a more parseable form. This entails:
-    - Get the patient's DOB in a format that is usable for MEDS, rather than the integral `anchor_year` and
+2. Convert the subject's static data to a more parseable form. This entails:
+    - Get the subject's DOB in a format that is usable for MEDS, rather than the integral `anchor_year` and
         `anchor_offset` fields.
-    - Merge the patient's `dod` with the `deathtime` from the `admissions` table.
+    - Merge the subject's `dod` with the `deathtime` from the `admissions` table.
 
 After these steps, modified files or symlinks to the original files will be written in a new directory which
 will be used as the input to the actual MEDS extraction ETL. We'll use `$MIMICIV_PREMEDS_DIR` to denote this
@@ -109,14 +109,14 @@ This is a step in 4 parts:
     This step uses the `./scripts/extraction/shard_events.py` script. See `joint_script*.sh` for the expected
     format of the command.
 
-2. Extract and form the patient splits and sub-shards. The `./scripts/extraction/split_and_shard_patients.py`
+2. Extract and form the subject splits and sub-shards. The `./scripts/extraction/split_and_shard_subjects.py`
     script is used for this step. See `joint_script*.sh` for the expected format of the command.
 
-3. Extract patient sub-shards and convert to MEDS events. The
+3. Extract subject sub-shards and convert to MEDS events. The
     `./scripts/extraction/convert_to_sharded_events.py` script is used for this step. See `joint_script*.sh` for
     the expected format of the command.
 
-4. Merge the MEDS events into a single file per patient sub-shard. The
+4. Merge the MEDS events into a single file per subject sub-shard. The
     `./scripts/extraction/merge_to_MEDS_cohort.py` script is used for this step. See `joint_script*.sh` for the
     expected format of the command.
 
@@ -139,7 +139,7 @@ timeline which is otherwise stored at the _datetime_ resolution?
 
 Other questions:
 
-1. How to handle merging the deathtimes between the hosp table and the patients table?
+1. How to handle merging the deathtimes between the hosp table and the subjects table?
 2. How to handle the dob nonsense MIMIC has?
 
 ## Notes
@@ -153,4 +153,4 @@ may need to run `unset SLURM_CPU_BIND` in your terminal first to avoid errors.
 
 If you wanted, some other processing could also be done here, such as:
 
-1. Converting the patient's dynamically recorded race into a static, most commonly recorded race field.
+1. Converting the subject's dynamically recorded race into a static, most commonly recorded race field.

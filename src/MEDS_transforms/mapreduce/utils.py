@@ -315,14 +315,14 @@ def shard_iterator(
         >>> from tempfile import TemporaryDirectory
         >>> import polars as pl
         >>> df = pl.DataFrame({
-        ...     "patient_id": [1, 2, 3, 4, 5, 6, 7, 8, 9],
+        ...     "subject_id": [1, 2, 3, 4, 5, 6, 7, 8, 9],
         ...     "code": ["A", "B", "C", "D", "E", "F", "G", "H", "I"],
         ...     "time": [1, 2, 3, 4, 5, 6, 1, 2, 3],
         ... })
         >>> shards = {"train/0": [1, 2, 3, 4], "train/1": [5, 6, 7], "tuning": [8], "held_out": [9]}
         >>> def write_dfs(input_dir: Path, df: pl.DataFrame=df, shards: dict=shards, sfx: str=".parquet"):
-        ...     for shard_name, patient_ids in shards.items():
-        ...         df = df.filter(pl.col("patient_id").is_in(patient_ids))
+        ...     for shard_name, subject_ids in shards.items():
+        ...         df = df.filter(pl.col("subject_id").is_in(subject_ids))
         ...         shard_fp = input_dir / f"{shard_name}{sfx}"
         ...         shard_fp.parent.mkdir(exist_ok=True, parents=True)
         ...         if sfx == ".parquet": df.write_parquet(shard_fp)
@@ -483,9 +483,9 @@ def shard_iterator(
         shards = train_shards
         includes_only_train = True
     elif train_only:
-        logger.info(
+        logger.warning(
             f"train_only={train_only} requested but no dedicated train shards found; processing all shards "
-            "and relying on `patient_splits.parquet` for filtering."
+            "and relying on `subject_splits.parquet` for filtering."
         )
 
     shards = shuffle_shards(shards, cfg)

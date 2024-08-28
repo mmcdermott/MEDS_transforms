@@ -1,4 +1,4 @@
-patient_id_col: subject_id
+subject_id_col: subject_id
 hosp/admissions:
   ed_registration:
     code: ED_REGISTRATION
@@ -27,7 +27,7 @@ hosp/admissions:
     time: col(dischtime)
     time_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
-  # We omit the death event here as it is joined to the data in the patients table in the pre-MEDS step.
+  # We omit the death event here as it is joined to the data in the subjects table in the pre-MEDS step.
 
 hosp/diagnoses_icd:
   diagnosis:
@@ -108,7 +108,7 @@ hosp/omr:
     time: col(chartdate)
     time_format: "%Y-%m-%d"
 
-hosp/patients:
+hosp/subjects:
   gender:
     code:
       - GENDER
@@ -295,18 +295,18 @@ icu/inputevents:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
         parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
-  patient_weight:
+  subject_weight:
     code:
-      - PATIENT_WEIGHT_AT_INFUSION
+      - SUBJECT_WEIGHT_AT_INFUSION
       - KG
     time: col(starttime)
     time_format: "%Y-%m-%d %H:%M:%S"
-    numeric_value: patientweight
+    numeric_value: subjectweight
 
 icu/outputevents:
   output:
     code:
-      - PATIENT_FLUID_OUTPUT
+      - SUBJECT_FLUID_OUTPUT
       - col(itemid)
       - col(valueuom)
     time: col(charttime)

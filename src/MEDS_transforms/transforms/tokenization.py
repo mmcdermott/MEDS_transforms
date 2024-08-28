@@ -6,7 +6,7 @@ continuous time sequence into a temporal sequence at the level that will be cons
 
 All these functions take in _normalized_ data -- meaning data where there are _no longer_ any code modifiers,
 as those have been normalized alongside codes into integer indices (in the output code column). The only
-columns of concern here thus are `patient_id`, `time`, `code`, `numeric_value`.
+columns of concern here thus are `subject_id`, `time`, `code`, `numeric_value`.
 """
 
 from pathlib import Path
@@ -69,7 +69,7 @@ def split_static_and_dynamic(df: pl.LazyFrame) -> tuple[pl.LazyFrame, pl.LazyFra
     Examples:
         >>> from datetime import datetime
         >>> df = pl.DataFrame({
-        ...     "patient_id": [1, 1, 2, 2],
+        ...     "subject_id": [1, 1, 2, 2],
         ...     "time": [None, datetime(2021, 1, 1), None, datetime(2021, 1, 2)],
         ...     "code": [100, 101, 200, 201],
         ...     "numeric_value": [1.0, 2.0, 3.0, 4.0]
@@ -78,7 +78,7 @@ def split_static_and_dynamic(df: pl.LazyFrame) -> tuple[pl.LazyFrame, pl.LazyFra
         >>> static.collect()
         shape: (2, 3)
         ┌────────────┬──────┬───────────────┐
-        │ patient_id ┆ code ┆ numeric_value │
+        │ subject_id ┆ code ┆ numeric_value │
         │ ---        ┆ ---  ┆ ---           │
         │ i64        ┆ i64  ┆ f64           │
         ╞════════════╪══════╪═══════════════╡
@@ -88,7 +88,7 @@ def split_static_and_dynamic(df: pl.LazyFrame) -> tuple[pl.LazyFrame, pl.LazyFra
         >>> dynamic.collect()
         shape: (2, 4)
         ┌────────────┬─────────────────────┬──────┬───────────────┐
-        │ patient_id ┆ time                ┆ code ┆ numeric_value │
+        │ subject_id ┆ time                ┆ code ┆ numeric_value │
         │ ---        ┆ ---                 ┆ ---  ┆ ---           │
         │ i64        ┆ datetime[μs]        ┆ i64  ┆ f64           │
         ╞════════════╪═════════════════════╪══════╪═══════════════╡
@@ -103,19 +103,19 @@ def split_static_and_dynamic(df: pl.LazyFrame) -> tuple[pl.LazyFrame, pl.LazyFra
 
 
 def extract_statics_and_schema(df: pl.LazyFrame) -> pl.LazyFrame:
-    """This function extracts static data and schema information (sequence of patient unique times).
+    """This function extracts static data and schema information (sequence of subject unique times).
 
     Args:
         df: The input data.
 
     Returns:
-        A `pl.LazyFrame` object containing the static data and the unique times of the patient, grouped
-        by patient as lists, in the same order as the patient IDs occurred in the original file.
+        A `pl.LazyFrame` object containing the static data and the unique times of the subject, grouped
+        by subject as lists, in the same order as the subject IDs occurred in the original file.
 
     Examples:
         >>> from datetime import datetime
         >>> df = pl.DataFrame({
-        ...     "patient_id": [1, 1, 1, 1, 2, 2, 2],
+        ...     "subject_id": [1, 1, 1, 1, 2, 2, 2],
         ...     "time": [
         ...         None, datetime(2021, 1, 1), datetime(2021, 1, 1), datetime(2021, 1, 13),
         ...         None, datetime(2021, 1, 2), datetime(2021, 1, 2)],
@@ -126,17 +126,17 @@ def extract_statics_and_schema(df: pl.LazyFrame) -> pl.LazyFrame:
         >>> df.drop("time")
         shape: (2, 4)
         ┌────────────┬───────────┬───────────────┬─────────────────────┐
-        │ patient_id ┆ code      ┆ numeric_value ┆ start_time          │
+        │ subject_id ┆ code      ┆ numeric_value ┆ start_time          │
         │ ---        ┆ ---       ┆ ---           ┆ ---                 │
         │ i64        ┆ list[i64] ┆ list[f64]     ┆ datetime[μs]        │
         ╞════════════╪═══════════╪═══════════════╪═════════════════════╡
         │ 1          ┆ [100]     ┆ [1.0]         ┆ 2021-01-01 00:00:00 │
         │ 2          ┆ [200]     ┆ [5.0]         ┆ 2021-01-02 00:00:00 │
         └────────────┴───────────┴───────────────┴─────────────────────┘
-        >>> df.select("patient_id", "time").explode("time")
+        >>> df.select("subject_id", "time").explode("time")
         shape: (3, 2)
         ┌────────────┬─────────────────────┐
-        │ patient_id ┆ time                │
+        │ subject_id ┆ time                │
         │ ---        ┆ ---                 │
         │ i64        ┆ datetime[μs]        │
         ╞════════════╪═════════════════════╡
@@ -148,21 +148,21 @@ def extract_statics_and_schema(df: pl.LazyFrame) -> pl.LazyFrame:
 
     static, dynamic = split_static_and_dynamic(df)
 
-    # This collects static data by patient ID and stores only (as a list) the codes and numeric values.
-    static_by_patient = static.group_by("patient_id", maintain_order=True).agg("code", "numeric_value")
+    # This collects static data by subject ID and stores only (as a list) the codes and numeric values.
+    static_by_subject = static.group_by("subject_id", maintain_order=True).agg("code", "numeric_value")
 
-    # This collects the unique times for each patient.
-    schema_by_patient = dynamic.group_by("patient_id", maintain_order=True).agg(
+    # This collects the unique times for each subject.
+    schema_by_subject = dynamic.group_by("subject_id", maintain_order=True).agg(
         pl.col("time").min().alias("start_time"), pl.col("time").unique(maintain_order=True)
     )
 
-    # TODO(mmd): Consider tracking patient offset explicitly here.
+    # TODO(mmd): Consider tracking subject offset explicitly here.
 
-    return static_by_patient.join(schema_by_patient, on="patient_id", how="inner")
+    return static_by_subject.join(schema_by_subject, on="subject_id", how="inner")
 
 
-def extract_seq_of_patient_events(df: pl.LazyFrame) -> pl.LazyFrame:
-    """This function extracts sequences of patient events, which are sequences of measurements.
+def extract_seq_of_subject_events(df: pl.LazyFrame) -> pl.LazyFrame:
+    """This function extracts sequences of subject events, which are sequences of measurements.
 
     The result of this can be naturally tensorized into a `JointNestedRaggedTensorDict` object.
 
@@ -170,8 +170,8 @@ def extract_seq_of_patient_events(df: pl.LazyFrame) -> pl.LazyFrame:
         df: The input data.
 
     Returns:
-        A `pl.LazyFrame` object containing the sequences of patient events, with the following columns:
-            - `patient_id`: The patient ID.
+        A `pl.LazyFrame` object containing the sequences of subject events, with the following columns:
+            - `subject_id`: The subject ID.
             - `time_delta_days`: The time delta in days, as a list of floats (ragged).
             - `code`: The code, as a list of lists of ints (ragged in both levels).
             - `numeric_value`: The numeric value as a list of lists of floats (ragged in both levels).
@@ -179,17 +179,17 @@ def extract_seq_of_patient_events(df: pl.LazyFrame) -> pl.LazyFrame:
     Examples:
         >>> from datetime import datetime
         >>> df = pl.DataFrame({
-        ...     "patient_id": [1, 1, 1, 1, 2, 2, 2],
+        ...     "subject_id": [1, 1, 1, 1, 2, 2, 2],
         ...     "time": [
         ...         None, datetime(2021, 1, 1), datetime(2021, 1, 1), datetime(2021, 1, 13),
         ...         None, datetime(2021, 1, 2), datetime(2021, 1, 2)],
         ...     "code": [100, 101, 102, 103, 200, 201, 202],
         ...     "numeric_value": pl.Series([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0], dtype=pl.Float32)
         ... }).lazy()
-        >>> extract_seq_of_patient_events(df).collect()
+        >>> extract_seq_of_subject_events(df).collect()
         shape: (2, 4)
         ┌────────────┬─────────────────┬─────────────────────┬─────────────────────┐
-        │ patient_id ┆ time_delta_days ┆ code                ┆ numeric_value       │
+        │ subject_id ┆ time_delta_days ┆ code                ┆ numeric_value       │
         │ ---        ┆ ---             ┆ ---                 ┆ ---                 │
         │ i64        ┆ list[f32]       ┆ list[list[i64]]     ┆ list[list[f32]]     │
         ╞════════════╪═════════════════╪═════════════════════╪═════════════════════╡
@@ -203,9 +203,9 @@ def extract_seq_of_patient_events(df: pl.LazyFrame) -> pl.LazyFrame:
     time_delta_days_expr = (pl.col("time").diff().dt.total_seconds() / SECONDS_PER_DAY).cast(pl.Float32)
 
     return (
-        dynamic.group_by("patient_id", "time", maintain_order=True)
+        dynamic.group_by("subject_id", "time", maintain_order=True)
         .agg(pl.col("code").name.keep(), fill_to_nans("numeric_value").name.keep())
-        .group_by("patient_id", maintain_order=True)
+        .group_by("subject_id", maintain_order=True)
         .agg(
             fill_to_nans(time_delta_days_expr).alias("time_delta_days"),
             "code",
@@ -229,10 +229,9 @@ def main(cfg: DictConfig):
     )
 
     output_dir = Path(cfg.stage_cfg.output_dir)
+    if train_only := cfg.stage_cfg.get("train_only", False):
+        raise ValueError(f"train_only={train_only} is not supported for this stage.")
     shards_single_output, include_only_train = shard_iterator(cfg)
-
-    if include_only_train:
-        raise ValueError("Not supported for this stage.")
 
     for in_fp, out_fp in shards_single_output:
         sharded_path = out_fp.relative_to(output_dir)
@@ -258,12 +257,12 @@ def main(cfg: DictConfig):
             event_seq_out_fp,
             pl.scan_parquet,
             write_lazyframe,
-            extract_seq_of_patient_events,
+            extract_seq_of_subject_events,
             do_overwrite=cfg.do_overwrite,
         )
 
     logger.info(f"Done with {cfg.stage}")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

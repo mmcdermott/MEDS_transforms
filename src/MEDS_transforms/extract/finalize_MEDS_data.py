@@ -38,7 +38,7 @@ def get_and_validate_data_schema(df: pl.LazyFrame, stage_cfg: DictConfig) -> pa.
         >>> get_and_validate_data_schema(df.lazy(), dict(do_retype=False)) # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
-        ValueError: MEDS Data DataFrame must have a 'patient_id' column of type Int64.
+        ValueError: MEDS Data DataFrame must have a 'subject_id' column of type Int64.
                     MEDS Data DataFrame must have a 'time' column of type
                         Datetime(time_unit='us', time_zone=None).
                     MEDS Data DataFrame must have a 'code' column of type String.
@@ -46,28 +46,28 @@ def get_and_validate_data_schema(df: pl.LazyFrame, stage_cfg: DictConfig) -> pa.
         >>> get_and_validate_data_schema(df.lazy(), {}) # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
-        ValueError: MEDS Data DataFrame must have a 'patient_id' column of type Int64.
+        ValueError: MEDS Data DataFrame must have a 'subject_id' column of type Int64.
                     MEDS Data DataFrame must have a 'code' column of type String.
         >>> from datetime import datetime
         >>> df = pl.DataFrame({
-        ...     "patient_id": pl.Series([1, 2], dtype=pl.UInt32),
+        ...     "subject_id": pl.Series([1, 2], dtype=pl.UInt32),
         ...     "time": [datetime(2021, 1, 1), datetime(2021, 1, 2)],
         ...     "code": ["A", "B"], "text_value": ["1", None], "numeric_value": [None, 34.2]
         ... })
         >>> get_and_validate_data_schema(df.lazy(), dict(do_retype=False)) # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
-        ValueError: MEDS Data 'patient_id' column must be of type Int64. Got UInt32.
+        ValueError: MEDS Data 'subject_id' column must be of type Int64. Got UInt32.
                     MEDS Data 'numeric_value' column must be of type Float32. Got Float64.
         >>> get_and_validate_data_schema(df.lazy(), {})
         pyarrow.Table
-        patient_id: int64
+        subject_id: int64
         time: timestamp[us]
         code: string
         numeric_value: float
         text_value: large_string
         ----
-        patient_id: [[1,2]]
+        subject_id: [[1,2]]
         time: [[2021-01-01 00:00:00.000000,2021-01-02 00:00:00.000000]]
         code: [["A","B"]]
         numeric_value: [[null,34.2]]
@@ -111,7 +111,7 @@ def main(cfg: DictConfig):
     """Writes out schema compliant MEDS data files for the extracted dataset.
 
     In particular, this script ensures that all shard files are MEDS compliant with the mandatory columns
-      - `patient_id` (Int64)
+      - `subject_id` (Int64)
       - `time` (DateTime)
       - `code` (String)
       - `numeric_value` (Float32)
@@ -134,5 +134,5 @@ def main(cfg: DictConfig):
     map_over(cfg, compute_fn=get_and_validate_data_schema, write_fn=pq.write_table)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

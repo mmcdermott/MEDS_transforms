@@ -8,7 +8,7 @@ function display_help() {
     echo "Usage: $0 <MIMICIV_RAW_DIR> <MIMICIV_PREMEDS_DIR> <MIMICIV_MEDS_DIR> <N_PARALLEL_WORKERS>"
     echo
     echo "This script processes MIMIC-IV data through several steps, handling raw data conversion,"
-    echo "sharding events, splitting patients, converting to sharded events, and merging into a MEDS cohort."
+    echo "sharding events, splitting subjects, converting to sharded events, and merging into a MEDS cohort."
     echo "This script uses slurm to process the data in parallel via the 'submitit' Hydra launcher."
     echo
     echo "Arguments:"
@@ -72,8 +72,8 @@ MEDS_extract-shard_events \
     event_conversion_config_fp=./MIMIC-IV_Example/configs/event_configs.yaml \
     stage=shard_events
 
-echo "Splitting patients on one worker"
-MEDS_extract-split_and_shard_patients \
+echo "Splitting subjects on one worker"
+MEDS_extract-split_and_shard_subjects \
     --multirun \
     worker="range(0,1)" \
     hydra/launcher=submitit_slurm \

@@ -7,12 +7,13 @@ scripts.
 
 import polars as pl
 
-from .transform_tester_base import OCCLUDE_OUTLIERS_SCRIPT, single_stage_transform_tester
-from .utils import MEDS_PL_SCHEMA, parse_meds_csvs
+from tests.MEDS_Transforms import OCCLUDE_OUTLIERS_SCRIPT
+from tests.MEDS_Transforms.transform_tester_base import single_stage_transform_tester
+from tests.utils import MEDS_PL_SCHEMA, parse_meds_csvs
 
 # This is the code metadata
 # MEDS_CODE_METADATA_CSV = """
-# code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,description,parent_code
+# code,code/n_occurrences,code/n_subjects,values/n_occurrences,values/sum,values/sum_sqd,description,parent_code
 # ,44,4,28,3198.8389005974336,382968.28937288234,,
 # ADMISSION//CARDIAC,2,2,0,,,,
 # ADMISSION//ORTHOPEDIC,1,1,0,,,,
@@ -75,7 +76,7 @@ Cut-off: 96.52486154259438, 100.39181021033531
 """  # noqa: E501
 
 WANT_TRAIN_0 = """
-patient_id,time,code,numeric_value,numeric_value/is_inlier
+subject_id,time,code,numeric_value,numeric_value/is_inlier
 239684,,EYE_COLOR//BROWN,,
 239684,,HEIGHT,,false
 239684,"12/28/1980, 00:00:00",DOB,,
@@ -109,7 +110,7 @@ patient_id,time,code,numeric_value,numeric_value/is_inlier
 """
 
 WANT_TRAIN_1 = """
-patient_id,time,code,numeric_value,numeric_value/is_inlier
+subject_id,time,code,numeric_value,numeric_value/is_inlier
 68729,,EYE_COLOR//HAZEL,,
 68729,,HEIGHT,160.3953106166676,true
 68729,"03/09/1978, 00:00:00",DOB,,
@@ -127,7 +128,7 @@ patient_id,time,code,numeric_value,numeric_value/is_inlier
 """
 
 WANT_TUNING_0 = """
-patient_id,time,code,numeric_value,numeric_value/is_inlier
+subject_id,time,code,numeric_value,numeric_value/is_inlier
 754281,,EYE_COLOR//BROWN,,
 754281,,HEIGHT,166.22261567137025,true
 754281,"12/19/1988, 00:00:00",DOB,,
@@ -138,7 +139,7 @@ patient_id,time,code,numeric_value,numeric_value/is_inlier
 """
 
 WANT_HELD_OUT_0 = """
-patient_id,time,code,numeric_value,numeric_value/is_inlier
+subject_id,time,code,numeric_value,numeric_value/is_inlier
 1500733,,EYE_COLOR//BROWN,,
 1500733,,HEIGHT,158.60131573580904,true
 1500733,"07/20/1986, 00:00:00",DOB,,

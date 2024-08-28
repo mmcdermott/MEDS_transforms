@@ -8,7 +8,7 @@ function display_help() {
     echo "Usage: $0 <EICU_RAW_DIR> <EICU_PREMEDS_DIR> <EICU_MEDS_DIR> <N_PARALLEL_WORKERS>"
     echo
     echo "This script processes eICU data through several steps, handling raw data conversion,"
-    echo "sharding events, splitting patients, converting to sharded events, and merging into a MEDS cohort."
+    echo "sharding events, splitting subjects, converting to sharded events, and merging into a MEDS cohort."
     echo "This script uses slurm to process the data in parallel via the 'submitit' Hydra launcher."
     echo
     echo "Arguments:"
@@ -71,8 +71,8 @@ echo "Trying submitit launching with $N_PARALLEL_WORKERS jobs."
     cohort_dir="$EICU_MEDS_DIR" \
     event_conversion_config_fp=./eICU_Example/configs/event_configs.yaml
 
-echo "Splitting patients on one worker"
-./scripts/extraction/split_and_shard_patients.py \
+echo "Splitting subjects on one worker"
+./scripts/extraction/split_and_shard_subjects.py \
     --multirun \
     worker="range(0,1)" \
     hydra/launcher=submitit_slurm \
