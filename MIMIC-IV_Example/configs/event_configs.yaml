@@ -100,6 +100,7 @@ hosp/labevents:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
         parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        valueuom: "valueuom"
 
 hosp/omr:
   omr:
@@ -218,6 +219,7 @@ icu/chartevents:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
         parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        valueuom: "valueuom"
 
 icu/procedureevents:
   start:
