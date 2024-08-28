@@ -200,6 +200,20 @@ def run_command(
 
 def assert_df_equal(want: pl.DataFrame, got: pl.DataFrame, msg: str = None, **kwargs):
     try:
+        update_exprs = {}
+        for k, v in want.schema.items():
+            assert k in got.schema, f"missing column {k}."
+            if kwargs.get("check_dtypes", False):
+                assert v == got.schema[k], f"column {k} has different types."
+            if v == pl.List(pl.String) and got.schema[k] == pl.List(pl.String):
+                update_exprs[k] = pl.col(k).list.join("||")
+        if update_exprs:
+            want_cols = want.columns
+            got_cols = got.columns
+
+            want = want.with_columns(**update_exprs).select(want_cols)
+            got = got.with_columns(**update_exprs).select(got_cols)
+
         assert_frame_equal(want, got, **kwargs)
     except AssertionError as e:
         pl.Config.set_tbl_rows(-1)

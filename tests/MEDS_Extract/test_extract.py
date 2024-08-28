@@ -525,13 +525,8 @@ def test_extraction():
         got_df = pl.read_parquet(output_file, glob=False)
 
         want_df = pl.read_csv(source=StringIO(MEDS_OUTPUT_CODE_METADATA_FILE)).with_columns(
-            pl.col("code"),
             pl.col("parent_codes").cast(pl.List(pl.Utf8)),
         )
-
-        # We collapse the list type as it throws an error in the assert_df_equal otherwise
-        got_df = got_df.with_columns(pl.col("parent_codes").list.join("||"))
-        want_df = want_df.with_columns(pl.col("parent_codes").list.join("||"))
 
         assert_df_equal(
             want=want_df,
