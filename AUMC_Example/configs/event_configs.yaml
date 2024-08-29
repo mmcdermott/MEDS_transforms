@@ -45,7 +45,7 @@ numericitems:
       - col(item)
       - col(unit)
     time: col(measuredattime)
-    numerical_value: value
+    numeric_value: value
 
 listitems:
   event:
@@ -104,7 +104,7 @@ drugitems:
       - col(item)
       - col(rateunit)
     time: col(starttime)
-    numerical_value: col(rate)
+    numeric_value: col(rate)
   dose: 
     code:
       - DRUG
@@ -113,7 +113,7 @@ drugitems:
       - col(item)
       - col(doseunit)
     time: col(starttime)
-    numerical_value: col(dose)
+    numeric_value: col(dose)
   end:
     code:
       - DRUG
