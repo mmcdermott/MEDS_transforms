@@ -1,11 +1,15 @@
-raw_cohort_dir: ???
-output_dir: ???
+input_dir: ${oc.env:MIMICIV_RAW_DIR}
+cohort_dir: ${oc.env:MIMICIV_PRE_MEDS_DIR}
+
+do_overwrite: false
+
+log_dir: ${cohort_dir}/.logs
 
 # Hydra
 hydra:
   job:
     name: pre_MEDS_${now:%Y-%m-%d_%H-%M-%S}
   run:
-    dir: ${output_dir}/.logs/${hydra.job.name}
+    dir: ${log_dir}
   sweep:
-    dir: ${output_dir}/.logs/${hydra.job.name}
+    dir: ${log_dir}

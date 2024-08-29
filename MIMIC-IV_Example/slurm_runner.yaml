@@ -1,0 +1,60 @@
+parallelize:
+  n_workers: ${oc.env:N_WORKERS}
+  launcher: "submitit_slurm"
+
+shard_events:
+  parallelize:
+    launcher_params:
+      timeout_min: 60
+      cpus_per_task: 10
+      mem_gb: 10
+      partition: "short"
+
+split_and_shard_subjects:
+  parallelize:
+    launcher_params:
+      timeout_min: 60
+      cpus_per_task: 10
+      mem_gb: 10
+      partition: "short"
+
+convert_to_sharded_events:
+  parallelize:
+    launcher_params:
+      timeout_min: 60
+      cpus_per_task: 10
+      mem_gb: 10
+      partition: "short"
+
+merge_to_MEDS_cohort:
+  parallelize:
+    launcher_params:
+      timeout_min: 60
+      cpus_per_task: 10
+      mem_gb: 10
+      partition: "short"
+
+extract_code_metadata:
+  parallelize:
+    launcher_params:
+      timeout_min: 60
+      cpus_per_task: 10
+      mem_gb: 10
+      partition: "short"
+
+finalize_MEDS_metadata:
+  parallelize:
+    launcher_params:
+      timeout_min: 60
+      cpus_per_task: 10
+      mem_gb: 10
+      partition: "short"
+
+finalize_MEDS_data:
+  parallelize:
+    n_workers: 1
+    launcher_params:
+      timeout_min: 15
+      cpus_per_task: 5
+      mem_gb: 10
+      partition: "short"
