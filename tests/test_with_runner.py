@@ -46,36 +46,42 @@ from tests.MEDS_Transforms.test_multi_stage_preprocess_pipeline import (
 from tests.MEDS_Transforms.transform_tester_base import MEDS_SHARDS, SPLITS_DF
 from tests.utils import add_params, single_stage_tester
 
-
-def scriptify(s: str) -> str:
-    return f"python {s}" if USE_LOCAL_SCRIPTS else s
-
-
-STAGE_RUNNER_YAML = f"""
+# Normally, you wouldn't need to specify all of these scripts, but in testing with local scripts we need to
+# specify them all as they need to point to their python paths.
+if USE_LOCAL_SCRIPTS:
+    STAGE_RUNNER_YAML = f"""
 filter_subjects:
-  script: {scriptify(FILTER_SUBJECTS_SCRIPT)}
+  script: "python {FILTER_SUBJECTS_SCRIPT}"
 
 add_time_derived_measurements:
-  script: {scriptify(ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT)}
+  script: "python {ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT}"
 
 fit_outlier_detection:
-  script: {scriptify(AGGREGATE_CODE_METADATA_SCRIPT)}
+  script: "python {AGGREGATE_CODE_METADATA_SCRIPT}"
 
 occlude_outliers:
-  script: {scriptify(OCCLUDE_OUTLIERS_SCRIPT)}
+  script: "python {OCCLUDE_OUTLIERS_SCRIPT}"
 
 fit_normalization:
-  script: {scriptify(AGGREGATE_CODE_METADATA_SCRIPT)}
+  script: "python {AGGREGATE_CODE_METADATA_SCRIPT}"
 
 fit_vocabulary_indices:
-  script: {scriptify(FIT_VOCABULARY_INDICES_SCRIPT)}
+  script: "python {FIT_VOCABULARY_INDICES_SCRIPT}"
 
 normalization:
-  script: {scriptify(NORMALIZATION_SCRIPT)}
+  script: "python {NORMALIZATION_SCRIPT}"
 
 tokenization:
-  script: {scriptify(TOKENIZATION_SCRIPT)}
-"""
+  script: "python {TOKENIZATION_SCRIPT}"
+    """
+else:
+    STAGE_RUNNER_YAML = f"""
+fit_outlier_detection:
+  script: {AGGREGATE_CODE_METADATA_SCRIPT}
+
+fit_normalization:
+  script: {AGGREGATE_CODE_METADATA_SCRIPT}
+    """
 
 PIPELINE_YAML = """
 defaults:
