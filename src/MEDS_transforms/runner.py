@@ -56,7 +56,10 @@ def get_parallelization_args(
 ) -> list[str]:
     """Gets the parallelization args."""
 
-    if parallelization_cfg is None or len(parallelization_cfg) == 0:
+    if parallelization_cfg is None:
+        return []
+
+    if len(parallelization_cfg) == 0 and len(default_parallelization_cfg) == 0:
         return []
 
     if "n_workers" in parallelization_cfg:
@@ -131,9 +134,13 @@ def run_stage(cfg: DictConfig, stage_name: str, default_parallelization_cfg: dic
         f"stage={stage_name}",
     ]
 
-    command_parts.extend(
-        get_parallelization_args(stage_runner_config.get("parallelize", {}), default_parallelization_cfg)
+    parallelization_args = get_parallelization_args(
+        stage_runner_config.get("parallelize", {}), default_parallelization_cfg
     )
+
+    if parallelization_args:
+        multirun = parallelization_args.pop(0)
+        command_parts = command_parts[:3] + [multirun] + command_parts[3:] + parallelization_args
 
     if do_profile:
         command_parts.append("++hydra.callbacks.profiler._target_=hydra_profiler.profiler.ProfilerCallback")
