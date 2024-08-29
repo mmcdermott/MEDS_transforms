@@ -303,7 +303,7 @@ icu/inputevents:
       - KG
     time: col(starttime)
     time_format: "%Y-%m-%d %H:%M:%S"
-    numeric_value: subjectweight
+    numeric_value: patientweight
 
 icu/outputevents:
   output:
