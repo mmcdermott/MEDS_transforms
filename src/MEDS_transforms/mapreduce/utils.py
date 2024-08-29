@@ -474,6 +474,12 @@ def shard_iterator(
         shard_name = shard_name[: -len(in_suffix)]
         shards.append(shard_name)
 
+    if not shards:
+        raise FileNotFoundError(
+            f"No shards found in {input_dir} with suffix {in_suffix}. Directory contents: "
+            f"{', '.join(str(p.relative_to(input_dir)) for p in input_dir.glob('**/*'))}"
+        )
+
     # We initialize this to False and overwrite it if we find dedicated train shards.
     includes_only_train = False
 

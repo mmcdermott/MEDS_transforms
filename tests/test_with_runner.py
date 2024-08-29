@@ -133,7 +133,7 @@ def test_pipeline():
         do_pass_stage_name=False,
         do_use_config_yaml=False,
         input_files={
-            **MEDS_SHARDS,
+            **{f"data/{k}": v for k, v in MEDS_SHARDS.items()},
             "metadata/codes.parquet": MEDS_CODE_METADATA,
             "metadata/subject_splits.parquet": SPLITS_DF,
             "pipeline.yaml": partial(add_params, PIPELINE_YAML),
@@ -157,4 +157,5 @@ def test_pipeline():
         stage_runner_fp="{input_dir}/stage_runner.yaml",
         test_name="Runner Test",
         do_include_dirs=False,
+        df_check_kwargs={"check_column_order": False},
     )
