@@ -54,7 +54,7 @@ fi
 
 DO_UNZIP="false"
 
-if [ ! -z "$_DO_UNZIP_ARG_STR" ]; then
+if [ -n "$_DO_UNZIP_ARG_STR" ]; then
   case "$_DO_UNZIP_ARG_STR" in
     do_unzip=true)
       DO_UNZIP="true"
@@ -72,13 +72,18 @@ fi
 
 # TODO: Add wget blocks once testing is validated.
 
-export EVENT_CONVERSION_CONFIG_FP="$(pwd)/configs/event_configs.yaml"
-export PIPELINE_CONFIG_FP="$(pwd)/configs/extract_MIMIC.yaml"
-export PRE_MEDS_PY_FP="$(pwd)/pre_MEDS.py"
+EVENT_CONVERSION_CONFIG_FP="$(pwd)/configs/event_configs.yaml"
+PIPELINE_CONFIG_FP="$(pwd)/configs/extract_MIMIC.yaml"
+PRE_MEDS_PY_FP="$(pwd)/pre_MEDS.py"
+
+# We export these variables separately from their assignment so that any errors during assignment are caught.
+export EVENT_CONVERSION_CONFIG_FP
+export PIPELINE_CONFIG_FP
+export PRE_MEDS_PY_FP
 
 if [ "$DO_UNZIP" == "true" ]; then
   GZ_FILES="${MIMICIV_RAW_DIR}/*/*.csv.gz"
-  if compgen -G $GZ_FILES > /dev/null; then
+  if compgen -G "$GZ_FILES" > /dev/null; then
     echo "Unzipping csv.gz files matching $GZ_FILES."
     for file in $GZ_FILES; do gzip -d --force "$file"; done
   else
