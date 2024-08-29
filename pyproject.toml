@@ -24,7 +24,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pre-commit"]
-tests = ["pytest", "pytest-cov", "rootutils"]
+tests = ["pytest", "pytest-cov", "rootutils", "hydra-joblib-launcher"]
 local_parallelism = ["hydra-joblib-launcher"]
 slurm_parallelism = ["hydra-submitit-launcher"]
 docs = [

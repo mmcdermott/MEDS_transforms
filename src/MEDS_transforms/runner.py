@@ -18,7 +18,7 @@ from omegaconf import DictConfig, OmegaConf
 
 try:
     from yaml import CLoader as Loader
-except ImportError:
+except ImportError:  # pragma: no cover
     from yaml import Loader
 
 from MEDS_transforms import RESERVED_CONFIG_NAMES, RUNNER_CONFIG_YAML
@@ -48,7 +48,7 @@ def get_script_from_name(stage_name: str) -> str | None:
         except ImportError:
             pass
 
-    return None
+    raise ValueError(f"Could not find a script for stage {stage_name}.")
 
 
 def get_parallelization_args(
@@ -120,10 +120,8 @@ def run_stage(cfg: DictConfig, stage_name: str, default_parallelization_cfg: dic
         script = stage_runner_config.script
     elif "_script" in stage_config:
         script = stage_config._script
-    elif get_script_from_name(stage_name):
-        script = get_script_from_name(stage_name)
     else:
-        raise ValueError(f"Cannot determine script for {stage_name}")
+        script = get_script_from_name(stage_name)
 
     command_parts = [
         script,
@@ -190,7 +188,7 @@ def main(cfg: DictConfig):
 
     if cfg.get("do_profile", False):
         try:
-            pass
+            import hydra_profiler  # noqa: F401
         except ImportError as e:
             raise ValueError(
                 "You can't run in profiling mode without installing hydra-profiler. Try installing "
@@ -203,7 +201,9 @@ def main(cfg: DictConfig):
         logger.info("All stages are already complete. Exiting.")
         return
 
-    if "parallelize" in cfg:
+    if "parallelize" in cfg._stage_runners:
+        default_parallelization_cfg = cfg._stage_runners.parallelize
+    elif "parallelize" in cfg:
         default_parallelization_cfg = cfg.parallelize
     else:
         default_parallelization_cfg = None
@@ -239,5 +239,5 @@ def load_yaml_file(path: str | None) -> dict | DictConfig:
 
 OmegaConf.register_new_resolver("load_yaml_file", load_yaml_file, replace=True)
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

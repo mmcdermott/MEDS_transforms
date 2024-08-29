@@ -77,6 +77,15 @@ fit_normalization:
   script: {AGGREGATE_CODE_METADATA_SCRIPT}
     """
 
+PARALLEL_STAGE_RUNNER_YAML = f"""
+parallelize:
+  n_workers: 2
+  launcher: "joblib"
+
+{STAGE_RUNNER_YAML}
+"""
+
+
 PIPELINE_YAML = f"""
 defaults:
   - _preprocess
@@ -224,6 +233,41 @@ def test_pipeline():
         pipeline_config_fp="{input_dir}/pipeline.yaml",
         stage_runner_fp="{input_dir}/stage_runner.yaml",
         test_name="Runner Test",
+        do_include_dirs=False,
+        df_check_kwargs={"check_column_order": False},
+    )
+
+    single_stage_tester(
+        script=RUNNER_SCRIPT,
+        config_name="runner",
+        stage_name=None,
+        stage_kwargs=None,
+        do_pass_stage_name=False,
+        do_use_config_yaml=False,
+        input_files={
+            **{f"data/{k}": v for k, v in MEDS_SHARDS.items()},
+            "metadata/codes.parquet": MEDS_CODE_METADATA,
+            "metadata/subject_splits.parquet": SPLITS_DF,
+            "pipeline.yaml": partial(add_params, PIPELINE_YAML),
+            "stage_runner.yaml": PARALLEL_STAGE_RUNNER_YAML,
+        },
+        want_outputs={
+            **WANT_FIT_NORMALIZATION,
+            **WANT_FIT_OUTLIERS,
+            **WANT_FIT_VOCABULARY_INDICES,
+            **WANT_FILTER,
+            **WANT_TIME_DERIVED,
+            **WANT_OCCLUDE_OUTLIERS,
+            **WANT_NORMALIZATION,
+            **WANT_TOKENIZATION_SCHEMAS,
+            **WANT_TOKENIZATION_EVENT_SEQS,
+            **WANT_NRTs,
+        },
+        assert_no_other_outputs=False,
+        should_error=False,
+        pipeline_config_fp="{input_dir}/pipeline.yaml",
+        stage_runner_fp="{input_dir}/stage_runner.yaml",
+        test_name="Runner Test with parallelism",
         do_include_dirs=False,
         df_check_kwargs={"check_column_order": False},
     )
