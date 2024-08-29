@@ -453,10 +453,11 @@ def shard_iterator(
         >>> includes_only_train
         False
 
-    If it can't find any files, it will return an empty list:
+    If it can't find any files, it will error:
         >>> fps, includes_only_train = shard_iterator(cfg)
-        >>> fps
-        []
+        Traceback (most recent call last):
+            ...
+        FileNotFoundError: No shards found in ... with suffix .parquet. Directory contents:...
     """
 
     input_dir = Path(cfg.stage_cfg.data_input_dir)
