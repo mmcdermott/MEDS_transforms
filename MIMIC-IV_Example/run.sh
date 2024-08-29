@@ -77,8 +77,13 @@ export PIPELINE_CONFIG_FP="$(pwd)/configs/extract_MIMIC.yaml"
 export PRE_MEDS_PY_FP="$(pwd)/pre_MEDS.py"
 
 if [ "$DO_UNZIP" == "true" ]; then
-  echo "Unzipping csv.gz files in ${MIMICIV_RAW_DIR}."
-    for file in "${MIMICIV_RAW_DIR}"/*/*.csv.gz; do gzip -d --force "$file"; done
+  GZ_FILES="${MIMICIV_RAW_DIR}/*/*.csv.gz"
+  if compgen -G $GZ_FILES > /dev/null; then
+    echo "Unzipping csv.gz files matching $GZ_FILES."
+    for file in $GZ_FILES; do gzip -d --force "$file"; done
+  else
+    echo "No csz.gz files to unzip at $GZ_FILES."
+  fi
 else
   echo "Skipping unzipping."
 fi

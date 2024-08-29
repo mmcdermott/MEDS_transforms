@@ -19,9 +19,13 @@ event_conversion_config_fp: ${oc.env:EVENT_CONVERSION_CONFIG_FP}
 input_dir: ${oc.env:MIMICIV_PRE_MEDS_DIR}
 cohort_dir: ${oc.env:MIMICIV_MEDS_COHORT_DIR}
 
-stage_configs.shard_events.infer_schema_length: 999999999
-etl_metadata.dataset_name: MIMIC-IV
-etl_metadata.dataset_version: 2.2
+etl_metadata:
+  dataset_name: MIMIC-IV
+  dataset_version: 2.2
+
+stage_configs:
+  shard_events:
+    infer_schema_length: 999999999
 
 stages:
   - shard_events
