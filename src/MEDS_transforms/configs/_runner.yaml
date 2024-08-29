@@ -2,13 +2,13 @@
 pipeline_config_fp: ???
 stage_runner_fp: null
 
-_local_pipeline_config: ${oc.create:${load_yaml_file:${pipeline_config_fp}}}
+_local_pipeline_config: ${oc.create:${load_yaml_file:${oc.select:pipeline_config_fp,null}}}
 _stage_runners: ${oc.create:${load_yaml_file:${stage_runner_fp}}}
 
 log_dir: "${_local_pipeline_config.cohort_dir}/.logs"
 
-_pipeline_name: ${oc.select:_local_pipeline_config.pipeline_name, "MEDS-transforms Pipeline"}
-_pipeline_description: ${oc.select:_pipeline_config.description, "No description provided."}
+_pipeline_name: ${oc.select:_local_pipeline_config.etl_metadata.pipeline_name,"MEDS-transforms Pipeline"}
+_pipeline_description: ${oc.select:_local_pipeline_config.description,"No description provided."}
 
 do_profile: False
 

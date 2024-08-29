@@ -242,8 +242,8 @@ def fix_str_for_path(s: str) -> str:
     return s.replace(" ", "_").replace("/", ".")
 
 
-OmegaConf.register_new_resolver("load_yaml_file", load_yaml_file, replace=False)
-OmegaConf.register_new_resolver("fix_str_for_path", fix_str_for_path, replace=False)
+OmegaConf.register_new_resolver("load_yaml_file", load_yaml_file, replace=True)
+OmegaConf.register_new_resolver("fix_str_for_path", fix_str_for_path, replace=True)
 
 if __name__ == "__main__":
     main()

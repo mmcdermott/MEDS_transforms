@@ -44,7 +44,7 @@ from tests.MEDS_Transforms.test_multi_stage_preprocess_pipeline import (
     WANT_NRTs,
 )
 from tests.MEDS_Transforms.transform_tester_base import MEDS_SHARDS, SPLITS_DF
-from tests.utils import add_params, single_stage_tester
+from tests.utils import add_params, exact_str_regex, single_stage_tester
 
 # Normally, you wouldn't need to specify all of these scripts, but in testing with local scripts we need to
 # specify them all as they need to point to their python paths.
@@ -85,6 +85,8 @@ defaults:
 input_dir: {{input_dir}}
 cohort_dir: {{cohort_dir}}
 
+description: "A test pipeline for the MEDS-transforms pipeline runner."
+
 stages:
   - filter_subjects
   - add_time_derived_measurements
@@ -124,8 +126,73 @@ stage_configs:
       - "values/sum_sqd"
 """
 
+NO_ARGS_HELP_STR = """
+== MEDS-Transforms Pipeline Runner ==
+MEDS-Transforms Pipeline Runner is a command line tool for running entire MEDS-transform pipelines in a single
+command.
+
+Runs the entire pipeline, end-to-end, based on the configuration provided.
+
+This script will launch many subsidiary commands via `subprocess`, one for each stage of the specified
+pipeline.
+
+**MEDS-transforms Pipeline description:**
+
+No description provided.
+"""
+
+WITH_CONFIG_HELP_STR = """
+== MEDS-Transforms Pipeline Runner ==
+MEDS-Transforms Pipeline Runner is a command line tool for running entire MEDS-transform pipelines in a single
+command.
+
+Runs the entire pipeline, end-to-end, based on the configuration provided.
+
+This script will launch many subsidiary commands via `subprocess`, one for each stage of the specified
+pipeline.
+
+**preprocess Pipeline description:**
+
+A test pipeline for the MEDS-transforms pipeline runner.
+"""
+
 
 def test_pipeline():
+    single_stage_tester(
+        script=str(RUNNER_SCRIPT) + " -h",
+        config_name="runner",
+        stage_name=None,
+        stage_kwargs=None,
+        do_pass_stage_name=False,
+        do_use_config_yaml=False,
+        input_files={},
+        want_outputs={},
+        assert_no_other_outputs=True,
+        should_error=False,
+        test_name="Runner Help Test",
+        do_include_dirs=False,
+        hydra_verbose=False,
+        stdout_regex=exact_str_regex(NO_ARGS_HELP_STR.strip()),
+    )
+
+    single_stage_tester(
+        script=str(RUNNER_SCRIPT) + " -h",
+        config_name="runner",
+        stage_name=None,
+        stage_kwargs=None,
+        do_pass_stage_name=False,
+        do_use_config_yaml=False,
+        input_files={"pipeline.yaml": partial(add_params, PIPELINE_YAML)},
+        want_outputs={},
+        assert_no_other_outputs=True,
+        should_error=False,
+        pipeline_config_fp="{input_dir}/pipeline.yaml",
+        test_name="Runner Help Test",
+        do_include_dirs=False,
+        hydra_verbose=False,
+        stdout_regex=exact_str_regex(WITH_CONFIG_HELP_STR.strip()),
+    )
+
     single_stage_tester(
         script=RUNNER_SCRIPT,
         config_name="runner",

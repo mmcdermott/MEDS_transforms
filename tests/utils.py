@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 import tempfile
 from contextlib import contextmanager
@@ -29,6 +30,10 @@ MEDS_PL_SCHEMA = {
     "numeric_value/is_inlier": pl.Boolean,
     "text_value": pl.String,
 }
+
+
+def exact_str_regex(s: str) -> str:
+    return f"^{re.escape(s)}$"
 
 
 def parse_meds_csvs(
@@ -381,6 +386,8 @@ def single_stage_tester(
     df_check_kwargs: dict | None = None,
     test_name: str | None = None,
     do_include_dirs: bool = True,
+    hydra_verbose: bool = True,
+    stdout_regex: str | None = None,
     **pipeline_kwargs,
 ):
     if test_name is None:
@@ -395,7 +402,7 @@ def single_stage_tester(
                 pipeline_kwargs[k] = v.format(input_dir=str(input_dir.resolve()))
 
         pipeline_config_kwargs = {
-            "hydra.verbose": True,
+            "hydra.verbose": hydra_verbose,
             **pipeline_kwargs,
         }
 
@@ -425,6 +432,12 @@ def single_stage_tester(
         stderr, stdout = run_command(**run_command_kwargs)
         if should_error:
             return
+
+        if stdout_regex is not None:
+            regex = re.compile(stdout_regex)
+            assert regex.search(stdout) is not None, (
+                f"Expected stdout to match regex:\n{stdout_regex}\n" f"Got:\n{stdout}"
+            )
 
         try:
             check_outputs(
