@@ -56,9 +56,6 @@ filter_subjects:
 add_time_derived_measurements:
   script: "python {ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT}"
 
-fit_outlier_detection:
-  script: "python {AGGREGATE_CODE_METADATA_SCRIPT}"
-
 occlude_outliers:
   script: "python {OCCLUDE_OUTLIERS_SCRIPT}"
 
@@ -76,20 +73,17 @@ tokenization:
     """
 else:
     STAGE_RUNNER_YAML = f"""
-fit_outlier_detection:
-  script: {AGGREGATE_CODE_METADATA_SCRIPT}
-
 fit_normalization:
   script: {AGGREGATE_CODE_METADATA_SCRIPT}
     """
 
-PIPELINE_YAML = """
+PIPELINE_YAML = f"""
 defaults:
   - _preprocess
   - _self_
 
-input_dir: {input_dir}
-cohort_dir: {cohort_dir}
+input_dir: {{input_dir}}
+cohort_dir: {{cohort_dir}}
 
 stages:
   - filter_subjects
@@ -114,6 +108,7 @@ stage_configs:
       time_of_day_code: "TIME_OF_DAY"
       endpoints: [6, 12, 18, 24]
   fit_outlier_detection:
+    _script: {("python " if USE_LOCAL_SCRIPTS else "") + str(AGGREGATE_CODE_METADATA_SCRIPT)}
     aggregations:
       - "values/n_occurrences"
       - "values/sum"
