@@ -28,11 +28,12 @@ SHARDS = {
     "held_out/0": [1500733],
 }
 
-SPLITS = {
-    "train": [239684, 1195293, 68729, 814703],
-    "tuning": [754281],
-    "held_out": [1500733],
-}
+SPLITS_DF = pl.DataFrame(
+    {
+        subject_id_field: [239684, 1195293, 68729, 814703, 754281, 1500733],
+        "split": ["train", "train", "train", "train", "tuning", "held_out"],
+    }
+)
 
 MEDS_SHARDS = parse_shards_yaml(
     """
@@ -184,14 +185,17 @@ def remap_inputs_for_transform(
     unified_inputs["metadata/.shards.json"] = input_shards_map
 
     if input_splits_map is None:
-        input_splits_map = SPLITS
+        input_splits_map = SPLITS_DF
 
-    input_splits_as_df = defaultdict(list)
-    for split_name, subject_ids in input_splits_map.items():
-        input_splits_as_df[subject_id_field].extend(subject_ids)
-        input_splits_as_df["split"].extend([split_name] * len(subject_ids))
+    if isinstance(input_splits_map, pl.DataFrame):
+        input_splits_df = input_splits_map
+    else:
+        input_splits_as_df = defaultdict(list)
+        for split_name, subject_ids in input_splits_map.items():
+            input_splits_as_df[subject_id_field].extend(subject_ids)
+            input_splits_as_df["split"].extend([split_name] * len(subject_ids))
 
-    input_splits_df = pl.DataFrame(input_splits_as_df)
+        input_splits_df = pl.DataFrame(input_splits_as_df)
 
     unified_inputs["metadata/subject_splits.parquet"] = input_splits_df
 

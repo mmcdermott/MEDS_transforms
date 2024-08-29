@@ -137,6 +137,9 @@ def run_command(
 
     err_cmd_lines = []
 
+    if config_name is not None and not config_name.startswith("_"):
+        config_name = f"_{config_name}"
+
     if do_use_config_yaml:
         if config_name is None:
             raise ValueError("config_name must be provided if do_use_config_yaml is True.")

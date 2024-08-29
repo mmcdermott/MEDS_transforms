@@ -8,13 +8,20 @@ To do this effectively, this runner functionally takes a "meta configuration" fi
 """
 
 import importlib
+import subprocess
 from pathlib import Path
-from typing import Any
 
 import hydra
+import yaml
+from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_transforms import RUNNER_CONFIG_YAML
+try:
+    from yaml import CLoader as Loader
+except ImportError:
+    from yaml import Loader
+
+from MEDS_transforms import RESERVED_CONFIG_NAMES, RUNNER_CONFIG_YAML
 from MEDS_transforms.utils import hydra_loguru_init
 
 
@@ -49,7 +56,7 @@ def get_parallelization_args(
 ) -> list[str]:
     """Gets the parallelization args."""
 
-    if parallelization_cfg is None:
+    if parallelization_cfg is None or len(parallelization_cfg) == 0:
         return []
 
     if "n_workers" in parallelization_cfg:
@@ -61,7 +68,7 @@ def get_parallelization_args(
 
     parallelization_args = [
         "--multirun",
-        f"worker=range(0,{n_workers})",
+        f'worker="range(0,{n_workers})"',
     ]
 
     if "launcher" in parallelization_cfg:
@@ -105,7 +112,7 @@ def run_stage(cfg: DictConfig, stage_name: str, default_parallelization_cfg: dic
 
     do_profile = cfg.get("do_profile", False)
     pipeline_config_fp = Path(cfg.pipeline_config_fp)
-    stage_config = pipeline_config_fp.stage_configs.get("stage", {})
+    stage_config = cfg._local_pipeline_config.stage_configs.get(stage_name, {})
     stage_runner_config = cfg._stage_runners.get(stage_name, {})
 
     script = None
@@ -120,7 +127,7 @@ def run_stage(cfg: DictConfig, stage_name: str, default_parallelization_cfg: dic
 
     command_parts = [
         script,
-        f"--config-path={str(pipeline_config_fp.parent.resolve())}",
+        f"--config-dir={str(pipeline_config_fp.parent.resolve())}",
         f"--config-name={pipeline_config_fp.stem}",
         "'hydra.searchpath=[pkg://MEDS_transforms.configs]'",
         f"stage={stage_name}",
@@ -142,9 +149,13 @@ def run_stage(cfg: DictConfig, stage_name: str, default_parallelization_cfg: dic
 
     stderr = command_out.stderr.decode()
     stdout = command_out.stdout.decode()
+    logger.info(f"Command output:\n{stdout}")
+    logger.info(f"Command error:\n{stderr}")
 
     if command_out.returncode != 0:
-        raise ValueError(f"Stage {stage_name} failed with return code {command_out.returncode}.\n{stderr}")
+        raise ValueError(
+            f"Stage {stage_name} failed via {full_cmd} with return code {command_out.returncode}."
+        )
 
 
 @hydra.main(
@@ -164,10 +175,20 @@ def main(cfg: DictConfig):
         raise FileNotFoundError(f"Pipeline configuration file {pipeline_config_fp} does not exist.")
     if not pipeline_config_fp.suffix == ".yaml":
         raise ValueError(f"Pipeline configuration file {pipeline_config_fp} must have a .yaml extension.")
+    if pipeline_config_fp.stem in RESERVED_CONFIG_NAMES:
+        raise ValueError(
+            f"Pipeline configuration file {pipeline_config_fp} must not have a name in "
+            f"{RESERVED_CONFIG_NAMES}."
+        )
 
-    logs_dir = Path(cfg.logs_dir)
+    pipeline_config = load_yaml_file(cfg.pipeline_config_fp)
+    stages = pipeline_config.get("stages", [])
+    if not stages:
+        raise ValueError("Pipeline configuration must specify at least one stage.")
 
-    if do_profile:
+    log_dir = Path(cfg.log_dir)
+
+    if cfg.get("do_profile", False):
         try:
             pass
         except ImportError as e:
@@ -177,7 +198,7 @@ def main(cfg: DictConfig):
                 "`pip install MEDS-transforms[profiler]`."
             ) from e
 
-    global_done_file = logs_dir / f"_all_stages.done"
+    global_done_file = log_dir / "_all_stages.done"
     if global_done_file.exists():
         logger.info("All stages are already complete. Exiting.")
         return
@@ -187,8 +208,8 @@ def main(cfg: DictConfig):
     else:
         default_parallelization_cfg = None
 
-    for stage in cfg.stages:
-        done_file = logs_dir / f"{stage}.done"
+    for stage in stages:
+        done_file = log_dir / f"{stage}.done"
 
         if done_file.exists():
             logger.info(f"Skipping stage {stage} as it is already complete.")
@@ -200,17 +221,29 @@ def main(cfg: DictConfig):
     global_done_file.touch()
 
 
-def load_file(path: str) -> Any:
-    with open(path) as f:
-        return f.read()
-
-
 def load_yaml_file(path: str | None) -> dict | DictConfig:
-    return OmegaConf.load(path) if path else {}
+    if not path:
+        return {}
+
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"File {path} does not exist.")
+
+    try:
+        return OmegaConf.load(path)
+    except Exception as e:
+        logger.warning(f"Failed to load {path} as an OmegaConf: {e}. Trying as a plain YAML file.")
+        yaml_text = path.read_text()
+        return yaml.load(yaml_text, Loader=Loader)
+
+
+def fix_str_for_path(s: str) -> str:
+    """Replaces all space characters with underscores and all slashes with periods."""
+    return s.replace(" ", "_").replace("/", ".")
 
 
 if __name__ == "__main__":
     OmegaConf.register_new_resolver("load_yaml_file", load_yaml_file, replace=False)
-    OmegaConf.register_new_resolver("load_file", load_file, replace=False)
+    OmegaConf.register_new_resolver("fix_str_for_path", fix_str_for_path, replace=False)
 
     main()

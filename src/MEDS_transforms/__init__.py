@@ -10,11 +10,13 @@ try:
 except PackageNotFoundError:  # pragma: no cover
     __version__ = "unknown"
 
-PREPROCESS_CONFIG_YAML = files(__package_name__).joinpath("configs/preprocess.yaml")
-EXTRACT_CONFIG_YAML = files(__package_name__).joinpath("configs/extract.yaml")
-RUNNER_CONFIG_YAML = files(__package_name__).joinpath("configs/runner.yaml")
+PREPROCESS_CONFIG_YAML = files(__package_name__).joinpath("configs/_preprocess.yaml")
+EXTRACT_CONFIG_YAML = files(__package_name__).joinpath("configs/_extract.yaml")
+RUNNER_CONFIG_YAML = files(__package_name__).joinpath("configs/_runner.yaml")
 
 MANDATORY_COLUMNS = [subject_id_field, time_field, code_field, "numeric_value"]
+
+RESERVED_CONFIG_NAMES = {c.stem for c in (PREPROCESS_CONFIG_YAML, EXTRACT_CONFIG_YAML, RUNNER_CONFIG_YAML)}
 
 MANDATORY_TYPES = {
     subject_id_field: pl.Int64,

@@ -60,6 +60,9 @@ MEDS_transform-occlude_outliers = "MEDS_transforms.transforms.occlude_outliers:m
 MEDS_transform-tensorization = "MEDS_transforms.transforms.tensorization:main"
 MEDS_transform-tokenization = "MEDS_transforms.transforms.tokenization:main"
 
+# Runner
+MEDS_transform-runner = "MEDS_transforms.runner:main"
+
 [project.urls]
 Homepage = "https://github.com/mmcdermott/MEDS_transforms"
 Issues = "https://github.com/mmcdermott/MEDS_transforms/issues"
