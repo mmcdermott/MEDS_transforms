@@ -151,7 +151,7 @@ Runs the entire pipeline, end-to-end, based on the configuration provided.
 This script will launch many subsidiary commands via `subprocess`, one for each stage of the specified
 pipeline.
 
-**preprocess Pipeline description:**
+**MEDS-transforms Pipeline description:**
 
 A test pipeline for the MEDS-transforms pipeline runner.
 """

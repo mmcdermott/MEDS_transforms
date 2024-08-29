@@ -237,13 +237,7 @@ def load_yaml_file(path: str | None) -> dict | DictConfig:
         return yaml.load(yaml_text, Loader=Loader)
 
 
-def fix_str_for_path(s: str) -> str:
-    """Replaces all space characters with underscores and all slashes with periods."""
-    return s.replace(" ", "_").replace("/", ".")
-
-
 OmegaConf.register_new_resolver("load_yaml_file", load_yaml_file, replace=True)
-OmegaConf.register_new_resolver("fix_str_for_path", fix_str_for_path, replace=True)
 
 if __name__ == "__main__":
     main()

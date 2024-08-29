@@ -7,14 +7,13 @@ _stage_runners: ${oc.create:${load_yaml_file:${stage_runner_fp}}}
 
 log_dir: "${_local_pipeline_config.cohort_dir}/.logs"
 
-_pipeline_name: ${oc.select:_local_pipeline_config.etl_metadata.pipeline_name,"MEDS-transforms Pipeline"}
 _pipeline_description: ${oc.select:_local_pipeline_config.description,"No description provided."}
 
 do_profile: False
 
 hydra:
   job:
-    name: "${fix_str_for_path:${_pipeline_name}}_runner_${now:%Y-%m-%d_%H-%M-%S}"
+    name: "MEDS-transforms_runner_${now:%Y-%m-%d_%H-%M-%S}"
   run:
     dir: "${log_dir}"
   help:
@@ -27,6 +26,6 @@ hydra:
 
       ${get_script_docstring:runner}
 
-      **${_pipeline_name} description:**
+      **MEDS-transforms Pipeline description:**
 
       ${_pipeline_description}
