@@ -2,6 +2,7 @@ import json
 import re
 import subprocess
 import tempfile
+from collections.abc import Callable
 from contextlib import contextmanager
 from io import StringIO
 from pathlib import Path
@@ -228,6 +229,19 @@ def assert_df_equal(want: pl.DataFrame, got: pl.DataFrame, msg: str = None, **kw
         raise AssertionError(f"{msg}:\nWant:\n{want}\nGot:\n{got}\n{e}") from e
 
 
+def check_json(want: dict | Callable, got: dict, msg: str):
+    try:
+        match want:
+            case dict():
+                assert got == want, f"Want:\n{want}\nGot:\n{got}"
+            case _ if callable(want):
+                want(got)
+            case _:
+                raise ValueError(f"Unknown want type: {type(want)}")
+    except AssertionError as e:
+        raise AssertionError(f"{msg}: {e}") from e
+
+
 def check_NRT_output(
     output_fp: Path,
     want_nrt: JointNestedRaggedTensorDict,
@@ -352,13 +366,8 @@ def check_outputs(
             case ".nrt":
                 check_NRT_output(output_fp, want, msg=msg)
             case ".json":
-                with open(output_fp) as f:
-                    got = json.load(f)
-                assert got == want, (
-                    f"Expected JSON at {output_fp.relative_to(cohort_dir)} to be equal to the target.\n"
-                    f"Wanted:\n{want}\n"
-                    f"Got:\n{got}"
-                )
+                got = json.loads(output_fp.read_text())
+                check_json(want, got, msg=msg)
             case _:
                 raise ValueError(f"Unknown file suffix: {file_suffix}")
 

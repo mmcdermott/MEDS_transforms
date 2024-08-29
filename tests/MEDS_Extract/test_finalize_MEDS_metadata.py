@@ -5,8 +5,11 @@ scripts.
 """
 
 
+from datetime import datetime
+
 import polars as pl
 from meds import __version__ as MEDS_VERSION
+from meds import code_metadata_filepath, dataset_metadata_filepath, subject_splits_filepath
 
 from MEDS_transforms.utils import get_package_version as get_meds_transform_version
 from tests.MEDS_Extract import FINALIZE_METADATA_SCRIPT
@@ -49,27 +52,41 @@ METADATA_DF = pl.DataFrame(
     }
 )
 
+
+def want_dataset_metadata(got: dict):
+    want_known = {
+        "dataset_name": "TEST",
+        "dataset_version": "1.0",
+        "etl_name": "MEDS_transforms",
+        "etl_version": get_meds_transform_version(),
+        "meds_version": MEDS_VERSION,
+    }
+
+    assert "created_at" in got, "Expected 'created_at' to be in the dataset metadata."
+    created_at_obs = got.pop("created_at")
+    as_dt = datetime.fromisoformat(created_at_obs)
+    assert as_dt < datetime.now(), f"Expected 'created_at' to be before now, got {created_at_obs}."
+    created_ago = datetime.now() - as_dt
+    assert created_ago.total_seconds() < 5 * 60, "Expected 'created_at' to be within 5 minutes of now."
+
+    assert got == want_known, f"Expected dataset metadata (less created at) to be {want_known}, got {got}."
+
+
 WANT_OUTPUTS = {
-    "metadata/codes": (
+    code_metadata_filepath: (
         METADATA_DF.with_columns(
             pl.col("code").cast(pl.String),
             pl.col("description").cast(pl.String),
             pl.col("parent_codes").cast(pl.List(pl.String)),
         ).select(["code", "description", "parent_codes"])
     ),
-    "metadata/subject_splits": pl.DataFrame(
+    subject_splits_filepath: pl.DataFrame(
         {
             "subject_id": [239684, 1195293, 68729, 814703, 754281, 1500733],
             "split": ["train", "train", "train", "train", "tuning", "held_out"],
         }
     ),
-    "metadata/dataset.json": {
-        "dataset_name": "TEST",
-        "dataset_version": "1.0",
-        "etl_name": "MEDS_transforms",
-        "etl_version": get_meds_transform_version(),
-        "meds_version": MEDS_VERSION,
-    },
+    dataset_metadata_filepath: want_dataset_metadata,
 }
 
 

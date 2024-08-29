@@ -6,12 +6,13 @@ scripts.
 
 import json
 import tempfile
+from datetime import datetime
 from io import StringIO
 from pathlib import Path
 
 import polars as pl
 from meds import __version__ as MEDS_VERSION
-from meds import subject_splits_filepath
+from meds import code_metadata_filepath, dataset_metadata_filepath, subject_splits_filepath
 
 from tests.MEDS_Extract import (
     CONVERT_TO_SHARDED_EVENTS_SCRIPT,
@@ -570,7 +571,7 @@ def test_extraction():
         full_stdout = "\n".join(all_stdouts)
 
         # Check code metadata
-        output_file = MEDS_cohort_dir / "metadata" / "codes.parquet"
+        output_file = MEDS_cohort_dir / code_metadata_filepath
         assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
 
         got_df = pl.read_parquet(output_file, glob=False, use_pyarrow=True)
@@ -593,12 +594,20 @@ def test_extraction():
         )
 
         # Check dataset metadata
-        output_file = MEDS_cohort_dir / "metadata" / "dataset.json"
+        output_file = MEDS_cohort_dir / dataset_metadata_filepath
         assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
 
         got_json = json.loads(output_file.read_text())
         assert "etl_version" in got_json, "Expected 'etl_version' to be in the dataset metadata."
         got_json.pop("etl_version")  # We don't test this as it changes with the commits.
+
+        assert "created_at" in got_json, "Expected 'created_at' to be in the dataset metadata."
+        created_at_obs = got_json.pop("created_at")
+        as_dt = datetime.fromisoformat(created_at_obs)
+        assert as_dt < datetime.now(), f"Expected 'created_at' to be before now, got {created_at_obs}."
+        created_ago = datetime.now() - as_dt
+        assert created_ago.total_seconds() < 5 * 60, "Expected 'created_at' to be within 5 minutes of now."
+
         assert got_json == MEDS_OUTPUT_DATASET_METADATA_JSON, f"Dataset metadata differs: {got_json}"
 
         # Check the splits parquet

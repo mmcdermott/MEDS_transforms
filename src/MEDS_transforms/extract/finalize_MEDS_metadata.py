@@ -2,6 +2,7 @@
 """Utilities for finalizing the metadata files for extracted MEDS datasets."""
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 import hydra
@@ -193,6 +194,7 @@ def main(cfg: DictConfig):
         "etl_name": cfg.etl_metadata.package_name,
         "etl_version": str(cfg.etl_metadata.package_version),
         "meds_version": MEDS_VERSION,
+        "created_at": datetime.now().isoformat(),
     }
     jsonschema.validate(instance=dataset_metadata, schema=dataset_metadata_schema)
 
