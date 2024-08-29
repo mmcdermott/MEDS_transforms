@@ -4,9 +4,18 @@ Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, ra
 scripts.
 """
 
+from yaml import load as load_yaml
+
+try:
+    from yaml import CLoader as Loader
+except ImportError:
+    from yaml import Loader
+
 import json
 import os
 import tempfile
+from collections import defaultdict
+from contextlib import contextmanager
 from io import StringIO
 from pathlib import Path
 
@@ -15,7 +24,7 @@ import polars as pl
 import rootutils
 from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 
-from .utils import assert_df_equal, parse_meds_csvs, run_command
+from .utils import MEDS_PL_SCHEMA, assert_df_equal, parse_meds_csvs, run_command
 
 root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
@@ -25,7 +34,9 @@ filters_root = code_root / "filters"
 
 if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
     # Root Source
+    AGGREGATE_CODE_METADATA_SCRIPT = code_root / "aggregate_code_metadata.py"
     FIT_VOCABULARY_INDICES_SCRIPT = code_root / "fit_vocabulary_indices.py"
+    RESHARD_TO_SPLIT_SCRIPT = code_root / "reshard_to_split.py"
 
     # Filters
     FILTER_MEASUREMENTS_SCRIPT = filters_root / "filter_measurements.py"
@@ -34,13 +45,16 @@ if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
     # Transforms
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT = transforms_root / "add_time_derived_measurements.py"
     REORDER_MEASUREMENTS_SCRIPT = transforms_root / "reorder_measurements.py"
+    EXTRACT_VALUES_SCRIPT = transforms_root / "extract_values.py"
     NORMALIZATION_SCRIPT = transforms_root / "normalization.py"
     OCCLUDE_OUTLIERS_SCRIPT = transforms_root / "occlude_outliers.py"
     TENSORIZATION_SCRIPT = transforms_root / "tensorization.py"
     TOKENIZATION_SCRIPT = transforms_root / "tokenization.py"
 else:
     # Root Source
+    AGGREGATE_CODE_METADATA_SCRIPT = "MEDS_transform-aggregate_code_metadata"
     FIT_VOCABULARY_INDICES_SCRIPT = "MEDS_transform-fit_vocabulary_indices"
+    RESHARD_TO_SPLIT_SCRIPT = "MEDS_transform-reshard_to_split"
 
     # Filters
     FILTER_MEASUREMENTS_SCRIPT = "MEDS_transform-filter_measurements"
@@ -49,6 +63,7 @@ else:
     # Transforms
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT = "MEDS_transform-add_time_derived_measurements"
     REORDER_MEASUREMENTS_SCRIPT = "MEDS_transform-reorder_measurements"
+    EXTRACT_VALUES_SCRIPT = "MEDS_transform-extract_values"
     NORMALIZATION_SCRIPT = "MEDS_transform-normalization"
     OCCLUDE_OUTLIERS_SCRIPT = "MEDS_transform-occlude_outliers"
     TENSORIZATION_SCRIPT = "MEDS_transform-tensorization"
@@ -56,11 +71,17 @@ else:
 
 # Test MEDS data (inputs)
 
-SPLITS = {
+SHARDS = {
     "train/0": [239684, 1195293],
     "train/1": [68729, 814703],
     "tuning/0": [754281],
     "held_out/0": [1500733],
+}
+
+SPLITS = {
+    "train": [239684, 1195293, 68729, 814703],
+    "tuning": [754281],
+    "held_out": [1500733],
 }
 
 MEDS_TRAIN_0 = """
@@ -152,7 +173,7 @@ MEDS_SHARDS = parse_meds_csvs(
 
 
 MEDS_CODE_METADATA_CSV = """
-code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,description,parent_code
+code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,description,parent_codes
 ,44,4,28,3198.8389005974336,382968.28937288234,,
 ADMISSION//CARDIAC,2,2,0,,,,
 ADMISSION//ORTHOPEDIC,1,1,0,,,,
@@ -172,18 +193,30 @@ MEDS_CODE_METADATA_SCHEMA = {
     "code/n_occurrences": pl.UInt8,
     "code/n_patients": pl.UInt8,
     "values/n_occurrences": pl.UInt8,
+    "values/n_patients": pl.UInt8,
     "values/sum": pl.Float32,
     "values/sum_sqd": pl.Float32,
+    "values/n_ints": pl.UInt8,
+    "values/min": pl.Float32,
+    "values/max": pl.Float32,
     "description": pl.Utf8,
-    "parent_code": pl.Utf8,
+    "parent_codes": pl.Utf8,
     "code/vocab_index": pl.UInt8,
 }
+
+
+def parse_shards_yaml(yaml_str: str, **schema_updates) -> pl.DataFrame:
+    schema = {**MEDS_PL_SCHEMA, **schema_updates}
+    return parse_meds_csvs(load_yaml(yaml_str, Loader=Loader), schema=schema)
 
 
 def parse_code_metadata_csv(csv_str: str) -> pl.DataFrame:
     cols = csv_str.strip().split("\n")[0].split(",")
     schema = {col: dt for col, dt in MEDS_CODE_METADATA_SCHEMA.items() if col in cols}
-    return pl.read_csv(StringIO(csv_str), schema=schema)
+    df = pl.read_csv(StringIO(csv_str), schema=schema)
+    if "parent_codes" in cols:
+        df = df.with_columns(pl.col("parent_codes").cast(pl.List(pl.Utf8)))
+    return df
 
 
 MEDS_CODE_METADATA = parse_code_metadata_csv(MEDS_CODE_METADATA_CSV)
@@ -192,8 +225,6 @@ MEDS_CODE_METADATA = parse_code_metadata_csv(MEDS_CODE_METADATA_CSV)
 def check_NRT_output(
     output_fp: Path,
     want_nrt: JointNestedRaggedTensorDict,
-    stderr: str,
-    stdout: str,
 ):
     assert output_fp.is_file(), f"Expected {output_fp} to exist."
 
@@ -201,8 +232,6 @@ def check_NRT_output(
 
     # assert got_nrt.schema == want_nrt.schema, (
     #    f"Expected the schema of the NRT at {output_fp} to be equal to the target.\n"
-    #    f"Script stdout:\n{stdout}\n"
-    #    f"Script stderr:\n{stderr}\n"
     #    f"Wanted:\n{want_nrt.schema}\n"
     #    f"Got:\n{got_nrt.schema}"
     # )
@@ -212,8 +241,6 @@ def check_NRT_output(
 
     assert got_tensors.keys() == want_tensors.keys(), (
         f"Expected the keys of the NRT at {output_fp} to be equal to the target.\n"
-        f"Script stdout:\n{stdout}\n"
-        f"Script stderr:\n{stderr}\n"
         f"Wanted:\n{list(want_tensors.keys())}\n"
         f"Got:\n{list(got_tensors.keys())}"
     )
@@ -224,8 +251,6 @@ def check_NRT_output(
 
         assert type(want_v) is type(got_v), (
             f"Expected tensor {k} of the NRT at {output_fp} to be of the same type as the target.\n"
-            f"Script stdout:\n{stdout}\n"
-            f"Script stderr:\n{stderr}\n"
             f"Wanted:\n{type(want_v)}\n"
             f"Got:\n{type(got_v)}"
         )
@@ -233,24 +258,18 @@ def check_NRT_output(
         if isinstance(want_v, list):
             assert len(want_v) == len(got_v), (
                 f"Expected list {k} of the NRT at {output_fp} to be of the same length as the target.\n"
-                f"Script stdout:\n{stdout}\n"
-                f"Script stderr:\n{stderr}\n"
                 f"Wanted:\n{len(want_v)}\n"
                 f"Got:\n{len(got_v)}"
             )
             for i, (want_i, got_i) in enumerate(zip(want_v, got_v)):
                 assert np.array_equal(want_i, got_i, equal_nan=True), (
                     f"Expected tensor {k}[{i}] of the NRT at {output_fp} to be equal to the target.\n"
-                    f"Script stdout:\n{stdout}\n"
-                    f"Script stderr:\n{stderr}\n"
                     f"Wanted:\n{want_i}\n"
                     f"Got:\n{got_i}"
                 )
         else:
             assert np.array_equal(want_v, got_v, equal_nan=True), (
                 f"Expected tensor {k} of the NRT at {output_fp} to be equal to the target.\n"
-                f"Script stdout:\n{stdout}\n"
-                f"Script stderr:\n{stderr}\n"
                 f"Wanted:\n{want_v}\n"
                 f"Got:\n{got_v}"
             )
@@ -259,8 +278,6 @@ def check_NRT_output(
 def check_df_output(
     output_fp: Path,
     want_df: pl.DataFrame,
-    stderr: str,
-    stdout: str,
     check_column_order: bool = False,
     check_row_order: bool = True,
     **kwargs,
@@ -271,26 +288,19 @@ def check_df_output(
     assert_df_equal(
         want_df,
         got_df,
-        (
-            f"Expected the dataframe at {output_fp} to be equal to the target.\n"
-            f"Script stdout:\n{stdout}\n"
-            f"Script stderr:\n{stderr}"
-        ),
+        (f"Expected the dataframe at {output_fp} to be equal to the target.\n"),
         check_column_order=check_column_order,
         check_row_order=check_row_order,
         **kwargs,
     )
 
 
-def single_stage_transform_tester(
-    transform_script: str | Path,
-    stage_name: str,
-    transform_stage_kwargs: dict[str, str] | None,
-    want_outputs: pl.DataFrame | dict[str, pl.DataFrame],
-    code_metadata: pl.DataFrame | str | None = None,
+@contextmanager
+def input_MEDS_dataset(
+    input_code_metadata: pl.DataFrame | str | None = None,
     input_shards: dict[str, pl.DataFrame] | None = None,
-    do_pass_stage_name: bool = False,
-    file_suffix: str = ".parquet",
+    input_shards_map: dict[str, list[int]] | None = None,
+    input_splits_map: dict[str, list[int]] | None = None,
 ):
     with tempfile.TemporaryDirectory() as d:
         MEDS_dir = Path(d) / "MEDS_cohort"
@@ -298,16 +308,29 @@ def single_stage_transform_tester(
 
         MEDS_data_dir = MEDS_dir / "data"
         MEDS_metadata_dir = MEDS_dir / "metadata"
-        cohort_metadata_dir = cohort_dir / "metadata"
 
         # Create the directories
         MEDS_data_dir.mkdir(parents=True)
         MEDS_metadata_dir.mkdir(parents=True)
         cohort_dir.mkdir(parents=True)
 
-        # Write the splits
-        splits_fp = MEDS_dir / "splits.json"
-        splits_fp.write_text(json.dumps(SPLITS))
+        # Write the shards map
+        if input_shards_map is None:
+            input_shards_map = SHARDS
+
+        shards_fp = MEDS_metadata_dir / ".shards.json"
+        shards_fp.write_text(json.dumps(input_shards_map))
+
+        # Write the splits parquet file
+        if input_splits_map is None:
+            input_splits_map = SPLITS
+        input_splits_as_df = defaultdict(list)
+        for split_name, patient_ids in input_splits_map.items():
+            input_splits_as_df["patient_id"].extend(patient_ids)
+            input_splits_as_df["split"].extend([split_name] * len(patient_ids))
+        input_splits_df = pl.DataFrame(input_splits_as_df)
+        input_splits_fp = MEDS_metadata_dir / "patient_splits.parquet"
+        input_splits_df.write_parquet(input_splits_fp, use_pyarrow=True)
 
         if input_shards is None:
             input_shards = MEDS_SHARDS
@@ -319,12 +342,71 @@ def single_stage_transform_tester(
             df.write_parquet(fp, use_pyarrow=True)
 
         code_metadata_fp = MEDS_metadata_dir / "codes.parquet"
-        if code_metadata is None:
-            code_metadata = MEDS_CODE_METADATA
-        elif isinstance(code_metadata, str):
-            code_metadata = parse_code_metadata_csv(code_metadata)
-        code_metadata.write_parquet(code_metadata_fp, use_pyarrow=True)
+        if input_code_metadata is None:
+            input_code_metadata = MEDS_CODE_METADATA
+        elif isinstance(input_code_metadata, str):
+            input_code_metadata = parse_code_metadata_csv(input_code_metadata)
+        input_code_metadata.write_parquet(code_metadata_fp, use_pyarrow=True)
 
+        yield MEDS_dir, cohort_dir
+
+
+def check_outputs(
+    cohort_dir: Path,
+    want_data: dict[str, pl.DataFrame] | None = None,
+    want_metadata: dict[str, pl.DataFrame] | pl.DataFrame | None = None,
+    assert_no_other_outputs: bool = True,
+    outputs_from_cohort_dir: bool = False,
+):
+    if want_metadata is not None:
+        if isinstance(want_metadata, pl.DataFrame):
+            want_metadata = {"codes.parquet": want_metadata}
+        metadata_root = cohort_dir if outputs_from_cohort_dir else cohort_dir / "metadata"
+        for shard_name, want in want_metadata.items():
+            if Path(shard_name).suffix == "":
+                shard_name = f"{shard_name}.parquet"
+            check_df_output(metadata_root / shard_name, want)
+
+    if want_data:
+        data_root = cohort_dir if outputs_from_cohort_dir else cohort_dir / "data"
+        all_file_suffixes = set()
+        for shard_name, want in want_data.items():
+            if Path(shard_name).suffix == "":
+                shard_name = f"{shard_name}.parquet"
+
+            file_suffix = Path(shard_name).suffix
+            all_file_suffixes.add(file_suffix)
+
+            output_fp = data_root / f"{shard_name}"
+            if file_suffix == ".parquet":
+                check_df_output(output_fp, want)
+            elif file_suffix == ".nrt":
+                check_NRT_output(output_fp, want)
+            else:
+                raise ValueError(f"Unknown file suffix: {file_suffix}")
+
+        if assert_no_other_outputs:
+            all_outputs = []
+            for suffix in all_file_suffixes:
+                all_outputs.extend(list((data_root).glob(f"**/*{suffix}")))
+            assert len(want_data) == len(all_outputs), (
+                f"Want {len(want_data)} outputs, but found {len(all_outputs)}.\n"
+                f"Found outputs: {[fp.relative_to(data_root) for fp in all_outputs]}\n"
+            )
+
+
+def single_stage_transform_tester(
+    transform_script: str | Path,
+    stage_name: str,
+    transform_stage_kwargs: dict[str, str] | None,
+    do_pass_stage_name: bool = False,
+    do_use_config_yaml: bool = False,
+    want_data: dict[str, pl.DataFrame] | None = None,
+    want_metadata: pl.DataFrame | None = None,
+    assert_no_other_outputs: bool = True,
+    **input_data_kwargs,
+):
+    with input_MEDS_dataset(**input_data_kwargs) as (MEDS_dir, cohort_dir):
         pipeline_config_kwargs = {
             "input_dir": str(MEDS_dir.resolve()),
             "cohort_dir": str(cohort_dir.resolve()),
@@ -332,28 +414,90 @@ def single_stage_transform_tester(
             "hydra.verbose": True,
         }
 
-        if do_pass_stage_name:
-            pipeline_config_kwargs["stage"] = stage_name
         if transform_stage_kwargs:
             pipeline_config_kwargs["stage_configs"] = {stage_name: transform_stage_kwargs}
 
-        # Run the transform
-        stderr, stdout = run_command(
-            transform_script,
-            pipeline_config_kwargs,
-            f"Single stage transform: {stage_name}",
-        )
+        run_command_kwargs = {
+            "script": transform_script,
+            "hydra_kwargs": pipeline_config_kwargs,
+            "test_name": f"Single stage transform: {stage_name}",
+        }
+        if do_use_config_yaml:
+            run_command_kwargs["do_use_config_yaml"] = True
+            run_command_kwargs["config_name"] = "preprocess"
+        if do_pass_stage_name:
+            run_command_kwargs["stage"] = stage_name
+            run_command_kwargs["do_pass_stage_name"] = True
 
-        # Check the output
-        if isinstance(want_outputs, pl.DataFrame):
-            # The want output is a code_metadata file in the root directory in this case.
-            check_df_output(cohort_metadata_dir / "codes.parquet", want_outputs, stderr, stdout)
-        else:
-            for shard_name, want in want_outputs.items():
-                output_fp = cohort_dir / "data" / f"{shard_name}{file_suffix}"
-                if file_suffix == ".parquet":
-                    check_df_output(output_fp, want, stderr, stdout)
-                elif file_suffix == ".nrt":
-                    check_NRT_output(output_fp, want, stderr, stdout)
-                else:
-                    raise ValueError(f"Unknown file suffix: {file_suffix}")
+        # Run the transform
+        stderr, stdout = run_command(**run_command_kwargs)
+
+        try:
+            check_outputs(cohort_dir, want_data=want_data, want_metadata=want_metadata)
+        except Exception as e:
+            raise AssertionError(
+                f"Single stage transform {stage_name} failed.\n"
+                f"Script stdout:\n{stdout}\n"
+                f"Script stderr:\n{stderr}"
+            ) from e
+
+
+def multi_stage_transform_tester(
+    transform_scripts: list[str | Path],
+    stage_names: list[str],
+    stage_configs: dict[str, str] | str | None,
+    do_pass_stage_name: bool | dict[str, bool] = True,
+    want_data: dict[str, pl.DataFrame] | None = None,
+    want_metadata: pl.DataFrame | None = None,
+    outputs_from_cohort_dir: bool = True,
+    **input_data_kwargs,
+):
+    with input_MEDS_dataset(**input_data_kwargs) as (MEDS_dir, cohort_dir):
+        match stage_configs:
+            case None:
+                stage_configs = {}
+            case str():
+                stage_configs = load_yaml(stage_configs, Loader=Loader)
+            case dict():
+                pass
+            case _:
+                raise ValueError(f"Unknown stage_configs type: {type(stage_configs)}")
+
+        match do_pass_stage_name:
+            case True:
+                do_pass_stage_name = {stage_name: True for stage_name in stage_names}
+            case False:
+                do_pass_stage_name = {stage_name: False for stage_name in stage_names}
+            case dict():
+                pass
+            case _:
+                raise ValueError(f"Unknown do_pass_stage_name type: {type(do_pass_stage_name)}")
+
+        pipeline_config_kwargs = {
+            "input_dir": str(MEDS_dir.resolve()),
+            "cohort_dir": str(cohort_dir.resolve()),
+            "stages": stage_names,
+            "stage_configs": stage_configs,
+            "hydra.verbose": True,
+        }
+
+        script_outputs = {}
+        n_stages = len(stage_names)
+        for i, (stage, script) in enumerate(zip(stage_names, transform_scripts)):
+            script_outputs[stage] = run_command(
+                script=script,
+                hydra_kwargs=pipeline_config_kwargs,
+                do_use_config_yaml=True,
+                config_name="preprocess",
+                test_name=f"Multi stage transform {i}/{n_stages}: {stage}",
+                stage_name=stage,
+                do_pass_stage_name=do_pass_stage_name[stage],
+            )
+
+        check_outputs(
+            cohort_dir,
+            want_data=want_data,
+            want_metadata=want_metadata,
+            outputs_from_cohort_dir=outputs_from_cohort_dir,
+            assert_no_other_outputs=False,  # this currently doesn't work due to metadata / data confusions.
+        )

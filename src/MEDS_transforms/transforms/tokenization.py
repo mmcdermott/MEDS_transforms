@@ -9,8 +9,6 @@ as those have been normalized alongside codes into integer indices (in the outpu
 columns of concern here thus are `patient_id`, `time`, `code`, `numeric_value`.
 """
 
-import json
-import random
 from pathlib import Path
 
 import hydra
@@ -19,7 +17,7 @@ from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce.mapper import rwlock_wrap
+from MEDS_transforms.mapreduce.utils import rwlock_wrap, shard_iterator
 from MEDS_transforms.utils import hydra_loguru_init, write_lazyframe
 
 SECONDS_PER_MINUTE = 60.0
@@ -186,27 +184,27 @@ def extract_seq_of_patient_events(df: pl.LazyFrame) -> pl.LazyFrame:
         ...         None, datetime(2021, 1, 1), datetime(2021, 1, 1), datetime(2021, 1, 13),
         ...         None, datetime(2021, 1, 2), datetime(2021, 1, 2)],
         ...     "code": [100, 101, 102, 103, 200, 201, 202],
-        ...     "numeric_value": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+        ...     "numeric_value": pl.Series([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0], dtype=pl.Float32)
         ... }).lazy()
         >>> extract_seq_of_patient_events(df).collect()
         shape: (2, 4)
-        ┌────────────┬─────────────────┬───────────────────────────┬─────────────────────┐
-        │ patient_id ┆ time_delta_days ┆ code                      ┆ numeric_value       │
-        │ ---        ┆ ---             ┆ ---                       ┆ ---                 │
-        │ i64        ┆ list[f64]       ┆ list[list[f64]]           ┆ list[list[f64]]     │
-        ╞════════════╪═════════════════╪═══════════════════════════╪═════════════════════╡
-        │ 1          ┆ [NaN, 12.0]     ┆ [[101.0, 102.0], [103.0]] ┆ [[2.0, 3.0], [4.0]] │
-        │ 2          ┆ [NaN]           ┆ [[201.0, 202.0]]          ┆ [[6.0, 7.0]]        │
-        └────────────┴─────────────────┴───────────────────────────┴─────────────────────┘
+        ┌────────────┬─────────────────┬─────────────────────┬─────────────────────┐
+        │ patient_id ┆ time_delta_days ┆ code                ┆ numeric_value       │
+        │ ---        ┆ ---             ┆ ---                 ┆ ---                 │
+        │ i64        ┆ list[f32]       ┆ list[list[i64]]     ┆ list[list[f32]]     │
+        ╞════════════╪═════════════════╪═════════════════════╪═════════════════════╡
+        │ 1          ┆ [NaN, 12.0]     ┆ [[101, 102], [103]] ┆ [[2.0, 3.0], [4.0]] │
+        │ 2          ┆ [NaN]           ┆ [[201, 202]]        ┆ [[6.0, 7.0]]        │
+        └────────────┴─────────────────┴─────────────────────┴─────────────────────┘
     """
 
     _, dynamic = split_static_and_dynamic(df)
 
-    time_delta_days_expr = (pl.col("time").diff().dt.total_seconds() / SECONDS_PER_DAY).cast(pl.Float64)
+    time_delta_days_expr = (pl.col("time").diff().dt.total_seconds() / SECONDS_PER_DAY).cast(pl.Float32)
 
     return (
         dynamic.group_by("patient_id", "time", maintain_order=True)
-        .agg(fill_to_nans("code").name.keep(), fill_to_nans("numeric_value").name.keep())
+        .agg(pl.col("code").name.keep(), fill_to_nans("numeric_value").name.keep())
         .group_by("patient_id", maintain_order=True)
         .agg(
             fill_to_nans(time_delta_days_expr).alias("time_delta_days"),
@@ -230,18 +228,17 @@ def main(cfg: DictConfig):
         f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
     )
 
-    input_dir = Path(cfg.stage_cfg.data_input_dir)
     output_dir = Path(cfg.stage_cfg.output_dir)
+    shards_single_output, include_only_train = shard_iterator(cfg)
 
-    shards = json.loads((Path(cfg.input_dir) / "splits.json").read_text())
+    if include_only_train:
+        raise ValueError("Not supported for this stage.")
 
-    patient_splits = list(shards.keys())
-    random.shuffle(patient_splits)
+    for in_fp, out_fp in shards_single_output:
+        sharded_path = out_fp.relative_to(output_dir)
 
-    for sp in patient_splits:
-        in_fp = input_dir / f"{sp}.parquet"
-        schema_out_fp = output_dir / "schemas" / f"{sp}.parquet"
-        event_seq_out_fp = output_dir / "event_seqs" / f"{sp}.parquet"
+        schema_out_fp = output_dir / "schemas" / sharded_path
+        event_seq_out_fp = output_dir / "event_seqs" / sharded_path
 
         logger.info(f"Tokenizing {str(in_fp.resolve())} into schemas at {str(schema_out_fp.resolve())}")
 
@@ -251,7 +248,6 @@ def main(cfg: DictConfig):
             pl.scan_parquet,
             write_lazyframe,
             extract_statics_and_schema,
-            do_return=False,
             do_overwrite=cfg.do_overwrite,
         )
 
@@ -263,7 +259,6 @@ def main(cfg: DictConfig):
             pl.scan_parquet,
             write_lazyframe,
             extract_seq_of_patient_events,
-            do_return=False,
             do_overwrite=cfg.do_overwrite,
         )
 

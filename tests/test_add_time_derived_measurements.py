@@ -5,10 +5,7 @@ scripts.
 """
 
 
-from .transform_tester_base import (
-    ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT,
-    single_stage_transform_tester,
-)
+from .transform_tester_base import ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT, single_stage_transform_tester
 from .utils import parse_meds_csvs
 
 AGE_CALCULATION_STR = """
@@ -243,5 +240,5 @@ def test_add_time_derived_measurements():
         transform_script=ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT,
         stage_name="add_time_derived_measurements",
         transform_stage_kwargs={"age": {"DOB_code": "DOB"}},
-        want_outputs=WANT_SHARDS,
+        want_data=WANT_SHARDS,
     )

@@ -7,7 +7,7 @@ import polars as pl
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_transforms import PREPROCESS_CONFIG_YAML
+from MEDS_transforms import INFERRED_STAGE_KEYS, PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over
 
 
@@ -64,10 +64,10 @@ def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[
         ┌────────────┬─────────────────────┬──────┬───────────────┐
         │ patient_id ┆ time                ┆ code ┆ numeric_value │
         │ ---        ┆ ---                 ┆ ---  ┆ ---           │
-        │ u32        ┆ datetime[μs]        ┆ str  ┆ f64           │
+        │ u32        ┆ datetime[μs]        ┆ str  ┆ f32           │
         ╞════════════╪═════════════════════╪══════╪═══════════════╡
         │ 1          ┆ 2021-01-01 00:00:00 ┆ AGE  ┆ 31.001347     │
-        │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE  ┆ 35.00417      │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE  ┆ 35.004169     │
         └────────────┴─────────────────────┴──────┴───────────────┘
         >>> # Now, we'll use the add_new_events functor to add these age events to the original DataFrame.
         >>> add_age_fn = add_new_events_fntr(age_fn)
@@ -76,7 +76,7 @@ def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[
         ┌────────────┬─────────────────────┬────────┬───────────────┐
         │ patient_id ┆ time                ┆ code   ┆ numeric_value │
         │ ---        ┆ ---                 ┆ ---    ┆ ---           │
-        │ u32        ┆ datetime[μs]        ┆ str    ┆ f64           │
+        │ u32        ┆ datetime[μs]        ┆ str    ┆ f32           │
         ╞════════════╪═════════════════════╪════════╪═══════════════╡
         │ 1          ┆ null                ┆ static ┆ null          │
         │ 1          ┆ 1990-01-01 00:00:00 ┆ DOB    ┆ null          │
@@ -84,7 +84,7 @@ def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[
         │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//A ┆ null          │
         │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//B ┆ null          │
         │ 2          ┆ 1988-01-02 00:00:00 ┆ DOB    ┆ null          │
-        │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE    ┆ 35.00417      │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE    ┆ 35.004169     │
         │ 2          ┆ 2023-01-03 00:00:00 ┆ lab//A ┆ null          │
         │ 3          ┆ 2022-01-01 00:00:00 ┆ lab//B ┆ null          │
         │ 3          ┆ 2022-01-01 00:00:00 ┆ dx//1  ┆ null          │
@@ -230,11 +230,11 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         ┌────────────┬─────────────────────┬──────┬───────────────┐
         │ patient_id ┆ time                ┆ code ┆ numeric_value │
         │ ---        ┆ ---                 ┆ ---  ┆ ---           │
-        │ u32        ┆ datetime[μs]        ┆ str  ┆ f64           │
+        │ u32        ┆ datetime[μs]        ┆ str  ┆ f32           │
         ╞════════════╪═════════════════════╪══════╪═══════════════╡
         │ 1          ┆ 2021-01-01 00:00:00 ┆ AGE  ┆ 31.001347     │
         │ 1          ┆ 2021-01-02 00:00:00 ┆ AGE  ┆ 31.004084     │
-        │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE  ┆ 35.00417      │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE  ┆ 35.004169     │
         └────────────┴─────────────────────┴──────┴───────────────┘
         >>> age_cfg = DictConfig({"DOB_code": "DOB", "age_code": "AGE", "age_unit": "scores"})
         >>> age_fn = age_fntr(age_cfg)
@@ -250,6 +250,7 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
     def fn(df: pl.LazyFrame) -> pl.LazyFrame:
         dob_expr = pl.when(pl.col("code") == cfg.DOB_code).then(pl.col("time")).min().over("patient_id")
         age_expr = (pl.col("time") - dob_expr).dt.total_microseconds() / microseconds_in_unit
+        age_expr = age_expr.cast(pl.Float32, strict=False)
 
         return (
             df.drop_nulls(subset=["time"])
@@ -364,14 +365,6 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
 
 
 def add_time_derived_measurements_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
-    INFERRED_STAGE_KEYS = {
-        "is_metadata",
-        "data_input_dir",
-        "metadata_input_dir",
-        "output_dir",
-        "reducer_output_dir",
-    }
-
     compute_fns = []
     # We use the raw stages object as the induced `stage_cfg` has extra properties like the input and output
     # directories.
