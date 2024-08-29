@@ -7,7 +7,7 @@ shard_events:
     launcher_params:
       timeout_min: 60
       cpus_per_task: 10
-      mem_gb: 10
+      mem_gb: 25
       partition: "short"
 
 split_and_shard_subjects:

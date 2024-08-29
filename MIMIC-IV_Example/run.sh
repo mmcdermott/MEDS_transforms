@@ -11,11 +11,10 @@ function display_help() {
     echo "sharding events, splitting subjects, converting to sharded events, and merging into a MEDS cohort."
     echo
     echo "Arguments:"
-    echo "  MIMICIV_RAW_DIR                               Directory containing raw MIMIC-IV data files."
-    echo "  MIMICIV_PREMEDS_DIR                           Output directory for pre-MEDS data."
-    echo "  MIMICIV_MEDS_DIR                              Output directory for processed MEDS data."
-    echo "  (OPTIONAL) STAGE_RUNNER_CONFIG_FP             Where the stage runner config lives, if desired."
-    echo "  (OPTIONAL) do_unzip=true OR do_unzip=false    Optional flag to unzip csv files before processing."
+    echo "  MIMICIV_RAW_DIR                                Directory containing raw MIMIC-IV data files."
+    echo "  MIMICIV_PREMEDS_DIR                            Output directory for pre-MEDS data."
+    echo "  MIMICIV_MEDS_DIR                               Output directory for processed MEDS data."
+    echo "  (OPTIONAL) do_unzip=true OR do_unzip=false     Optional flag to unzip files before processing."
     echo
     echo "Options:"
     echo "  -h, --help          Display this help message and exit."
@@ -36,46 +35,26 @@ if [ "$#" -lt 3 ]; then
     display_help
 fi
 
-if [ "$#" -gt 5 ]; then
-    echo "Error: Incorrect number of arguments provided."
-    display_help
-fi
-
 export MIMICIV_RAW_DIR=$1
 export MIMICIV_PRE_MEDS_DIR=$2
 export MIMICIV_MEDS_COHORT_DIR=$3
 shift 3
 
 # Defaults
-STAGE_RUNNER_ARG=""
 _DO_UNZIP_ARG_STR=""
 
 if [ $# -ge 1 ]; then
   case "$1" in
     do_unzip=*)
-      if [ $# -ge 2 ]; then
-        echo "Error: Stage runner filepath must come before do_unzip if both are specified!"
-        display_help
-      else
-        _DO_UNZIP_ARG_STR="$1"
-        shift 1
-      fi
-      ;;
-    *)
-      STAGE_RUNNER_ARG="stage_runner_fp=$1"
-      if [ $# -ge 2 ]; then
-        _DO_UNZIP_ARG_STR="$2"
-        shift 2
-      else
-        shift 1
-      fi
+      _DO_UNZIP_ARG_STR="$1"
+      shift 1
       ;;
   esac
 fi
 
 DO_UNZIP="false"
 
-if [ -z "$_DO_UNZIP_ARG_STR" ]; then
+if [ ! -z "$_DO_UNZIP_ARG_STR" ]; then
   case "$_DO_UNZIP_ARG_STR" in
     do_unzip=true)
       DO_UNZIP="true"
@@ -113,5 +92,4 @@ if [ -z "$N_WORKERS" ]; then
 fi
 
 echo "Running extraction pipeline."
-MEDS_transform-runner "pipeline_config_fp=$PIPELINE_CONFIG_FP" "$STAGE_RUNNER_ARG"
-
+MEDS_transform-runner "pipeline_config_fp=$PIPELINE_CONFIG_FP" "$@"
