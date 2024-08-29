@@ -109,7 +109,7 @@ hosp/omr:
     time: col(chartdate)
     time_format: "%Y-%m-%d"
 
-hosp/subjects:
+hosp/patients:
   gender:
     code:
       - GENDER

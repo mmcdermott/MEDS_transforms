@@ -7,15 +7,16 @@ shard_events:
     launcher_params:
       timeout_min: 60
       cpus_per_task: 10
-      mem_gb: 25
+      mem_gb: 40
       partition: "short"
 
 split_and_shard_subjects:
   parallelize:
+    n_workers: 1
     launcher_params:
-      timeout_min: 60
+      timeout_min: 10
       cpus_per_task: 10
-      mem_gb: 10
+      mem_gb: 7
       partition: "short"
 
 convert_to_sharded_events:
@@ -23,7 +24,7 @@ convert_to_sharded_events:
     launcher_params:
       timeout_min: 60
       cpus_per_task: 10
-      mem_gb: 10
+      mem_gb: 25
       partition: "short"
 
 merge_to_MEDS_cohort:
@@ -31,7 +32,7 @@ merge_to_MEDS_cohort:
     launcher_params:
       timeout_min: 60
       cpus_per_task: 10
-      mem_gb: 10
+      mem_gb: 25
       partition: "short"
 
 extract_code_metadata:
