@@ -1,5 +1,5 @@
 defaults:
-  - pipeline
+  - _pipeline
   - stage_configs:
       - reshard_to_split
       - filter_subjects

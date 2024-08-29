@@ -9,71 +9,71 @@ from tests.MEDS_Transforms.transform_tester_base import parse_shards_yaml, singl
 
 INPUT_SHARDS = parse_shards_yaml(
     """
-    train/0: |-2
-      subject_id,time,code,numeric_value,text_value
-      239684,,EYE_COLOR//BROWN,,
-      239684,"12/28/1980, 00:00:00",DOB,,
-      239684,"05/11/2010, 17:41:51",BP,,"120/80"
-      1195293,,EYE_COLOR//BLUE,,
-      1195293,"06/20/1978, 00:00:00",DOB,,
-      1195293,"06/20/2010, 19:23:52",BP,,"144/96"
-      1195293,"06/20/2010, 19:23:52",HR,80,
-      1195293,"06/20/2010, 19:23:52",TEMP,,"100F"
-    train/1: |-2
-      subject_id,time,code,numeric_value,text_value
-      68729,,EYE_COLOR//HAZEL,,
-      68729,"03/09/1978, 00:00:00",DOB,,
-      814703,"02/05/2010, 05:55:39",HR,170.2,
-    tuning/0: |-2
-      subject_id,time,code,numeric_value,text_value
-      754281,,EYE_COLOR//BROWN,,
-      754281,"12/19/1988, 00:00:00",DOB,,
-      754281,"01/03/2010, 06:27:59",HR,142.0,
-      754281,"06/20/2010, 20:23:50",BP,,"134/76"
-      754281,"06/20/2010, 21:00:02",TEMP,,"36.2C"
-    held_out/0: |-2
-      subject_id,time,code,numeric_value,text_value
-      1500733,,EYE_COLOR//BROWN,,
-      1500733,"07/20/1986, 00:00:00",DOB,,
-      1500733,"06/03/2010, 14:54:38",HR,91.4
-      1500733,"06/03/2010, 14:54:38",BP,,"123/82"
+train/0: |-2
+  subject_id,time,code,numeric_value,text_value
+  239684,,EYE_COLOR//BROWN,,
+  239684,"12/28/1980, 00:00:00",DOB,,
+  239684,"05/11/2010, 17:41:51",BP,,"120/80"
+  1195293,,EYE_COLOR//BLUE,,
+  1195293,"06/20/1978, 00:00:00",DOB,,
+  1195293,"06/20/2010, 19:23:52",BP,,"144/96"
+  1195293,"06/20/2010, 19:23:52",HR,80,
+  1195293,"06/20/2010, 19:23:52",TEMP,,"100F"
+train/1: |-2
+  subject_id,time,code,numeric_value,text_value
+  68729,,EYE_COLOR//HAZEL,,
+  68729,"03/09/1978, 00:00:00",DOB,,
+  814703,"02/05/2010, 05:55:39",HR,170.2,
+tuning/0: |-2
+  subject_id,time,code,numeric_value,text_value
+  754281,,EYE_COLOR//BROWN,,
+  754281,"12/19/1988, 00:00:00",DOB,,
+  754281,"01/03/2010, 06:27:59",HR,142.0,
+  754281,"06/20/2010, 20:23:50",BP,,"134/76"
+  754281,"06/20/2010, 21:00:02",TEMP,,"36.2C"
+held_out/0: |-2
+  subject_id,time,code,numeric_value,text_value
+  1500733,,EYE_COLOR//BROWN,,
+  1500733,"07/20/1986, 00:00:00",DOB,,
+  1500733,"06/03/2010, 14:54:38",HR,91.4
+  1500733,"06/03/2010, 14:54:38",BP,,"123/82"
     """
 )
 
 WANT_SHARDS = parse_shards_yaml(
     """
-    train/0: |-2
-      subject_id,time,code,numeric_value,text_value
-      239684,,EYE_COLOR//BROWN,,
-      239684,"12/28/1980, 00:00:00",DOB,,
-      239684,"05/11/2010, 17:41:51",BP//SYSTOLIC,120,
-      239684,"05/11/2010, 17:41:51",BP//DIASTOLIC,80,
-      1195293,,EYE_COLOR//BLUE,,
-      1195293,"06/20/1978, 00:00:00",DOB,,
-      1195293,"06/20/2010, 19:23:52",BP//SYSTOLIC,144,
-      1195293,"06/20/2010, 19:23:52",BP//DIASTOLIC,96,
-      1195293,"06/20/2010, 19:23:52",TEMP//F,100,
-      1195293,"06/20/2010, 19:23:52",HR,80,
-    train/1: |-2
-      subject_id,time,code,numeric_value,text_value
-      68729,,EYE_COLOR//HAZEL,,
-      68729,"03/09/1978, 00:00:00",DOB,,
-      814703,"02/05/2010, 05:55:39",HR,170.2,
-    tuning/0: |-2
-      subject_id,time,code,numeric_value,text_value
-      754281,,EYE_COLOR//BROWN,,
-      754281,"12/19/1988, 00:00:00",DOB,,
-      754281,"01/03/2010, 06:27:59",HR,142.0,
-      754281,"06/20/2010, 20:23:50",BP//SYSTOLIC,134,
-      754281,"06/20/2010, 20:23:50",BP//DIASTOLIC,76,
-      754281,"06/20/2010, 21:00:02",TEMP//C,36.2,
-    held_out/0: |-2
-      subject_id,time,code,numeric_value,text_value
-      1500733,,EYE_COLOR//BROWN,,
-      1500733,"07/20/1986, 00:00:00",DOB,,
-      1500733,"06/03/2010, 14:54:38",BP//SYSTOLIC,123,
-      1500733,"06/03/2010, 14:54:38",BP//DIASTOLIC,82,
-      1500733,"06/03/2010, 14:54:38",HR,91.4,
+train/0: |-2
+  subject_id,time,code,numeric_value,text_value
+  239684,,EYE_COLOR//BROWN,,
+  239684,"12/28/1980, 00:00:00",DOB,,
+  239684,"05/11/2010, 17:41:51",BP//SYSTOLIC,120,
+  239684,"05/11/2010, 17:41:51",BP//DIASTOLIC,80,
+  1195293,,EYE_COLOR//BLUE,,
+  1195293,"06/20/1978, 00:00:00",DOB,,
+  1195293,"06/20/2010, 19:23:52",BP//SYSTOLIC,144,
+  1195293,"06/20/2010, 19:23:52",BP//DIASTOLIC,96,
+  1195293,"06/20/2010, 19:23:52",TEMP//F,100,
+  1195293,"06/20/2010, 19:23:52",HR,80,
+train/1: |-2
+  subject_id,time,code,numeric_value,text_value
+  68729,,EYE_COLOR//HAZEL,,
+  68729,"03/09/1978, 00:00:00",DOB,,
+  814703,"02/05/2010, 05:55:39",HR,170.2,
+tuning/0: |-2
+  subject_id,time,code,numeric_value,text_value
+  754281,,EYE_COLOR//BROWN,,
+  754281,"12/19/1988, 00:00:00",DOB,,
+  754281,"01/03/2010, 06:27:59",HR,142.0,
+  754281,"06/20/2010, 20:23:50",BP//SYSTOLIC,134,
+  754281,"06/20/2010, 20:23:50",BP//DIASTOLIC,76,
+  754281,"06/20/2010, 21:00:02",TEMP//C,36.2,
+held_out/0: |-2
+  subject_id,time,code,numeric_value,text_value
+  1500733,,EYE_COLOR//BROWN,,
+  1500733,"07/20/1986, 00:00:00",DOB,,
+  1500733,"06/03/2010, 14:54:38",BP//SYSTOLIC,123,
+  1500733,"06/03/2010, 14:54:38",BP//DIASTOLIC,82,
+  1500733,"06/03/2010, 14:54:38",HR,91.4,
     """
 )
 

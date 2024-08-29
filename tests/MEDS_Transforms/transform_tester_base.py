@@ -17,10 +17,7 @@ from pathlib import Path
 import polars as pl
 from meds import subject_id_field
 
-from tests.utils import FILE_T, multi_stage_tester, parse_meds_csvs, parse_shards_yaml, single_stage_tester
-
-# So it can be imported from here
-parse_shards_yaml = parse_shards_yaml
+from tests.utils import FILE_T, multi_stage_tester, parse_shards_yaml, single_stage_tester
 
 # Test MEDS data (inputs)
 
@@ -31,99 +28,90 @@ SHARDS = {
     "held_out/0": [1500733],
 }
 
-SPLITS = {
-    "train": [239684, 1195293, 68729, 814703],
-    "tuning": [754281],
-    "held_out": [1500733],
-}
-
-MEDS_TRAIN_0 = """
-subject_id,time,code,numeric_value
-239684,,EYE_COLOR//BROWN,
-239684,,HEIGHT,175.271115221764
-239684,"12/28/1980, 00:00:00",DOB,
-239684,"05/11/2010, 17:41:51",ADMISSION//CARDIAC,
-239684,"05/11/2010, 17:41:51",HR,102.6
-239684,"05/11/2010, 17:41:51",TEMP,96.0
-239684,"05/11/2010, 17:48:48",HR,105.1
-239684,"05/11/2010, 17:48:48",TEMP,96.2
-239684,"05/11/2010, 18:25:35",HR,113.4
-239684,"05/11/2010, 18:25:35",TEMP,95.8
-239684,"05/11/2010, 18:57:18",HR,112.6
-239684,"05/11/2010, 18:57:18",TEMP,95.5
-239684,"05/11/2010, 19:27:19",DISCHARGE,
-1195293,,EYE_COLOR//BLUE,
-1195293,,HEIGHT,164.6868838269085
-1195293,"06/20/1978, 00:00:00",DOB,
-1195293,"06/20/2010, 19:23:52",ADMISSION//CARDIAC,
-1195293,"06/20/2010, 19:23:52",HR,109.0
-1195293,"06/20/2010, 19:23:52",TEMP,100.0
-1195293,"06/20/2010, 19:25:32",HR,114.1
-1195293,"06/20/2010, 19:25:32",TEMP,100.0
-1195293,"06/20/2010, 19:45:19",HR,119.8
-1195293,"06/20/2010, 19:45:19",TEMP,99.9
-1195293,"06/20/2010, 20:12:31",HR,112.5
-1195293,"06/20/2010, 20:12:31",TEMP,99.8
-1195293,"06/20/2010, 20:24:44",HR,107.7
-1195293,"06/20/2010, 20:24:44",TEMP,100.0
-1195293,"06/20/2010, 20:41:33",HR,107.5
-1195293,"06/20/2010, 20:41:33",TEMP,100.4
-1195293,"06/20/2010, 20:50:04",DISCHARGE,
-"""
-
-MEDS_TRAIN_1 = """
-subject_id,time,code,numeric_value
-68729,,EYE_COLOR//HAZEL,
-68729,,HEIGHT,160.3953106166676
-68729,"03/09/1978, 00:00:00",DOB,
-68729,"05/26/2010, 02:30:56",ADMISSION//PULMONARY,
-68729,"05/26/2010, 02:30:56",HR,86.0
-68729,"05/26/2010, 02:30:56",TEMP,97.8
-68729,"05/26/2010, 04:51:52",DISCHARGE,
-814703,,EYE_COLOR//HAZEL,
-814703,,HEIGHT,156.48559093209357
-814703,"03/28/1976, 00:00:00",DOB,
-814703,"02/05/2010, 05:55:39",ADMISSION//ORTHOPEDIC,
-814703,"02/05/2010, 05:55:39",HR,170.2
-814703,"02/05/2010, 05:55:39",TEMP,100.1
-814703,"02/05/2010, 07:02:30",DISCHARGE,
-"""
-
-MEDS_TUNING_0 = """
-subject_id,time,code,numeric_value
-754281,,EYE_COLOR//BROWN,
-754281,,HEIGHT,166.22261567137025
-754281,"12/19/1988, 00:00:00",DOB,
-754281,"01/03/2010, 06:27:59",ADMISSION//PULMONARY,
-754281,"01/03/2010, 06:27:59",HR,142.0
-754281,"01/03/2010, 06:27:59",TEMP,99.8
-754281,"01/03/2010, 08:22:13",DISCHARGE,
-"""
-
-MEDS_HELD_OUT_0 = """
-subject_id,time,code,numeric_value
-1500733,,EYE_COLOR//BROWN,
-1500733,,HEIGHT,158.60131573580904
-1500733,"07/20/1986, 00:00:00",DOB,
-1500733,"06/03/2010, 14:54:38",ADMISSION//ORTHOPEDIC,
-1500733,"06/03/2010, 14:54:38",HR,91.4
-1500733,"06/03/2010, 14:54:38",TEMP,100.0
-1500733,"06/03/2010, 15:39:49",HR,84.4
-1500733,"06/03/2010, 15:39:49",TEMP,100.3
-1500733,"06/03/2010, 16:20:49",HR,90.1
-1500733,"06/03/2010, 16:20:49",TEMP,100.1
-1500733,"06/03/2010, 16:44:26",DISCHARGE,
-"""
-
-MEDS_SHARDS = parse_meds_csvs(
+SPLITS_DF = pl.DataFrame(
     {
-        "train/0": MEDS_TRAIN_0,
-        "train/1": MEDS_TRAIN_1,
-        "tuning/0": MEDS_TUNING_0,
-        "held_out/0": MEDS_HELD_OUT_0,
+        subject_id_field: [239684, 1195293, 68729, 814703, 754281, 1500733],
+        "split": ["train", "train", "train", "train", "tuning", "held_out"],
     }
 )
 
+MEDS_SHARDS = parse_shards_yaml(
+    """
+train/0: |-2
+  subject_id,time,code,numeric_value
+  239684,,EYE_COLOR//BROWN,
+  239684,,HEIGHT,175.271115221764
+  239684,"12/28/1980, 00:00:00",DOB,
+  239684,"05/11/2010, 17:41:51",ADMISSION//CARDIAC,
+  239684,"05/11/2010, 17:41:51",HR,102.6
+  239684,"05/11/2010, 17:41:51",TEMP,96.0
+  239684,"05/11/2010, 17:48:48",HR,105.1
+  239684,"05/11/2010, 17:48:48",TEMP,96.2
+  239684,"05/11/2010, 18:25:35",HR,113.4
+  239684,"05/11/2010, 18:25:35",TEMP,95.8
+  239684,"05/11/2010, 18:57:18",HR,112.6
+  239684,"05/11/2010, 18:57:18",TEMP,95.5
+  239684,"05/11/2010, 19:27:19",DISCHARGE,
+  1195293,,EYE_COLOR//BLUE,
+  1195293,,HEIGHT,164.6868838269085
+  1195293,"06/20/1978, 00:00:00",DOB,
+  1195293,"06/20/2010, 19:23:52",ADMISSION//CARDIAC,
+  1195293,"06/20/2010, 19:23:52",HR,109.0
+  1195293,"06/20/2010, 19:23:52",TEMP,100.0
+  1195293,"06/20/2010, 19:25:32",HR,114.1
+  1195293,"06/20/2010, 19:25:32",TEMP,100.0
+  1195293,"06/20/2010, 19:45:19",HR,119.8
+  1195293,"06/20/2010, 19:45:19",TEMP,99.9
+  1195293,"06/20/2010, 20:12:31",HR,112.5
+  1195293,"06/20/2010, 20:12:31",TEMP,99.8
+  1195293,"06/20/2010, 20:24:44",HR,107.7
+  1195293,"06/20/2010, 20:24:44",TEMP,100.0
+  1195293,"06/20/2010, 20:41:33",HR,107.5
+  1195293,"06/20/2010, 20:41:33",TEMP,100.4
+  1195293,"06/20/2010, 20:50:04",DISCHARGE,
+
+train/1: |-2
+  subject_id,time,code,numeric_value
+  68729,,EYE_COLOR//HAZEL,
+  68729,,HEIGHT,160.3953106166676
+  68729,"03/09/1978, 00:00:00",DOB,
+  68729,"05/26/2010, 02:30:56",ADMISSION//PULMONARY,
+  68729,"05/26/2010, 02:30:56",HR,86.0
+  68729,"05/26/2010, 02:30:56",TEMP,97.8
+  68729,"05/26/2010, 04:51:52",DISCHARGE,
+  814703,,EYE_COLOR//HAZEL,
+  814703,,HEIGHT,156.48559093209357
+  814703,"03/28/1976, 00:00:00",DOB,
+  814703,"02/05/2010, 05:55:39",ADMISSION//ORTHOPEDIC,
+  814703,"02/05/2010, 05:55:39",HR,170.2
+  814703,"02/05/2010, 05:55:39",TEMP,100.1
+  814703,"02/05/2010, 07:02:30",DISCHARGE,
+
+tuning/0: |-2
+  subject_id,time,code,numeric_value
+  754281,,EYE_COLOR//BROWN,
+  754281,,HEIGHT,166.22261567137025
+  754281,"12/19/1988, 00:00:00",DOB,
+  754281,"01/03/2010, 06:27:59",ADMISSION//PULMONARY,
+  754281,"01/03/2010, 06:27:59",HR,142.0
+  754281,"01/03/2010, 06:27:59",TEMP,99.8
+  754281,"01/03/2010, 08:22:13",DISCHARGE,
+
+held_out/0: |-2
+  subject_id,time,code,numeric_value
+  1500733,,EYE_COLOR//BROWN,
+  1500733,,HEIGHT,158.60131573580904
+  1500733,"07/20/1986, 00:00:00",DOB,
+  1500733,"06/03/2010, 14:54:38",ADMISSION//ORTHOPEDIC,
+  1500733,"06/03/2010, 14:54:38",HR,91.4
+  1500733,"06/03/2010, 14:54:38",TEMP,100.0
+  1500733,"06/03/2010, 15:39:49",HR,84.4
+  1500733,"06/03/2010, 15:39:49",TEMP,100.3
+  1500733,"06/03/2010, 16:20:49",HR,90.1
+  1500733,"06/03/2010, 16:20:49",TEMP,100.1
+  1500733,"06/03/2010, 16:44:26",DISCHARGE,
+    """
+)
 
 MEDS_CODE_METADATA_CSV = """
 code,code/n_occurrences,code/n_subjects,values/n_occurrences,values/sum,values/sum_sqd,description,parent_codes
@@ -197,14 +185,17 @@ def remap_inputs_for_transform(
     unified_inputs["metadata/.shards.json"] = input_shards_map
 
     if input_splits_map is None:
-        input_splits_map = SPLITS
+        input_splits_map = SPLITS_DF
 
-    input_splits_as_df = defaultdict(list)
-    for split_name, subject_ids in input_splits_map.items():
-        input_splits_as_df[subject_id_field].extend(subject_ids)
-        input_splits_as_df["split"].extend([split_name] * len(subject_ids))
+    if isinstance(input_splits_map, pl.DataFrame):
+        input_splits_df = input_splits_map
+    else:
+        input_splits_as_df = defaultdict(list)
+        for split_name, subject_ids in input_splits_map.items():
+            input_splits_as_df[subject_id_field].extend(subject_ids)
+            input_splits_as_df["split"].extend([split_name] * len(subject_ids))
 
-    input_splits_df = pl.DataFrame(input_splits_as_df)
+        input_splits_df = pl.DataFrame(input_splits_as_df)
 
     unified_inputs["metadata/subject_splits.parquet"] = input_splits_df
 

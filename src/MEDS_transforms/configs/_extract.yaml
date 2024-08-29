@@ -1,5 +1,5 @@
 defaults:
-  - pipeline
+  - _pipeline
   - stage_configs:
       - shard_events
       - split_and_shard_subjects

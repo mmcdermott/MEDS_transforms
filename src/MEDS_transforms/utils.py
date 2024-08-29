@@ -1,5 +1,6 @@
 """Core utilities for MEDS pipelines built with these tools."""
 
+import importlib
 import inspect
 import os
 import sys
@@ -108,10 +109,13 @@ def get_package_version() -> str:
     return package_version
 
 
-def get_script_docstring() -> str:
+def get_script_docstring(filename: str | None = None) -> str:
     """Returns the docstring of the main function of the script from which this function was called."""
 
-    main_module = sys.modules["__main__"]
+    if filename is not None:
+        main_module = importlib.import_module(f"MEDS_transforms.{filename}")
+    else:
+        main_module = sys.modules["__main__"]
     func = getattr(main_module, "main", None)
     if func and callable(func):
         return inspect.getdoc(func) or ""
