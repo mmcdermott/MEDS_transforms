@@ -8,7 +8,8 @@ from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms.extract import CONFIG_YAML
-from MEDS_transforms.mapreduce.mapper import map_over, shard_iterator
+from MEDS_transforms.mapreduce.mapper import map_over
+from MEDS_transforms.mapreduce.utils import shard_iterator_by_shard_map
 
 
 def merge_subdirs_and_sort(
@@ -237,7 +238,7 @@ def main(cfg: DictConfig):
     map_over(
         cfg,
         read_fn=read_fn,
-        shard_iterator_fntr=partial(shard_iterator, in_suffix=""),
+        shard_iterator_fntr=shard_iterator_by_shard_map,
     )
 
 

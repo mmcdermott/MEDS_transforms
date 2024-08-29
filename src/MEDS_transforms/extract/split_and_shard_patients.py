@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import json
+import math
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -13,15 +14,13 @@ from MEDS_transforms.extract import CONFIG_YAML
 from MEDS_transforms.utils import stage_init
 
 
-def shard_patients[
-    SUBJ_ID_T
-](
+def shard_patients(
     patients: np.ndarray,
     n_patients_per_shard: int = 50000,
-    external_splits: dict[str, Sequence[SUBJ_ID_T]] | None = None,
-    split_fracs_dict: dict[str, float] = {"train": 0.8, "tuning": 0.1, "held_out": 0.1},
+    external_splits: dict[str, Sequence[int]] | None = None,
+    split_fracs_dict: dict[str, float] | None = {"train": 0.8, "tuning": 0.1, "held_out": 0.1},
     seed: int = 1,
-) -> dict[str, list[SUBJ_ID_T]]:
+) -> dict[str, list[int]]:
     """Shard a list of patients, nested within train/tuning/held-out splits.
 
     This function takes a list of patients and shards them into train/tuning/held-out splits, with the shards
@@ -41,7 +40,8 @@ def shard_patients[
             tasks or test cases (e.g., prospective tests); training patients should often still be included in
             the IID splits to maximize the amount of data that can be used for training.
         split_fracs_dict: A dictionary mapping the split name to the fraction of patients to include in that
-            split. Defaults to 80% train, 10% tuning, 10% held-out.
+            split. Defaults to 80% train, 10% tuning, 10% held-out. This can be None or empty only when
+            external splits fully specify the population.
         seed: The random seed to use for shuffling the patients before seeding and sharding. This is useful
             for ensuring reproducibility.
 
@@ -71,15 +71,20 @@ def shard_patients[
         >>> shard_patients(patients, n_patients_per_shard=3, split_fracs_dict={'train': 0.5})
         Traceback (most recent call last):
             ...
-        ValueError: The sum of the split fractions must be equal to 1.
+        ValueError: The sum of the split fractions must be equal to 1. Got 0.5 through {'train': 0.5}.
         >>> shard_patients([1, 2], n_patients_per_shard=3)
         Traceback (most recent call last):
             ...
         ValueError: Unable to adjust splits to ensure all splits have at least 1 patient.
+        >>> external_splits = {
+        ...     'train': np.array([1, 2, 3, 4, 5, 6], dtype=int),
+        ...     'test': np.array([7, 8, 9, 10], dtype=int),
+        ... }
+        >>> shard_patients(patients, 6, external_splits, split_fracs_dict=None)
+        {'train/0': [1, 2, 3, 4, 5, 6], 'test/0': [7, 8, 9, 10]}
+        >>> shard_patients(patients, 3, external_splits)
+        {'train/0': [5, 1, 3], 'train/1': [2, 6, 4], 'test/0': [10, 7], 'test/1': [8, 9]}
     """
-
-    if sum(split_fracs_dict.values()) != 1:
-        raise ValueError("The sum of the split fractions must be equal to 1.")
 
     if external_splits is None:
         external_splits = {}
@@ -99,31 +104,46 @@ def shard_patients[
     is_in_external_split = np.isin(patients, list(all_external_splits))
     patient_ids_to_split = patients[~is_in_external_split]
 
-    n_patients = len(patient_ids_to_split)
+    splits = external_splits
+
+    splits_cover = sum(split_fracs_dict.values()) if split_fracs_dict else 0
 
     rng = np.random.default_rng(seed)
-    split_names_idx = rng.permutation(len(split_fracs_dict))
-    split_names = np.array(list(split_fracs_dict.keys()))[split_names_idx]
-    split_fracs = np.array([split_fracs_dict[k] for k in split_names])
-    split_lens = np.round(split_fracs[:-1] * n_patients).astype(int)
-    split_lens = np.append(split_lens, n_patients - split_lens.sum())
+    if n_patients := len(patient_ids_to_split):
+        if not math.isclose(splits_cover, 1):
+            raise ValueError(
+                f"The sum of the split fractions must be equal to 1. Got {splits_cover} "
+                f"through {split_fracs_dict}."
+            )
+        split_names_idx = rng.permutation(len(split_fracs_dict))
+        split_names = np.array(list(split_fracs_dict.keys()))[split_names_idx]
+        split_fracs = np.array([split_fracs_dict[k] for k in split_names])
+        split_lens = np.round(split_fracs[:-1] * n_patients).astype(int)
+        split_lens = np.append(split_lens, n_patients - split_lens.sum())
 
-    if split_lens.min() == 0:
-        logger.warning(
-            "Some splits are empty. Adjusting splits to ensure all splits have at least 1 patient."
-        )
-        max_split = split_lens.argmax()
-        split_lens[max_split] -= 1
-        split_lens[split_lens.argmin()] += 1
+        if split_lens.min() == 0:
+            logger.warning(
+                "Some splits are empty. Adjusting splits to ensure all splits have at least 1 patient."
+            )
+            max_split = split_lens.argmax()
+            split_lens[max_split] -= 1
+            split_lens[split_lens.argmin()] += 1
 
-    if split_lens.min() == 0:
-        raise ValueError("Unable to adjust splits to ensure all splits have at least 1 patient.")
+        if split_lens.min() == 0:
+            raise ValueError("Unable to adjust splits to ensure all splits have at least 1 patient.")
 
-    patients = rng.permutation(patient_ids_to_split)
-    patients_per_split = np.split(patients, split_lens.cumsum())
+        patients = rng.permutation(patient_ids_to_split)
+        patients_per_split = np.split(patients, split_lens.cumsum())
 
-    splits = {k: v for k, v in zip(split_names, patients_per_split)}
-    splits = {**splits, **external_splits}
+        splits = {**{k: v for k, v in zip(split_names, patients_per_split)}, **splits}
+    else:
+        if split_fracs_dict:
+            logger.warning(
+                "External splits were provided covering all patients, but split_fracs_dict was not empty. "
+                "Ignoring the split_fracs_dict."
+            )
+        else:
+            logger.info("External splits were provided covering all patients.")
 
     # Sharding
     final_shards = {}
@@ -186,7 +206,7 @@ def main(cfg: DictConfig):
             ensure that split fractions sum to 1.
     """
 
-    subsharded_dir, MEDS_cohort_dir, _, _ = stage_init(cfg)
+    subsharded_dir, _, _ = stage_init(cfg)
 
     event_conversion_cfg_fp = Path(cfg.event_conversion_config_fp)
     if not event_conversion_cfg_fp.exists():
@@ -231,7 +251,7 @@ def main(cfg: DictConfig):
         if not external_splits_json_fp.exists():
             raise FileNotFoundError(f"External splits JSON file not found at {external_splits_json_fp}")
 
-        logger.info(f"Reading external splits from {cfg.external_splits_json_fp}")
+        logger.info(f"Reading external splits from {str(cfg.stage_cfg.external_splits_json_fp.resolve())}")
         external_splits = json.loads(external_splits_json_fp.read_text())
 
         size_strs = ", ".join(f"{k}: {len(v)}" for k, v in external_splits.items())
@@ -249,11 +269,11 @@ def main(cfg: DictConfig):
         seed=cfg.seed,
     )
 
-    logger.info(f"Writing sharded patients to {MEDS_cohort_dir}")
-    MEDS_cohort_dir.mkdir(parents=True, exist_ok=True)
-    out_fp = MEDS_cohort_dir / "splits.json"
-    out_fp.write_text(json.dumps(sharded_patients))
-    logger.info(f"Done writing sharded patients to {out_fp}")
+    shards_map_fp = Path(cfg.shards_map_fp)
+    logger.info(f"Writing sharded patients to {str(shards_map_fp.resolve())}")
+    shards_map_fp.parent.mkdir(parents=True, exist_ok=True)
+    shards_map_fp.write_text(json.dumps(sharded_patients))
+    logger.info("Done writing sharded patients")
 
 
 if __name__ == "__main__":

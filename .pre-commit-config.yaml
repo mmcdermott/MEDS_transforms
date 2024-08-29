@@ -1,7 +1,7 @@
 default_language_version:
   python: python3.12
 
-exclude: "sample_data|docs/MIMIC_IV_tutorial/wandb_reports"
+exclude: "docs/index.md|MIMIC-IV_Example/README.md|eICU_Example/README.md"
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -45,7 +45,7 @@ repos:
     rev: v3.10.1
     hooks:
       - id: pyupgrade
-        args: [--py310-plus]
+        args: [--py311-plus]
 
   # python docstring formatting
   - repo: https://github.com/myint/docformatter
@@ -95,10 +95,12 @@ repos:
           - mdformat-gfm
           - mdformat-tables
           - mdformat_frontmatter
-          - mdformat-myst
           - mdformat-black
           - mdformat-config
           - mdformat-shfmt
+          - mdformat-mkdocs
+          - mdformat-toc
+          - mdformat-admon
 
   # word spelling linter
   - repo: https://github.com/codespell-project/codespell
@@ -124,8 +126,4 @@ repos:
       - id: nbqa-isort
         args: ["--profile=black"]
       - id: nbqa-flake8
-        args:
-          [
-            "--extend-ignore=E203,E402,E501,F401,F841",
-            "--exclude=logs/*,data/*",
-          ]
+        args: ["--extend-ignore=E203,E402,E501,F401,F841", "--exclude=logs/*,data/*"]
