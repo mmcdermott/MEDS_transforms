@@ -20,6 +20,8 @@ The stage configuration arguments will be as given in the yaml block below:
 
 from functools import partial
 
+from meds import code_metadata_filepath, subject_splits_filepath
+
 from tests import RUNNER_SCRIPT, USE_LOCAL_SCRIPTS
 from tests.MEDS_Transforms import (
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT,
@@ -211,8 +213,8 @@ def test_pipeline():
         do_use_config_yaml=False,
         input_files={
             **{f"data/{k}": v for k, v in MEDS_SHARDS.items()},
-            "metadata/codes.parquet": MEDS_CODE_METADATA,
-            "metadata/subject_splits.parquet": SPLITS_DF,
+            code_metadata_filepath: MEDS_CODE_METADATA,
+            subject_splits_filepath: SPLITS_DF,
             "pipeline.yaml": partial(add_params, PIPELINE_YAML),
             "stage_runner.yaml": STAGE_RUNNER_YAML,
         },
@@ -246,8 +248,8 @@ def test_pipeline():
         do_use_config_yaml=False,
         input_files={
             **{f"data/{k}": v for k, v in MEDS_SHARDS.items()},
-            "metadata/codes.parquet": MEDS_CODE_METADATA,
-            "metadata/subject_splits.parquet": SPLITS_DF,
+            code_metadata_filepath: MEDS_CODE_METADATA,
+            subject_splits_filepath: SPLITS_DF,
             "pipeline.yaml": partial(add_params, PIPELINE_YAML),
             "stage_runner.yaml": PARALLEL_STAGE_RUNNER_YAML,
         },

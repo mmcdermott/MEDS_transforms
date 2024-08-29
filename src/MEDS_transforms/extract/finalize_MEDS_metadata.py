@@ -12,11 +12,14 @@ import pyarrow.parquet as pq
 from loguru import logger
 from meds import __version__ as MEDS_VERSION
 from meds import (
+    code_metadata_filepath,
     code_metadata_schema,
+    dataset_metadata_filepath,
     dataset_metadata_schema,
     held_out_split,
     subject_id_field,
     subject_split_schema,
+    subject_splits_filepath,
     train_split,
     tuning_split,
 )
@@ -150,9 +153,12 @@ def main(cfg: DictConfig):
     _, _, input_metadata_dir = stage_init(cfg)
     output_metadata_dir = Path(cfg.stage_cfg.reducer_output_dir)
 
-    output_code_metadata_fp = output_metadata_dir / "codes.parquet"
-    dataset_metadata_fp = output_metadata_dir / "dataset.json"
-    subject_splits_fp = output_metadata_dir / "subject_splits.parquet"
+    if output_metadata_dir.parts[-1] != Path(code_metadata_filepath).parts[0]:
+        raise ValueError(f"Output metadata directory must end in 'metadata'. Got {output_metadata_dir}")
+
+    output_code_metadata_fp = output_metadata_dir.parent / code_metadata_filepath
+    dataset_metadata_fp = output_metadata_dir.parent / dataset_metadata_filepath
+    subject_splits_fp = output_metadata_dir.parent / subject_splits_filepath
 
     for out_fp in [output_code_metadata_fp, dataset_metadata_fp, subject_splits_fp]:
         out_fp.parent.mkdir(parents=True, exist_ok=True)

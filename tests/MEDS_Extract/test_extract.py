@@ -11,6 +11,7 @@ from pathlib import Path
 
 import polars as pl
 from meds import __version__ as MEDS_VERSION
+from meds import subject_splits_filepath
 
 from tests.MEDS_Extract import (
     CONVERT_TO_SHARDED_EVENTS_SCRIPT,
@@ -628,8 +629,7 @@ def test_extraction():
         got_json.pop("etl_version")  # We don't test this as it changes with the commits.
         assert got_json == MEDS_OUTPUT_DATASET_METADATA_JSON, f"Dataset metadata differs: {got_json}"
 
-        # Check the splits parquet
-        output_file = MEDS_cohort_dir / "metadata" / "subject_splits.parquet"
+        output_file = MEDS_cohort_dir / subject_splits_filepath
         assert output_file.is_file(), f"Expected {output_file} to exist: stderr:\n{stderr}\nstdout:\n{stdout}"
 
         got_df = pl.read_parquet(output_file, glob=False, use_pyarrow=True)

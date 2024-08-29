@@ -15,7 +15,7 @@ from io import StringIO
 from pathlib import Path
 
 import polars as pl
-from meds import subject_id_field
+from meds import subject_id_field, subject_splits_filepath
 
 from tests.utils import FILE_T, multi_stage_tester, parse_shards_yaml, single_stage_tester
 
@@ -197,7 +197,7 @@ def remap_inputs_for_transform(
 
         input_splits_df = pl.DataFrame(input_splits_as_df)
 
-    unified_inputs["metadata/subject_splits.parquet"] = input_splits_df
+    unified_inputs[subject_splits_filepath] = input_splits_df
 
     return unified_inputs
 
