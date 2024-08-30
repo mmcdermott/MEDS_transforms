@@ -166,7 +166,7 @@ def extract_event(
         ...     "text_value": "woo_text",
         ... }
         >>> extract_event(raw_data, event_cfg, do_dedup_text_and_numeric=True)
-        shape: (4, 4)
+        shape: (4, 5)
         ┌────────────┬───────────┬─────────────────────┬───────────────┬────────────┐
         │ subject_id ┆ code      ┆ time                ┆ numeric_value ┆ text_value │
         │ ---        ┆ ---       ┆ ---                 ┆ ---           ┆ ---        │
