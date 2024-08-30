@@ -386,7 +386,7 @@ def main(cfg: DictConfig):
 
         metadata_fp, read_fn = get_supported_fp(raw_input_dir, input_prefix)
         if metadata_fp.suffix != ".parquet":
-            read_fn = partial(read_fn, infer_schema_length=999999999)
+            read_fn = partial(read_fn, infer_schema=False)
         out_fp = partial_metadata_dir / f"{input_prefix}.parquet"
         logger.info(f"Extracting metadata from {metadata_fp} and saving to {out_fp}")
 
