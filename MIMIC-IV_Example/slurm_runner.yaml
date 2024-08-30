@@ -5,7 +5,7 @@ parallelize:
 shard_events:
   parallelize:
     launcher_params:
-      timeout_min: 60
+      timeout_min: 50
       cpus_per_task: 10
       mem_gb: 40
       partition: "short"
@@ -22,7 +22,7 @@ split_and_shard_subjects:
 convert_to_sharded_events:
   parallelize:
     launcher_params:
-      timeout_min: 60
+      timeout_min: 10
       cpus_per_task: 10
       mem_gb: 25
       partition: "short"
@@ -30,17 +30,17 @@ convert_to_sharded_events:
 merge_to_MEDS_cohort:
   parallelize:
     launcher_params:
-      timeout_min: 60
+      timeout_min: 15
       cpus_per_task: 10
-      mem_gb: 25
+      mem_gb: 85
       partition: "short"
 
 extract_code_metadata:
   parallelize:
     launcher_params:
-      timeout_min: 60
+      timeout_min: 10
       cpus_per_task: 10
-      mem_gb: 10
+      mem_gb: 25
       partition: "short"
 
 finalize_MEDS_metadata:
