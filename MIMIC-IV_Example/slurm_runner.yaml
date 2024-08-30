@@ -57,5 +57,5 @@ finalize_MEDS_data:
     launcher_params:
       timeout_min: 10
       cpus_per_task: 10
-      mem_gb: 25
+      mem_gb: 70
       partition: "short"
