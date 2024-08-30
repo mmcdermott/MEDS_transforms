@@ -94,7 +94,9 @@ def get_code_expr(code_field: str | list | ListConfig) -> tuple[pl.Expr, pl.Expr
 
 
 def extract_event(
-    df: pl.LazyFrame, event_cfg: dict[str, str | None], do_dedup_text_and_numeric: bool = False,
+    df: pl.LazyFrame,
+    event_cfg: dict[str, str | None],
+    do_dedup_text_and_numeric: bool = False,
 ) -> pl.LazyFrame:
     """Extracts a single event dataframe from the raw data.
 
@@ -502,8 +504,6 @@ def extract_event(
             .otherwise(text_expr)
         )
 
-    if "numeric_value" in event_exprs and "text_value" in event_exprs:
-
     if code_null_filter_expr is not None:
         logger.info(f"Filtering out rows with null codes via {code_null_filter_expr}")
         df = df.filter(code_null_filter_expr)
@@ -517,7 +517,9 @@ def extract_event(
 
 
 def convert_to_events(
-    df: pl.LazyFrame, event_cfgs: dict[str, dict[str, str | None | Sequence[str]]]
+    df: pl.LazyFrame,
+    event_cfgs: dict[str, dict[str, str | None | Sequence[str]]],
+    do_dedup_text_and_numeric: bool = False,
 ) -> pl.LazyFrame:
     """Converts a DataFrame of raw data into a DataFrame of events.
 
@@ -676,9 +678,13 @@ def convert_to_events(
     for event_name, event_cfg in event_cfgs.items():
         try:
             logger.info(f"Building computational graph for extracting {event_name}")
-            event_dfs.append(extract_event(
-                df, event_cfg, do_dedup_text_and_numeric=do_dedup_text_and_numeric,
-            ))
+            event_dfs.append(
+                extract_event(
+                    df,
+                    event_cfg,
+                    do_dedup_text_and_numeric=do_dedup_text_and_numeric,
+                )
+            )
         except Exception as e:
             raise ValueError(f"Error extracting event {event_name}: {e}") from e
 
