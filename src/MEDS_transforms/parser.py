@@ -596,18 +596,6 @@ def cfg_to_expr(cfg: str | ListConfig | DictConfig) -> tuple[pl.Expr, set[str]]:
         ['34.2', 'bar//2', '34.2']
         >>> sorted(cols)
         ['baz']
-
-    Note that sometimes coalescing can lead to unexpected results. For example, if the first expression is of
-    a different type than the second, the second expression may have its type coerced to match the first,
-    potentially in an unexpected manner. This is also related to some polars, bugs, such as
-    https://github.com/pola-rs/polars/issues/17773
-        >>> cfg = [
-        ...    {"matcher": {"baz": 2}, "output": {"str": "bar//{baz}"}},
-        ...    {"literal": 34.8218},
-        ... ]
-        >>> expr, cols = cfg_to_expr(cfg)
-        >>> data.select(expr.alias("out"))["out"].to_list()
-        ['34', 'bar//2', '34']
     """
     structured_expr = parse_col_expr(cfg)
     return structured_expr_to_pl(structured_expr)
