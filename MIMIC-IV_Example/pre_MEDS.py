@@ -56,26 +56,34 @@ FUNCTIONS = {
 def main(cfg: DictConfig):
     """Performs pre-MEDS data wrangling for MIMIC-IV.
 
-    Inputs are the raw MIMIC files, read from the `raw_cohort_dir` config parameter. Output files are either
+    Inputs are the raw MIMIC files, read from the `input_dir` config parameter. Output files are either
     symlinked (if they are not modified) or written in processed form to the `MEDS_input_dir` config
     parameter. Hydra is used to manage configuration parameters and logging.
     """
 
     hydra_loguru_init()
 
-    raw_cohort_dir = Path(cfg.raw_cohort_dir)
-    MEDS_input_dir = Path(cfg.output_dir)
+    input_dir = Path(cfg.input_dir)
+    MEDS_input_dir = Path(cfg.cohort_dir)
 
-    all_fps = list(raw_cohort_dir.glob("**/*.*"))
+    done_fp = MEDS_input_dir / ".done"
+    if done_fp.is_file() and not cfg.do_overwrite:
+        logger.info(
+            f"Pre-MEDS transformation already complete as {done_fp} exists and "
+            f"do_overwrite={cfg.do_overwrite}. Returning."
+        )
+        exit(0)
+
+    all_fps = list(input_dir.glob("**/*.*"))
 
     dfs_to_load = {}
     seen_fps = {}
 
     for in_fp in all_fps:
-        pfx = get_shard_prefix(raw_cohort_dir, in_fp)
+        pfx = get_shard_prefix(input_dir, in_fp)
 
         try:
-            fp, read_fn = get_supported_fp(raw_cohort_dir, pfx)
+            fp, read_fn = get_supported_fp(input_dir, pfx)
         except FileNotFoundError:
             logger.info(f"Skipping {pfx} @ {str(in_fp.resolve())} as no compatible dataframe file was found.")
             continue
@@ -88,7 +96,7 @@ def main(cfg: DictConfig):
         else:
             seen_fps[str(fp.resolve())] = read_fn
 
-        out_fp = MEDS_input_dir / fp.relative_to(raw_cohort_dir)
+        out_fp = MEDS_input_dir / fp.relative_to(input_dir)
 
         if out_fp.is_file():
             print(f"Done with {pfx}. Continuing")
@@ -130,7 +138,7 @@ def main(cfg: DictConfig):
         fps = fps_and_cols["fps"]
         cols = list(fps_and_cols["cols"])
 
-        df_to_load_fp, df_to_load_read_fn = get_supported_fp(raw_cohort_dir, df_to_load_pfx)
+        df_to_load_fp, df_to_load_read_fn = get_supported_fp(input_dir, df_to_load_pfx)
 
         st = datetime.now()
 
@@ -142,7 +150,7 @@ def main(cfg: DictConfig):
         logger.info(f"  Loaded in {datetime.now() - st}")
 
         for fp in fps:
-            pfx = get_shard_prefix(raw_cohort_dir, fp)
+            pfx = get_shard_prefix(input_dir, fp)
             out_fp = MEDS_input_dir / f"{pfx}.parquet"
 
             logger.info(f"  Processing dependent df @ {pfx}...")
@@ -157,6 +165,7 @@ def main(cfg: DictConfig):
             logger.info(f"    Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - fp_st}")
 
     logger.info(f"Done! All dataframes processed and written to {str(MEDS_input_dir.resolve())}")
+    done_fp.write_text(f"Finished at {datetime.now()}")
 
 
 if __name__ == "__main__":

@@ -115,7 +115,7 @@ def run_stage(cfg: DictConfig, stage_name: str, default_parallelization_cfg: dic
 
     do_profile = cfg.get("do_profile", False)
     pipeline_config_fp = Path(cfg.pipeline_config_fp)
-    stage_config = cfg._local_pipeline_config.stage_configs.get(stage_name, {})
+    stage_config = cfg._local_pipeline_config.get("stage_configs", {}).get(stage_name, {})
     stage_runner_config = cfg._stage_runners.get(stage_name, {})
 
     script = None

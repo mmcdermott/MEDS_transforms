@@ -93,7 +93,11 @@ def get_code_expr(code_field: str | list | ListConfig) -> tuple[pl.Expr, pl.Expr
     return code_expr, code_null_filter_expr, needed_cols
 
 
-def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.LazyFrame:
+def extract_event(
+    df: pl.LazyFrame,
+    event_cfg: dict[str, str | None],
+    do_dedup_text_and_numeric: bool = False,
+) -> pl.LazyFrame:
     """Extracts a single event dataframe from the raw data.
 
     Args:
@@ -123,6 +127,8 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
             possible, these additional columns should conform to the conventions of the MEDS data schema ---
             e.g., primary numeric values associated with the event should be named `"numeric_value"` in
             the output MEDS data (and thus have the key `"numeric_value"` in the `event_cfg` dictionary).
+        do_dedup_text_and_numeric: If true, the result will ensure that the `text_value` column is dropped if
+            it is simply a string version of the `numeric_value` column.
 
     Returns:
         A DataFrame containing the event data extracted from the raw data, containing only unique rows across
@@ -150,25 +156,27 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
         ...     "code_modifier": ["1", "2", "3", "4"],
         ...     "time": ["2021-01-01", "2021-01-02", "2021-01-03", "2021-01-04"],
         ...     "numeric_value": [1, 2, 3, 4],
+        ...     "woo_text": ["1", "2", "3/10", "4.24"],
         ... })
         >>> event_cfg = {
         ...     "code": ["FOO", "col(code)", "col(code_modifier)"],
         ...     "time": "col(time)",
         ...     "time_format": "%Y-%m-%d",
         ...     "numeric_value": "numeric_value",
+        ...     "text_value": "woo_text",
         ... }
-        >>> extract_event(raw_data, event_cfg)
-        shape: (4, 4)
-        ┌────────────┬───────────┬─────────────────────┬───────────────┐
-        │ subject_id ┆ code      ┆ time                ┆ numeric_value │
-        │ ---        ┆ ---       ┆ ---                 ┆ ---           │
-        │ i64        ┆ str       ┆ datetime[μs]        ┆ i64           │
-        ╞════════════╪═══════════╪═════════════════════╪═══════════════╡
-        │ 1          ┆ FOO//A//1 ┆ 2021-01-01 00:00:00 ┆ 1             │
-        │ 1          ┆ FOO//B//2 ┆ 2021-01-02 00:00:00 ┆ 2             │
-        │ 2          ┆ FOO//C//3 ┆ 2021-01-03 00:00:00 ┆ 3             │
-        │ 2          ┆ FOO//D//4 ┆ 2021-01-04 00:00:00 ┆ 4             │
-        └────────────┴───────────┴─────────────────────┴───────────────┘
+        >>> extract_event(raw_data, event_cfg, do_dedup_text_and_numeric=True)
+        shape: (4, 5)
+        ┌────────────┬───────────┬─────────────────────┬───────────────┬────────────┐
+        │ subject_id ┆ code      ┆ time                ┆ numeric_value ┆ text_value │
+        │ ---        ┆ ---       ┆ ---                 ┆ ---           ┆ ---        │
+        │ i64        ┆ str       ┆ datetime[μs]        ┆ i64           ┆ str        │
+        ╞════════════╪═══════════╪═════════════════════╪═══════════════╪════════════╡
+        │ 1          ┆ FOO//A//1 ┆ 2021-01-01 00:00:00 ┆ 1             ┆ null       │
+        │ 1          ┆ FOO//B//2 ┆ 2021-01-02 00:00:00 ┆ 2             ┆ null       │
+        │ 2          ┆ FOO//C//3 ┆ 2021-01-03 00:00:00 ┆ 3             ┆ 3/10       │
+        │ 2          ┆ FOO//D//4 ┆ 2021-01-04 00:00:00 ┆ 4             ┆ 4.24       │
+        └────────────┴───────────┴─────────────────────┴───────────────┴────────────┘
         >>> data_with_nulls = pl.DataFrame({
         ...     "subject_id": [1, 1, 2, 2],
         ...     "code": ["A", None, "C", "D"],
@@ -484,6 +492,18 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
 
         event_exprs[k] = col
 
+    has_numeric = "numeric_value" in event_exprs
+    has_text = "text_value" in event_exprs
+
+    if do_dedup_text_and_numeric and has_numeric and has_text:
+        text_expr = event_exprs["text_value"]
+        num_expr = event_exprs["numeric_value"]
+        event_exprs["text_value"] = (
+            pl.when(text_expr.cast(pl.Float32, strict=False) == num_expr.cast(pl.Float32))
+            .then(pl.lit(None, pl.String))
+            .otherwise(text_expr)
+        )
+
     if code_null_filter_expr is not None:
         logger.info(f"Filtering out rows with null codes via {code_null_filter_expr}")
         df = df.filter(code_null_filter_expr)
@@ -497,7 +517,9 @@ def extract_event(df: pl.LazyFrame, event_cfg: dict[str, str | None]) -> pl.Lazy
 
 
 def convert_to_events(
-    df: pl.LazyFrame, event_cfgs: dict[str, dict[str, str | None | Sequence[str]]]
+    df: pl.LazyFrame,
+    event_cfgs: dict[str, dict[str, str | None | Sequence[str]]],
+    do_dedup_text_and_numeric: bool = False,
 ) -> pl.LazyFrame:
     """Converts a DataFrame of raw data into a DataFrame of events.
 
@@ -656,7 +678,13 @@ def convert_to_events(
     for event_name, event_cfg in event_cfgs.items():
         try:
             logger.info(f"Building computational graph for extracting {event_name}")
-            event_dfs.append(extract_event(df, event_cfg))
+            event_dfs.append(
+                extract_event(
+                    df,
+                    event_cfg,
+                    do_dedup_text_and_numeric=do_dedup_text_and_numeric,
+                )
+            )
         except Exception as e:
             raise ValueError(f"Error extracting event {event_name}: {e}") from e
 
@@ -731,6 +759,7 @@ def main(cfg: DictConfig):
                         return convert_to_events(
                             df.filter(pl.col("subject_id").is_in(typed_subjects)),
                             event_cfgs=copy.deepcopy(event_cfgs),
+                            do_dedup_text_and_numeric=cfg.stage_cfg.get("do_dedup_text_and_numeric", False),
                         )
                     except Exception as e:
                         raise ValueError(
