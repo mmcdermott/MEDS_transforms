@@ -45,17 +45,17 @@ extract_code_metadata:
 
 finalize_MEDS_metadata:
   parallelize:
+    n_workers: 1
     launcher_params:
-      timeout_min: 60
-      cpus_per_task: 10
+      timeout_min: 10
+      cpus_per_task: 5
       mem_gb: 10
       partition: "short"
 
 finalize_MEDS_data:
   parallelize:
-    n_workers: 1
     launcher_params:
-      timeout_min: 15
-      cpus_per_task: 5
-      mem_gb: 10
+      timeout_min: 10
+      cpus_per_task: 10
+      mem_gb: 70
       partition: "short"
