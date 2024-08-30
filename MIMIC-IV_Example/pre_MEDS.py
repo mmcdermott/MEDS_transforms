@@ -266,7 +266,7 @@ def main(cfg: DictConfig):
             relative_in_fp = fp.relative_to(out_fp.resolve().parent, walk_up=True)
             out_fp.symlink_to(relative_in_fp)
             continue
-        else:
+        elif pfx in FUNCTIONS:
             out_fp = MEDS_input_dir / f"{pfx}.parquet"
             if out_fp.is_file():
                 print(f"Done with {pfx}. Continuing")
