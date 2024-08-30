@@ -42,7 +42,7 @@ hosp/diagnoses_icd:
     _metadata:
       hosp/d_icd_diagnoses:
         description: "long_title"
-        parent_codes: "ICD{icd_version}CM/{icd_code}" # Single strings are templates of columns.
+        parent_codes: "ICD{icd_version}CM/{norm_icd_code}" # Single strings are templates of columns.
 
 hosp/drgcodes:
   drg:
@@ -165,8 +165,8 @@ hosp/procedures_icd:
       hosp/d_icd_procedures:
         description: "long_title"
         parent_codes: # List of objects are string labels mapping to filters to be evaluated.
-          - "ICD{icd_version}Proc/{icd_code}": { icd_version: "9" }
-          - "ICD{icd_version}PCS/{icd_code}": { icd_version: "10" }
+          - "ICD{icd_version}Proc/{norm_icd_code}": { icd_version: "9" }
+          - "ICD{icd_version}PCS/{norm_icd_code}": { icd_version: "10" }
 
 hosp/transfers:
   transfer:

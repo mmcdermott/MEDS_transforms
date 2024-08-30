@@ -332,8 +332,14 @@ def main(cfg: DictConfig):
 
         st = datetime.now()
         logger.info(f"Processing {pfx}...")
-        processed_df = read_fn(fp).collect().with_columns(
-            fn(pl.col("icd_version").cast(pl.String), pl.col("icd_code").cast(pl.String)).alias("icd_code")
+        processed_df = (
+            read_fn(fp)
+            .collect()
+            .with_columns(
+                fn(pl.col("icd_version").cast(pl.String), pl.col("icd_code").cast(pl.String)).alias(
+                    "norm_icd_code"
+                )
+            )
         )
         processed_df.write_parquet(out_fp, use_pyarrow=True)
         logger.info(f"  Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - st}")
