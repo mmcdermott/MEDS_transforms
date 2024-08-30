@@ -327,12 +327,15 @@ def main(cfg: DictConfig):
             print(f"Done with {pfx}. Continuing")
             continue
 
+        if fp.suffix != ".parquet":
+            read_fn = partial(read_fn, infer_schema=False)
+
         st = datetime.now()
         logger.info(f"Processing {pfx}...")
-        processed_df = read_fn(fp).with_columns(
-            fn(pl.col("icd_version"), pl.col("icd_code")).alias("icd_code")
+        processed_df = read_fn(fp).collect().with_columns(
+            fn(pl.col("icd_version").cast(pl.String), pl.col("icd_code").cast(pl.String)).alias("icd_code")
         )
-        write_lazyframe(processed_df, out_fp)
+        processed_df.write_parquet(out_fp, use_pyarrow=True)
         logger.info(f"  Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - st}")
 
     logger.info(f"Done! All dataframes processed and written to {str(MEDS_input_dir.resolve())}")
