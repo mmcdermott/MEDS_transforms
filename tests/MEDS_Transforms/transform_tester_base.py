@@ -5,11 +5,6 @@ scripts.
 """
 
 
-try:
-    pass
-except ImportError:
-    pass
-
 from collections import defaultdict
 from io import StringIO
 from pathlib import Path
