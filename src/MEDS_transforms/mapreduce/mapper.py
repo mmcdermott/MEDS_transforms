@@ -11,7 +11,7 @@ from typing import Any, NotRequired, TypedDict, TypeVar
 import hydra
 import polars as pl
 from loguru import logger
-from meds import subject_id_field
+from meds import subject_id_field, subject_splits_filepath
 from omegaconf import DictConfig, ListConfig
 
 from ..parser import is_matcher, matcher_to_expr
@@ -621,11 +621,11 @@ def map_over(
     start = datetime.now()
 
     train_only = cfg.stage_cfg.get("train_only", False)
-    split_fp = Path(cfg.input_dir) / "metadata" / "subject_split.parquet"
 
     shards, includes_only_train = shard_iterator_fntr(cfg)
 
     if train_only:
+        split_fp = Path(cfg.input_dir) / subject_splits_filepath
         if includes_only_train:
             logger.info(
                 f"Processing train split only via shard prefix. Not filtering with {str(split_fp.resolve())}."
@@ -636,7 +636,7 @@ def map_over(
                 pl.scan_parquet(split_fp)
                 .filter(pl.col("split") == "train")
                 .select(subject_id_field)
-                .collect()
+                .collect()[subject_id_field]
                 .to_list()
             )
             read_fn = read_and_filter_fntr(train_subjects, read_fn)

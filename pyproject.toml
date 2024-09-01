@@ -17,14 +17,14 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-  "polars~=1.1.0", "pyarrow", "nested_ragged_tensors", "loguru", "hydra-core", "numpy", "meds==0.3.2",
+  "polars~=1.6.0", "pyarrow", "nested_ragged_tensors", "loguru", "hydra-core", "numpy", "meds==0.3.3",
 ]
 
 [tool.setuptools_scm]
 
 [project.optional-dependencies]
 dev = ["pre-commit"]
-tests = ["pytest", "pytest-cov", "rootutils"]
+tests = ["pytest", "pytest-cov", "rootutils", "hydra-joblib-launcher"]
 local_parallelism = ["hydra-joblib-launcher"]
 slurm_parallelism = ["hydra-submitit-launcher"]
 docs = [
@@ -59,6 +59,9 @@ MEDS_transform-normalization = "MEDS_transforms.transforms.normalization:main"
 MEDS_transform-occlude_outliers = "MEDS_transforms.transforms.occlude_outliers:main"
 MEDS_transform-tensorization = "MEDS_transforms.transforms.tensorization:main"
 MEDS_transform-tokenization = "MEDS_transforms.transforms.tokenization:main"
+
+# Runner
+MEDS_transform-runner = "MEDS_transforms.runner:main"
 
 [project.urls]
 Homepage = "https://github.com/mmcdermott/MEDS_transforms"

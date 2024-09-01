@@ -10,6 +10,7 @@ from pathlib import Path
 import hydra
 import polars as pl
 from loguru import logger
+from meds import subject_id_field, subject_splits_filepath, time_field
 from omegaconf import DictConfig
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
@@ -60,7 +61,7 @@ def make_new_shards_fn(df: pl.DataFrame, cfg: DictConfig, stage_cfg: DictConfig)
         splits_map[sp].append(pt_id)
 
     return shard_subjects(
-        subjects=df["subject_id"].to_numpy(),
+        subjects=df[subject_id_field].to_numpy(),
         n_subjects_per_shard=stage_cfg.n_subjects_per_shard,
         external_splits=splits_map,
         split_fracs_dict=None,
@@ -96,7 +97,7 @@ def main(cfg: DictConfig):
 
     output_dir = Path(cfg.stage_cfg.output_dir)
 
-    splits_file = Path(cfg.input_dir) / "metadata" / "subject_splits.parquet"
+    splits_file = Path(cfg.input_dir) / subject_splits_filepath
     shards_fp = output_dir / ".shards.json"
 
     rwlock_wrap(
@@ -139,15 +140,15 @@ def main(cfg: DictConfig):
             logger.info(f"Reading shards for {subshard_name} (file names are in the input sharding scheme):")
             for in_fp, _ in orig_shards_iter:
                 logger.info(f"  - {str(in_fp.relative_to(input_dir).resolve())}")
-                new_df = pl.scan_parquet(in_fp, glob=False).filter(pl.col("subject_id").is_in(subjects))
+                new_df = pl.scan_parquet(in_fp, glob=False).filter(pl.col(subject_id_field).is_in(subjects))
                 if df is None:
                     df = new_df
                 else:
-                    df = df.merge_sorted(new_df, key="subject_id")
+                    df = df.merge_sorted(new_df, key=subject_id_field)
             return df
 
         def compute_fn(df: list[pl.DataFrame]) -> pl.LazyFrame:
-            return df.sort(by=["subject_id", "time"], maintain_order=True, multithreaded=False)
+            return df.sort(by=[subject_id_field, time_field], maintain_order=True, multithreaded=False)
 
         def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
             write_lazyframe(df, out_fp)
