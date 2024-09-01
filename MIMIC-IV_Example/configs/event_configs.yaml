@@ -1,4 +1,4 @@
-patient_id_col: subject_id
+subject_id_col: subject_id
 hosp/admissions:
   ed_registration:
     code: ED_REGISTRATION
@@ -27,7 +27,7 @@ hosp/admissions:
     time: col(dischtime)
     time_format: "%Y-%m-%d %H:%M:%S"
     hadm_id: hadm_id
-  # We omit the death event here as it is joined to the data in the patients table in the pre-MEDS step.
+  # We omit the death event here as it is joined to the data in the subjects table in the pre-MEDS step.
 
 hosp/diagnoses_icd:
   diagnosis:
@@ -42,7 +42,7 @@ hosp/diagnoses_icd:
     _metadata:
       hosp/d_icd_diagnoses:
         description: "long_title"
-        parent_codes: "ICD{icd_version}CM/{icd_code}" # Single strings are templates of columns.
+        parent_codes: "ICD{icd_version}CM/{norm_icd_code}" # Single strings are templates of columns.
 
 hosp/drgcodes:
   drg:
@@ -100,6 +100,7 @@ hosp/labevents:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
         parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        valueuom: "valueuom"
 
 hosp/omr:
   omr:
@@ -164,8 +165,8 @@ hosp/procedures_icd:
       hosp/d_icd_procedures:
         description: "long_title"
         parent_codes: # List of objects are string labels mapping to filters to be evaluated.
-          - "ICD{icd_version}Proc/{icd_code}": { icd_version: 9 }
-          - "ICD{icd_version}PCS/{icd_code}": { icd_version: 10 }
+          - "ICD{icd_version}Proc/{norm_icd_code}": { icd_version: "9" }
+          - "ICD{icd_version}PCS/{norm_icd_code}": { icd_version: "10" }
 
 hosp/transfers:
   transfer:
@@ -218,6 +219,7 @@ icu/chartevents:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
         parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        valueuom: "valueuom"
 
 icu/procedureevents:
   start:
@@ -295,9 +297,9 @@ icu/inputevents:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
         parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
-  patient_weight:
+  subject_weight:
     code:
-      - PATIENT_WEIGHT_AT_INFUSION
+      - SUBJECT_WEIGHT_AT_INFUSION
       - KG
     time: col(starttime)
     time_format: "%Y-%m-%d %H:%M:%S"
@@ -306,7 +308,7 @@ icu/inputevents:
 icu/outputevents:
   output:
     code:
-      - PATIENT_FLUID_OUTPUT
+      - SUBJECT_FLUID_OUTPUT
       - col(itemid)
       - col(valueuom)
     time: col(charttime)

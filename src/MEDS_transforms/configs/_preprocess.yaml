@@ -1,8 +1,8 @@
 defaults:
-  - pipeline
+  - _pipeline
   - stage_configs:
       - reshard_to_split
-      - filter_patients
+      - filter_subjects
       - add_time_derived_measurements
       - count_code_occurrences
       - filter_measurements
@@ -24,7 +24,7 @@ code_modifiers: ???
 
 # Pipeline Structure
 stages:
-  - filter_patients
+  - filter_subjects
   - add_time_derived_measurements
   - preliminary_counts
   - filter_measurements

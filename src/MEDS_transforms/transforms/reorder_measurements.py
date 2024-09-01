@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""A polars-to-polars transformation function for filtering patients by sequence length."""
+"""A polars-to-polars transformation function for filtering subjects by sequence length."""
 from collections.abc import Callable
 
 import hydra
@@ -19,7 +19,7 @@ def reorder_by_code_fntr(
 
     Args:
         stage_cfg: The stage-specific configuration object which contains the `ordered_code_patterns` field
-            that defines the order of the codes within each patient event (unique timepoint). Each element of
+            that defines the order of the codes within each subject event (unique timepoint). Each element of
             this list should be a regex pattern that matches codes that should be re-ordered at the index of
             the regex pattern in the list. Codes are matched in the order of the list, and if a code matches
             multiple regex patterns, it will be ordered by the first regex pattern that matches it.
@@ -34,7 +34,7 @@ def reorder_by_code_fntr(
     Examples:
         >>> code_metadata_df = pl.DataFrame({"code": ["A", "A", "B", "C"], "modifier1": [1, 2, 1, 2]})
         >>> data = pl.DataFrame({
-        ...     "patient_id":[1, 1, 2, 2], "time": [1, 1, 1, 1],
+        ...     "subject_id":[1, 1, 2, 2], "time": [1, 1, 1, 1],
         ...     "code": ["A", "B", "A", "C"], "modifier1": [1, 2, 1, 2]
         ... })
         >>> stage_cfg = DictConfig({"ordered_code_patterns": ["B", "A"]})
@@ -42,7 +42,7 @@ def reorder_by_code_fntr(
         >>> fn(data.lazy()).collect()
         shape: (4, 4)
         ┌────────────┬──────┬──────┬───────────┐
-        │ patient_id ┆ time ┆ code ┆ modifier1 │
+        │ subject_id ┆ time ┆ code ┆ modifier1 │
         │ ---        ┆ ---  ┆ ---  ┆ ---       │
         │ i64        ┆ i64  ┆ str  ┆ i64       │
         ╞════════════╪══════╪══════╪═══════════╡
@@ -55,7 +55,7 @@ def reorder_by_code_fntr(
         ...     "code": ["LAB//foo", "ADMISSION//bar", "LAB//baz", "ADMISSION//qux", "DISCHARGE"],
         ... })
         >>> data = pl.DataFrame({
-        ...     "patient_id":[1, 1, 1, 2, 2, 2],
+        ...     "subject_id":[1, 1, 1, 2, 2, 2],
         ...     "time": [1, 1, 1, 1, 2, 3],
         ...     "code": ["LAB//foo", "ADMISSION//bar", "LAB//baz", "ADMISSION//qux", "DISCHARGE", "LAB//baz"],
         ... })
@@ -66,7 +66,7 @@ def reorder_by_code_fntr(
         >>> fn(data.lazy()).collect()
         shape: (6, 3)
         ┌────────────┬──────┬────────────────┐
-        │ patient_id ┆ time ┆ code           │
+        │ subject_id ┆ time ┆ code           │
         │ ---        ┆ ---  ┆ ---            │
         │ i64        ┆ i64  ┆ str            │
         ╞════════════╪══════╪════════════════╡
@@ -81,7 +81,7 @@ def reorder_by_code_fntr(
         >>> fn(data.lazy()).collect()
         shape: (6, 3)
         ┌────────────┬──────┬────────────────┐
-        │ patient_id ┆ time ┆ code           │
+        │ subject_id ┆ time ┆ code           │
         │ ---        ┆ ---  ┆ ---            │
         │ i64        ┆ i64  ┆ str            │
         ╞════════════╪══════╪════════════════╡
@@ -141,7 +141,7 @@ def reorder_by_code_fntr(
 
         return (
             df.join(code_indices, on=join_cols, how="left", coalesce=True)
-            .sort("patient_id", "time", "code_order_idx", maintain_order=True)
+            .sort("subject_id", "time", "code_order_idx", maintain_order=True)
             .drop("code_order_idx")
         )
 
@@ -152,13 +152,13 @@ def reorder_by_code_fntr(
     version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
 )
 def main(cfg: DictConfig):
-    """Reorders measurements within each patient event (unique timepoint) by the specified code order.
+    """Reorders measurements within each subject event (unique timepoint) by the specified code order.
 
     In particular, given a set of [regex crate compatible](https://docs.rs/regex/latest/regex/) regexes in the
     `stage_cfg.ordered_code_patterns` list, this script will re-order the measurements within each event
     (unique timepoint) such that the measurements are sorted by the index of the first regex that matches
     their code in the `ordered_code_patterns` list. So, if the `ordered_code_patterns` list is
-    `["foo$", "bar", "foo.*"]`, and a single patient event has measurements with codes
+    `["foo$", "bar", "foo.*"]`, and a single subject event has measurements with codes
     `["foobar", "barbaz", "foo", "quat"]`, the measurements will be re-ordered to the order:
     `["foo", "foobar", "barbaz", "quat"]`, because:
       - "foo" matches the first regex in the list (the `foo$` matches any string with "foo" at the end).
@@ -176,7 +176,7 @@ def main(cfg: DictConfig):
 
     Args:
         stage_configs.reorder_measurements.ordered_code_patterns: A list of regex patterns that specify the
-            order of the codes within each patient event (unique timepoint). To specify this on the command
+            order of the codes within each subject event (unique timepoint). To specify this on the command
             line, use the hydra list syntax by enclosing the entire key-value string argument in single
             quotes: ``'stage_configs.reorder_measurements.ordered_code_patterns=["foo$", "bar", "foo.*"]'``.
     """
@@ -184,5 +184,5 @@ def main(cfg: DictConfig):
     map_over(cfg, reorder_by_code_fntr)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

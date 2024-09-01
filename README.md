@@ -45,12 +45,12 @@ directories.
 The fundamental design philosophy of this repository can be summarized as follows:
 
 1. _(The MEDS Assumption)_: All structured electronic health record (EHR) data can be represented as a
-    series of events, each of which is associated with a patient, a time, and a set of codes and
+    series of events, each of which is associated with a subject, a time, and a set of codes and
     numeric values. This representation is the Medical Event Data Standard (MEDS) format, and in this
-    repository we use it in the "flat" format, where data is organized as rows of `patient_id`,
+    repository we use it in the "flat" format, where data is organized as rows of `subject_id`,
     `time`, `code`, `numeric_value` columns.
 2. _Easy Efficiency through Sharding_: MEDS datasets in this repository are sharded into smaller, more
-    manageable pieces (organized as separate files) at the patient level (and, during the raw-data extraction
+    manageable pieces (organized as separate files) at the subject level (and, during the raw-data extraction
     process, the event level). This enables users to scale up their processing capabilities ad nauseum by
     leveraging more workers to process these shards in parallel. This parallelization is seamlessly enabled
     with the configuration schema used in the scripts in this repository. This style of parallelization
@@ -62,7 +62,7 @@ The fundamental design philosophy of this repository can be summarized as follow
     the others, and each stage is designed to do a small amount of work and be easily testable in isolation.
     This design philosophy ensures that the pipeline is robust to changes, easy to debug, and easy to extend.
     In particular, to add new operations specific to a given model or dataset, the user need only write
-    simple functions that take in a flat MEDS dataframe (representing a single patient level shard) and
+    simple functions that take in a flat MEDS dataframe (representing a single subject level shard) and
     return a new flat MEDS dataframe, and then wrap that function in a script by following the examples
     provided in this repository. These individual functions can use the same configuration schema as other
     stages in the pipeline or include a separate, stage-specific configuration, and can use whatever
@@ -198,9 +198,9 @@ To use this repository as a template, the user should follow these steps:
 Assumptions:
 
 1. Your data is organized in a set of parquet files on disk such that each row of each file corresponds to
-    one or more measurements per patient and has all necessary information in that row to extract said
-    measurement, organized in a simple, columnar format. Each of these parquet files stores the patient's ID in
-    a column called `patient_id` in the same type.
+    one or more measurements per subject and has all necessary information in that row to extract said
+    measurement, organized in a simple, columnar format. Each of these parquet files stores the subject's ID in
+    a column called `subject_id` in the same type.
 2. You have a pre-defined or can externally define the requisite MEDS base `code_metadata` file that
     describes the codes in your data as necessary. This file is not used in the provided pre-processing
     pipeline in this package, but is necessary for other uses of the MEDS data.
@@ -221,16 +221,16 @@ The provided ETL consists of the following steps, which can be performed as need
 degree of parallelism is desired per step.
 
 1. It re-shards the input data into a set of smaller, event-level shards to facilitate parallel processing.
-    This can be skipped if your input data is already suitably sharded at either a per-patient or per-event
+    This can be skipped if your input data is already suitably sharded at either a per-subject or per-event
     level.
 2. It extracts the subject IDs from the sharded data and computes the set of ML splits and (per split) the
-    patient shards. These are stored in a JSON file in the output cohort directory.
+    subject shards. These are stored in a JSON file in the output cohort directory.
 3. It converts the input, event level shards into the MEDS flat format and joins and shards these data into
-    patient-level shards for MEDS use and stores them in a nested format in the output cohort directory,
+    subject-level shards for MEDS use and stores them in a nested format in the output cohort directory,
     again in the flat format. This step can be broken down into two sub-steps:
-    - First, each input shard is converted to the MEDS flat format and split into sub patient-level shards.
-    - Second, the appropriate sub patient-level shards are joined and re-organized into the final
-        patient-level shards. This method ensures that we minimize the amount of read contention on the input
+    - First, each input shard is converted to the MEDS flat format and split into sub subject-level shards.
+    - Second, the appropriate sub subject-level shards are joined and re-organized into the final
+        subject-level shards. This method ensures that we minimize the amount of read contention on the input
         shards during the join process and can maximize parallel throughput, as (theoretically, with sufficient
         workers) all input shards can be sub-sharded in parallel and then all output shards can be joined in
         parallel.
@@ -239,7 +239,7 @@ The ETL scripts all use [Hydra](https://hydra.cc/) for configuration management,
 `configs/extraction.yaml` file for configuration. The user can override any of these settings in the normal
 way for Hydra configurations.
 
-If desired, appropriate scripts can be written and run at a per-patient shard level to convert between the
+If desired, appropriate scripts can be written and run at a per-subject shard level to convert between the
 flat format and any of the other valid nested MEDS format, but for now we leave that up to the user.
 
 #### Input Event Extraction
@@ -250,11 +250,11 @@ dataframes should be parsed into different event formats. The YAML file stores a
 following structure:
 
 ```yaml
-patient_id: $GLOBAL_PATIENT_ID_OVERWRITE # Optional, if you want to overwrite the patient ID column name for
-                                         # all inputs. If not specified, defaults to "patient_id".
+subject_id: $GLOBAL_SUBJECT_ID_OVERWRITE # Optional, if you want to overwrite the subject ID column name for
+                                         # all inputs. If not specified, defaults to "subject_id".
 $INPUT_FILE_STEM:
-    patient_id: $INPUT_FILE_PATIENT_ID # Optional, if you want to overwrite the patient ID column name for
-                                       # this input. IF not specified, defaults to the global patient ID.
+    subject_id: $INPUT_FILE_SUBJECT_ID # Optional, if you want to overwrite the subject ID column name for
+                                       # this input. IF not specified, defaults to the global subject ID.
     $EVENT_NAME:
         code:
           - $CODE_PART_1
@@ -287,18 +287,18 @@ script is a functional test that is also run with `pytest` to verify correctness
 
 1. `scripts/extraction/shard_events.py` shards the input data into smaller, event-level shards by splitting
     raw files into chunks of a configurable number of rows. Files are split sequentially, with no regard for
-    data content or patient boundaries. The resulting files are stored in the `subsharded_events`
+    data content or subject boundaries. The resulting files are stored in the `subsharded_events`
     subdirectory of the output directory.
-2. `scripts/extraction/split_and_shard_patients.py` splits the patient population into ML splits and shards
-    these splits into patient-level shards. The result of this process is only a simple `JSON` file
-    containing the patient IDs belonging to individual splits and shards. This file is stored in the
+2. `scripts/extraction/split_and_shard_subjects.py` splits the subject population into ML splits and shards
+    these splits into subject-level shards. The result of this process is only a simple `JSON` file
+    containing the subject IDs belonging to individual splits and shards. This file is stored in the
     `output_directory/splits.json` file.
 3. `scripts/extraction/convert_to_sharded_events.py` converts the input, event-level shards into the MEDS
-    event format and splits them into patient-level sub-shards. So, the resulting files are sharded into
-    patient-level, then event-level groups and are not merged into full patient-level shards or appropriately
+    event format and splits them into subject-level sub-shards. So, the resulting files are sharded into
+    subject-level, then event-level groups and are not merged into full subject-level shards or appropriately
     sorted for downstream use.
-4. `scripts/extraction/merge_to_MEDS_cohort.py` merges the patient-level, event-level shards into full
-    patient-level shards and sorts them appropriately for downstream use. The resulting files are stored in
+4. `scripts/extraction/merge_to_MEDS_cohort.py` merges the subject-level, event-level shards into full
+    subject-level shards and sorts them appropriately for downstream use. The resulting files are stored in
     the `output_directory/final_cohort` directory.
 
 ## MEDS Pre-processing Transformations
@@ -308,9 +308,9 @@ contains a variety of pre-processing transformations and scripts that can be app
 in various ways to prepare them for downstream modeling. Broadly speaking, the pre-processing pipeline can be
 broken down into the following steps:
 
-1. Filtering the dataset by criteria that do not require cross-patient analyses, e.g.,
+1. Filtering the dataset by criteria that do not require cross-subject analyses, e.g.,
 
-    - Filtering patients by the number of events or unique times they have.
+    - Filtering subjects by the number of events or unique times they have.
     - Removing numeric values that fall outside of pre-specified, per-code ranges (e.g., for outlier
         removal).
 
@@ -318,9 +318,9 @@ broken down into the following steps:
 
     - Adding time-derived measurements, e.g.,
         - The time since the last event of a certain type.
-        - The patient's age as of each unique timepoint.
+        - The subject's age as of each unique timepoint.
         - The time-of-day of each event.
-        - Adding a "dummy" event to the dataset for each patient that occurs at the end of the observation
+        - Adding a "dummy" event to the dataset for each subject that occurs at the end of the observation
             period.
 
 3. Iteratively (a) grouping the dataset by `code` and associated code modifier columns and collecting
@@ -344,11 +344,11 @@ broken down into the following steps:
 5. Normalizing the data to convert codes to indices and numeric values to the desired form (either
     categorical indices or normalized numeric values).
 
-6. Tokenizing the data in time to create a pre-tensorized dataset with clear delineations between patients,
-    patient sequence elements, and measurements per sequence element (note that various of these delineations
+6. Tokenizing the data in time to create a pre-tensorized dataset with clear delineations between subjects,
+    subject sequence elements, and measurements per sequence element (note that various of these delineations
     may be fully flat/trivial for unnested formats).
 
-7. Tensorizing the data to permit efficient retrieval from disk of patient data for deep-learning modeling
+7. Tensorizing the data to permit efficient retrieval from disk of subject data for deep-learning modeling
     via PyTorch.
 
 Much like how the entire MEDS ETL pipeline is controlled by a single configuration file, the pre-processing
@@ -363,7 +363,7 @@ be a bottleneck.
 
 Tokenization is the process of producing dataframes that are arranged into the sequences that will eventually
 be processed by deep-learning methods. Generally, these dataframes will be arranged such that each row
-corresponds to a unique patient, with nested list-type columns corresponding either to _events_ (unique
+corresponds to a unique subject, with nested list-type columns corresponding either to _events_ (unique
 timepoints), themselves with nested, list-type measurements, or to _measurements_ (unique measurements within
 a timepoint) directly. Importantly, _tokenized files are generally not ideally suited to direct ingestion by
 PyTorch datasets_. Instead, they should undergo a _tensorization_ process to be converted into a format that
@@ -379,7 +379,7 @@ does not inhibit rapid training, and (3) be organized such that CPU and GPU reso
 during training. Similarly, by _scalability_, we mean that the three desiderata above should hold true even as
 the dataset size grows much larger---while total training time can increase, time to begin training, to
 process the data per-item, and CPU/GPU resources required should remain constant, or only grow negligibly,
-such as the cost of maintaining a larger index of patient IDs to file offsets or paths (though disk space will
+such as the cost of maintaining a larger index of subject IDs to file offsets or paths (though disk space will
 of course increase).
 
 Depending on one's performance needs and dataset sizes, there are 3 modes of deep learning training that can
@@ -398,7 +398,7 @@ on an as-needed basis. This mode is extremely scalable, because the entire datas
 loaded or stored in memory in its entirety. When done properly, retrieving data from disk can be done in a
 manner that is independent of the total dataset size as well, thereby rendering the load time similarly
 unconstrained by total dataset size. This mode is also extremely flexible, because different cohorts can be
-loaded from the same base dataset simply by changing which patients and what offsets within patient data are
+loaded from the same base dataset simply by changing which subjects and what offsets within subject data are
 read on any given cohort, all without changing the base files or underlying code. However, this mode does
 require ragged dataset collation which can be more resource intensive than pre-batched iteration, so it is
 slower than the "Fixed-batch retrieval" approach. This mode is what is currently supported by this repository.

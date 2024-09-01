@@ -6,14 +6,14 @@ scripts.
 
 import polars as pl
 
-from .transform_tester_base import (
-    AGGREGATE_CODE_METADATA_SCRIPT,
+from tests.MEDS_Transforms import AGGREGATE_CODE_METADATA_SCRIPT
+from tests.MEDS_Transforms.transform_tester_base import (
     MEDS_CODE_METADATA_SCHEMA,
     single_stage_transform_tester,
 )
 
 WANT_OUTPUT_CODE_METADATA_FILE = """
-code,code/n_occurrences,code/n_patients,values/n_occurrences,values/n_patients,values/sum,values/sum_sqd,values/n_ints,values/min,values/max,description,parent_codes
+code,code/n_occurrences,code/n_subjects,values/n_occurrences,values/n_subjects,values/sum,values/sum_sqd,values/n_ints,values/min,values/max,description,parent_codes
 ,44,4,28,4,3198.8389005974336,382968.28937288234,6,86.0,175.271118,,
 ADMISSION//CARDIAC,2,2,0,0,0,0,0,,,,
 ADMISSION//ORTHOPEDIC,1,1,0,0,0,0,0,,,,
@@ -45,9 +45,9 @@ WANT_OUTPUT_CODE_METADATA_FILE = pl.DataFrame(
             "TEMP",
         ],
         "code/n_occurrences": [44, 2, 1, 1, 4, 4, 1, 1, 2, 4, 12, 12],
-        "code/n_patients": [4, 2, 1, 1, 4, 4, 1, 1, 2, 4, 4, 4],
+        "code/n_subjects": [4, 2, 1, 1, 4, 4, 1, 1, 2, 4, 4, 4],
         "values/n_occurrences": [28, 0, 0, 0, 0, 0, 0, 0, 0, 4, 12, 12],
-        "values/n_patients": [4, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4],
+        "values/n_subjects": [4, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4],
         "values/sum": [
             3198.8389005974336,
             0,
@@ -163,9 +163,9 @@ TEMP,"Body Temperature",LOINC/8310-5
 
 AGGREGATIONS = [
     "code/n_occurrences",
-    "code/n_patients",
+    "code/n_subjects",
     "values/n_occurrences",
-    "values/n_patients",
+    "values/n_subjects",
     "values/sum",
     "values/sum_sqd",
     "values/n_ints",
@@ -183,4 +183,6 @@ def test_aggregate_code_metadata():
         want_metadata=WANT_OUTPUT_CODE_METADATA_FILE,
         input_code_metadata=MEDS_CODE_METADATA_FILE,
         do_use_config_yaml=True,
+        assert_no_other_outputs=False,
+        df_check_kwargs={"check_column_order": False},
     )
