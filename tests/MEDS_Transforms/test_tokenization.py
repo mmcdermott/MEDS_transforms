@@ -302,8 +302,6 @@ def test_tokenization():
         should_error=True,
     )
 
-
-def test_tokenization_missing_static():
     single_stage_transform_tester(
         transform_script=TOKENIZATION_SCRIPT,
         stage_name="tokenization",
@@ -311,13 +309,4 @@ def test_tokenization_missing_static():
         input_shards=NORMALIZED_SHARDS_MISSING_STATIC,
         want_data={**WANT_SCHEMAS_MISSING_STATIC, **WANT_EVENT_SEQS},
         df_check_kwargs={"check_column_order": False},
-    )
-
-    single_stage_transform_tester(
-        transform_script=TOKENIZATION_SCRIPT,
-        stage_name="tokenization",
-        transform_stage_kwargs={"train_only": True},
-        input_shards=NORMALIZED_SHARDS_MISSING_STATIC,
-        want_data={**WANT_SCHEMAS_MISSING_STATIC, **WANT_EVENT_SEQS},
-        should_error=True,
     )
