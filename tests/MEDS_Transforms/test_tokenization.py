@@ -13,9 +13,11 @@ import polars as pl
 from tests.MEDS_Transforms import TOKENIZATION_SCRIPT
 
 from ..utils import parse_meds_csvs
-from .test_normalization import NORMALIZED_MEDS_SCHEMA, WANT_HELD_OUT_0
+from .test_normalization import NORMALIZED_MEDS_SCHEMA
+from .test_normalization import WANT_HELD_OUT_0 as NORMALIZED_HELD_OUT_0
 from .test_normalization import WANT_SHARDS as NORMALIZED_SHARDS
-from .test_normalization import WANT_TRAIN_1, WANT_TUNING_0
+from .test_normalization import WANT_TRAIN_1 as NORMALIZED_TRAIN_1
+from .test_normalization import WANT_TUNING_0 as NORMALIZED_TUNING_0
 from .transform_tester_base import single_stage_transform_tester
 
 SECONDS_PER_DAY = 60 * 60 * 24
@@ -238,7 +240,7 @@ WANT_EVENT_SEQS = {
     "event_seqs/held_out/0": WANT_EVENT_SEQ_HELD_OUT_0,
 }
 
-WANT_TRAIN_0 = """
+NORMALIZED_TRAIN_0 = """
 subject_id,time,code,numeric_value
 239684,"12/28/1980, 00:00:00",5,
 239684,"05/11/2010, 17:41:51",1,
@@ -272,10 +274,10 @@ subject_id,time,code,numeric_value
 
 NORMALIZED_SHARDS_MISSING_STATIC = parse_meds_csvs(
     {
-        "train/0": WANT_TRAIN_0,
-        "train/1": WANT_TRAIN_1,
-        "tuning/0": WANT_TUNING_0,
-        "held_out/0": WANT_HELD_OUT_0,
+        "train/0": NORMALIZED_TRAIN_0,
+        "train/1": NORMALIZED_TRAIN_1,
+        "tuning/0": NORMALIZED_TUNING_0,
+        "held_out/0": NORMALIZED_HELD_OUT_0,
     },
     schema=NORMALIZED_MEDS_SCHEMA,
 )
