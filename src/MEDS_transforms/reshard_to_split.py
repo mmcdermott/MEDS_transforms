@@ -10,16 +10,41 @@ from pathlib import Path
 import hydra
 import polars as pl
 from loguru import logger
+from meds import subject_id_field, subject_splits_filepath, time_field
 from omegaconf import DictConfig
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.extract.split_and_shard_patients import shard_patients
+from MEDS_transforms.extract.split_and_shard_subjects import shard_subjects
 from MEDS_transforms.mapreduce.utils import rwlock_wrap, shard_iterator, shuffle_shards
 from MEDS_transforms.utils import stage_init, write_lazyframe
 
 
 def valid_json_file(fp: Path) -> bool:
-    """Check if a file is a valid JSON file."""
+    """Check if a file is a valid JSON file.
+
+    Args:
+        fp: Path to the file.
+
+    Returns:
+        True if the file is a valid JSON file, False otherwise.
+
+    Examples:
+        >>> import tempfile
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     fp = Path(tmpdir) / "test.json"
+        ...     valid_json_file(fp)
+        False
+        >>> with tempfile.NamedTemporaryFile(suffix=".json") as tmpfile:
+        ...     fp = Path(tmpfile.name)
+        ...     _ = fp.write_text("foobar not a json file.\tHello, world!")
+        ...     valid_json_file(fp)
+        False
+        >>> with tempfile.NamedTemporaryFile(suffix=".json") as tmpfile:
+        ...     fp = Path(tmpfile.name)
+        ...     _ = fp.write_text('{"foo": "bar"}')
+        ...     valid_json_file(fp)
+        True
+    """
     if not fp.is_file():
         return False
     try:
@@ -30,13 +55,14 @@ def valid_json_file(fp: Path) -> bool:
 
 
 def make_new_shards_fn(df: pl.DataFrame, cfg: DictConfig, stage_cfg: DictConfig) -> dict[str, list[str]]:
+    """This function creates a new sharding scheme for the MEDS cohort."""
     splits_map = defaultdict(list)
     for pt_id, sp in df.iter_rows():
         splits_map[sp].append(pt_id)
 
-    return shard_patients(
-        patients=df["patient_id"].to_numpy(),
-        n_patients_per_shard=stage_cfg.n_patients_per_shard,
+    return shard_subjects(
+        subjects=df[subject_id_field].to_numpy(),
+        n_subjects_per_shard=stage_cfg.n_subjects_per_shard,
         external_splits=splits_map,
         split_fracs_dict=None,
         seed=cfg.get("seed", 1),
@@ -44,6 +70,20 @@ def make_new_shards_fn(df: pl.DataFrame, cfg: DictConfig, stage_cfg: DictConfig)
 
 
 def write_json(d: dict, fp: Path) -> None:
+    """Write a dictionary to a JSON file.
+
+    Args:
+        d: Dictionary to write.
+        fp: Path to the file.
+
+    Examples:
+        >>> import tempfile
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     fp = Path(tmpdir) / "test.json"
+        ...     write_json({"foo": "bar"}, fp)
+        ...     fp.read_text()
+        '{"foo": "bar"}'
+    """
     fp.write_text(json.dumps(d))
 
 
@@ -51,13 +91,13 @@ def write_json(d: dict, fp: Path) -> None:
     version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
 )
 def main(cfg: DictConfig):
-    """Re-shard a MEDS cohort to in a manner that subdivides patient splits."""
+    """Re-shard a MEDS cohort to in a manner that subdivides subject splits."""
 
     stage_init(cfg)
 
     output_dir = Path(cfg.stage_cfg.output_dir)
 
-    splits_file = Path(cfg.input_dir) / "metadata" / "patient_splits.parquet"
+    splits_file = Path(cfg.input_dir) / subject_splits_filepath
     shards_fp = output_dir / ".shards.json"
 
     rwlock_wrap(
@@ -79,9 +119,10 @@ def main(cfg: DictConfig):
 
     new_sharded_splits = json.loads(shards_fp.read_text())
 
-    orig_shards_iter, include_only_train = shard_iterator(cfg, out_suffix="")
-    if include_only_train:
-        raise ValueError("This stage does not support include_only_train=True")
+    if cfg.stage_cfg.get("train_only", False):
+        raise ValueError("This stage does not support train_only=True")
+
+    orig_shards_iter, _ = shard_iterator(cfg, out_suffix="")
 
     orig_shards_iter = [(in_fp, out_fp.relative_to(output_dir)) for in_fp, out_fp in orig_shards_iter]
 
@@ -92,22 +133,22 @@ def main(cfg: DictConfig):
     logger.info("Starting sub-sharding")
 
     for subshard_name, out_fp in new_shards_iter:
-        patients = new_sharded_splits[subshard_name]
+        subjects = new_sharded_splits[subshard_name]
 
         def read_fn(input_dir: Path) -> pl.LazyFrame:
             df = None
             logger.info(f"Reading shards for {subshard_name} (file names are in the input sharding scheme):")
             for in_fp, _ in orig_shards_iter:
                 logger.info(f"  - {str(in_fp.relative_to(input_dir).resolve())}")
-                new_df = pl.scan_parquet(in_fp, glob=False).filter(pl.col("patient_id").is_in(patients))
+                new_df = pl.scan_parquet(in_fp, glob=False).filter(pl.col(subject_id_field).is_in(subjects))
                 if df is None:
                     df = new_df
                 else:
-                    df = df.merge_sorted(new_df, key="patient_id")
+                    df = df.merge_sorted(new_df, key=subject_id_field)
             return df
 
         def compute_fn(df: list[pl.DataFrame]) -> pl.LazyFrame:
-            return df.sort(by=["patient_id", "time"], maintain_order=True, multithreaded=False)
+            return df.sort(by=[subject_id_field, time_field], maintain_order=True, multithreaded=False)
 
         def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
             write_lazyframe(df, out_fp)
@@ -125,5 +166,5 @@ def main(cfg: DictConfig):
     logger.info(f"Done with {cfg.stage}")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

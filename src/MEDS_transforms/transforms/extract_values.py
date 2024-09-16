@@ -5,6 +5,7 @@ from collections.abc import Callable
 import hydra
 import polars as pl
 from loguru import logger
+from meds import subject_id_field
 from omegaconf import DictConfig
 
 from MEDS_transforms import DEPRECATED_NAMES, INFERRED_STAGE_KEYS, MANDATORY_TYPES, PREPROCESS_CONFIG_YAML
@@ -31,13 +32,13 @@ def extract_values_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.La
         >>> stage_cfg = {"numeric_value": "foo", "categorical_value": "bar"}
         >>> fn = extract_values_fntr(stage_cfg)
         >>> df = pl.DataFrame({
-        ...     "patient_id": [1, 1, 1], "time": [1, 2, 3],
+        ...     "subject_id": [1, 1, 1], "time": [1, 2, 3],
         ...     "foo": ["1", "2", "3"], "bar": [1.0, 2.0, 4.0],
         ... })
         >>> fn(df)
         shape: (3, 6)
         ┌────────────┬──────┬─────┬─────┬───────────────┬───────────────────┐
-        │ patient_id ┆ time ┆ foo ┆ bar ┆ numeric_value ┆ categorical_value │
+        │ subject_id ┆ time ┆ foo ┆ bar ┆ numeric_value ┆ categorical_value │
         │ ---        ┆ ---  ┆ --- ┆ --- ┆ ---           ┆ ---               │
         │ i64        ┆ i64  ┆ str ┆ f64 ┆ f32           ┆ str               │
         ╞════════════╪══════╪═════╪═════╪═══════════════╪═══════════════════╡
@@ -57,7 +58,7 @@ def extract_values_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.La
         ValueError: Error building expression for numeric_value...
         >>> stage_cfg = {"numeric_value": "foo", "categorical_value": "bar"}
         >>> fn = extract_values_fntr(stage_cfg)
-        >>> df = pl.DataFrame({"patient_id": [1, 1, 1], "time": [1, 2, 3]})
+        >>> df = pl.DataFrame({"subject_id": [1, 1, 1], "time": [1, 2, 3]})
         >>> fn(df)
         Traceback (most recent call last):
             ...
@@ -66,11 +67,11 @@ def extract_values_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.La
     Note that deprecated column names like "numerical_value" or "timestamp" won't be re-typed.
         >>> stage_cfg = {"numerical_value": "foo"}
         >>> fn = extract_values_fntr(stage_cfg)
-        >>> df = pl.DataFrame({"patient_id": [1, 1, 1], "time": [1, 2, 3], "foo": ["1", "2", "3"]})
+        >>> df = pl.DataFrame({"subject_id": [1, 1, 1], "time": [1, 2, 3], "foo": ["1", "2", "3"]})
         >>> fn(df)
         shape: (3, 4)
         ┌────────────┬──────┬─────┬─────────────────┐
-        │ patient_id ┆ time ┆ foo ┆ numerical_value │
+        │ subject_id ┆ time ┆ foo ┆ numerical_value │
         │ ---        ┆ ---  ┆ --- ┆ ---             │
         │ i64        ┆ i64  ┆ str ┆ str             │
         ╞════════════╪══════╪═════╪═════════════════╡
@@ -94,8 +95,10 @@ def extract_values_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.La
         match out_col_n:
             case str() if out_col_n in MANDATORY_TYPES:
                 expr = expr.cast(MANDATORY_TYPES[out_col_n])
-                if out_col_n == "patient_id":
-                    logger.warning("You should almost CERTAINLY not be extracting patient_id as a value.")
+                if out_col_n == subject_id_field:
+                    logger.warning(
+                        f"You should almost CERTAINLY not be extracting {subject_id_field} as a value."
+                    )
                 if out_col_n == "time":
                     logger.warning("Warning: `time` is being extracted post-hoc!")
             case str() if out_col_n in DEPRECATED_NAMES:
@@ -116,7 +119,7 @@ def extract_values_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.La
         if not need_cols.issubset(in_cols):
             raise ValueError(f"Missing columns: {sorted(list(need_cols - in_cols))}")
 
-        return df.with_columns(new_cols).sort("patient_id", "time", maintain_order=True)
+        return df.with_columns(new_cols).sort(subject_id_field, "time", maintain_order=True)
 
     return compute_fn
 
@@ -130,5 +133,5 @@ def main(cfg: DictConfig):
     map_over(cfg, compute_fn=extract_values_fntr)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

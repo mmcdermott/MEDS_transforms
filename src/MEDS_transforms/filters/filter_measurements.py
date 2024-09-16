@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""A polars-to-polars transformation function for filtering patients by sequence length."""
+"""A polars-to-polars transformation function for filtering subjects by sequence length."""
 from collections.abc import Callable
 
 import hydra
@@ -13,7 +13,7 @@ from MEDS_transforms.mapreduce.mapper import map_over
 def filter_measurements_fntr(
     stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
-    """Returns a function that filters patient events to only encompass those with a set of permissible codes.
+    """Returns a function that filters subject events to only encompass those with a set of permissible codes.
 
     Args:
         df: The input DataFrame.
@@ -26,44 +26,44 @@ def filter_measurements_fntr(
         >>> code_metadata_df = pl.DataFrame({
         ...     "code":               ["A", "A", "B", "C"],
         ...     "modifier1":          [1,   2,   1,   2],
-        ...     "code/n_patients":    [2,   1,   3,   2],
+        ...     "code/n_subjects":    [2,   1,   3,   2],
         ...     "code/n_occurrences": [4,   5,   3,   2],
         ... })
         >>> data = pl.DataFrame({
-        ...     "patient_id": [1,   1,   2,   2],
+        ...     "subject_id": [1,   1,   2,   2],
         ...     "code":       ["A", "B", "A", "C"],
         ...     "modifier1":  [1,   1,   2,   2],
         ... }).lazy()
-        >>> stage_cfg = DictConfig({"min_patients_per_code": 2, "min_occurrences_per_code": 3})
+        >>> stage_cfg = DictConfig({"min_subjects_per_code": 2, "min_occurrences_per_code": 3})
         >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (2, 3)
         ┌────────────┬──────┬───────────┐
-        │ patient_id ┆ code ┆ modifier1 │
+        │ subject_id ┆ code ┆ modifier1 │
         │ ---        ┆ ---  ┆ ---       │
         │ i64        ┆ str  ┆ i64       │
         ╞════════════╪══════╪═══════════╡
         │ 1          ┆ A    ┆ 1         │
         │ 1          ┆ B    ┆ 1         │
         └────────────┴──────┴───────────┘
-        >>> stage_cfg = DictConfig({"min_patients_per_code": 1, "min_occurrences_per_code": 4})
+        >>> stage_cfg = DictConfig({"min_subjects_per_code": 1, "min_occurrences_per_code": 4})
         >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (2, 3)
         ┌────────────┬──────┬───────────┐
-        │ patient_id ┆ code ┆ modifier1 │
+        │ subject_id ┆ code ┆ modifier1 │
         │ ---        ┆ ---  ┆ ---       │
         │ i64        ┆ str  ┆ i64       │
         ╞════════════╪══════╪═══════════╡
         │ 1          ┆ A    ┆ 1         │
         │ 2          ┆ A    ┆ 2         │
         └────────────┴──────┴───────────┘
-        >>> stage_cfg = DictConfig({"min_patients_per_code": 1})
+        >>> stage_cfg = DictConfig({"min_subjects_per_code": 1})
         >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (4, 3)
         ┌────────────┬──────┬───────────┐
-        │ patient_id ┆ code ┆ modifier1 │
+        │ subject_id ┆ code ┆ modifier1 │
         │ ---        ┆ ---  ┆ ---       │
         │ i64        ┆ str  ┆ i64       │
         ╞════════════╪══════╪═══════════╡
@@ -72,12 +72,12 @@ def filter_measurements_fntr(
         │ 2          ┆ A    ┆ 2         │
         │ 2          ┆ C    ┆ 2         │
         └────────────┴──────┴───────────┘
-        >>> stage_cfg = DictConfig({"min_patients_per_code": None, "min_occurrences_per_code": None})
+        >>> stage_cfg = DictConfig({"min_subjects_per_code": None, "min_occurrences_per_code": None})
         >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (4, 3)
         ┌────────────┬──────┬───────────┐
-        │ patient_id ┆ code ┆ modifier1 │
+        │ subject_id ┆ code ┆ modifier1 │
         │ ---        ┆ ---  ┆ ---       │
         │ i64        ┆ str  ┆ i64       │
         ╞════════════╪══════╪═══════════╡
@@ -91,20 +91,46 @@ def filter_measurements_fntr(
         >>> fn(data).collect()
         shape: (1, 3)
         ┌────────────┬──────┬───────────┐
-        │ patient_id ┆ code ┆ modifier1 │
+        │ subject_id ┆ code ┆ modifier1 │
         │ ---        ┆ ---  ┆ ---       │
         │ i64        ┆ str  ┆ i64       │
         ╞════════════╪══════╪═══════════╡
         │ 2          ┆ A    ┆ 2         │
         └────────────┴──────┴───────────┘
+
+    This stage works even if the default row index column exists:
+        >>> code_metadata_df = pl.DataFrame({
+        ...     "code":               ["A", "A", "B", "C"],
+        ...     "modifier1":          [1,   2,   1,   2],
+        ...     "code/n_subjects":    [2,   1,   3,   2],
+        ...     "code/n_occurrences": [4,   5,   3,   2],
+        ... })
+        >>> data = pl.DataFrame({
+        ...     "subject_id": [1,   1,   2,   2],
+        ...     "code":       ["A", "B", "A", "C"],
+        ...     "modifier1":  [1,   1,   2,   2],
+        ...     "_row_idx":   [1,   1,   1,   1],
+        ... }).lazy()
+        >>> stage_cfg = DictConfig({"min_subjects_per_code": 2, "min_occurrences_per_code": 3})
+        >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn(data).collect()
+        shape: (2, 4)
+        ┌────────────┬──────┬───────────┬──────────┐
+        │ subject_id ┆ code ┆ modifier1 ┆ _row_idx │
+        │ ---        ┆ ---  ┆ ---       ┆ ---      │
+        │ i64        ┆ str  ┆ i64       ┆ i64      │
+        ╞════════════╪══════╪═══════════╪══════════╡
+        │ 1          ┆ A    ┆ 1         ┆ 1        │
+        │ 1          ┆ B    ┆ 1         ┆ 1        │
+        └────────────┴──────┴───────────┴──────────┘
     """
 
-    min_patients_per_code = stage_cfg.get("min_patients_per_code", None)
+    min_subjects_per_code = stage_cfg.get("min_subjects_per_code", None)
     min_occurrences_per_code = stage_cfg.get("min_occurrences_per_code", None)
 
     filter_exprs = []
-    if min_patients_per_code is not None:
-        filter_exprs.append(pl.col("code/n_patients") >= min_patients_per_code)
+    if min_subjects_per_code is not None:
+        filter_exprs.append(pl.col("code/n_subjects") >= min_subjects_per_code)
     if min_occurrences_per_code is not None:
         filter_exprs.append(pl.col("code/n_occurrences") >= min_occurrences_per_code)
 
@@ -118,10 +144,10 @@ def filter_measurements_fntr(
     allowed_code_metadata = (code_metadata.filter(pl.all_horizontal(filter_exprs)).select(join_cols)).lazy()
 
     def filter_measurements_fn(df: pl.LazyFrame) -> pl.LazyFrame:
-        f"""Filters patient events to only encompass those with a set of permissible codes.
+        f"""Filters subject events to only encompass those with a set of permissible codes.
 
         In particular, this function filters the DataFrame to only include (code, modifier) pairs that have
-        at least {min_patients_per_code} patients and {min_occurrences_per_code} occurrences.
+        at least {min_subjects_per_code} subjects and {min_occurrences_per_code} occurrences.
         """
 
         idx_col = "_row_idx"
@@ -147,5 +173,5 @@ def main(cfg: DictConfig):
     map_over(cfg, compute_fn=filter_measurements_fntr)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

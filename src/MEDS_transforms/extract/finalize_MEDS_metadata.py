@@ -2,6 +2,7 @@
 """Utilities for finalizing the metadata files for extracted MEDS datasets."""
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 import hydra
@@ -12,10 +13,14 @@ import pyarrow.parquet as pq
 from loguru import logger
 from meds import __version__ as MEDS_VERSION
 from meds import (
+    code_metadata_filepath,
     code_metadata_schema,
+    dataset_metadata_filepath,
     dataset_metadata_schema,
     held_out_split,
-    patient_split_schema,
+    subject_id_field,
+    subject_split_schema,
+    subject_splits_filepath,
     train_split,
     tuning_split,
 )
@@ -121,8 +126,8 @@ def main(cfg: DictConfig):
       - `etl_name` (string)
       - `etl_version` (string)
       - `meds_version` (string)
-    (3) a `metadata/patient_splits.parquet` file exists that has the mandatory columns
-      - `patient_id` (Int64)
+    (3) a `metadata/subject_splits.parquet` file exists that has the mandatory columns
+      - `subject_id` (Int64)
       - `split` (string)
 
     This stage *_should almost always be the last metadata stage in an extraction pipeline._*
@@ -149,11 +154,14 @@ def main(cfg: DictConfig):
     _, _, input_metadata_dir = stage_init(cfg)
     output_metadata_dir = Path(cfg.stage_cfg.reducer_output_dir)
 
-    output_code_metadata_fp = output_metadata_dir / "codes.parquet"
-    dataset_metadata_fp = output_metadata_dir / "dataset.json"
-    patient_splits_fp = output_metadata_dir / "patient_splits.parquet"
+    if output_metadata_dir.parts[-1] != Path(code_metadata_filepath).parts[0]:
+        raise ValueError(f"Output metadata directory must end in 'metadata'. Got {output_metadata_dir}")
 
-    for out_fp in [output_code_metadata_fp, dataset_metadata_fp, patient_splits_fp]:
+    output_code_metadata_fp = output_metadata_dir.parent / code_metadata_filepath
+    dataset_metadata_fp = output_metadata_dir.parent / dataset_metadata_filepath
+    subject_splits_fp = output_metadata_dir.parent / subject_splits_filepath
+
+    for out_fp in [output_code_metadata_fp, dataset_metadata_fp, subject_splits_fp]:
         out_fp.parent.mkdir(parents=True, exist_ok=True)
         if out_fp.exists() and cfg.do_overwrite:
             out_fp.unlink()
@@ -186,6 +194,7 @@ def main(cfg: DictConfig):
         "etl_name": cfg.etl_metadata.package_name,
         "etl_version": str(cfg.etl_metadata.package_version),
         "meds_version": MEDS_VERSION,
+        "created_at": datetime.now().isoformat(),
     }
     jsonschema.validate(instance=dataset_metadata, schema=dataset_metadata_schema)
 
@@ -194,29 +203,29 @@ def main(cfg: DictConfig):
 
     # Split creation
     shards_map_fp = Path(cfg.shards_map_fp)
-    logger.info("Creating patient splits from {str(shards_map_fp.resolve())}")
+    logger.info("Creating subject splits from {str(shards_map_fp.resolve())}")
     shards_map = json.loads(shards_map_fp.read_text())
-    patient_splits = []
+    subject_splits = []
     seen_splits = {train_split: 0, tuning_split: 0, held_out_split: 0}
-    for shard, patient_ids in shards_map.items():
+    for shard, subject_ids in shards_map.items():
         split = "/".join(shard.split("/")[:-1])
 
         if split not in seen_splits:
             seen_splits[split] = 0
-        seen_splits[split] += len(patient_ids)
+        seen_splits[split] += len(subject_ids)
 
-        patient_splits.extend([{"patient_id": pid, "split": split} for pid in patient_ids])
+        subject_splits.extend([{subject_id_field: pid, "split": split} for pid in subject_ids])
 
     for split, cnt in seen_splits.items():
         if cnt:
-            logger.info(f"Split {split} has {cnt} patients")
+            logger.info(f"Split {split} has {cnt} subjects")
         else:
             logger.warning(f"Split {split} not found in shards map")
 
-    patient_splits_tbl = pa.Table.from_pylist(patient_splits, schema=patient_split_schema)
-    logger.info(f"Writing finalized patient splits to {str(patient_splits_fp.resolve())}")
-    pq.write_table(patient_splits_tbl, patient_splits_fp)
+    subject_splits_tbl = pa.Table.from_pylist(subject_splits, schema=subject_split_schema)
+    logger.info(f"Writing finalized subject splits to {str(subject_splits_fp.resolve())}")
+    pq.write_table(subject_splits_tbl, subject_splits_fp)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

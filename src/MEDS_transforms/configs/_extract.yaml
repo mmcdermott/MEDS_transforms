@@ -1,8 +1,9 @@
 defaults:
-  - pipeline
+  - _pipeline
   - stage_configs:
       - shard_events
-      - split_and_shard_patients
+      - split_and_shard_subjects
+      - convert_to_sharded_events
       - merge_to_MEDS_cohort
       - extract_code_metadata
       - finalize_MEDS_metadata
@@ -32,7 +33,7 @@ shards_map_fp: "${cohort_dir}/metadata/.shards.json"
 
 stages:
   - shard_events
-  - split_and_shard_patients
+  - split_and_shard_subjects
   - convert_to_sharded_events
   - merge_to_MEDS_cohort
   - extract_code_metadata

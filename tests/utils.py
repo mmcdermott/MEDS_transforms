@@ -1,23 +1,40 @@
+import json
+import re
 import subprocess
 import tempfile
+from collections.abc import Callable
+from contextlib import contextmanager
 from io import StringIO
 from pathlib import Path
+from typing import Any
 
+import numpy as np
 import polars as pl
+from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 from omegaconf import OmegaConf
 from polars.testing import assert_frame_equal
+from yaml import load as load_yaml
+
+try:
+    from yaml import CLoader as Loader
+except ImportError:
+    from yaml import Loader
 
 DEFAULT_CSV_TS_FORMAT = "%m/%d/%Y, %H:%M:%S"
 
 # TODO: Make use meds library
 MEDS_PL_SCHEMA = {
-    "patient_id": pl.UInt32,
+    "subject_id": pl.Int64,
     "time": pl.Datetime("us"),
     "code": pl.String,
     "numeric_value": pl.Float32,
     "numeric_value/is_inlier": pl.Boolean,
     "text_value": pl.String,
 }
+
+
+def exact_str_regex(s: str) -> str:
+    return f"^{re.escape(s)}$"
 
 
 def parse_meds_csvs(
@@ -42,6 +59,11 @@ def parse_meds_csvs(
         return reader(csvs)
     else:
         return {k: reader(v) for k, v in csvs.items()}
+
+
+def parse_shards_yaml(yaml_str: str, **schema_updates) -> pl.DataFrame:
+    schema = {**MEDS_PL_SCHEMA, **schema_updates}
+    return parse_meds_csvs(load_yaml(yaml_str.strip(), Loader=Loader), schema=schema)
 
 
 def dict_to_hydra_kwargs(d: dict[str, str]) -> str:
@@ -70,6 +92,8 @@ def dict_to_hydra_kwargs(d: dict[str, str]) -> str:
         ValueError: Unexpected type for value for key a: <class 'datetime.datetime'>: 2021-11-01 00:00:00
     """
 
+    modifier_chars = ["~", "'", "++", "+"]
+
     out = []
     for k, v in d.items():
         if not isinstance(k, str):
@@ -86,11 +110,13 @@ def dict_to_hydra_kwargs(d: dict[str, str]) -> str:
             case dict():
                 inner_kwargs = dict_to_hydra_kwargs(v)
                 for inner_kv in inner_kwargs:
-                    if inner_kv.startswith("~"):
-                        out.append(f"~{k}.{inner_kv[1:]}")
-                    elif inner_kv.startswith("'"):
-                        out.append(f"'{k}.{inner_kv[1:]}")
-                    else:
+                    handled = False
+                    for mod in modifier_chars:
+                        if inner_kv.startswith(mod):
+                            out.append(f"{mod}{k}.{inner_kv[len(mod):]}")
+                            handled = True
+                            break
+                    if not handled:
                         out.append(f"{k}.{inner_kv}")
             case list() | tuple():
                 v = list(v)
@@ -116,6 +142,9 @@ def run_command(
     command_parts = script
 
     err_cmd_lines = []
+
+    if config_name is not None and not config_name.startswith("_"):
+        config_name = f"_{config_name}"
 
     if do_use_config_yaml:
         if config_name is None:
@@ -180,11 +209,320 @@ def run_command(
 
 def assert_df_equal(want: pl.DataFrame, got: pl.DataFrame, msg: str = None, **kwargs):
     try:
+        update_exprs = {}
+        for k, v in want.schema.items():
+            assert k in got.schema, f"missing column {k}."
+            if kwargs.get("check_dtypes", False):
+                assert v == got.schema[k], f"column {k} has different types."
+            if v == pl.List(pl.String) and got.schema[k] == pl.List(pl.String):
+                update_exprs[k] = pl.col(k).list.join("||")
+        if update_exprs:
+            want_cols = want.columns
+            got_cols = got.columns
+
+            want = want.with_columns(**update_exprs).select(want_cols)
+            got = got.with_columns(**update_exprs).select(got_cols)
+
         assert_frame_equal(want, got, **kwargs)
     except AssertionError as e:
         pl.Config.set_tbl_rows(-1)
-        print(f"DFs are not equal: {msg}\nwant:")
-        print(want)
-        print("got:")
-        print(got)
-        raise AssertionError(f"{msg}\n{e}") from e
+        raise AssertionError(f"{msg}:\nWant:\n{want}\nGot:\n{got}\n{e}") from e
+
+
+def check_json(want: dict | Callable, got: dict, msg: str):
+    try:
+        match want:
+            case dict():
+                assert got == want, f"Want:\n{want}\nGot:\n{got}"
+            case _ if callable(want):
+                want(got)
+            case _:
+                raise ValueError(f"Unknown want type: {type(want)}")
+    except AssertionError as e:
+        raise AssertionError(f"{msg}: {e}") from e
+
+
+def check_NRT_output(
+    output_fp: Path,
+    want_nrt: JointNestedRaggedTensorDict,
+    msg: str,
+):
+    got_nrt = JointNestedRaggedTensorDict.load(output_fp)
+
+    # assert got_nrt.schema == want_nrt.schema, (
+    #    f"Expected the schema of the NRT at {output_fp} to be equal to the target.\n"
+    #    f"Wanted:\n{want_nrt.schema}\n"
+    #    f"Got:\n{got_nrt.schema}"
+    # )
+
+    want_tensors = want_nrt.tensors
+    got_tensors = got_nrt.tensors
+
+    assert got_tensors.keys() == want_tensors.keys(), (
+        f"{msg}:\n" f"Wanted:\n{list(want_tensors.keys())}\n" f"Got:\n{list(got_tensors.keys())}"
+    )
+
+    for k in want_tensors.keys():
+        want_v = want_tensors[k]
+        got_v = got_tensors[k]
+
+        assert type(want_v) is type(
+            got_v
+        ), f"{msg}: Wanted {k} to be of type {type(want_v)}, got {type(got_v)}."
+
+        if isinstance(want_v, list):
+            assert len(want_v) == len(got_v), (
+                f"Expected list {k} of the NRT at {output_fp} to be of the same length as the target.\n"
+                f"Wanted:\n{len(want_v)}\n"
+                f"Got:\n{len(got_v)}"
+            )
+            for i, (want_i, got_i) in enumerate(zip(want_v, got_v)):
+                assert np.array_equal(want_i, got_i, equal_nan=True), (
+                    f"Expected tensor {k}[{i}] of the NRT at {output_fp} to be equal to the target.\n"
+                    f"Wanted:\n{want_i}\n"
+                    f"Got:\n{got_i}"
+                )
+        else:
+            assert np.array_equal(want_v, got_v, equal_nan=True), (
+                f"Expected tensor {k} of the NRT at {output_fp} to be equal to the target.\n"
+                f"Wanted:\n{want_v}\n"
+                f"Got:\n{got_v}"
+            )
+
+
+FILE_T = pl.DataFrame | dict[str, Any] | str
+
+
+def add_params(templ_str: str, **kwargs):
+    return templ_str.format(**kwargs)
+
+
+@contextmanager
+def input_dataset(input_files: dict[str, FILE_T] | None = None):
+    with tempfile.TemporaryDirectory() as d:
+        input_dir = Path(d) / "input_cohort"
+        cohort_dir = Path(d) / "output_cohort"
+
+        for filename, data in input_files.items():
+            fp = input_dir / filename
+            fp.parent.mkdir(parents=True, exist_ok=True)
+
+            match data:
+                case pl.DataFrame() if fp.suffix == "":
+                    data.write_parquet(fp.with_suffix(".parquet"), use_pyarrow=True)
+                case pl.DataFrame() if fp.suffix == ".parquet":
+                    data.write_parquet(fp, use_pyarrow=True)
+                case pl.DataFrame() if fp.suffix == ".csv":
+                    data.write_csv(fp)
+                case dict() if fp.suffix == "":
+                    fp.with_suffix(".json").write_text(json.dumps(data))
+                case dict() if fp.suffix.endswith(".json"):
+                    fp.write_text(json.dumps(data))
+                case str():
+                    fp.write_text(data.strip())
+                case _ if callable(data):
+                    data_str = data(
+                        input_dir=str(input_dir.resolve()),
+                        cohort_dir=str(cohort_dir.resolve()),
+                    )
+                    fp.write_text(data_str)
+                case _:
+                    raise ValueError(f"Unknown data type {type(data)} for file {fp.relative_to(input_dir)}")
+
+        yield input_dir, cohort_dir
+
+
+def check_outputs(
+    cohort_dir: Path,
+    want_outputs: dict[str, pl.DataFrame],
+    assert_no_other_outputs: bool = True,
+    **df_check_kwargs,
+):
+    all_file_suffixes = set()
+
+    for output_name, want in want_outputs.items():
+        if Path(output_name).suffix == "":
+            output_name = f"{output_name}.parquet"
+
+        file_suffix = Path(output_name).suffix
+        all_file_suffixes.add(file_suffix)
+
+        output_fp = cohort_dir / output_name
+
+        files_found = [str(fp.relative_to(cohort_dir)) for fp in cohort_dir.glob("**/*{file_suffix}")]
+
+        if not output_fp.is_file():
+            raise AssertionError(
+                f"Wanted {output_fp.relative_to(cohort_dir)} to exist. "
+                f"{len(files_found)} {file_suffix} files found: {', '.join(files_found)}"
+            )
+
+        msg = f"Expected {output_fp.relative_to(cohort_dir)} to be equal to the target"
+
+        match file_suffix:
+            case ".parquet":
+                got_df = pl.read_parquet(output_fp, glob=False)
+                assert_df_equal(want, got_df, msg=msg, **df_check_kwargs)
+            case ".nrt":
+                check_NRT_output(output_fp, want, msg=msg)
+            case ".json":
+                got = json.loads(output_fp.read_text())
+                check_json(want, got, msg=msg)
+            case _:
+                raise ValueError(f"Unknown file suffix: {file_suffix}")
+
+    if assert_no_other_outputs:
+        all_outputs = []
+        for suffix in all_file_suffixes:
+            all_outputs.extend(list(cohort_dir.glob(f"**/*{suffix}")))
+        assert len(want_outputs) == len(all_outputs), (
+            f"Want {len(want_outputs)} outputs, but found {len(all_outputs)}.\n"
+            f"Found outputs: {[fp.relative_to(cohort_dir) for fp in all_outputs]}\n"
+        )
+
+
+def single_stage_tester(
+    script: str | Path,
+    stage_name: str | None,
+    stage_kwargs: dict[str, str] | None,
+    do_pass_stage_name: bool = False,
+    do_use_config_yaml: bool = False,
+    want_outputs: dict[str, pl.DataFrame] | None = None,
+    assert_no_other_outputs: bool = True,
+    should_error: bool = False,
+    config_name: str = "preprocess",
+    input_files: dict[str, FILE_T] | None = None,
+    df_check_kwargs: dict | None = None,
+    test_name: str | None = None,
+    do_include_dirs: bool = True,
+    hydra_verbose: bool = True,
+    stdout_regex: str | None = None,
+    **pipeline_kwargs,
+):
+    if test_name is None:
+        test_name = f"Single stage transform: {stage_name}"
+
+    if df_check_kwargs is None:
+        df_check_kwargs = {}
+
+    with input_dataset(input_files) as (input_dir, cohort_dir):
+        for k, v in pipeline_kwargs.items():
+            if type(v) is str and "{input_dir}" in v:
+                pipeline_kwargs[k] = v.format(input_dir=str(input_dir.resolve()))
+
+        pipeline_config_kwargs = {
+            "hydra.verbose": hydra_verbose,
+            **pipeline_kwargs,
+        }
+
+        if do_include_dirs:
+            pipeline_config_kwargs["input_dir"] = str(input_dir.resolve())
+            pipeline_config_kwargs["cohort_dir"] = str(cohort_dir.resolve())
+
+        if stage_name is not None:
+            pipeline_config_kwargs["stages"] = [stage_name]
+        if stage_kwargs:
+            pipeline_config_kwargs["stage_configs"] = {stage_name: stage_kwargs}
+
+        run_command_kwargs = {
+            "script": script,
+            "hydra_kwargs": pipeline_config_kwargs,
+            "test_name": test_name,
+            "should_error": should_error,
+            "config_name": config_name,
+            "do_use_config_yaml": do_use_config_yaml,
+        }
+
+        if do_pass_stage_name:
+            run_command_kwargs["stage"] = stage_name
+            run_command_kwargs["do_pass_stage_name"] = True
+
+        # Run the transform
+        stderr, stdout = run_command(**run_command_kwargs)
+        if should_error:
+            return
+
+        if stdout_regex is not None:
+            regex = re.compile(stdout_regex)
+            assert regex.search(stdout) is not None, (
+                f"Expected stdout to match regex:\n{stdout_regex}\n" f"Got:\n{stdout}"
+            )
+
+        try:
+            check_outputs(
+                cohort_dir,
+                want_outputs=want_outputs,
+                assert_no_other_outputs=assert_no_other_outputs,
+                **df_check_kwargs,
+            )
+        except Exception as e:
+            raise AssertionError(
+                f"Single stage transform {stage_name} failed -- {e}:\n"
+                f"Script stdout:\n{stdout}\n"
+                f"Script stderr:\n{stderr}\n"
+            ) from e
+
+
+def multi_stage_tester(
+    scripts: list[str | Path],
+    stage_names: list[str],
+    stage_configs: dict[str, str] | str | None,
+    do_pass_stage_name: bool | dict[str, bool] = True,
+    want_outputs: dict[str, pl.DataFrame] | None = None,
+    assert_no_other_outputs: bool = False,
+    config_name: str = "preprocess",
+    input_files: dict[str, FILE_T] | None = None,
+    **pipeline_kwargs,
+):
+    with input_dataset(input_files) as (input_dir, cohort_dir):
+        match stage_configs:
+            case None:
+                stage_configs = {}
+            case str():
+                stage_configs = load_yaml(stage_configs, Loader=Loader)
+            case dict():
+                pass
+            case _:
+                raise ValueError(f"Unknown stage_configs type: {type(stage_configs)}")
+
+        match do_pass_stage_name:
+            case True:
+                do_pass_stage_name = {stage_name: True for stage_name in stage_names}
+            case False:
+                do_pass_stage_name = {stage_name: False for stage_name in stage_names}
+            case dict():
+                pass
+            case _:
+                raise ValueError(f"Unknown do_pass_stage_name type: {type(do_pass_stage_name)}")
+
+        pipeline_config_kwargs = {
+            "input_dir": str(input_dir.resolve()),
+            "cohort_dir": str(cohort_dir.resolve()),
+            "stages": stage_names,
+            "stage_configs": stage_configs,
+            "hydra.verbose": True,
+            **pipeline_kwargs,
+        }
+
+        script_outputs = {}
+        n_stages = len(stage_names)
+        for i, (stage, script) in enumerate(zip(stage_names, scripts)):
+            script_outputs[stage] = run_command(
+                script=script,
+                hydra_kwargs=pipeline_config_kwargs,
+                do_use_config_yaml=True,
+                config_name=config_name,
+                test_name=f"Multi stage transform {i}/{n_stages}: {stage}",
+                stage_name=stage,
+                do_pass_stage_name=do_pass_stage_name[stage],
+            )
+
+        try:
+            check_outputs(
+                cohort_dir,
+                want_outputs=want_outputs,
+                assert_no_other_outputs=assert_no_other_outputs,
+                check_column_order=False,
+            )
+        except Exception as e:
+            raise AssertionError(f"{n_stages}-stage pipeline ({stage_names}) failed--{e}") from e

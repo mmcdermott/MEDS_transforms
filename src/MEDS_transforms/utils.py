@@ -1,5 +1,6 @@
 """Core utilities for MEDS pipelines built with these tools."""
 
+import importlib
 import inspect
 import os
 import sys
@@ -108,10 +109,13 @@ def get_package_version() -> str:
     return package_version
 
 
-def get_script_docstring() -> str:
+def get_script_docstring(filename: str | None = None) -> str:
     """Returns the docstring of the main function of the script from which this function was called."""
 
-    main_module = sys.modules["__main__"]
+    if filename is not None:
+        main_module = importlib.import_module(f"MEDS_transforms.{filename}")
+    else:
+        main_module = sys.modules["__main__"]
     func = getattr(main_module, "main", None)
     if func and callable(func):
         return inspect.getdoc(func) or ""
@@ -412,15 +416,15 @@ def is_col_field(field: str | None) -> bool:
         bool: True if the field is formatted as "col(column_name)", False otherwise.
 
     Examples:
-        >>> is_col_field("col(patient_id)")
+        >>> is_col_field("col(subject_id)")
         True
-        >>> is_col_field("col(patient_id")
+        >>> is_col_field("col(subject_id")
         False
-        >>> is_col_field("patient_id)")
+        >>> is_col_field("subject_id)")
         False
-        >>> is_col_field("column(patient_id)")
+        >>> is_col_field("column(subject_id)")
         False
-        >>> is_col_field("patient_id")
+        >>> is_col_field("subject_id")
         False
         >>> is_col_field(None)
         False
@@ -440,16 +444,16 @@ def parse_col_field(field: str) -> str:
         ValueError: If the input string does not match the expected format.
 
     Examples:
-        >>> parse_col_field("col(patient_id)")
-        'patient_id'
-        >>> parse_col_field("col(patient_id")
+        >>> parse_col_field("col(subject_id)")
+        'subject_id'
+        >>> parse_col_field("col(subject_id")
         Traceback (most recent call last):
         ...
-        ValueError: Invalid column field: col(patient_id
-        >>> parse_col_field("column(patient_id)")
+        ValueError: Invalid column field: col(subject_id
+        >>> parse_col_field("column(subject_id)")
         Traceback (most recent call last):
         ...
-        ValueError: Invalid column field: column(patient_id)
+        ValueError: Invalid column field: column(subject_id)
     """
     if not is_col_field(field):
         raise ValueError(f"Invalid column field: {field}")

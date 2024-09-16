@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""A polars-to-polars transformation function for filtering patients by sequence length."""
+"""A polars-to-polars transformation function for filtering subjects by sequence length."""
 from collections.abc import Callable
 
 import hydra
@@ -13,7 +13,7 @@ from MEDS_transforms.mapreduce.mapper import map_over
 def occlude_outliers_fntr(
     stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
-    """Filters patient events to only encompass those with a set of permissible codes.
+    """Filters subject events to only encompass those with a set of permissible codes.
 
     Args:
         df: The input DataFrame.
@@ -33,7 +33,7 @@ def occlude_outliers_fntr(
         ... # for clarity: --- stddev = [3.0,  0.0,  3.0,  1.0]
         ... })
         >>> data = pl.DataFrame({
-        ...     "patient_id":      [1,   1,   2,   2],
+        ...     "subject_id":      [1,   1,   2,   2],
         ...     "code":            ["A", "B", "A", "C"],
         ...     "modifier1":       [1,   1,   2,   2],
         ... # for clarity: mean    [0.0, 4.0, 4.0, 1.0]
@@ -45,7 +45,7 @@ def occlude_outliers_fntr(
         >>> fn(data).collect()
         shape: (4, 5)
         ┌────────────┬──────┬───────────┬───────────────┬─────────────────────────┐
-        │ patient_id ┆ code ┆ modifier1 ┆ numeric_value ┆ numeric_value/is_inlier │
+        │ subject_id ┆ code ┆ modifier1 ┆ numeric_value ┆ numeric_value/is_inlier │
         │ ---        ┆ ---  ┆ ---       ┆ ---           ┆ ---                     │
         │ i64        ┆ str  ┆ i64       ┆ f64           ┆ bool                    │
         ╞════════════╪══════╪═══════════╪═══════════════╪═════════════════════════╡
@@ -78,7 +78,7 @@ def occlude_outliers_fntr(
     code_metadata = code_metadata.lazy().select(cols_to_select)
 
     def occlude_outliers_fn(df: pl.LazyFrame) -> pl.LazyFrame:
-        f"""Filters out outlier numeric values from patient events.
+        f"""Filters out outlier numeric values from subject events.
 
         In particular, this function filters the DataFrame to only include numeric values that are within
         {stddev_cutoff} standard deviations of the mean for the corresponding (code, modifier) pair.
@@ -110,5 +110,5 @@ def main(cfg: DictConfig):
     map_over(cfg, compute_fn=occlude_outliers_fntr)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

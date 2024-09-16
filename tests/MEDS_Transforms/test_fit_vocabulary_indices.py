@@ -5,14 +5,11 @@ scripts.
 """
 
 
-from .transform_tester_base import (
-    FIT_VOCABULARY_INDICES_SCRIPT,
-    parse_code_metadata_csv,
-    single_stage_transform_tester,
-)
+from tests.MEDS_Transforms import FIT_VOCABULARY_INDICES_SCRIPT
+from tests.MEDS_Transforms.transform_tester_base import parse_code_metadata_csv, single_stage_transform_tester
 
 WANT_CSV = """
-code,code/n_occurrences,code/n_patients,values/n_occurrences,values/sum,values/sum_sqd,description,parent_codes,code/vocab_index
+code,code/n_occurrences,code/n_subjects,values/n_occurrences,values/sum,values/sum_sqd,description,parent_codes,code/vocab_index
 ,44,4,28,3198.8389005974336,382968.28937288234,,,1
 ADMISSION//CARDIAC,2,2,0,,,,,2
 ADMISSION//ORTHOPEDIC,1,1,0,,,,,3
@@ -34,4 +31,12 @@ def test_fit_vocabulary_indices_with_default_stage_config():
         stage_name="fit_vocabulary_indices",
         transform_stage_kwargs=None,
         want_metadata=parse_code_metadata_csv(WANT_CSV),
+    )
+
+    single_stage_transform_tester(
+        transform_script=FIT_VOCABULARY_INDICES_SCRIPT,
+        stage_name="fit_vocabulary_indices",
+        transform_stage_kwargs={"ordering_method": "file"},
+        want_metadata=parse_code_metadata_csv(WANT_CSV),
+        should_error=True,
     )

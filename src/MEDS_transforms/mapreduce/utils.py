@@ -315,14 +315,14 @@ def shard_iterator(
         >>> from tempfile import TemporaryDirectory
         >>> import polars as pl
         >>> df = pl.DataFrame({
-        ...     "patient_id": [1, 2, 3, 4, 5, 6, 7, 8, 9],
+        ...     "subject_id": [1, 2, 3, 4, 5, 6, 7, 8, 9],
         ...     "code": ["A", "B", "C", "D", "E", "F", "G", "H", "I"],
         ...     "time": [1, 2, 3, 4, 5, 6, 1, 2, 3],
         ... })
         >>> shards = {"train/0": [1, 2, 3, 4], "train/1": [5, 6, 7], "tuning": [8], "held_out": [9]}
         >>> def write_dfs(input_dir: Path, df: pl.DataFrame=df, shards: dict=shards, sfx: str=".parquet"):
-        ...     for shard_name, patient_ids in shards.items():
-        ...         df = df.filter(pl.col("patient_id").is_in(patient_ids))
+        ...     for shard_name, subject_ids in shards.items():
+        ...         df = df.filter(pl.col("subject_id").is_in(subject_ids))
         ...         shard_fp = input_dir / f"{shard_name}{sfx}"
         ...         shard_fp.parent.mkdir(exist_ok=True, parents=True)
         ...         if sfx == ".parquet": df.write_parquet(shard_fp)
@@ -453,10 +453,11 @@ def shard_iterator(
         >>> includes_only_train
         False
 
-    If it can't find any files, it will return an empty list:
+    If it can't find any files, it will error:
         >>> fps, includes_only_train = shard_iterator(cfg)
-        >>> fps
-        []
+        Traceback (most recent call last):
+            ...
+        FileNotFoundError: No shards found in ... with suffix .parquet. Directory contents:...
     """
 
     input_dir = Path(cfg.stage_cfg.data_input_dir)
@@ -474,6 +475,12 @@ def shard_iterator(
         shard_name = shard_name[: -len(in_suffix)]
         shards.append(shard_name)
 
+    if not shards:
+        raise FileNotFoundError(
+            f"No shards found in {input_dir} with suffix {in_suffix}. Directory contents: "
+            f"{', '.join(str(p.relative_to(input_dir)) for p in input_dir.glob('**/*'))}"
+        )
+
     # We initialize this to False and overwrite it if we find dedicated train shards.
     includes_only_train = False
 
@@ -483,9 +490,9 @@ def shard_iterator(
         shards = train_shards
         includes_only_train = True
     elif train_only:
-        logger.info(
+        logger.warning(
             f"train_only={train_only} requested but no dedicated train shards found; processing all shards "
-            "and relying on `patient_splits.parquet` for filtering."
+            "and relying on `subject_splits.parquet` for filtering."
         )
 
     shards = shuffle_shards(shards, cfg)
