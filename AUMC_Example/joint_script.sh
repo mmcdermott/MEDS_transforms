@@ -66,7 +66,7 @@ MEDS_extract-split_and_shard_patients \
     input_dir="$AUMC_PREMEDS_DIR" \
     cohort_dir="$AUMC_MEDS_DIR" \
     stage="split_and_shard_patients" \
-    stage_configs.split_and_shard_patients.n_patients_per_shard=10000 \
+    stage_configs.split_and_shard_patients.n_patients_per_shard=1000 \
     event_conversion_config_fp=./AUMC_Example/configs/event_configs.yaml "$@"
 
 echo "Converting to sharded events with $N_PARALLEL_WORKERS workers in parallel"
