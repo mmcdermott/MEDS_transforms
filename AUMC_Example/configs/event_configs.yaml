@@ -1,4 +1,4 @@
-patient_id_col: patientid
+patient_id_col: subject_id
 
 patient:
   dob: 

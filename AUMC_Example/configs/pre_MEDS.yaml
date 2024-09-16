@@ -1,5 +1,5 @@
-raw_cohort_dir: ???
-output_dir: ???
+input_dir: ${oc.env:AUMC_RAW_DIR}
+cohort_dir: ${oc.env:AUMC_PRE_MEDS_DIR}
 
 # Hydra
 hydra:
