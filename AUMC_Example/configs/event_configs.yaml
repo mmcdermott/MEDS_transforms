@@ -1,0 +1,123 @@
+patient_id_col: patientid
+
+patient:
+  dob: 
+    code: "DOB"
+    time: col(dateofbirth)
+  gender:
+    code: ["GENDER", "col(gender)"]
+    time: null
+  dod: 
+    code: "DEATH"
+    time: col(dateofdeath)
+
+admissions:
+  icu_admission:
+    code:
+      - "ICU_ADMISSION"
+      - col(location)
+      - col(urgency)
+      - col(origin)
+      - col(specialty)
+    time: col(admittedattime)
+  icu_discharge:
+    code: 
+      - "ICU_DISCHARGE"
+      - col(destination)
+    time: col(dischargedattime)
+  weight:
+    code:
+      - "WEIGHT_AT_ADMISSION"
+      - col(weightsource)
+      - col(weightgroup)
+    time: col(admittedattime)
+  height: 
+    code:
+      - "HEIGHT_AT_ADMISSION"
+      - col(heightsource)
+      - col(heightgroup)
+    time: col(admittedattime)
+
+numericitems:
+  event:
+    code:
+      - MEASURE
+      - col(item)
+      - col(unit)
+    time: col(measuredattime)
+    numeric_value: value
+
+listitems:
+  event:
+    code:
+      - MEASURE
+      - col(item)
+      - col(islabresult)
+      - col(value)
+    time: col(measuredattime)
+  
+freetextitems:
+  event:
+    code:
+      - MEASURE
+      - col(item)
+      - col(islabresult)
+    time: col(measuredattime)
+    text_value: value
+
+procedureorderitems:
+  event: 
+    code:
+      - PROCEDURE
+      - col(ordercategoryname)
+      - col(item)
+    time: col(registeredattime)
+
+processitems:
+  start: 
+    code:
+      - PROCESS
+      - START
+      - col(item)
+    time: col(starttime)
+  end:
+    code: 
+      - PROCESS
+      - END
+      - col(item)
+    time: col(stoptime)
+
+drugitems: 
+  start: 
+    code:
+      - DRUG
+      - START
+      - col(ordercategory)
+      - col(item)
+      - col(action)
+    time: col(starttime)
+  rate: 
+    code:
+      - DRUG
+      - RATE
+      - col(ordercategory)
+      - col(item)
+      - col(rateunit)
+    time: col(starttime)
+    numeric_value: col(rate)
+  dose: 
+    code:
+      - DRUG
+      - DOSE
+      - col(ordercategory)
+      - col(item)
+      - col(doseunit)
+    time: col(starttime)
+    numeric_value: col(dose)
+  end:
+    code:
+      - DRUG
+      - END
+      - col(ordercategory)
+      - col(item)
+    time: col(stoptime)
