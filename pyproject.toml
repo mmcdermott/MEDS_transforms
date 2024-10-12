@@ -23,7 +23,7 @@ dependencies = [
 [tool.setuptools_scm]
 
 [project.optional-dependencies]
-dev = ["pre-commit"]
+dev = ["pre-commit<4"]
 tests = ["pytest", "pytest-cov", "rootutils", "hydra-joblib-launcher"]
 local_parallelism = ["hydra-joblib-launcher"]
 slurm_parallelism = ["hydra-submitit-launcher"]
