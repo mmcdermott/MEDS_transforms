@@ -21,42 +21,42 @@ patient:
       - col(hospitalregion)
       - col(hospitalteachingstatus)
       - col(hospitalnumbedscategory)
-    time: col(hospitaladmittime)
+    time: col(hospitaladmittimestamp) # missing hospitaladmittime
     hospital_id: "hospitalid"
   hosp_discharge:
     code:
       - "HOSPITAL_DISCHARGE"
       - col(hospitaldischargestatus)
       - col(hospitaldischargelocation)
-    time: col(hospitaldischargetime)
+    time: col(hospitaldischargetimestamp) # missing hospitaldischargetime
   unit_admission:
     code:
       - "UNIT_ADMISSION"
       - col(unitadmitsource)
       - col(unitstaytype)
-    time: col(unitadmittime)
+    time: col(unitadmittimestamp) # missing unitadmittime
     ward_id: "wardid"
     unit_stay_id: "patientunitstayid"
   unit_admission_weight:
     code:
       - "UNIT_ADMISSION_WEIGHT"
-    time: col(unitadmittime)
+    time: col(unitadmittimestamp) # missing unitadmittime
     numeric_value: "unitadmissionweight"
   unit_admission_height:
     code:
       - "UNIT_ADMISSION_HEIGHT"
-    time: col(unitadmittime)
+    time: col(unitadmittimestamp) # missing unitadmittime
     numeric_value: "unitadmissionheight"
   unit_discharge:
     code:
       - "UNIT_DISCHARGE"
       - col(unitdischargestatus)
       - col(unitdischargelocation)
-    time: col(unitdischargetime)
+    time: col(unitdischargetimestamp) # missing unitdischargetime
   unit_discharge_weight:
     code:
       - "UNIT_DISCHARGE_WEIGHT"
-    time: col(unitdischargetime)
+    time: col(unitdischargetimestamp) # missing unitdischargetime
     numeric_value: "unitdischargeweight"
 
 admissiondx:
@@ -153,7 +153,7 @@ medication:
       - "MEDICATION"
       - "ORDERED"
       - col(drugname)
-    time: col(drugordertime)
+    time: col(drugordertimestamp) # missing drugordertime
     medication_id: "medicationid"
     drug_iv_admixture: "drugivadmixture"
     dosage: "dosage"
@@ -167,14 +167,14 @@ medication:
       - "MEDICATION"
       - "STARTED"
       - col(drugname)
-    time: col(drugstarttime)
+    time: col(drugstarttimestamp) # missing drugstarttime
     medication_id: "medicationid"
   drug_stopped:
     code:
       - "MEDICATION"
       - "STOPPED"
       - col(drugname)
-    time: col(drugstoptime)
+    time: col(drugstoptimestamp) # missing drugstoptime
     medication_id: "medicationid"
 
 nurseAssessment:
