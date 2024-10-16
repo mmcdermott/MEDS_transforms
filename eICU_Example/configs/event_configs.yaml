@@ -1,6 +1,8 @@
 # Note that there is no "subject_id" for eICU -- patients are only differentiable during the course of a
 # single health system stay. Accordingly, we set the "patient" id here as the "patientHealthSystemStayID"
 
+
+
 subject_id_col: patienthealthsystemstayid
 
 patient:
@@ -59,14 +61,14 @@ patient:
     time: col(unitdischargetimestamp) # missing unitdischargetime
     numeric_value: "unitdischargeweight"
 
-admissiondx:
+admissionDx:
   admission_diagnosis:
     code:
       - "ADMISSION_DX"
       - col(admitdxname)
     time: col(admitDxEnteredTimestamp)
-    admission_dx_id: "admitDxID"
-    unit_stay_id: "patientunitstayid"
+    admission_dx_id: "admissiondxid" # "admitDxID"
+    unit_stay_id: "patientunitstayid"  # not created
 
 allergy:
   allergy:

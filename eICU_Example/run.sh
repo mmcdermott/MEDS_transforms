@@ -48,7 +48,7 @@ echo "  * stage_configs.split_and_shard_subjects.n_subjects_per_shard=10000"
 echo "  * stage_configs.merge_to_MEDS_cohort.unique_by=null"
 
 echo "Running pre-MEDS conversion."
-# ./eICU_Example/pre_MEDS.py raw_cohort_dir="$EICU_RAW_DIR" output_dir="$EICU_PREMEDS_DIR"
+./eICU_Example/pre_MEDS.py raw_cohort_dir="$EICU_RAW_DIR" output_dir="$EICU_PREMEDS_DIR"
 
 echo "Running shard_events.py with $N_PARALLEL_WORKERS workers in parallel"
 ./src/MEDS_transforms/extract/shard_events.py \
@@ -57,13 +57,17 @@ echo "Running shard_events.py with $N_PARALLEL_WORKERS workers in parallel"
     hydra/launcher=joblib \
     input_dir="$EICU_PREMEDS_DIR" \
     cohort_dir="$EICU_MEDS_DIR" \
-    event_conversion_config_fp=./eICU_Example/configs/event_configs.yaml "$@"
+    event_conversion_config_fp=./eICU_Example/configs/event_configs.yaml \
+    stage_configs.split_and_shard_subjects.n_subjects_per_shard=10000 \
+    stage_configs.merge_to_MEDS_cohort.unique_by=null "$@"
 
 echo "Splitting subjects in serial"
 ./src/MEDS_transforms/extract/split_and_shard_subjects.py \
     input_dir="$EICU_PREMEDS_DIR" \
     cohort_dir="$EICU_MEDS_DIR" \
-    event_conversion_config_fp=./eICU_Example/configs/event_configs.yaml "$@"
+    event_conversion_config_fp=./eICU_Example/configs/event_configs.yaml \
+    stage_configs.split_and_shard_subjects.n_subjects_per_shard=10000 \
+    stage_configs.merge_to_MEDS_cohort.unique_by=null "$@"
 
 echo "Converting to sharded events with $N_PARALLEL_WORKERS workers in parallel"
 ./src/MEDS_transforms/extract/convert_to_sharded_events.py \
@@ -72,7 +76,9 @@ echo "Converting to sharded events with $N_PARALLEL_WORKERS workers in parallel"
     hydra/launcher=joblib \
     input_dir="$EICU_PREMEDS_DIR" \
     cohort_dir="$EICU_MEDS_DIR" \
-    event_conversion_config_fp=./eICU_Example/configs/event_configs.yaml "$@"
+    event_conversion_config_fp=./eICU_Example/configs/event_configs.yaml \
+    stage_configs.split_and_shard_subjects.n_subjects_per_shard=10000 \
+    stage_configs.merge_to_MEDS_cohort.unique_by=null "$@"
 
 echo "Merging to a MEDS cohort with $N_PARALLEL_WORKERS workers in parallel"
 ./src/MEDS_transforms/extract/merge_to_MEDS_cohort.py \
@@ -81,4 +87,6 @@ echo "Merging to a MEDS cohort with $N_PARALLEL_WORKERS workers in parallel"
     hydra/launcher=joblib \
     input_dir="$EICU_PREMEDS_DIR" \
     cohort_dir="$EICU_MEDS_DIR" \
-    event_conversion_config_fp=./eICU_Example/configs/event_configs.yaml "$@"
+    event_conversion_config_fp=./eICU_Example/configs/event_configs.yaml \
+    stage_configs.split_and_shard_subjects.n_subjects_per_shard=10000 \
+    stage_configs.merge_to_MEDS_cohort.unique_by=null "$@"
