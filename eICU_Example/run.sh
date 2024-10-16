@@ -46,6 +46,7 @@ echo "in the merge stage. You can do this by setting the following parameters at
 echo "args when running this script:"
 echo "  * stage_configs.split_and_shard_subjects.n_subjects_per_shard=10000"
 echo "  * stage_configs.merge_to_MEDS_cohort.unique_by=null"
+echo "Additionally, consider reducing N_PARALLEL_WORKERS if > 1"
 
 echo "Running pre-MEDS conversion."
 ./eICU_Example/pre_MEDS.py raw_cohort_dir="$EICU_RAW_DIR" output_dir="$EICU_PREMEDS_DIR"
