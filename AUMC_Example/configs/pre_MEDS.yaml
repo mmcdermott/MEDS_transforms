@@ -1,0 +1,11 @@
+input_dir: ${oc.env:AUMC_RAW_DIR}
+cohort_dir: ${oc.env:AUMC_PRE_MEDS_DIR}
+
+# Hydra
+hydra:
+  job:
+    name: pre_MEDS_${now:%Y-%m-%d_%H-%M-%S}
+  run:
+    dir: ${output_dir}/.logs/${hydra.job.name}
+  sweep:
+    dir: ${output_dir}/.logs/${hydra.job.name}
