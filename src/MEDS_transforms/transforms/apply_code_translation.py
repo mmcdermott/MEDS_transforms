@@ -18,8 +18,7 @@ def apply_code_translation_fntr(
 
     including the mandatory columns:
       - `code` (`str`)
-      - `code/vocab_index` (`int`)
-      - Any `code_modifiers` columns, if specified
+      - `stage_cfg.translation_col` (`str`)
 
     Args:
         df: The MEDS dataset to normalize. See above for the expected schema.
