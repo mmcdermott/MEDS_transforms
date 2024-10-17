@@ -1,8 +1,6 @@
 # Note that there is no "subject_id" for eICU -- patients are only differentiable during the course of a
 # single health system stay. Accordingly, we set the "patient" id here as the "patientHealthSystemStayID"
 
-
-
 subject_id_col: patienthealthsystemstayid
 
 patient:
