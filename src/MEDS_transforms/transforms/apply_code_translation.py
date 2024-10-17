@@ -37,7 +37,6 @@ def apply_code_translation_fntr(
         ...     },
         ...     schema={"subject_id": pl.UInt32, "code": pl.Utf8},
         ... ).lazy()
-        >>> stage_cfg = DictConfig({"translation_col": "translated"})
         >>> metadata_df = pl.DataFrame(
         ...     {
         ...         "code": ["static", "DOB", "ICD//9//A", "ICD//9//B", "ICD//9//C", "ICD//10//A"],
@@ -45,6 +44,29 @@ def apply_code_translation_fntr(
         ...     },
         ...     schema={"code": pl.Utf8, "translated": pl.Utf8},
         ... )
+        >>> stage_cfg = DictConfig({})
+        >>> apply_code_translation_fntr(stage_cfg, metadata_df)(df).collect()
+        shape: (8, 2)
+        ┌────────────┬────────────┐
+        │ subject_id ┆ code       │
+        │ ---        ┆ ---        │
+        │ u32        ┆ str        │
+        ╞════════════╪════════════╡
+        │ 1          ┆ static     │
+        │ 1          ┆ DOB        │
+        │ 1          ┆ ICD//9//A  │
+        │ 1          ┆ ICD//10//A │
+        │ 2          ┆ DOB        │
+        │ 2          ┆ ICD//9//A  │
+        │ 3          ┆ ICD//9//B  │
+        │ 3          ┆ ICD//9//C  │
+        └────────────┴────────────┘
+        >>> stage_cfg = DictConfig({"translation_col": "new_code"})
+        >>> apply_code_translation_fntr(stage_cfg, metadata_df)(df).collect()
+        Traceback (most recent call last):
+            ...
+        ValueError: Column with translation ('new_code') not found in code metadata.
+        >>> stage_cfg = DictConfig({"translation_col": "translated"})
         >>> apply_code_translation_fntr(stage_cfg, metadata_df)(df).collect()
         shape: (8, 2)
         ┌────────────┬────────────┐
@@ -91,7 +113,7 @@ def apply_code_translation_fntr(
         return lambda df: df
 
     if translation_col not in code_metadata.columns:
-        raise ValueError(f"Column '{translation_col}' not found in code metadata.")
+        raise ValueError(f"Column with translation ('{translation_col}') not found in code metadata.")
 
     def apply_code_translation_fn(df: pl.LazyFrame) -> pl.LazyFrame:
         return (
