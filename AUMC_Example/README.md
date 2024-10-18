@@ -1,6 +1,6 @@
-# MIMIC-IV Example
+# AUMC Example
 
-This is an example of how to extract a MEDS dataset from MIMIC-IV. All scripts in this README are assumed to
+This is an example of how to extract a MEDS dataset from AUMCdb (https://github.com/AmsterdamUMC/AmsterdamUMCdb). All scripts in this README are assumed to
 be run **not** from this directory but from the root directory of this entire repository (e.g., one directory
 up from this one).
 
@@ -17,12 +17,12 @@ If you want to profile the time and memory costs of your ETL, also install: `pip
 ## Step 0.5: Set-up
 Set some environment variables and download the necessary files:
 ```bash
-export MIMICIV_RAW_DIR=??? # set to the directory in which you want to store the raw MIMIC-IV data
-export MIMICIV_PRE_MEDS_DIR=??? # set to the directory in which you want to store the intermediate MEDS MIMIC-IV data
-export MIMICIV_MEDS_COHORT_DIR=??? # set to the directory in which you want to store the final MEDS MIMIC-IV data
+export AUMC_RAW_DIR=??? # set to the directory in which you want to store the raw data
+export AUMC_PRE_MEDS_DIR=??? # set to the directory in which you want to store the intermediate MEDS data
+export AUMC_MEDS_COHORT_DIR=??? # set to the directory in which you want to store the final MEDS data
 
-export VERSION=0.0.6 # or whatever version you want
-export URL="https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/$VERSION/MIMIC-IV_Example"
+export VERSION=0.0.8 # or whatever version you want
+export URL="https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/$VERSION/AUMC_Example"
 
 wget $URL/run.sh
 wget $URL/pre_MEDS.py
@@ -30,42 +30,24 @@ wget $URL/local_parallelism_runner.yaml
 wget $URL/slurm_runner.yaml
 mkdir configs
 cd configs
-wget $URL/configs/extract_MIMIC.yaml
+wget $URL/configs/extract_AUMC.yaml
 cd ..
 chmod +x run.sh
 chmod +x pre_MEDS.py
 ```
 
-## Step 1: Download MIMIC-IV
 
-Download the MIMIC-IV dataset from https://physionet.org/content/mimiciv/2.2/ following the instructions on
-that page. You will need the raw `.csv.gz` files for this example. We will use `$MIMICIV_RAW_DIR` to denote
-the root directory of where the resulting _core data files_ are stored -- e.g., there should be a `hosp` and
-`icu` subdirectory of `$MIMICIV_RAW_DIR`.
+## Step 1: Download AUMC
 
-## Step 1.5: Download MIMIC-IV Metadata files
+Download the AUMC dataset from following the instructions on https://github.com/AmsterdamUMC/AmsterdamUMCdb?tab=readme-ov-file. You will need the raw `.csv` files for this example. We will use `$AUMC_RAW_DIR` to denote the root directory of where the resulting _core data files_ are stored.
 
-```bash
-cd $MIMICIV_RAW_DIR
-export MIMIC_URL=https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map
-wget $MIMIC_URL/d_labitems_to_loinc.csv
-wget $MIMIC_URL/inputevents_to_rxnorm.csv
-wget $MIMIC_URL/lab_itemid_to_loinc.csv
-wget $MIMIC_URL/meas_chartevents_main.csv
-wget $MIMIC_URL/meas_chartevents_value.csv
-wget $MIMIC_URL/numerics-summary.csv
-wget $MIMIC_URL/outputevents_to_loinc.csv
-wget $MIMIC_URL/proc_datetimeevents.csv
-wget $MIMIC_URL/proc_itemid.csv
-wget $MIMIC_URL/waveforms-summary.csv
-```
 
 ## Step 2: Run the MEDS ETL
 
 To run the MEDS ETL, run the following command:
 
 ```bash
-./run.sh $MIMICIV_RAW_DIR $MIMICIV_PRE_MEDS_DIR $MIMICIV_MEDS_COHORT_DIR do_unzip=true
+./run.sh $AUMC_RAW_DIR $AUMC_PRE_MEDS_DIR $AUMC_MEDS_COHORT_DIR
 ```
 > [!NOTE] 
 > This can take up large amounts of memory if not parallelized. You can reduce the shard size to reduce memory usage by setting the `shard_size` parameter in the `extract_MIMIC.yaml` file.
@@ -77,9 +59,12 @@ additional argument
 
 ```bash
 export N_WORKERS=5
-./run.sh $MIMICIV_RAW_DIR $MIMICIV_PRE_MEDS_DIR $MIMICIV_MEDS_DIR do_unzip=true \
+./run.sh $AUMC_RAW_DIR $AUMC_PRE_MEDS_DIR $AUMC_MEDS_DIR \
     stage_runner_fp=slurm_runner.yaml
 ```
+
+The `N_WORKERS` environment variable set before the command controls how many parallel workers should be used
+at maximum.
 
 The `N_WORKERS` environment variable set before the command controls how many parallel workers should be used
 at maximum.
@@ -95,6 +80,21 @@ variable and there is nothing to customize in this file.
 
 To profile the time and memory costs of your ETL, add the `do_profile=true` flag at the end.
 
+## Limitations / TO-DOs:
+
+Currently, some tables are ignored, including:
+
+INSERT TABLES IGNORED HERE
+
+Lots of questions remain about how to appropriately handle times of the data -- e.g., things like HCPCS
+events are stored at the level of the _date_, not the _datetime_. How should those be slotted into the
+timeline which is otherwise stored at the _datetime_ resolution?
+
+Other questions:
+
+1. How to handle merging the deathtimes between the hosp table and the patients table?
+2. How to handle the dob nonsense MIMIC has?
+
 ## Notes
 
 Note: If you use the slurm system and you launch the hydra submitit jobs from an interactive slurm node, you
@@ -106,4 +106,3 @@ may need to run `unset SLURM_CPU_BIND` in your terminal first to avoid errors.
 
 If you wanted, some other processing could also be done here, such as:
 
-1. Converting the subject's dynamically recorded race into a static, most commonly recorded race field.

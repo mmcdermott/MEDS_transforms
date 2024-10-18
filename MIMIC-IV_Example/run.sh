@@ -35,6 +35,12 @@ if [ "$#" -lt 3 ]; then
     display_help
 fi
 
+# Check that the do_unzip flag is not set as a positional argument
+if [[ "$1" == "do_unzip=true" || "$1" == "do_unzip=false" || "$2" == "do_unzip=true" || "$2" == "do_unzip=false" || "$3" == "do_unzip=true" || "$3" == "do_unzip=false" ]]; then
+    echo "Error: Incorrect number of arguments provided. Check if your environment variables are set correctly."
+    display_help
+fi
+
 export MIMICIV_RAW_DIR=$1
 export MIMICIV_PRE_MEDS_DIR=$2
 export MIMICIV_MEDS_COHORT_DIR=$3
