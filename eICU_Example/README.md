@@ -9,12 +9,13 @@ up from this one).
 
 **Status**: This is a work in progress. The code is not yet functional. Remaining work includes:
 
-- [ ] Implementing the pre-MEDS processing step.
-    - [ ] Identifying the pre-MEDS steps for eICU
-- [ ] Testing the pre-MEDS processing step on live eICU-CRD.
-    - [ ] Test that it runs at all.
-    - [ ] Test that the output is as expected.
+- [x] Implementing the pre-MEDS processing step.
+    - [x] Identifying the pre-MEDS steps for eICU
+- [x] Testing the pre-MEDS processing step on live eICU-CRD.
+    - [x] Test that it runs at all.
+    - [x] Test that the output is as expected.
 - [ ] Check the installation instructions on a fresh client.
+- [ ] Set up a runner config and one-script view like in the [MIMIC Example](https://github.com/mmcdermott/MEDS_transforms/tree/main/MIMIC-IV_Example)
 - [ ] Testing the `configs/event_configs.yaml` configuration on eICU-CRD
 - [ ] Testing the MEDS extraction ETL runs on eICU-CRD (this should be expected to work, but needs
     live testing).

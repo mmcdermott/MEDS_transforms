@@ -12,8 +12,12 @@ import polars as pl
 
 from tests.MEDS_Transforms import TOKENIZATION_SCRIPT
 
+from ..utils import parse_meds_csvs
 from .test_normalization import NORMALIZED_MEDS_SCHEMA
+from .test_normalization import WANT_HELD_OUT_0 as NORMALIZED_HELD_OUT_0
 from .test_normalization import WANT_SHARDS as NORMALIZED_SHARDS
+from .test_normalization import WANT_TRAIN_1 as NORMALIZED_TRAIN_1
+from .test_normalization import WANT_TUNING_0 as NORMALIZED_TUNING_0
 from .transform_tester_base import single_stage_transform_tester
 
 SECONDS_PER_DAY = 60 * 60 * 24
@@ -71,6 +75,17 @@ WANT_SCHEMAS_TRAIN_0 = pl.DataFrame(
         "subject_id": [239684, 1195293],
         "code": [[7, 9], [6, 9]],
         "numeric_value": [[None, 1.5770268440246582], [None, 0.06802856922149658]],
+        "start_time": [ts[0] for ts in TRAIN_0_TIMES],
+        "time": TRAIN_0_TIMES,
+    },
+    schema=SCHEMAS_SCHEMA,
+)
+
+WANT_SCHEMAS_TRAIN_0_MISSING_STATIC = pl.DataFrame(
+    {
+        "subject_id": [239684, 1195293],
+        "code": [None, [6, 9]],
+        "numeric_value": [None, [None, 0.06802856922149658]],
         "start_time": [ts[0] for ts in TRAIN_0_TIMES],
         "time": TRAIN_0_TIMES,
     },
@@ -211,12 +226,61 @@ WANT_SCHEMAS = {
     "schemas/held_out/0": WANT_SCHEMAS_HELD_OUT_0,
 }
 
+WANT_SCHEMAS_MISSING_STATIC = {
+    "schemas/train/0": WANT_SCHEMAS_TRAIN_0_MISSING_STATIC,
+    "schemas/train/1": WANT_SCHEMAS_TRAIN_1,
+    "schemas/tuning/0": WANT_SCHEMAS_TUNING_0,
+    "schemas/held_out/0": WANT_SCHEMAS_HELD_OUT_0,
+}
+
 WANT_EVENT_SEQS = {
     "event_seqs/train/0": WANT_EVENT_SEQ_TRAIN_0,
     "event_seqs/train/1": WANT_EVENT_SEQ_TRAIN_1,
     "event_seqs/tuning/0": WANT_EVENT_SEQ_TUNING_0,
     "event_seqs/held_out/0": WANT_EVENT_SEQ_HELD_OUT_0,
 }
+
+NORMALIZED_TRAIN_0 = """
+subject_id,time,code,numeric_value
+239684,"12/28/1980, 00:00:00",5,
+239684,"05/11/2010, 17:41:51",1,
+239684,"05/11/2010, 17:41:51",10,-0.569736897945404
+239684,"05/11/2010, 17:41:51",11,-1.2714673280715942
+239684,"05/11/2010, 17:48:48",10,-0.43754738569259644
+239684,"05/11/2010, 17:48:48",11,-1.168027639389038
+239684,"05/11/2010, 18:25:35",10,0.001321975840255618
+239684,"05/11/2010, 18:25:35",11,-1.37490713596344
+239684,"05/11/2010, 18:57:18",10,-0.04097883030772209
+239684,"05/11/2010, 18:57:18",11,-1.5300706624984741
+239684,"05/11/2010, 19:27:19",4,
+1195293,,6,
+1195293,,9,0.06802856922149658
+1195293,"06/20/1978, 00:00:00",5,
+1195293,"06/20/2010, 19:23:52",1,
+1195293,"06/20/2010, 19:23:52",10,-0.23133166134357452
+1195293,"06/20/2010, 19:23:52",11,0.7973587512969971
+1195293,"06/20/2010, 19:25:32",10,0.03833488002419472
+1195293,"06/20/2010, 19:25:32",11,0.7973587512969971
+1195293,"06/20/2010, 19:45:19",10,0.3397272229194641
+1195293,"06/20/2010, 19:45:19",11,0.745638906955719
+1195293,"06/20/2010, 20:12:31",10,-0.046266332268714905
+1195293,"06/20/2010, 20:12:31",11,0.6939190626144409
+1195293,"06/20/2010, 20:24:44",10,-0.3000703752040863
+1195293,"06/20/2010, 20:24:44",11,0.7973587512969971
+1195293,"06/20/2010, 20:41:33",10,-0.31064537167549133
+1195293,"06/20/2010, 20:41:33",11,1.004242181777954
+1195293,"06/20/2010, 20:50:04",4,
+"""
+
+NORMALIZED_SHARDS_MISSING_STATIC = parse_meds_csvs(
+    {
+        "train/0": NORMALIZED_TRAIN_0,
+        "train/1": NORMALIZED_TRAIN_1,
+        "tuning/0": NORMALIZED_TUNING_0,
+        "held_out/0": NORMALIZED_HELD_OUT_0,
+    },
+    schema=NORMALIZED_MEDS_SCHEMA,
+)
 
 
 def test_tokenization():
@@ -236,4 +300,13 @@ def test_tokenization():
         input_shards=NORMALIZED_SHARDS,
         want_data={**WANT_SCHEMAS, **WANT_EVENT_SEQS},
         should_error=True,
+    )
+
+    single_stage_transform_tester(
+        transform_script=TOKENIZATION_SCRIPT,
+        stage_name="tokenization",
+        transform_stage_kwargs=None,
+        input_shards=NORMALIZED_SHARDS_MISSING_STATIC,
+        want_data={**WANT_SCHEMAS_MISSING_STATIC, **WANT_EVENT_SEQS},
+        df_check_kwargs={"check_column_order": False},
     )

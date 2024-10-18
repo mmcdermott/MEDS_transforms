@@ -144,6 +144,38 @@ def extract_statics_and_schema(df: pl.LazyFrame) -> pl.LazyFrame:
         │ 1          ┆ 2021-01-13 00:00:00 │
         │ 2          ┆ 2021-01-02 00:00:00 │
         └────────────┴─────────────────────┘
+        >>> df = pl.DataFrame({
+        ...     "subject_id": [1, 1, 1, 1, 2, 2, 2],
+        ...     "time": [
+        ...         datetime(2020, 1, 1), datetime(2021, 1, 1), datetime(2021, 1, 1), datetime(2021, 1, 13),
+        ...         datetime(2020, 1, 1), datetime(2021, 1, 2), datetime(2021, 1, 2)],
+        ...     "code": [100, 101, 102, 103, 200, 201, 202],
+        ...     "numeric_value": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+        ... }).lazy()
+        >>> df = extract_statics_and_schema(df).collect()
+        >>> df.drop("time")
+        shape: (2, 4)
+        ┌────────────┬───────────┬───────────────┬─────────────────────┐
+        │ subject_id ┆ code      ┆ numeric_value ┆ start_time          │
+        │ ---        ┆ ---       ┆ ---           ┆ ---                 │
+        │ i64        ┆ list[i64] ┆ list[f64]     ┆ datetime[μs]        │
+        ╞════════════╪═══════════╪═══════════════╪═════════════════════╡
+        │ 1          ┆ null      ┆ null          ┆ 2020-01-01 00:00:00 │
+        │ 2          ┆ null      ┆ null          ┆ 2020-01-01 00:00:00 │
+        └────────────┴───────────┴───────────────┴─────────────────────┘
+        >>> df.select("subject_id", "time").explode("time")
+        shape: (5, 2)
+        ┌────────────┬─────────────────────┐
+        │ subject_id ┆ time                │
+        │ ---        ┆ ---                 │
+        │ i64        ┆ datetime[μs]        │
+        ╞════════════╪═════════════════════╡
+        │ 1          ┆ 2020-01-01 00:00:00 │
+        │ 1          ┆ 2021-01-01 00:00:00 │
+        │ 1          ┆ 2021-01-13 00:00:00 │
+        │ 2          ┆ 2020-01-01 00:00:00 │
+        │ 2          ┆ 2021-01-02 00:00:00 │
+        └────────────┴─────────────────────┘
     """
 
     static, dynamic = split_static_and_dynamic(df)
@@ -158,7 +190,7 @@ def extract_statics_and_schema(df: pl.LazyFrame) -> pl.LazyFrame:
 
     # TODO(mmd): Consider tracking subject offset explicitly here.
 
-    return static_by_subject.join(schema_by_subject, on="subject_id", how="inner")
+    return static_by_subject.join(schema_by_subject, on="subject_id", how="full", coalesce=True)
 
 
 def extract_seq_of_subject_events(df: pl.LazyFrame) -> pl.LazyFrame:
