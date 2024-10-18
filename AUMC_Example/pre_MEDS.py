@@ -146,7 +146,7 @@ def main(cfg: DictConfig):
         logger.info(f"  Adding preprocessor for {table_name}:\n{OmegaConf.to_yaml(preprocessor_cfg)}")
         functions[table_name] = join_and_get_pseudotime_fntr(table_name=table_name, **preprocessor_cfg)
 
-    raw_cohort_dir = Path(cfg.raw_cohort_dir)
+    raw_cohort_dir = Path(cfg.input_dir)
     MEDS_input_dir = Path(cfg.output_dir)
 
     patient_out_fp = MEDS_input_dir / "patient.parquet"
