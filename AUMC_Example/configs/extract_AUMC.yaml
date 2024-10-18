@@ -25,10 +25,8 @@ etl_metadata:
 stage_configs:
   shard_events:
     infer_schema_length: 999999999
-    # data_input_dir: ${oc.env:AUMC_PRE_MEDS_DIR}
-    # raw_cohort_dir: ${oc.env:AUMC_MEDS_COHORT_DIR}
   split_and_shard_subjects:
-    n_patients_per_shard=1000
+    n_patients_per_shard: 1000
 
 stages:
   - shard_events
@@ -38,3 +36,4 @@ stages:
   - extract_code_metadata
   - finalize_MEDS_metadata
   - finalize_MEDS_data
+
