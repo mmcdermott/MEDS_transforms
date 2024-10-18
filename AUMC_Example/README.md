@@ -6,105 +6,79 @@ up from this one).
 
 ## Step 0: Installation
 
-Download this repository and install the requirements:
-If you want to install via pypi, (note that for now, you still need to copy some files locally even with a
-pypi installation, which is covered below, so make sure you are in a suitable directory) use:
-
 ```bash
 conda create -n MEDS python=3.12
 conda activate MEDS
-pip install MEDS_transforms[examples,local_parallelism]
-mkdir AUMC_Example
-cd AUMC_Example
-wget https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/main/AUMC_Example/joint_script.sh
-wget https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/main/AUMC_Example/joint_script_slurm.sh
-wget https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/main/AUMC_Example/pre_MEDS.py
-chmod +x joint_script.sh
-chmod +x joint_script_slurm.sh
-chmod +x pre_MEDS.py
+pip install "MEDS_transforms[local_parallelism,slurm_parallelism]"
+```
+
+If you want to profile the time and memory costs of your ETL, also install: `pip install hydra-profiler`.
+
+## Step 0.5: Set-up
+Set some environment variables and download the necessary files:
+```bash
+export AUMC_RAW_DIR=??? # set to the directory in which you want to store the raw data
+export AUMC_PRE_MEDS_DIR=??? # set to the directory in which you want to store the intermediate MEDS data
+export AUMC_MEDS_COHORT_DIR=??? # set to the directory in which you want to store the final MEDS data
+
+export VERSION=0.0.8 # or whatever version you want
+export URL="https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/$VERSION/AUMC_Example"
+
+wget $URL/run.sh
+wget $URL/pre_MEDS.py
+wget $URL/local_parallelism_runner.yaml
+wget $URL/slurm_runner.yaml
+mkdir configs
+cd configs
+wget $URL/configs/extract_AUMC.yaml
 cd ..
+chmod +x run.sh
+chmod +x pre_MEDS.py
 ```
 
-If you want to install locally, use:
-
-```bash
-git clone git@github.com:mmcdermott/MEDS_transforms.git
-cd MEDS_transforms
-conda create -n MEDS python=3.12
-conda activate MEDS
-pip install .[examples,local_parallelism]
-```
 
 ## Step 1: Download AUMC
 
 Download the AUMC dataset from following the instructions on https://github.com/AmsterdamUMC/AmsterdamUMCdb?tab=readme-ov-file. You will need the raw `.csv` files for this example. We will use `$AUMC_RAW_DIR` to denote the root directory of where the resulting _core data files_ are stored.
 
-## Step 2: Run the basic MEDS ETL
 
-This step contains several sub-steps; luckily, all these substeps can be run via a single script, with the
-`joint_script.sh` script which uses the Hydra `joblib` launcher to run things with local parallelism (make
-sure you enable this feature by including the `[local_parallelism]` option during installation) or via
-`joint_script_slurm.sh` which uses the Hydra `submitit` launcher to run things through slurm (make sure you
-enable this feature by including the `[slurm_parallelism]` option during installation). This script entails
-several steps:
+## Step 2: Run the MEDS ETL
 
-### Step 2.1: Get the data ready for base MEDS extraction
+To run the MEDS ETL, run the following command:
 
-This is a step in a few parts:
-
-1. Join a few tables by `hadm_id` to get the right times in the right rows for processing. In
-   particular, we need to join:
-   - the `hosp/diagnoses_icd` table with the `hosp/admissions` table to get the `dischtime` for each
-     `hadm_id`.
-   - the `hosp/drgcodes` table with the `hosp/admissions` table to get the `dischtime` for each `hadm_id`.
-2. Convert the patient's static data to a more parseable form. This entails:
-   - Get the patient's DOB in a format that is usable for MEDS, rather than the integral `anchor_year` and
-     `anchor_offset` fields.
-   - Merge the patient's `dod` with the `deathtime` from the `admissions` table.
-
-After these steps, modified files or symlinks to the original files will be written in a new directory which
-will be used as the input to the actual MEDS extraction ETL. We'll use `$AUMC_PREMEDS_DIR` to denote this
-directory.
-
-This step is run in the `joint_script.sh` script or the `joint_script_slurm.sh` script, but in either case the
-base command that is run is as follows (assumed to be run **not** from this directory but from the
-root directory of this repository):
 ```bash
-export AUMC_RAW_DIR=/path/to/AUMC/raw
-export AUMC_PREMEDS_DIR=/path/to/AUMC/pre_meds
+./run.sh $AUMC_RAW_DIR $AUMC_PRE_MEDS_DIR $AUMC_MEDS_COHORT_DIR
+```
+> [!NOTE] 
+> This can take up large amounts of memory if not parallelized. You can reduce the shard size to reduce memory usage by setting the `shard_size` parameter in the `extract_MIMIC.yaml` file.
+> Check that your environment variables are set correctly.
+To not unzip the `.csv.gz` files, set `do_unzip=false` instead of `do_unzip=true`.
+
+To use a specific stage runner file (e.g., to set different parallelism options), you can specify it as an
+additional argument
+
 ```bash
-./AUMC_Example/pre_MEDS.py raw_cohort_dir=$AUMC_RAW_DIR output_dir=$AUMC_PREMEDS_DIR
+export N_WORKERS=5
+./run.sh $AUMC_RAW_DIR $AUMC_PRE_MEDS_DIR $AUMC_MEDS_DIR \
+    stage_runner_fp=slurm_runner.yaml
 ```
 
-In practice, on a machine with 150 GB of RAM and 10 cores, this step takes less than 5 minutes in total.
+The `N_WORKERS` environment variable set before the command controls how many parallel workers should be used
+at maximum.
 
-### Step 2.2: Run the MEDS extraction ETL
+The `N_WORKERS` environment variable set before the command controls how many parallel workers should be used
+at maximum.
 
-We will assume you want to output the final MEDS dataset into a directory we'll denote as `$AUMC_MEDS_DIR`.
-Note this is a different directory than the pre-MEDS directory (though, of course, they can both be
-subdirectories of the same root directory).
+The `slurm_runner.yaml` file (downloaded above) runs each stage across several workers on separate slurm
+worker nodes using the `submitit` launcher. _**You will need to customize this file to your own slurm system
+so that the partition names are correct before use.**_ The memory and time costs are viable in the current
+configuration, but if your nodes are sufficiently different you may need to adjust those as well.
 
-This is a step in 4 parts:
+The `local_parallelism_runner.yaml` file (downloaded above) runs each stage via separate processes on the
+launching machine. There are no additional arguments needed for this stage beyond the `N_WORKERS` environment
+variable and there is nothing to customize in this file.
 
-1. Sub-shard the raw files. Run this command as many times simultaneously as you would like to have workers
-   performing this sub-sharding step. See below for how to automate this parallelism using hydra launchers.
-
-   This step uses the `./scripts/extraction/shard_events.py` script. See `joint_script*.sh` for the expected
-   format of the command.
-
-2. Extract and form the patient splits and sub-shards. The `./scripts/extraction/split_and_shard_patients.py`
-   script is used for this step. See `joint_script*.sh` for the expected format of the command.
-
-3. Extract patient sub-shards and convert to MEDS events. The
-   `./scripts/extraction/convert_to_sharded_events.py` script is used for this step. See `joint_script*.sh` for
-   the expected format of the command.
-
-4. Merge the MEDS events into a single file per patient sub-shard. The
-   `./scripts/extraction/merge_to_MEDS_cohort.py` script is used for this step. See `joint_script*.sh` for the
-   expected format of the command.
-
-5. (Optional) Generate preliminary code statistics and merge to external metadata. This is not performed
-   currently in the `joint_script*.sh` scripts.
+To profile the time and memory costs of your ETL, add the `do_profile=true` flag at the end.
 
 ## Limitations / TO-DOs:
 
