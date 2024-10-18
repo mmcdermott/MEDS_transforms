@@ -147,7 +147,7 @@ def main(cfg: DictConfig):
         functions[table_name] = join_and_get_pseudotime_fntr(table_name=table_name, **preprocessor_cfg)
 
     raw_cohort_dir = Path(cfg.input_dir)
-    MEDS_input_dir = Path(cfg.output_dir)
+    MEDS_input_dir = Path(cfg.cohort_dir)
 
     patient_out_fp = MEDS_input_dir / "patient.parquet"
     link_out_fp = MEDS_input_dir / "link_patient_to_admission.parquet"
