@@ -65,9 +65,6 @@ export N_WORKERS=5
 The `N_WORKERS` environment variable set before the command controls how many parallel workers should be used
 at maximum.
 
-The `N_WORKERS` environment variable set before the command controls how many parallel workers should be used
-at maximum.
-
 The `slurm_runner.yaml` file (downloaded above) runs each stage across several workers on separate slurm
 worker nodes using the `submitit` launcher. _**You will need to customize this file to your own slurm system
 so that the partition names are correct before use.**_ The memory and time costs are viable in the current
@@ -100,6 +97,10 @@ Note: If you use the slurm system and you launch the hydra submitit jobs from an
 may need to run `unset SLURM_CPU_BIND` in your terminal first to avoid errors.
 
 ## Future Work
+Check with AUMCdb authors:
+- How should we deal with `registeredat` and `updatedat`?
+- We **IGNORE** several flags for the `drugitems` -- this may be a mistake!
+- When is the administered dose recorded? Is this done after the fact?
 
 ### Pre-MEDS Processing
 

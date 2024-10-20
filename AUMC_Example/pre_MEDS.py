@@ -8,7 +8,6 @@ import rootutils
 
 root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
-import gzip
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -132,8 +131,6 @@ def join_and_get_pseudotime_fntr(
 @hydra.main(version_base=None, config_path="configs", config_name="pre_MEDS")
 def main(cfg: DictConfig):
     """Performs pre-MEDS data wrangling for AUMCdb.
-
-
     """
 
     hydra_loguru_init()
