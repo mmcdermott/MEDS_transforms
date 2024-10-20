@@ -2,7 +2,7 @@ admissions:
   offset_col:
     - "admittedat"
     - "dischargedat"
-  pseudotime_col: 
+  pseudotime_col:
     - "admittedattime"
     - "dischargedattime"
   output_data_cols:
@@ -21,7 +21,7 @@ numericitems:
     - "measuredat"
     - "registeredat"
     - "updatedat"
-  pseudotime_col: 
+  pseudotime_col:
     - "measuredattime"
     - "registeredattime"
     - "updatedattime"
@@ -35,11 +35,11 @@ numericitems:
     - "How should we deal with `registeredat` and `updatedat`?"
 
 listitems:
-  offset_col: 
+  offset_col:
     - "measuredat"
     - "registeredat"
     - "updatedat"
-  pseudotime_col: 
+  pseudotime_col:
     - "measuredattime"
     - "registeredattime"
     - "updatedattime"
@@ -53,11 +53,11 @@ listitems:
     - "How should we deal with `registeredat` and `updatedat`?"
 
 freetextitems:
-  offset_col: 
+  offset_col:
     - "measuredat"
     - "registeredat"
     - "updatedat"
-  pseudotime_col: 
+  pseudotime_col:
     - "measuredattime"
     - "registeredattime"
     - "updatedattime"
@@ -75,7 +75,7 @@ drugitems:
   offset_col:
     - "start"
     - "stop"
-  pseudotime_col: 
+  pseudotime_col:
     - "starttime"
     - "stoptime"
   output_data_cols:
@@ -92,7 +92,7 @@ drugitems:
     - "administered"
     - "administeredunit"
     - "action"
-  warning_items: 
+  warning_items:
     - "We **IGNORE** several flags here -- this may be a mistake!"
     - "When is the administered dose recorded? Is this done after the fact?"
 
@@ -109,7 +109,7 @@ processitems:
   offset_col:
     - "start"
     - "stop"
-  pseudotime_col: 
+  pseudotime_col:
     - "starttime"
     - "stoptime"
   output_data_cols:

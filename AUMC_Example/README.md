@@ -50,9 +50,8 @@ To run the MEDS ETL, run the following command:
 ./run.sh $AUMC_RAW_DIR $AUMC_PRE_MEDS_DIR $AUMC_MEDS_COHORT_DIR
 ```
 > [!NOTE] 
-> This can take up large amounts of memory if not parallelized. You can reduce the shard size to reduce memory usage by setting the `shard_size` parameter in the `extract_MIMIC.yaml` file.
+> This can take up large amounts of memory if not parallelized. You can reduce the shard size to reduce memory usage by setting the `shard_size` parameter in the `extract_AUMC.yaml` file.
 > Check that your environment variables are set correctly.
-To not unzip the `.csv.gz` files, set `do_unzip=false` instead of `do_unzip=true`.
 
 To use a specific stage runner file (e.g., to set different parallelism options), you can specify it as an
 additional argument
