@@ -72,7 +72,7 @@ class OmopConceptRelationshipMapping(VocabularyMapping):
             concept_id_to_code_mapping,
             on="concept_id"
         ).drop(
-            ["mapped_concept_id", "concept_id"]
+            ["mapped_concept_ids", "concept_id"]
         ).rename(
             {"code": "source_code"}
         )
@@ -87,18 +87,16 @@ class OmopConceptRelationshipMapping(VocabularyMapping):
             concept_id_to_code_mapping,
             on="concept_id"
         ).drop(
-            ["mapped_concept_id", "concept_id"]
+            ["mapped_concept_ids", "concept_id"]
         ).rename(
             {"code": "target_code"}
         )
 
-        source_concept_id_to_mapped_concepts.join(
-            target_concept_id_to_mapped_concepts, on="hash"
-        )
-
         return {
-            row["source_code"]: row["target_codes"]
-            for row in source_concept_id_to_mapped_concepts.collect().to_dicts()
+            row["source_code"]: row["target_code"]
+            for row in source_concept_id_to_mapped_concepts.join(
+                target_concept_id_to_mapped_concepts, on="hash"
+            ).collect().to_dicts()
         }
 
 
@@ -263,20 +261,28 @@ def add_metadata_translation(
 
     Examples:
         >>> code_metadata = pl.DataFrame({
-        ...     "code": ["ICD//9//A", "ICD//9//B", "ICD//10//A", "ICD//10//A"],
+        ...     "code": ["ICD9CM//V10.60", "ICD9CM//V15", "None_ICD9_code"],
         ... })
-        >>> add_metadata_translation(code_metadata, translation_col="translated")
-        shape: (4, 2)
-        ┌────────────┬────────────┐
-        │ code       ┆ translated │
-        │ ---        ┆ ---        │
-        │ str        ┆ str        │
-        ╞════════════╪════════════╡
-        │ ICD//9//A  ┆ null       │
-        │ ICD//9//B  ┆ null       │
-        │ ICD//10//A ┆ null       │
-        │ ICD//10//A ┆ null       │
-        └────────────┴────────────┘
+        >>> source_vocabulary = get_vocabulary("ICD9")
+        >>> target_vocabulary = get_vocabulary("ICD10")
+        >>> vocabulary_cache_dir = Path("vocabulary_cache_dir")
+        >>> add_metadata_translation(
+        ...     code_metadata,
+        ...     source_vocabulary,
+        ...     target_vocabulary,
+        ...     "translated_col",
+        ...     vocabulary_cache_dir
+        ...)
+        shape: (3, 2)
+        ┌────────────────┬─────────────────┐
+        │ code           ┆ translated_col  │
+        │ ---            ┆ ---             │
+        │ str            ┆ str             │
+        ╞════════════════╪═════════════════╡
+        │ ICD9CM//V10.60 ┆ ICD10CM//Z97.15 │
+        │ ICD9CM//V15    ┆ ICD10CM//Z97.15 │
+        │ test           ┆ test            │
+        └────────────────┴─────────────────┘
     """
 
     vocabulary_mapping = get_vocabulary_mapping(vocabulary_cache_dir, source_vocabulary, target_vocabulary)
@@ -286,8 +292,8 @@ def add_metadata_translation(
         pl.coalesce(
             translated_col_expr,
             pl.col("code")
-        ).alias(translation_col)
-    ).with_columns(pl.col.translated.cast(str))
+        ).cast(pl.String).alias(translation_col)
+    )
 
 
 @hydra.main(
