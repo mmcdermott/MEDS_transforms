@@ -1,2 +1,5 @@
 add_metadata_translation:
+  source_vocabulary: "ICD9"
+  target_vocabulary: "ICD10"
   translation_col: "translated"
+  vocabulary_cache_dir: "vocabulary_cache"
