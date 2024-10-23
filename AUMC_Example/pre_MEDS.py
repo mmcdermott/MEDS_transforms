@@ -83,7 +83,39 @@ def join_and_get_pseudotime_fntr(
 
     Also raises specified warning strings via the logger for uncertain columns.
 
-    TODO
+    Args: 
+        table_name: name of the AUMCdb table that should be joined
+        offset_col: list of all columns that contain time offsets since the patient's first admission
+        pseudotime_col: list of all timestamp columns derived from `offset_col` and the linked `patient` 
+            table
+        output_data_cols: list of all data columns included in the output 
+        warning_items: any warnings noted in the table_preprocessors.yaml
+
+    Example: 
+        All args except `table_name` are taken from the table_preprocessors.yaml. For example, for the 
+        table `numericitems`, we have the following yaml configuration:
+
+        numericitems:
+            offset_col: 
+                - "measuredat"
+                - "registeredat"
+                - "updatedat"
+            pseudotime_col:
+                - "measuredattime"
+                - "registeredattime"
+                - "updatedattime"
+            output_data_cols:
+                - "item"
+                - "value"
+                - "unit"
+                - "registeredby"
+                - "updatedby"
+            warning_items:
+                - "How should we deal with `registeredat` and `updatedat`?"
+
+    Returns: 
+        Function that expects the raw data stored in the `table_name` table and the joined output of the
+        `process_patient_and_admissions` function. Both inputs are expected to be `pl.DataFrame`s.
     """
 
     if output_data_cols is None:
@@ -131,6 +163,10 @@ def join_and_get_pseudotime_fntr(
 @hydra.main(version_base=None, config_path="configs", config_name="pre_MEDS")
 def main(cfg: DictConfig):
     """Performs pre-MEDS data wrangling for AUMCdb.
+
+    Inputs are the raw AUMCdb files, read from the `input_dir` config parameter. Output files are written
+    in processed form and as Parquet files to the `cohort_dir` config parameter. Hydra is used to manage
+    configuration parameters and logging. 
     """
 
     hydra_loguru_init()
