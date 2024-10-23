@@ -5,7 +5,7 @@ set -e
 
 # Function to display help message
 function display_help() {
-    echo "Usage: $0 <EICU_RAW_DIR> <EICU_PREMEDS_DIR> <EICU_MEDS_DIR> <N_PARALLEL_WORKERS>"
+    echo "Usage: $0 <EICU_RAW_DIR> <EICU_PREMEDS_DIR> <EICU_MEDS_DIR>"
     echo
     echo "This script processes eICU data through several steps, handling raw data conversion,"
     echo "sharding events, splitting subjects, converting to sharded events, and merging into a MEDS cohort."
@@ -14,7 +14,6 @@ function display_help() {
     echo "  EICU_RAW_DIR        Directory containing raw eICU data files."
     echo "  EICU_PREMEDS_DIR    Output directory for pre-MEDS data."
     echo "  EICU_MEDS_DIR       Output directory for processed MEDS data."
-    echo "  N_PARALLEL_WORKERS  Number of parallel workers for processing."
     echo "  (OPTIONAL) do_unzip=true OR do_unzip=false     Optional flag to unzip files before processing."
     echo
     echo "Options:"
@@ -36,7 +35,6 @@ fi
 EICU_RAW_DIR="$1"
 EICU_PRE_MEDS_DIR="$2"
 EICU_MEDS_COHORT_DIR="$3"
-N_PARALLEL_WORKERS="$4"
 
 export EICU_PRE_MEDS_DIR="$2"
 export EICU_MEDS_COHORT_DIR="$3"
