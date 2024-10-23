@@ -23,10 +23,8 @@ etl_metadata:
   dataset_version: 1.0.2
 
 stage_configs:
-  shard_events:
-    infer_schema_length: 999999999
   split_and_shard_subjects:
-    n_patients_per_shard: 1000
+    n_subjects_per_shard: 1000
 
 stages:
   - shard_events
