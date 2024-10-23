@@ -4,9 +4,6 @@
 
 See the docstring of `main` for more information.
 """
-import rootutils
-
-root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=True)
 
 from collections.abc import Callable
 from datetime import datetime
@@ -171,7 +168,7 @@ def main(cfg: DictConfig):
 
     hydra_loguru_init()
 
-    table_preprocessors_config_fp = Path("./AUMC_Example/configs/table_preprocessors.yaml")
+    table_preprocessors_config_fp = Path("./configs/table_preprocessors.yaml")
     logger.info(f"Loading table preprocessors from {str(table_preprocessors_config_fp.resolve())}...")
     preprocessors = OmegaConf.load(table_preprocessors_config_fp)
     functions = {}
