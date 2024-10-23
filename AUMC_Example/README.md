@@ -76,21 +76,6 @@ variable and there is nothing to customize in this file.
 
 To profile the time and memory costs of your ETL, add the `do_profile=true` flag at the end.
 
-## Limitations / TO-DOs:
-
-Currently, some tables are ignored, including:
-
-INSERT TABLES IGNORED HERE
-
-Lots of questions remain about how to appropriately handle times of the data -- e.g., things like HCPCS
-events are stored at the level of the _date_, not the _datetime_. How should those be slotted into the
-timeline which is otherwise stored at the _datetime_ resolution?
-
-Other questions:
-
-1. How to handle merging the deathtimes between the hosp table and the patients table?
-2. How to handle the dob nonsense MIMIC has?
-
 ## Notes
 
 Note: If you use the slurm system and you launch the hydra submitit jobs from an interactive slurm node, you
@@ -101,8 +86,4 @@ Check with AUMCdb authors:
 - How should we deal with `registeredat` and `updatedat`?
 - We **IGNORE** several flags for the `drugitems` -- this may be a mistake!
 - When is the administered dose recorded? Is this done after the fact?
-
-### Pre-MEDS Processing
-
-If you wanted, some other processing could also be done here, such as:
 
