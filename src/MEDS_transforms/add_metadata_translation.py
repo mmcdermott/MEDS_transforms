@@ -109,6 +109,7 @@ def get_vocabulary_mapping(
         Traceback (most recent call last):
         ...
         ValueError: Supported translations: from ICD9 to ICD10
+        But the given pair is ('SNOMED', 'ICD10')
     """
     vocabulary_tuple = (
         source_vocabulary.vocabulary_name,
@@ -119,42 +120,38 @@ def get_vocabulary_mapping(
             vocabulary_cache_dir, source_vocabulary, target_vocabulary
         )
     raise ValueError(
-        "Supported translations: " + "\n".join([f"from {s} to {t}" for s, t in SUPPORTED_TRANSLATIONS.keys()])
+        "Supported translations: "
+        + "\n".join([f"from {s} to {t}" for s, t in SUPPORTED_TRANSLATIONS.keys()])
+        + f"\nBut the given pair is {vocabulary_tuple}"
     )
 
 
 def add_metadata_translation(
-    code_metadata: pl.DataFrame,
-    source_vocabulary: Vocabulary,
-    target_vocabulary: Vocabulary,
-    translation_col: str,
-    vocabulary_cache_dir: Path,
-) -> pl.DataFrame:
+    cfg: DictConfig,
+) -> None:
     """Validate the code metadata has the requisite columns and is unique.
 
     Args:
-        code_metadata (pl.DataFrame): Metadata about the codes in the MEDS dataset,
-            with a column `code` and a collection of code modifier columns.
-        source_vocabulary (Vocabulary): The source vocabulary to be translated.
-        target_vocabulary (Vocabulary): The preferred target vocabulary to be translated to.
-        translation_col (str): The name of the column that stores the translated `code`.
-        vocabulary_cache_dir (Path): The cache folder that contains the OMOP concept_relationship data.
+        cfg (DictConfig): the pipeline configuration
 
     Returns:
-        pl.DataFrame: A DataFrame with the translated codes.
+        None
 
     Examples:
         >>> import tempfile
         >>> from pathlib import Path
         >>> import polars as pl
+        >>> from omegaconf import DictConfig, OmegaConf
         >>> from MEDS_transforms.vocabulary_mapping import Vocabulary
-        >>> source_vocab = Vocabulary("ICD9", ["ICD9CM"])
-        >>> target_vocab = Vocabulary("ICD10", ["ICD10CM"])
         >>> code_metadata = pl.DataFrame({
         ...     "code": ["ICD9CM//V9.60", "ICD9CM//V15", "None_ICD9_code"],
         ... })
         >>> with tempfile.TemporaryDirectory() as tmpdirname:
         ...     temp_dir = Path(tmpdirname)
+        ...     metadata_dir = temp_dir / "metadata"
+        ...     metadata_dir.mkdir(exist_ok=True)
+        ...     output_dir = temp_dir / "output"
+        ...     output_dir.mkdir(exist_ok=True)
         ...     concept_df = pl.DataFrame({
         ...         "concept_id": [1, 2, 3],
         ...         "concept_code": ["V9.60", "V10.60", "SNOMED_code"],
@@ -171,10 +168,21 @@ def add_metadata_translation(
         ...     concept_relationship_df.write_parquet(
         ...         str(temp_dir / "concept_relationship" / "data.parquet")
         ...     )
-        ...     updated_code_metadata = add_metadata_translation(
-        ...         code_metadata, source_vocab, target_vocab, "translated", temp_dir
-        ...     )
-        >>> updated_code_metadata
+        ...     # Write code_metadata to metadata_input_dir
+        ...     code_metadata.write_parquet(str(metadata_dir / "codes.parquet"))
+        ...     cfg = OmegaConf.create({
+        ...         "stage_cfg": {
+        ...             "metadata_input_dir": str(metadata_dir),
+        ...             "vocabulary_cache_dir": str(temp_dir),
+        ...             "reducer_output_dir": str(output_dir),
+        ...             "source_vocabulary": "ICD9",
+        ...             "target_vocabulary": "ICD10",
+        ...             "translation_col": "translated"
+        ...         }
+        ...     })
+        ...     add_metadata_translation(cfg)
+        ...     updated_code_metadata = pl.read_parquet(output_dir / "codes.parquet")
+        >>> print(updated_code_metadata)
         shape: (3, 2)
         ┌────────────────┬─────────────────┐
         │ code           ┆ translated      │
@@ -186,12 +194,32 @@ def add_metadata_translation(
         │ None_ICD9_code ┆ None_ICD9_code  │
         └────────────────┴─────────────────┘
     """
+
+    metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
+    vocabulary_cache_dir = Path(cfg.stage_cfg.get("vocabulary_cache_dir", "vocabulary_cache"))
+    # If the vocabulary cache dir is an absolute path, we will use it as is otherwise we assume
+    # it's a relative path w.r.t metadata_input_dir
+    if not vocabulary_cache_dir.is_absolute():
+        vocabulary_cache_dir = metadata_input_dir / vocabulary_cache_dir
+
+    translation_col = cfg.stage_cfg.get("translation_col", "translated")
+    output_dir = Path(cfg.stage_cfg.reducer_output_dir)
+    code_metadata = pl.read_parquet(metadata_input_dir / "codes.parquet", use_pyarrow=True)
+    source_vocabulary = get_vocabulary(cfg.stage_cfg.get("source_vocabulary"))
+    target_vocabulary = get_vocabulary(cfg.stage_cfg.get("target_vocabulary"))
+    logger.info("Adding code translation.")
+
     vocabulary_mapping = get_vocabulary_mapping(vocabulary_cache_dir, source_vocabulary, target_vocabulary)
     mapping = vocabulary_mapping.get_code_mappings()
     translated_col_expr = pl.col("code").replace_strict(mapping, return_dtype=pl.String, default=None)
-    return code_metadata.with_columns(
+    code_metadata = code_metadata.with_columns(
         pl.coalesce(translated_col_expr, pl.col("code")).cast(pl.String).alias(translation_col)
     )
+    output_fp = output_dir / "codes.parquet"
+    output_fp.parent.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Indices assigned. Writing to {output_fp}")
+    code_metadata.write_parquet(output_fp, use_pyarrow=True)
+    logger.info(f"Done with {cfg.stage_cfg}")
 
 
 @hydra.main(
@@ -209,34 +237,7 @@ def main(cfg: DictConfig):
         f"Stage: {cfg.stage}\n\n"
         f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
     )
-
-    metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
-    vocabulary_cache_dir = Path(cfg.stage_cfg.get("vocabulary_cache_dir", "vocabulary_cache"))
-    # If the vocabulary cache dir is an absolute path, we will use it as is otherwise we assume
-    # it's a relative path w.r.t metadata_input_dir
-    if not vocabulary_cache_dir.is_absolute():
-        vocabulary_cache_dir = metadata_input_dir / vocabulary_cache_dir
-
-    output_dir = Path(cfg.stage_cfg.reducer_output_dir)
-    code_metadata = pl.read_parquet(metadata_input_dir / "codes.parquet", use_pyarrow=True)
-    source_vocabulary = get_vocabulary(cfg.stage_cfg.get("source_vocabulary", "ICD9"))
-    target_vocabulary = get_vocabulary(cfg.stage_cfg.get("source_vocabulary", "ICD10"))
-    logger.info("Adding code translation.")
-    code_metadata = add_metadata_translation(
-        code_metadata,
-        source_vocabulary,
-        target_vocabulary,
-        cfg.stage_cfg.get("translation_col", "translated"),
-        vocabulary_cache_dir,
-    )
-
-    output_fp = output_dir / "codes.parquet"
-    output_fp.parent.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Indices assigned. Writing to {output_fp}")
-
-    code_metadata.write_parquet(output_fp, use_pyarrow=True)
-
-    logger.info(f"Done with {cfg.stage}")
+    add_metadata_translation(cfg)
 
 
 if __name__ == "__main__":  # pragma: no cover
