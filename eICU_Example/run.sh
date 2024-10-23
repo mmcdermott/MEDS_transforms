@@ -104,7 +104,7 @@ else
 fi
 
 echo "Running pre-MEDS conversion."
-./eICU_Example/pre_MEDS.py raw_cohort_dir="$EICU_RAW_DIR" output_dir="$EICU_PREMEDS_DIR"
+./pre_MEDS.py raw_cohort_dir="$EICU_RAW_DIR" output_dir="$EICU_PRE_MEDS_DIR"
 
 if [ -z "$N_WORKERS" ]; then
   echo "Setting N_WORKERS to 1 to avoid issues with the runners."
