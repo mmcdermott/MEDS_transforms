@@ -68,6 +68,8 @@ class VocabularyMapping(ABC):
         Returns:
             Dict[str, str]: A dictionary where keys are source vocabulary codes and values
             are the corresponding target vocabulary codes.
+
+        Examples:
         """
 
 
@@ -97,6 +99,10 @@ class OmopConceptRelationshipMapping(VocabularyMapping):
 
         Returns:
             str: A hashed string representing the sorted concept IDs concatenated with a hyphen.
+
+        Examples:
+            >>> OmopConceptRelationshipMapping.create_hash([3, 1, 2])
+            '1-2-3'
         """
         return "-".join(map(str, sorted(concept_ids)))
 
@@ -112,6 +118,37 @@ class OmopConceptRelationshipMapping(VocabularyMapping):
 
         Raises:
             Exception: If the vocabulary tables cannot be loaded or the mappings cannot be created.
+
+        Examples:
+            >>> import tempfile
+            >>> from pathlib import Path
+            >>> import polars as pl
+            >>> from MEDS_transforms.vocabulary_mapping import Vocabulary
+            >>> source_vocab = Vocabulary("ICD9", ["ICD9CM"])
+            >>> target_vocab = Vocabulary("ICD10", ["ICD10CM"])
+
+            >>> with tempfile.TemporaryDirectory() as tmpdirname:
+            ...     temp_dir = Path(tmpdirname)
+            ...     concept_df = pl.DataFrame({
+            ...         "concept_id": [1, 2, 3],
+            ...         "concept_code": ["V9.60", "V10.60", "SNOMED_code"],
+            ...         "vocabulary_id": ["ICD9CM", "ICD10CM", "SNOMED"]
+            ...     })
+            ...     concept_relationship_df = pl.DataFrame({
+            ...         "concept_id_1": [1, 2, 3],
+            ...         "concept_id_2": [3, 3, 3],
+            ...         "relationship_id": ["Maps to", "Maps to", "Maps to"]
+            ...     })
+            ...     (temp_dir / "concept").mkdir(exist_ok=True)
+            ...     (temp_dir / "concept_relationship").mkdir(exist_ok=True)
+            ...     concept_df.write_parquet(str(temp_dir / "concept" / "data.parquet"))
+            ...     concept_relationship_df.write_parquet(
+            ...         str(temp_dir / "concept_relationship" / "data.parquet")
+            ...     )
+            ...     mapping_instance = OmopConceptRelationshipMapping(temp_dir, source_vocab, target_vocab)
+            ...     result = mapping_instance.get_code_mappings()
+            >>> result
+            {'ICD9CM//V9.60': 'ICD10CM//V10.60'}
         """
         source_omop_vocabularies = self.source_vocabulary.omop_vocabularies
         target_omop_vocabularies = self.target_vocabulary.omop_vocabularies
@@ -152,14 +189,13 @@ class OmopConceptRelationshipMapping(VocabularyMapping):
             .rename({"code": "target_code"})
         )
 
-        return {
-            row["source_code"]: row["target_code"]
-            for row in source_concept_id_to_mapped_concepts.join(
-                target_concept_id_to_mapped_concepts, on="hash"
-            )
-            .collect()
-            .to_dicts()
-        }
+        source_to_target_mappings = source_concept_id_to_mapped_concepts.join(
+            target_concept_id_to_mapped_concepts, on="hash"
+        )
+        if isinstance(source_to_target_mappings, pl.LazyFrame):
+            source_to_target_mappings = source_to_target_mappings.collect()
+
+        return {row["source_code"]: row["target_code"] for row in source_to_target_mappings.to_dicts()}
 
 
 def try_loading_vocabulary_table(vocabulary_cache_dir: Path, vocabulary_table: str) -> pl.LazyFrame:
@@ -173,6 +209,36 @@ def try_loading_vocabulary_table(vocabulary_cache_dir: Path, vocabulary_table: s
         pl.exceptions.ComputeError: the concept_relationship dataframe cannot be loaded
 
     Returns: the concept_relationship dataframe
+
+        Examples:
+        >>> import os
+        >>> import tempfile
+        >>> import polars as pl
+        >>> from pathlib import Path
+        >>> with tempfile.TemporaryDirectory() as tmpdirname:
+        ...     temp_dir = Path(tmpdirname)
+        ...     table_dir = temp_dir / "concept_relationship"
+        ...     table_dir.mkdir(parents=True, exist_ok=True)
+        ...     # Create a dummy Parquet file
+        ...     df = pl.DataFrame({
+        ...         "concept_id_1": [1, 2, 3],
+        ...         "concept_id_2": [10, 20, 30],
+        ...         "relationship_id": ["Maps to", "Maps to", "Maps to"]
+        ...     })
+        ...     df.write_parquet(str(table_dir / "dummy.parquet"))
+        ...     # Attempt to load the parquet file using try_loading_vocabulary_table
+        ...     concept_relationship_df = try_loading_vocabulary_table(temp_dir, "concept_relationship")
+        ...     print(concept_relationship_df.collect().sort("concept_id_1"))
+        shape: (3, 3)
+        ┌──────────────┬──────────────┬─────────────────┐
+        │ concept_id_1 ┆ concept_id_2 ┆ relationship_id │
+        │ ---          ┆ ---          ┆ ---             │
+        │ i64          ┆ i64          ┆ str             │
+        ╞══════════════╪══════════════╪═════════════════╡
+        │ 1            ┆ 10           ┆ Maps to         │
+        │ 2            ┆ 20           ┆ Maps to         │
+        │ 3            ┆ 30           ┆ Maps to         │
+        └──────────────┴──────────────┴─────────────────┘
     """
     if not vocabulary_cache_dir.exists():
         raise FileNotFoundError(
@@ -188,10 +254,10 @@ def try_loading_vocabulary_table(vocabulary_cache_dir: Path, vocabulary_table: s
 
 
 def create_concept_to_parent_dict(
-    concept: pl.LazyFrame,
-    concept_relationship: pl.LazyFrame,
+    concept: pl.DataFrame | pl.LazyFrame,
+    concept_relationship: pl.DataFrame | pl.LazyFrame,
     omop_vocabularies: list[str],
-) -> pl.LazyFrame:
+) -> pl.DataFrame | pl.LazyFrame:
     """Creates a mapping of concept IDs to their parent concept IDs based on the "Is a" relationship in the
     OMOP vocabulary.
 
@@ -218,6 +284,30 @@ def create_concept_to_parent_dict(
             A LazyFrame containing the mapping of each concept ID to its corresponding
             parent concept ID. The output will have two columns: "concept_id" and
             "parent_concept_id".
+
+    Examples:
+        >>> import polars as pl
+        >>> concept = pl.DataFrame({
+        ...     "concept_id": [1, 2, 3],
+        ...     "vocabulary_id": ["OMOP", "OMOP", "OTHER"]
+        ... })
+        >>> concept_relationship = pl.DataFrame({
+        ...     "concept_id_1": [1, 2, 3],
+        ...     "concept_id_2": [10, 20, 30],
+        ...     "relationship_id": ["Is a", "Is a", "Is a"]
+        ... })
+        >>> omop_vocabularies = ["OMOP"]
+        >>> result = create_concept_to_parent_dict(concept, concept_relationship, omop_vocabularies)
+        >>> result.sort(by="concept_id")
+        shape: (2, 2)
+        ┌────────────┬───────────────────┐
+        │ concept_id ┆ parent_concept_id │
+        │ ---        ┆ ---               │
+        │ i64        ┆ i64               │
+        ╞════════════╪═══════════════════╡
+        │ 1          ┆ 10                │
+        │ 2          ┆ 20                │
+        └────────────┴───────────────────┘
     """
     concept_to_parent_mapping_df = (
         concept.filter(pl.col("vocabulary_id").is_in(omop_vocabularies))
@@ -231,10 +321,10 @@ def create_concept_to_parent_dict(
 
 
 def create_concept_to_mapped_concepts_dict(
-    concept: pl.LazyFrame,
-    concept_relationship: pl.LazyFrame,
+    concept: pl.DataFrame | pl.LazyFrame,
+    concept_relationship: pl.DataFrame | pl.LazyFrame,
     omop_vocabularies: list[str],
-) -> pl.LazyFrame:
+) -> pl.DataFrame | pl.LazyFrame:
     """Creates a mapping of concept IDs to their corresponding mapped concept IDs based on the "Maps to"
     relationship in the OMOP vocabulary.
 
@@ -262,6 +352,30 @@ def create_concept_to_mapped_concepts_dict(
             A LazyFrame containing the mapping of each concept ID to its unique mapped
             concept IDs. The output will have two columns: "concept_id" and
             "mapped_concept_ids".
+
+    Examples:
+        >>> import polars as pl
+        >>> concept = pl.DataFrame({
+        ...     "concept_id": [1, 2, 3],
+        ...     "vocabulary_id": ["OMOP", "OMOP", "OTHER"]
+        ... }).lazy()
+        >>> concept_relationship = pl.DataFrame({
+        ...     "concept_id_1": [1, 2, 3],
+        ...     "concept_id_2": [10, 20, None],
+        ...     "relationship_id": ["Maps to", "Maps to", "Maps to"]
+        ... }).lazy()
+        >>> omop_vocabularies = ["OMOP"]
+        >>> result = create_concept_to_mapped_concepts_dict(concept, concept_relationship, omop_vocabularies)
+        >>> result.collect().sort(by="concept_id")
+        shape: (2, 2)
+        ┌────────────┬────────────────────┐
+        │ concept_id ┆ mapped_concept_ids │
+        │ ---        ┆ ---                │
+        │ i64        ┆ list[i64]          │
+        ╞════════════╪════════════════════╡
+        │ 1          ┆ [10]               │
+        │ 2          ┆ [20]               │
+        └────────────┴────────────────────┘
     """
     concept_to_mapped_concept_ids = (
         concept.filter(pl.col("vocabulary_id").is_in(omop_vocabularies))
