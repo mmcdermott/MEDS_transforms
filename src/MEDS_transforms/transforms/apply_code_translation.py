@@ -11,7 +11,9 @@ from MEDS_transforms.mapreduce.mapper import map_over
 
 
 def apply_code_translation_fntr(
-    stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
+    stage_cfg: DictConfig,
+    code_metadata: pl.LazyFrame,
+    code_modifiers: list[str] | None = None,
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """In addition, the `code_metadata` dataset should contain information about the codes in the MEDS
     dataset,
@@ -113,11 +115,17 @@ def apply_code_translation_fntr(
         return lambda df: df
 
     if translation_col not in code_metadata.columns:
-        raise ValueError(f"Column with translation ('{translation_col}') not found in code metadata.")
+        raise ValueError(
+            f"Column with translation ('{translation_col}') not found in code metadata."
+        )
 
     def apply_code_translation_fn(df: pl.LazyFrame) -> pl.LazyFrame:
         return (
-            df.join(code_metadata.select(translation_col, "code").lazy(), on="code", how="left")
+            df.join(
+                code_metadata.select(translation_col, "code").lazy(),
+                on="code",
+                how="left",
+            )
             .with_columns(code=pl.coalesce(translation_col, "code"))
             .drop(translation_col)
         )
@@ -126,7 +134,9 @@ def apply_code_translation_fntr(
 
 
 @hydra.main(
-    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
+    version_base=None,
+    config_path=str(PREPROCESS_CONFIG_YAML.parent),
+    config_name=PREPROCESS_CONFIG_YAML.stem,
 )
 def main(cfg: DictConfig):
     """TODO."""

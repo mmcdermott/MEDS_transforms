@@ -44,6 +44,7 @@ class VocabularyMapping(ABC):
             Abstract method that must be implemented by subclasses. It should return a
             dictionary mapping source vocabulary codes (str) to target vocabulary codes (str).
     """
+
     def __init__(
         self,
         vocabulary_cache_dir: Path,
@@ -99,6 +100,7 @@ class OmopConceptRelationshipMapping(VocabularyMapping):
             concept codes using the "Maps to" relationships from the OMOP vocabulary.
             The function joins source and target mappings via hashed concept ID lists.
     """
+
     @staticmethod
     def create_hash(concept_ids: List[str]) -> str:
         """
@@ -131,62 +133,65 @@ class OmopConceptRelationshipMapping(VocabularyMapping):
         source_omop_vocabularies = self.source_vocabulary.omop_vocabularies
         target_omop_vocabularies = self.target_vocabulary.omop_vocabularies
 
-        concept = try_loading_vocabulary_table(
-            self.vocabulary_cache_dir,
-            "concept"
-        )
+        concept = try_loading_vocabulary_table(self.vocabulary_cache_dir, "concept")
         concept_relationship = try_loading_vocabulary_table(
-            self.vocabulary_cache_dir,
-            "concept_relationship"
+            self.vocabulary_cache_dir, "concept_relationship"
         )
-        concept_id_to_code_mapping = concept.filter(
-            pl.col("vocabulary_id").is_in(
-                self.source_vocabulary.omop_vocabularies + self.target_vocabulary.omop_vocabularies
+        concept_id_to_code_mapping = (
+            concept.filter(
+                pl.col("vocabulary_id").is_in(
+                    self.source_vocabulary.omop_vocabularies
+                    + self.target_vocabulary.omop_vocabularies
+                )
             )
-        ).with_columns(
-            pl.concat_str(["vocabulary_id", "concept_code"], separator="//").alias("code")
-        ).select("concept_id", "code")
-
-        source_concept_id_to_mapped_concepts = create_concept_to_mapped_concepts_dict(
-            concept,
-            concept_relationship,
-            source_omop_vocabularies
-        ).with_columns(
-            pl.col("mapped_concept_ids").map_elements(self.create_hash, return_dtype=pl.String).alias("hash")
-        ).join(
-            concept_id_to_code_mapping,
-            on="concept_id"
-        ).drop(
-            ["mapped_concept_ids", "concept_id"]
-        ).rename(
-            {"code": "source_code"}
+            .with_columns(
+                pl.concat_str(["vocabulary_id", "concept_code"], separator="//").alias(
+                    "code"
+                )
+            )
+            .select("concept_id", "code")
         )
 
-        target_concept_id_to_mapped_concepts = create_concept_to_mapped_concepts_dict(
-            concept,
-            concept_relationship,
-            target_omop_vocabularies
-        ).with_columns(
-            pl.col("mapped_concept_ids").map_elements(self.create_hash, return_dtype=pl.String).alias("hash")
-        ).join(
-            concept_id_to_code_mapping,
-            on="concept_id"
-        ).drop(
-            ["mapped_concept_ids", "concept_id"]
-        ).rename(
-            {"code": "target_code"}
+        source_concept_id_to_mapped_concepts = (
+            create_concept_to_mapped_concepts_dict(
+                concept, concept_relationship, source_omop_vocabularies
+            )
+            .with_columns(
+                pl.col("mapped_concept_ids")
+                .map_elements(self.create_hash, return_dtype=pl.String)
+                .alias("hash")
+            )
+            .join(concept_id_to_code_mapping, on="concept_id")
+            .drop(["mapped_concept_ids", "concept_id"])
+            .rename({"code": "source_code"})
+        )
+
+        target_concept_id_to_mapped_concepts = (
+            create_concept_to_mapped_concepts_dict(
+                concept, concept_relationship, target_omop_vocabularies
+            )
+            .with_columns(
+                pl.col("mapped_concept_ids")
+                .map_elements(self.create_hash, return_dtype=pl.String)
+                .alias("hash")
+            )
+            .join(concept_id_to_code_mapping, on="concept_id")
+            .drop(["mapped_concept_ids", "concept_id"])
+            .rename({"code": "target_code"})
         )
 
         return {
             row["source_code"]: row["target_code"]
             for row in source_concept_id_to_mapped_concepts.join(
                 target_concept_id_to_mapped_concepts, on="hash"
-            ).collect().to_dicts()
+            )
+            .collect()
+            .to_dicts()
         }
 
 
-ICD9 = Vocabulary("ICD9", ['ICD9CM', 'ICD9sPCS'])
-ICD10 = Vocabulary("ICD10", ['ICD10CM', 'ICD10PCS'])
+ICD9 = Vocabulary("ICD9", ["ICD9CM", "ICD9sPCS"])
+ICD10 = Vocabulary("ICD10", ["ICD10CM", "ICD10PCS"])
 
 SUPPORTED_VOCABULARIES = [ICD9, ICD10]
 SUPPORTED_TRANSLATIONS = {
@@ -195,8 +200,7 @@ SUPPORTED_TRANSLATIONS = {
 
 
 def try_loading_vocabulary_table(
-    vocabulary_cache_dir: Path,
-    vocabulary_table: str
+    vocabulary_cache_dir: Path, vocabulary_table: str
 ) -> pl.LazyFrame:
     """
     Try loading a vocabulary polars dataframe from vocabulary_cache_dir
@@ -213,7 +217,8 @@ def try_loading_vocabulary_table(
     """
     if not vocabulary_cache_dir.exists():
         raise FileNotFoundError(
-            f"{vocabulary_cache_dir} does not exist, the OMOP concept_relationship table must exist in {vocabulary_cache_dir}")
+            f"{vocabulary_cache_dir} does not exist, the OMOP concept_relationship table must exist in {vocabulary_cache_dir}"
+        )
     try:
         wildcard_path = vocabulary_cache_dir / vocabulary_table / "*.parquet"
         return pl.scan_parquet(wildcard_path)
@@ -225,7 +230,7 @@ def try_loading_vocabulary_table(
 def create_concept_to_parent_dict(
     concept: pl.LazyFrame,
     concept_relationship: pl.LazyFrame,
-    omop_vocabularies: List[str]
+    omop_vocabularies: List[str],
 ) -> pl.LazyFrame:
     """
     Creates a mapping of concept IDs to their parent concept IDs based on the "Is a"
@@ -248,22 +253,21 @@ def create_concept_to_parent_dict(
         pl.LazyFrame: A LazyFrame containing the mapping of each concept ID to its corresponding
         parent concept ID. The output will have two columns: "concept_id" and "parent_concept_id".
     """
-    concept_to_parent_mapping_df = concept.filter(
-        pl.col("vocabulary_id").is_in(omop_vocabularies)
-    ).select("concept_id").join(
-        concept_relationship, left_on="concept_id", right_on="concept_id_1"
-    ).filter(
-        pl.col("relationship_id") == "Is a"
-    ).with_columns(
-        pl.col("concept_id_2").alias("parent_concept_id")
-    ).select("concept_id", "parent_concept_id")
+    concept_to_parent_mapping_df = (
+        concept.filter(pl.col("vocabulary_id").is_in(omop_vocabularies))
+        .select("concept_id")
+        .join(concept_relationship, left_on="concept_id", right_on="concept_id_1")
+        .filter(pl.col("relationship_id") == "Is a")
+        .with_columns(pl.col("concept_id_2").alias("parent_concept_id"))
+        .select("concept_id", "parent_concept_id")
+    )
     return concept_to_parent_mapping_df
 
 
 def create_concept_to_mapped_concepts_dict(
     concept: pl.LazyFrame,
     concept_relationship: pl.LazyFrame,
-    omop_vocabularies: List[str]
+    omop_vocabularies: List[str],
 ) -> pl.LazyFrame:
     """
     Creates a mapping of concept IDs to their corresponding mapped concept IDs
@@ -288,21 +292,23 @@ def create_concept_to_mapped_concepts_dict(
         unique mapped concept IDs. The output will have two columns: "concept_id"
         and "mapped_concept_ids".
     """
-    concept_to_mapped_concept_ids = concept.filter(
-        pl.col("vocabulary_id").is_in(omop_vocabularies)
-    ).select(
-        "concept_id"
-    ).join(
-        concept_relationship,
-        how="left",
-        left_on="concept_id",
-        right_on="concept_id_1",
-    ).filter(
-        pl.col("relationship_id") == "Maps to"
-    ).with_columns(
-        pl.coalesce(pl.col("concept_id_2"), pl.col("concept_id")).alias("mapped_concept_id")
-    ).group_by("concept_id").agg(
-        pl.col("mapped_concept_id").unique().alias("mapped_concept_ids")
+    concept_to_mapped_concept_ids = (
+        concept.filter(pl.col("vocabulary_id").is_in(omop_vocabularies))
+        .select("concept_id")
+        .join(
+            concept_relationship,
+            how="left",
+            left_on="concept_id",
+            right_on="concept_id_1",
+        )
+        .filter(pl.col("relationship_id") == "Maps to")
+        .with_columns(
+            pl.coalesce(pl.col("concept_id_2"), pl.col("concept_id")).alias(
+                "mapped_concept_id"
+            )
+        )
+        .group_by("concept_id")
+        .agg(pl.col("mapped_concept_id").unique().alias("mapped_concept_ids"))
     )
     return concept_to_mapped_concept_ids
 
@@ -352,7 +358,7 @@ def get_vocabulary(vocabulary_name: str) -> Vocabulary:
 def get_vocabulary_mapping(
     vocabulary_cache_dir: Path,
     source_vocabulary: Vocabulary,
-    target_vocabulary: Vocabulary
+    target_vocabulary: Vocabulary,
 ) -> VocabularyMapping:
     """
     Retrieves a vocabulary mapping between a source and target vocabulary.
@@ -375,16 +381,15 @@ def get_vocabulary_mapping(
         ValueError: If there is no supported translation between the source and
         target vocabularies.
     """
-    vocabulary_tuple = (source_vocabulary.vocabulary_name, target_vocabulary.vocabulary_name)
+    vocabulary_tuple = (
+        source_vocabulary.vocabulary_name,
+        target_vocabulary.vocabulary_name,
+    )
     if vocabulary_tuple in SUPPORTED_TRANSLATIONS:
         return SUPPORTED_TRANSLATIONS[vocabulary_tuple](
-            vocabulary_cache_dir,
-            source_vocabulary,
-            target_vocabulary
+            vocabulary_cache_dir, source_vocabulary, target_vocabulary
         )
-    raise ValueError(
-        f"Supported translations: {SUPPORTED_TRANSLATIONS}\n"
-    )
+    raise ValueError(f"Supported translations: {SUPPORTED_TRANSLATIONS}\n")
 
 
 def add_metadata_translation(
@@ -435,19 +440,24 @@ def add_metadata_translation(
         └────────────────┴─────────────────┘
     """
 
-    vocabulary_mapping = get_vocabulary_mapping(vocabulary_cache_dir, source_vocabulary, target_vocabulary)
+    vocabulary_mapping = get_vocabulary_mapping(
+        vocabulary_cache_dir, source_vocabulary, target_vocabulary
+    )
     mapping = vocabulary_mapping.get_code_mappings()
-    translated_col_expr = pl.col("code").replace_strict(mapping, return_dtype=pl.String, default=None)
+    translated_col_expr = pl.col("code").replace_strict(
+        mapping, return_dtype=pl.String, default=None
+    )
     return code_metadata.with_columns(
-        pl.coalesce(
-            translated_col_expr,
-            pl.col("code")
-        ).cast(pl.String).alias(translation_col)
+        pl.coalesce(translated_col_expr, pl.col("code"))
+        .cast(pl.String)
+        .alias(translation_col)
     )
 
 
 @hydra.main(
-    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
+    version_base=None,
+    config_path=str(PREPROCESS_CONFIG_YAML.parent),
+    config_name=PREPROCESS_CONFIG_YAML.stem,
 )
 def main(cfg: DictConfig):
     """TODO."""
@@ -461,13 +471,17 @@ def main(cfg: DictConfig):
     )
 
     metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
-    vocabulary_cache_dir = Path(cfg.stage_cfg.get("vocabulary_cache_dir", "vocabulary_cache"))
+    vocabulary_cache_dir = Path(
+        cfg.stage_cfg.get("vocabulary_cache_dir", "vocabulary_cache")
+    )
     # If the vocabulary cache dir is an absolute path, we will use it as is otherwise we assume it's a relative path w.r.t metadata_input_dir
     if not vocabulary_cache_dir.is_absolute():
         vocabulary_cache_dir = metadata_input_dir / vocabulary_cache_dir
 
     output_dir = Path(cfg.stage_cfg.reducer_output_dir)
-    code_metadata = pl.read_parquet(metadata_input_dir / "codes.parquet", use_pyarrow=True)
+    code_metadata = pl.read_parquet(
+        metadata_input_dir / "codes.parquet", use_pyarrow=True
+    )
     source_vocabulary = get_vocabulary(cfg.stage_cfg.get("source_vocabulary", "ICD9"))
     target_vocabulary = get_vocabulary(cfg.stage_cfg.get("source_vocabulary", "ICD10"))
     logger.info("Adding code translation.")
@@ -476,7 +490,7 @@ def main(cfg: DictConfig):
         source_vocabulary,
         target_vocabulary,
         cfg.stage_cfg.get("translation_col", "translated"),
-        vocabulary_cache_dir
+        vocabulary_cache_dir,
     )
 
     output_fp = output_dir / "codes.parquet"
