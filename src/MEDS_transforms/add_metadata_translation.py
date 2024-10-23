@@ -47,14 +47,22 @@ def get_vocabulary(vocabulary_name: str) -> Vocabulary:
         >>> vocab = get_vocabulary("ICD9")
         >>> print(vocab)
         Vocabulary(vocabulary_name='ICD9', omop_vocabularies=['ICD9CM', 'ICD9sPCS'])
+        >>> vocab = get_vocabulary("invalid_vocabulary")
+        Traceback (most recent call last):
+        ...
+        ValueError: invalid_vocabulary is not a supported vocabulary
+        Supported vocabularies: ['ICD9', 'ICD10']
+        Supported translations: from ICD9 to ICD10
+        <BLANKLINE>
     """
     for vocabulary in SUPPORTED_VOCABULARIES:
         if vocabulary_name.casefold() == vocabulary.vocabulary_name.casefold():
             return vocabulary
     raise ValueError(
         f"{vocabulary_name} is not a supported vocabulary\n"
-        f"Supported vocabularies: {SUPPORTED_VOCABULARIES}\n"
-        f"Supported translations: {SUPPORTED_TRANSLATIONS}\n"
+        f"Supported vocabularies: {[_.vocabulary_name for _ in SUPPORTED_VOCABULARIES]}\n"
+        f"Supported translations: "
+        f"{'\n'.join([f'from {s} to {t}' for s, t in SUPPORTED_TRANSLATIONS.keys()])}\n"
     )
 
 
@@ -86,6 +94,23 @@ def get_vocabulary_mapping(
     Raises:
         ValueError: If there is no supported translation between the source and
         target vocabularies.
+
+     Examples:
+        >>> from pathlib import Path
+        >>> from MEDS_transforms.vocabulary_mapping import Vocabulary, VocabularyMapping
+        >>> from MEDS_transforms.vocabulary_mapping import OmopConceptRelationshipMapping
+        >>> source_vocab = Vocabulary("ICD9", ["ICD9CM"])
+        >>> target_vocab = Vocabulary("ICD10", ["ICD10CM"])
+        >>> vocab_cache_dir = Path("/mock/cache/dir")
+        >>> mapping = get_vocabulary_mapping(vocab_cache_dir, source_vocab, target_vocab)
+        >>> isinstance(mapping, OmopConceptRelationshipMapping)
+        True
+        >>> unsupported_vocab = Vocabulary("SNOMED", ["SNOMEDCT"])
+        >>> get_vocabulary_mapping(vocab_cache_dir, unsupported_vocab, target_vocab)
+        Traceback (most recent call last):
+        ...
+        ValueError: Supported translations: from ICD9 to ICD10
+        <BLANKLINE>
     """
     vocabulary_tuple = (
         source_vocabulary.vocabulary_name,
@@ -95,7 +120,10 @@ def get_vocabulary_mapping(
         return SUPPORTED_TRANSLATIONS[vocabulary_tuple](
             vocabulary_cache_dir, source_vocabulary, target_vocabulary
         )
-    raise ValueError(f"Supported translations: {SUPPORTED_TRANSLATIONS}\n")
+    raise ValueError(
+        f"Supported translations: "
+        f"{'\n'.join([f'from {s} to {t}' for s, t in SUPPORTED_TRANSLATIONS.keys()])}\n"
+    )
 
 
 def add_metadata_translation(
@@ -117,8 +145,50 @@ def add_metadata_translation(
 
     Returns:
         pl.DataFrame: A DataFrame with the translated codes.
-    """
 
+    Examples:
+        >>> import tempfile
+        >>> from pathlib import Path
+        >>> import polars as pl
+        >>> from MEDS_transforms.vocabulary_mapping import Vocabulary
+        >>> source_vocab = Vocabulary("ICD9", ["ICD9CM"])
+        >>> target_vocab = Vocabulary("ICD10", ["ICD10CM"])
+        >>> code_metadata = pl.DataFrame({
+        ...     "code": ["ICD9CM//V9.60", "ICD9CM//V15", "None_ICD9_code"],
+        ... })
+        >>> with tempfile.TemporaryDirectory() as tmpdirname:
+        ...     temp_dir = Path(tmpdirname)
+        ...     concept_df = pl.DataFrame({
+        ...         "concept_id": [1, 2, 3],
+        ...         "concept_code": ["V9.60", "V10.60", "SNOMED_code"],
+        ...         "vocabulary_id": ["ICD9CM", "ICD10CM", "SNOMED"]
+        ...     })
+        ...     concept_relationship_df = pl.DataFrame({
+        ...         "concept_id_1": [1, 2, 3],
+        ...         "concept_id_2": [3, 3, 3],
+        ...         "relationship_id": ["Maps to", "Maps to", "Maps to"]
+        ...     })
+        ...     (temp_dir / "concept").mkdir(exist_ok=True)
+        ...     (temp_dir / "concept_relationship").mkdir(exist_ok=True)
+        ...     concept_df.write_parquet(str(temp_dir / "concept" / "data.parquet"))
+        ...     concept_relationship_df.write_parquet(
+        ...         str(temp_dir / "concept_relationship" / "data.parquet")
+        ...     )
+        ...     updated_code_metadata = add_metadata_translation(
+        ...         code_metadata, source_vocab, target_vocab, "translated", temp_dir
+        ...     )
+        >>> updated_code_metadata
+        shape: (3, 2)
+        ┌────────────────┬─────────────────┐
+        │ code           ┆ translated      │
+        │ ---            ┆ ---             │
+        │ str            ┆ str             │
+        ╞════════════════╪═════════════════╡
+        │ ICD9CM//V9.60  ┆ ICD10CM//V10.60 │
+        │ ICD9CM//V15    ┆ ICD9CM//V15     │
+        │ None_ICD9_code ┆ None_ICD9_code  │
+        └────────────────┴─────────────────┘
+    """
     vocabulary_mapping = get_vocabulary_mapping(vocabulary_cache_dir, source_vocabulary, target_vocabulary)
     mapping = vocabulary_mapping.get_code_mappings()
     translated_col_expr = pl.col("code").replace_strict(mapping, return_dtype=pl.String, default=None)
