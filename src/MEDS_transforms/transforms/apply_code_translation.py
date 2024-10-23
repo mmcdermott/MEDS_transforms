@@ -115,9 +115,7 @@ def apply_code_translation_fntr(
         return lambda df: df
 
     if translation_col not in code_metadata.columns:
-        raise ValueError(
-            f"Column with translation ('{translation_col}') not found in code metadata."
-        )
+        raise ValueError(f"Column with translation ('{translation_col}') not found in code metadata.")
 
     def apply_code_translation_fn(df: pl.LazyFrame) -> pl.LazyFrame:
         return (
