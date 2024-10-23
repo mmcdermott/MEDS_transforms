@@ -22,7 +22,8 @@ export MIMICIV_PRE_MEDS_DIR=??? # set to the directory in which you want to stor
 export MIMICIV_MEDS_COHORT_DIR=??? # set to the directory in which you want to store the raw MIMIC-IV data
 
 export VERSION=0.0.6 # or whatever version you want
-export URL="https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/$VERSION/MIMIC-IV_Example"
+# export URL="https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/$VERSION/MIMIC-IV_Example"
+export URL="https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/refs/heads/main/MIMIC-IV_Example"
 
 wget $URL/run.sh
 wget $URL/pre_MEDS.py
@@ -31,6 +32,8 @@ wget $URL/slurm_runner.yaml
 mkdir configs
 cd configs
 wget $URL/configs/extract_MIMIC.yaml
+wget $URL/configs/pre_MEDS.yaml
+wget $URL/configs/event_configs.yaml
 cd ..
 chmod +x run.sh
 chmod +x pre_MEDS.py
@@ -46,18 +49,18 @@ the root directory of where the resulting _core data files_ are stored -- e.g., 
 ## Step 1.5: Download MIMIC-IV Metadata files
 
 ```bash
-cd $MIMIC_RAW_DIR
-export MIMIC_URL=https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map
-wget $MIMIC_URL/d_labitems_to_loinc.csv
-wget $MIMIC_URL/inputevents_to_rxnorm.csv
-wget $MIMIC_URL/lab_itemid_to_loinc.csv
-wget $MIMIC_URL/meas_chartevents_main.csv
-wget $MIMIC_URL/meas_chartevents_value.csv
-wget $MIMIC_URL/numerics-summary.csv
-wget $MIMIC_URL/outputevents_to_loinc.csv
-wget $MIMIC_URL/proc_datetimeevents.csv
-wget $MIMIC_URL/proc_itemid.csv
-wget $MIMIC_URL/waveforms-summary.csv
+cd $MIMICIV_RAW_DIR
+export MIMICIV_RAW_DIR=https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map
+wget $MIMICIV_RAW_DIR/d_labitems_to_loinc.csv
+wget $MIMICIV_RAW_DIR/inputevents_to_rxnorm.csv
+wget $MIMICIV_RAW_DIR/lab_itemid_to_loinc.csv
+wget $MIMICIV_RAW_DIR/meas_chartevents_main.csv
+wget $MIMICIV_RAW_DIR/meas_chartevents_value.csv
+wget $MIMICIV_RAW_DIR/numerics-summary.csv
+wget $MIMICIV_RAW_DIR/outputevents_to_loinc.csv
+wget $MIMICIV_RAW_DIR/proc_datetimeevents.csv
+wget $MIMICIV_RAW_DIR/proc_itemid.csv
+wget $MIMICIV_RAW_DIR/waveforms-summary.csv
 ```
 
 ## Step 2: Run the MEDS ETL
