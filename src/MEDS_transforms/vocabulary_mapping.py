@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict
 
 import polars as pl
 
@@ -9,12 +8,11 @@ import polars as pl
 @dataclass
 class Vocabulary:
     vocabulary_name: str
-    omop_vocabularies: List[str]
+    omop_vocabularies: list[str]
 
 
 class VocabularyMapping(ABC):
-    """
-    Abstract base class for defining mappings between source and target vocabularies.
+    """Abstract base class for defining mappings between source and target vocabularies.
 
     This class provides a structure for mapping concept codes from one vocabulary to
     another, with the actual logic for generating the mappings being implemented
@@ -43,9 +41,8 @@ class VocabularyMapping(ABC):
         source_vocabulary: Vocabulary,
         target_vocabulary: Vocabulary,
     ):
-        """
-        Initializes the VocabularyMapping class with a source vocabulary, target
-        vocabulary, and a directory for caching vocabulary data.
+        """Initializes the VocabularyMapping class with a source vocabulary, target vocabulary, and a
+        directory for caching vocabulary data.
 
         Args:
             vocabulary_cache_dir (Path):
@@ -62,9 +59,8 @@ class VocabularyMapping(ABC):
         self.target_vocabulary = target_vocabulary
 
     @abstractmethod
-    def get_code_mappings(self) -> Dict[str, str]:
-        """
-        Abstract method to retrieve the mapping between source and target vocabulary codes.
+    def get_code_mappings(self) -> dict[str, str]:
+        """Abstract method to retrieve the mapping between source and target vocabulary codes.
 
         Subclasses must implement this method to return a dictionary mapping source
         vocabulary codes (str) to target vocabulary codes (str).
@@ -73,15 +69,13 @@ class VocabularyMapping(ABC):
             Dict[str, str]: A dictionary where keys are source vocabulary codes and values
             are the corresponding target vocabulary codes.
         """
-        pass
 
 
 class OmopConceptRelationshipMapping(VocabularyMapping):
-    """
-    This class defines the mapping between source and target OMOP concept vocabularies
-    using relationships defined in the OMOP 'concept' and 'concept_relationship' tables.
-    It extends the VocabularyMapping class and provides a method to retrieve mappings
-    of source concept codes to target concept codes based on OMOP vocabularies.
+    """This class defines the mapping between source and target OMOP concept vocabularies using relationships
+    defined in the OMOP 'concept' and 'concept_relationship' tables. It extends the VocabularyMapping class
+    and provides a method to retrieve mappings of source concept codes to target concept codes based on OMOP
+    vocabularies.
 
     Methods:
         create_hash(concept_ids: List[str]) -> str:
@@ -94,10 +88,9 @@ class OmopConceptRelationshipMapping(VocabularyMapping):
     """
 
     @staticmethod
-    def create_hash(concept_ids: List[str]) -> str:
-        """
-        Creates a unique hash string from a list of concept IDs by sorting and concatenating
-        them with a hyphen ("-").
+    def create_hash(concept_ids: list[str]) -> str:
+        """Creates a unique hash string from a list of concept IDs by sorting and concatenating them with a
+        hyphen ("-").
 
         Args:
             concept_ids (List[str]): A list of concept IDs to hash.
@@ -107,13 +100,11 @@ class OmopConceptRelationshipMapping(VocabularyMapping):
         """
         return "-".join(map(str, sorted(concept_ids)))
 
-    def get_code_mappings(self) -> Dict[str, str]:
-        """
-        Retrieves mappings between source concept codes and target concept codes based on the
-        OMOP 'Maps to' relationships. The function first loads concept and concept relationship
-        tables, generates mappings for both the source and target OMOP vocabularies, and then
-        joins these mappings on hashed concept IDs to produce the final dictionary mapping
-        source codes to target codes.
+    def get_code_mappings(self) -> dict[str, str]:
+        """Retrieves mappings between source concept codes and target concept codes based on the OMOP 'Maps
+        to' relationships. The function first loads concept and concept relationship tables, generates
+        mappings for both the source and target OMOP vocabularies, and then joins these mappings on hashed
+        concept IDs to produce the final dictionary mapping source codes to target codes.
 
         Returns:
             Dict[str, str]: A dictionary mapping source concept codes (str) to target concept
@@ -126,28 +117,19 @@ class OmopConceptRelationshipMapping(VocabularyMapping):
         target_omop_vocabularies = self.target_vocabulary.omop_vocabularies
 
         concept = try_loading_vocabulary_table(self.vocabulary_cache_dir, "concept")
-        concept_relationship = try_loading_vocabulary_table(
-            self.vocabulary_cache_dir, "concept_relationship"
-        )
+        concept_relationship = try_loading_vocabulary_table(self.vocabulary_cache_dir, "concept_relationship")
         concept_id_to_code_mapping = (
             concept.filter(
                 pl.col("vocabulary_id").is_in(
-                    self.source_vocabulary.omop_vocabularies
-                    + self.target_vocabulary.omop_vocabularies
+                    self.source_vocabulary.omop_vocabularies + self.target_vocabulary.omop_vocabularies
                 )
             )
-            .with_columns(
-                pl.concat_str(["vocabulary_id", "concept_code"], separator="//").alias(
-                    "code"
-                )
-            )
+            .with_columns(pl.concat_str(["vocabulary_id", "concept_code"], separator="//").alias("code"))
             .select("concept_id", "code")
         )
 
         source_concept_id_to_mapped_concepts = (
-            create_concept_to_mapped_concepts_dict(
-                concept, concept_relationship, source_omop_vocabularies
-            )
+            create_concept_to_mapped_concepts_dict(concept, concept_relationship, source_omop_vocabularies)
             .with_columns(
                 pl.col("mapped_concept_ids")
                 .map_elements(self.create_hash, return_dtype=pl.String)
@@ -159,9 +141,7 @@ class OmopConceptRelationshipMapping(VocabularyMapping):
         )
 
         target_concept_id_to_mapped_concepts = (
-            create_concept_to_mapped_concepts_dict(
-                concept, concept_relationship, target_omop_vocabularies
-            )
+            create_concept_to_mapped_concepts_dict(concept, concept_relationship, target_omop_vocabularies)
             .with_columns(
                 pl.col("mapped_concept_ids")
                 .map_elements(self.create_hash, return_dtype=pl.String)
@@ -182,11 +162,8 @@ class OmopConceptRelationshipMapping(VocabularyMapping):
         }
 
 
-def try_loading_vocabulary_table(
-    vocabulary_cache_dir: Path, vocabulary_table: str
-) -> pl.LazyFrame:
-    """
-    Try loading a vocabulary polars dataframe from vocabulary_cache_dir
+def try_loading_vocabulary_table(vocabulary_cache_dir: Path, vocabulary_table: str) -> pl.LazyFrame:
+    """Try loading a vocabulary polars dataframe from vocabulary_cache_dir.
 
     Args:
         vocabulary_cache_dir:
@@ -199,7 +176,8 @@ def try_loading_vocabulary_table(
     """
     if not vocabulary_cache_dir.exists():
         raise FileNotFoundError(
-            f"{vocabulary_cache_dir} does not exist, the OMOP concept_relationship table must exist in {vocabulary_cache_dir}"
+            f"{vocabulary_cache_dir} does not exist, "
+            f"the OMOP concept_relationship table must exist in {vocabulary_cache_dir}"
         )
     try:
         wildcard_path = vocabulary_cache_dir / vocabulary_table / "*.parquet"
@@ -212,11 +190,10 @@ def try_loading_vocabulary_table(
 def create_concept_to_parent_dict(
     concept: pl.LazyFrame,
     concept_relationship: pl.LazyFrame,
-    omop_vocabularies: List[str],
+    omop_vocabularies: list[str],
 ) -> pl.LazyFrame:
-    """
-    Creates a mapping of concept IDs to their parent concept IDs based on the "Is a"
-    relationship in the OMOP vocabulary.
+    """Creates a mapping of concept IDs to their parent concept IDs based on the "Is a" relationship in the
+    OMOP vocabulary.
 
     This function filters the provided concept data to include only those belonging to
     the specified OMOP vocabularies. It then joins the concept data with the concept
@@ -256,11 +233,10 @@ def create_concept_to_parent_dict(
 def create_concept_to_mapped_concepts_dict(
     concept: pl.LazyFrame,
     concept_relationship: pl.LazyFrame,
-    omop_vocabularies: List[str],
+    omop_vocabularies: list[str],
 ) -> pl.LazyFrame:
-    """
-    Creates a mapping of concept IDs to their corresponding mapped concept IDs
-    based on the "Maps to" relationship in the OMOP vocabulary.
+    """Creates a mapping of concept IDs to their corresponding mapped concept IDs based on the "Maps to"
+    relationship in the OMOP vocabulary.
 
     This function filters the provided concept data to include only those
     belonging to the specified OMOP vocabularies. It then joins the concept
@@ -297,11 +273,7 @@ def create_concept_to_mapped_concepts_dict(
             right_on="concept_id_1",
         )
         .filter(pl.col("relationship_id") == "Maps to")
-        .with_columns(
-            pl.coalesce(pl.col("concept_id_2"), pl.col("concept_id")).alias(
-                "mapped_concept_id"
-            )
-        )
+        .with_columns(pl.coalesce(pl.col("concept_id_2"), pl.col("concept_id")).alias("mapped_concept_id"))
         .group_by("concept_id")
         .agg(pl.col("mapped_concept_id").unique().alias("mapped_concept_ids"))
     )

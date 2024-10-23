@@ -9,12 +9,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.utils import hydra_loguru_init
-
-from MEDS_transforms.vocabulary_mapping import (
-    Vocabulary,
-    VocabularyMapping,
-    OmopConceptRelationshipMapping,
-)
+from MEDS_transforms.vocabulary_mapping import OmopConceptRelationshipMapping, Vocabulary, VocabularyMapping
 
 ICD9 = Vocabulary("ICD9", ["ICD9CM", "ICD9sPCS"])
 ICD10 = Vocabulary("ICD10", ["ICD10CM", "ICD10PCS"])
@@ -22,14 +17,11 @@ ICD10 = Vocabulary("ICD10", ["ICD10CM", "ICD10PCS"])
 SUPPORTED_VOCABULARIES = [ICD9, ICD10]
 # TODO: might change this to Dict[Tuple[str, str], List[VocabularyMapping]] as there could be multiple mapping
 #  strategies to convert from the source to target vocabularies
-SUPPORTED_TRANSLATIONS = {
-    (ICD9.vocabulary_name, ICD10.vocabulary_name): OmopConceptRelationshipMapping
-}
+SUPPORTED_TRANSLATIONS = {(ICD9.vocabulary_name, ICD10.vocabulary_name): OmopConceptRelationshipMapping}
 
 
 def get_vocabulary(vocabulary_name: str) -> Vocabulary:
-    """
-    Retrieve a vocabulary object by its name from the list of supported vocabularies.
+    """Retrieve a vocabulary object by its name from the list of supported vocabularies.
 
     This function searches through the `SUPPORTED_VOCABULARIES` to find a vocabulary
     that matches the provided `vocabulary_name`. If a match is found, the corresponding
@@ -78,8 +70,7 @@ def get_vocabulary_mapping(
     source_vocabulary: Vocabulary,
     target_vocabulary: Vocabulary,
 ) -> VocabularyMapping:
-    """
-    Retrieves a vocabulary mapping between a source and target vocabulary.
+    """Retrieves a vocabulary mapping between a source and target vocabulary.
 
     This function checks if a translation between the specified source and target
     vocabularies is supported. If supported, it returns the appropriate vocabulary
@@ -121,8 +112,7 @@ def add_metadata_translation(
     translation_col: str,
     vocabulary_cache_dir: Path,
 ) -> pl.DataFrame:
-    """
-    Validate the code metadata has the requisite columns and is unique.
+    """Validate the code metadata has the requisite columns and is unique.
 
     Args:
         code_metadata (pl.DataFrame): Metadata about the codes in the MEDS dataset,
@@ -136,17 +126,11 @@ def add_metadata_translation(
         pl.DataFrame: A DataFrame with the translated codes.
     """
 
-    vocabulary_mapping = get_vocabulary_mapping(
-        vocabulary_cache_dir, source_vocabulary, target_vocabulary
-    )
+    vocabulary_mapping = get_vocabulary_mapping(vocabulary_cache_dir, source_vocabulary, target_vocabulary)
     mapping = vocabulary_mapping.get_code_mappings()
-    translated_col_expr = pl.col("code").replace_strict(
-        mapping, return_dtype=pl.String, default=None
-    )
+    translated_col_expr = pl.col("code").replace_strict(mapping, return_dtype=pl.String, default=None)
     return code_metadata.with_columns(
-        pl.coalesce(translated_col_expr, pl.col("code"))
-        .cast(pl.String)
-        .alias(translation_col)
+        pl.coalesce(translated_col_expr, pl.col("code")).cast(pl.String).alias(translation_col)
     )
 
 
@@ -167,17 +151,14 @@ def main(cfg: DictConfig):
     )
 
     metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
-    vocabulary_cache_dir = Path(
-        cfg.stage_cfg.get("vocabulary_cache_dir", "vocabulary_cache")
-    )
-    # If the vocabulary cache dir is an absolute path, we will use it as is otherwise we assume it's a relative path w.r.t metadata_input_dir
+    vocabulary_cache_dir = Path(cfg.stage_cfg.get("vocabulary_cache_dir", "vocabulary_cache"))
+    # If the vocabulary cache dir is an absolute path, we will use it as is otherwise we assume
+    # it's a relative path w.r.t metadata_input_dir
     if not vocabulary_cache_dir.is_absolute():
         vocabulary_cache_dir = metadata_input_dir / vocabulary_cache_dir
 
     output_dir = Path(cfg.stage_cfg.reducer_output_dir)
-    code_metadata = pl.read_parquet(
-        metadata_input_dir / "codes.parquet", use_pyarrow=True
-    )
+    code_metadata = pl.read_parquet(metadata_input_dir / "codes.parquet", use_pyarrow=True)
     source_vocabulary = get_vocabulary(cfg.stage_cfg.get("source_vocabulary", "ICD9"))
     target_vocabulary = get_vocabulary(cfg.stage_cfg.get("source_vocabulary", "ICD10"))
     logger.info("Adding code translation.")
