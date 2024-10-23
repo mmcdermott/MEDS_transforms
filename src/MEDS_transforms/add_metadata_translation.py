@@ -53,7 +53,6 @@ def get_vocabulary(vocabulary_name: str) -> Vocabulary:
         ValueError: invalid_vocabulary is not a supported vocabulary
         Supported vocabularies: ['ICD9', 'ICD10']
         Supported translations: from ICD9 to ICD10
-        <BLANKLINE>
     """
     for vocabulary in SUPPORTED_VOCABULARIES:
         if vocabulary_name.casefold() == vocabulary.vocabulary_name.casefold():
@@ -62,7 +61,7 @@ def get_vocabulary(vocabulary_name: str) -> Vocabulary:
         f"{vocabulary_name} is not a supported vocabulary\n"
         f"Supported vocabularies: {[_.vocabulary_name for _ in SUPPORTED_VOCABULARIES]}\n"
         f"Supported translations: "
-        f"{'\n'.join([f'from {s} to {t}' for s, t in SUPPORTED_TRANSLATIONS.keys()])}\n"
+        + "\n".join([f"from {s} to {t}" for s, t in SUPPORTED_TRANSLATIONS.keys()])
     )
 
 
@@ -110,7 +109,6 @@ def get_vocabulary_mapping(
         Traceback (most recent call last):
         ...
         ValueError: Supported translations: from ICD9 to ICD10
-        <BLANKLINE>
     """
     vocabulary_tuple = (
         source_vocabulary.vocabulary_name,
@@ -121,8 +119,7 @@ def get_vocabulary_mapping(
             vocabulary_cache_dir, source_vocabulary, target_vocabulary
         )
     raise ValueError(
-        f"Supported translations: "
-        f"{'\n'.join([f'from {s} to {t}' for s, t in SUPPORTED_TRANSLATIONS.keys()])}\n"
+        "Supported translations: " + "\n".join([f"from {s} to {t}" for s, t in SUPPORTED_TRANSLATIONS.keys()])
     )
 
 
