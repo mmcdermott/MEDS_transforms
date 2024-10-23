@@ -215,6 +215,22 @@ def try_loading_vocabulary_table(vocabulary_cache_dir: Path, vocabulary_table: s
         >>> import tempfile
         >>> import polars as pl
         >>> from pathlib import Path
+        >>> try_loading_vocabulary_table(Path("test"), "concept_relationship")
+        Traceback (most recent call last):
+        ...
+        FileNotFoundError: test does not exist, the OMOP concept_relationship table must exist in test
+
+        >>> with tempfile.TemporaryDirectory() as tmpdirname:
+        ...     temp_dir = Path(tmpdirname)
+        ...     (temp_dir / "concept_relationship").mkdir(exist_ok=True)
+        ...     invalid_file = temp_dir / "invalid.parquet"
+        ...     with open(invalid_file, "wb") as f:
+        ...         f.write(b"This is not a valid Parquet file.")
+        ...     try_loading_vocabulary_table(temp_dir, "concept_relationship")
+        Traceback (most recent call last):
+        ...
+        polars.exceptions.ComputeError: Error loading the concept_relationship parquet files from: ...
+
         >>> with tempfile.TemporaryDirectory() as tmpdirname:
         ...     temp_dir = Path(tmpdirname)
         ...     table_dir = temp_dir / "concept_relationship"
@@ -247,10 +263,15 @@ def try_loading_vocabulary_table(vocabulary_cache_dir: Path, vocabulary_table: s
         )
     try:
         wildcard_path = vocabulary_cache_dir / vocabulary_table / "*.parquet"
-        return pl.scan_parquet(wildcard_path)
-    except pl.exceptions.ComputeError as e:
+        data_frame_lazy = pl.scan_parquet(wildcard_path)
+        # Try to load some data
+        data_frame_lazy.head(10).collect()
+        return data_frame_lazy
+    except pl.exceptions.ComputeError:
         # Handle the error
-        raise f"Error loading the concept_relationship parquet files from: {vocabulary_cache_dir}" from e
+        raise pl.exceptions.ComputeError(
+            f"Error loading the concept_relationship parquet files from: {vocabulary_cache_dir}"
+        )
 
 
 def create_concept_to_parent_dict(
