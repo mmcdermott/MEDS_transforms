@@ -15,6 +15,7 @@ function display_help() {
     echo "  EICU_PREMEDS_DIR    Output directory for pre-MEDS data."
     echo "  EICU_MEDS_DIR       Output directory for processed MEDS data."
     echo "  N_PARALLEL_WORKERS  Number of parallel workers for processing."
+    echo "  (OPTIONAL) do_unzip=true OR do_unzip=false     Optional flag to unzip files before processing."
     echo
     echo "Options:"
     echo "  -h, --help          Display this help message and exit."
@@ -33,9 +34,12 @@ if [ "$#" -lt 4 ]; then
 fi
 
 EICU_RAW_DIR="$1"
-EICU_PREMEDS_DIR="$2"
-EICU_MEDS_DIR="$3"
+EICU_PRE_MEDS_DIR="$2"
+EICU_MEDS_COHORT_DIR="$3"
 N_PARALLEL_WORKERS="$4"
+
+export EICU_PRE_MEDS_DIR="$2"
+export EICU_MEDS_COHORT_DIR="$3"
 
 shift 4
 
@@ -48,46 +52,66 @@ echo "  * stage_configs.split_and_shard_subjects.n_subjects_per_shard=10000"
 echo "  * stage_configs.merge_to_MEDS_cohort.unique_by=null"
 echo "Additionally, consider reducing N_PARALLEL_WORKERS if > 1"
 
+# Defaults
+_DO_UNZIP_ARG_STR=""
+
+if [ $# -ge 1 ]; then
+  case "$1" in
+    do_unzip=*)
+      _DO_UNZIP_ARG_STR="$1"
+      shift 1
+      ;;
+  esac
+fi
+
+DO_UNZIP="false"
+
+if [ -n "$_DO_UNZIP_ARG_STR" ]; then
+  case "$_DO_UNZIP_ARG_STR" in
+    do_unzip=true)
+      DO_UNZIP="true"
+      ;;
+    do_unzip=false)
+      DO_UNZIP="false"
+      ;;
+    *)
+      echo "Error: Invalid do_unzip value. Use 'do_unzip=true' or 'do_unzip=false'."
+      exit 1
+      ;;
+  esac
+  echo "Setting DO_UNZIP=$DO_UNZIP"
+fi
+
+# TODO: Add wget blocks once testing is validated.
+EVENT_CONVERSION_CONFIG_FP="$(pwd)/configs/event_configs.yaml"
+PIPELINE_CONFIG_FP="$(pwd)/configs/extract_eICU.yaml"
+PRE_MEDS_PY_FP="$(pwd)/pre_MEDS.py"
+
+# We export these variables separately from their assignment so that any errors during assignment are caught.
+export EVENT_CONVERSION_CONFIG_FP
+export PIPELINE_CONFIG_FP
+export PRE_MEDS_PY_FP
+
+
+if [ "$DO_UNZIP" == "true" ]; then
+  GZ_FILES="${EICU_RAW_DIR}/*.csv.gz"
+  if compgen -G "$GZ_FILES" > /dev/null; then
+    echo "Unzipping csv.gz files matching $GZ_FILES."
+    for file in $GZ_FILES; do gzip -d --force "$file"; done
+  else
+    echo "No csz.gz files to unzip at $GZ_FILES."
+  fi
+else
+  echo "Skipping unzipping."
+fi
+
 echo "Running pre-MEDS conversion."
 ./eICU_Example/pre_MEDS.py raw_cohort_dir="$EICU_RAW_DIR" output_dir="$EICU_PREMEDS_DIR"
 
-echo "Running shard_events.py with $N_PARALLEL_WORKERS workers in parallel"
-./src/MEDS_transforms/extract/shard_events.py \
-    --multirun \
-    worker="range(0,$N_PARALLEL_WORKERS)" \
-    hydra/launcher=joblib \
-    input_dir="$EICU_PREMEDS_DIR" \
-    cohort_dir="$EICU_MEDS_DIR" \
-    event_conversion_config_fp=./eICU_Example/configs/event_configs.yaml \
-    stage_configs.split_and_shard_subjects.n_subjects_per_shard=10000 \
-    stage_configs.merge_to_MEDS_cohort.unique_by=null "$@"
+if [ -z "$N_WORKERS" ]; then
+  echo "Setting N_WORKERS to 1 to avoid issues with the runners."
+  export N_WORKERS="1"
+fi
 
-echo "Splitting subjects in serial"
-./src/MEDS_transforms/extract/split_and_shard_subjects.py \
-    input_dir="$EICU_PREMEDS_DIR" \
-    cohort_dir="$EICU_MEDS_DIR" \
-    event_conversion_config_fp=./eICU_Example/configs/event_configs.yaml \
-    stage_configs.split_and_shard_subjects.n_subjects_per_shard=10000 \
-    stage_configs.merge_to_MEDS_cohort.unique_by=null "$@"
-
-echo "Converting to sharded events with $N_PARALLEL_WORKERS workers in parallel"
-./src/MEDS_transforms/extract/convert_to_sharded_events.py \
-    --multirun \
-    worker="range(0,$N_PARALLEL_WORKERS)" \
-    hydra/launcher=joblib \
-    input_dir="$EICU_PREMEDS_DIR" \
-    cohort_dir="$EICU_MEDS_DIR" \
-    event_conversion_config_fp=./eICU_Example/configs/event_configs.yaml \
-    stage_configs.split_and_shard_subjects.n_subjects_per_shard=10000 \
-    stage_configs.merge_to_MEDS_cohort.unique_by=null "$@"
-
-echo "Merging to a MEDS cohort with $N_PARALLEL_WORKERS workers in parallel"
-./src/MEDS_transforms/extract/merge_to_MEDS_cohort.py \
-    --multirun \
-    worker="range(0,$N_PARALLEL_WORKERS)" \
-    hydra/launcher=joblib \
-    input_dir="$EICU_PREMEDS_DIR" \
-    cohort_dir="$EICU_MEDS_DIR" \
-    event_conversion_config_fp=./eICU_Example/configs/event_configs.yaml \
-    stage_configs.split_and_shard_subjects.n_subjects_per_shard=10000 \
-    stage_configs.merge_to_MEDS_cohort.unique_by=null "$@"
+echo "Running extraction pipeline."
+MEDS_transform-runner "pipeline_config_fp=$PIPELINE_CONFIG_FP" "$@"

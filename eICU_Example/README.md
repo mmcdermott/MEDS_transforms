@@ -49,35 +49,22 @@ cd ..
 
 Download the eICU-CRD dataset (version 2.0) from https://physionet.org/content/eicu-crd/2.0/ following the
 instructions on that page. You will need the raw `.csv.gz` files for this example. We will use
-`$EICU_RAW_DIR` to denote the root directory of where the resulting _core data files_ are stored -- e.g.,
-there should be a `hosp` and `icu` subdirectory of `$EICU_RAW_DIR`.
+`$EICU_RAW_DIR` to denote the root directory of where the resulting _core data files_ are stored
 
-## Step 2: Get the data ready for base MEDS extraction
+## Step 2: Run the MEDS extraction ETL
 
-This is a step in a few parts:
-
-1. Join a few tables by `hadm_id` to get the right timestamps in the right rows for processing. In
-    particular, we need to join:
-    - TODO
-2. Convert the subject's static data to a more parseable form. This entails:
-    - Get the subject's DOB in a format that is usable for MEDS, rather than the integral `anchor_year` and
-        `anchor_offset` fields.
-    - Merge the subject's `dod` with the `deathtime` from the `admissions` table.
-
-After these steps, modified files or symlinks to the original files will be written in a new directory which
-will be used as the input to the actual MEDS extraction ETL. We'll use `$EICU_PREMEDS_DIR` to denote this
-directory.
-
-To run this step, you can use the following script (assumed to be run **not** from this directory but from the
-root directory of this repository):
+To run the MEDS ETL, run the following command:
 
 ```bash
-./eICU_Example/pre_MEDS.py raw_cohort_dir=$EICU_RAW_DIR output_dir=$EICU_PREMEDS_DIR
+./run.sh $EICU_RAW_DIR $EICU_PRE_MEDS_DIR $EICU_MEDS_COHORT_DIR $N_PARALLEL_WORKERS do_unzip=true
 ```
 
-In practice, on a machine with 150 GB of RAM and 10 cores, this step takes less than 5 minutes in total.
+To not unzip the `.csv.gz` files, set `do_unzip=false` instead of `do_unzip=true`.
 
-## Step 3: Run the MEDS extraction ETL
+To use a specific stage runner file (e.g., to set different parallelism options), you can specify it as an
+additional argument
+
+The `N_PARALLEL_WORKERS` variable controls how many parallel workers should be used at maximum.
 
 Note that eICU has a lot more observations per subject than does MIMIC-IV, so to keep to a reasonable memory
 burden (e.g., \< 150GB per worker), you will want a smaller shard size, as well as to turn off the final unique
