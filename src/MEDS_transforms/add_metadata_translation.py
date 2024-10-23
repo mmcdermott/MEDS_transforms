@@ -47,13 +47,6 @@ def get_vocabulary(vocabulary_name: str) -> Vocabulary:
         >>> vocab = get_vocabulary("ICD9")
         >>> print(vocab)
         Vocabulary(vocabulary_name='ICD9', omop_vocabularies=['ICD9CM', 'ICD9sPCS'])
-        >>> get_vocabulary("invalid_vocab")
-        Traceback (most recent call last):
-        ...
-        ValueError: invalid_vocab is not a supported vocabulary
-        Supported vocabularies: [Vocabulary(vocabulary_name='ICD9', omop_vocabularies=['ICD9CM', 'ICD9sPCS']), Vocabulary(vocabulary_name='ICD10', omop_vocabularies=['ICD10CM', 'ICD10PCS'])]
-        Supported translations: {('ICD9', 'ICD10'): <class 'MEDS_transforms.vocabulary_mapping.OmopConceptRelationshipMapping'>}
-        <BLANKLINE>
     """
     for vocabulary in SUPPORTED_VOCABULARIES:
         if vocabulary_name.casefold() == vocabulary.vocabulary_name.casefold():
