@@ -21,28 +21,113 @@ class Vocabulary:
 
 
 class VocabularyMapping(ABC):
+    """
+    Abstract base class for defining mappings between source and target vocabularies.
+
+    This class provides a structure for mapping concept codes from one vocabulary to
+    another, with the actual logic for generating the mappings being implemented
+    in subclasses. It initializes with a source vocabulary and a target vocabulary,
+    both of which are necessary to create the mappings.
+
+    Attributes:
+        vocabulary_cache_dir (Path): The directory where vocabulary data (e.g., concept
+        tables, mappings) is cached or stored.
+
+        source_vocabulary (Vocabulary): The vocabulary object representing the source
+        vocabulary that contains the concepts to be mapped.
+
+        target_vocabulary (Vocabulary): The vocabulary object representing the target
+        vocabulary that the source concepts are mapped to.
+
+    Methods:
+        get_code_mappings() -> Dict[str, str]:
+            Abstract method that must be implemented by subclasses. It should return a
+            dictionary mapping source vocabulary codes (str) to target vocabulary codes (str).
+    """
     def __init__(
         self,
         vocabulary_cache_dir: Path,
         source_vocabulary: Vocabulary,
         target_vocabulary: Vocabulary,
     ):
+        """
+        Initializes the VocabularyMapping class with a source vocabulary, target
+        vocabulary, and a directory for caching vocabulary data.
+
+        Args:
+            vocabulary_cache_dir (Path): The directory path where vocabulary-related
+            data is cached.
+
+            source_vocabulary (Vocabulary): The source vocabulary object that contains
+            the concepts to be mapped.
+
+            target_vocabulary (Vocabulary): The target vocabulary object where the
+            source concepts will be mapped to.
+        """
         self.vocabulary_cache_dir = vocabulary_cache_dir
         self.source_vocabulary = source_vocabulary
         self.target_vocabulary = target_vocabulary
 
     @abstractmethod
     def get_code_mappings(self) -> Dict[str, str]:
+        """
+        Abstract method to retrieve the mapping between source and target vocabulary codes.
+
+        Subclasses must implement this method to return a dictionary mapping source
+        vocabulary codes (str) to target vocabulary codes (str).
+
+        Returns:
+            Dict[str, str]: A dictionary where keys are source vocabulary codes and values
+            are the corresponding target vocabulary codes.
+        """
         pass
 
 
 class OmopConceptRelationshipMapping(VocabularyMapping):
+    """
+    This class defines the mapping between source and target OMOP concept vocabularies
+    using relationships defined in the OMOP 'concept' and 'concept_relationship' tables.
+    It extends the VocabularyMapping class and provides a method to retrieve mappings
+    of source concept codes to target concept codes based on OMOP vocabularies.
 
+    Methods:
+        create_hash(concept_ids: List[str]) -> str:
+            Creates a unique hash by sorting and concatenating concept IDs into a string.
+
+        get_code_mappings() -> Dict[str, str]:
+            Returns a dictionary mapping source OMOP concept codes to target OMOP
+            concept codes using the "Maps to" relationships from the OMOP vocabulary.
+            The function joins source and target mappings via hashed concept ID lists.
+    """
     @staticmethod
     def create_hash(concept_ids: List[str]) -> str:
+        """
+        Creates a unique hash string from a list of concept IDs by sorting and concatenating
+        them with a hyphen ("-").
+
+        Args:
+            concept_ids (List[str]): A list of concept IDs to hash.
+
+        Returns:
+            str: A hashed string representing the sorted concept IDs concatenated with a hyphen.
+        """
         return "-".join(map(str, sorted(concept_ids)))
 
     def get_code_mappings(self) -> Dict[str, str]:
+        """
+        Retrieves mappings between source concept codes and target concept codes based on the
+        OMOP 'Maps to' relationships. The function first loads concept and concept relationship
+        tables, generates mappings for both the source and target OMOP vocabularies, and then
+        joins these mappings on hashed concept IDs to produce the final dictionary mapping
+        source codes to target codes.
+
+        Returns:
+            Dict[str, str]: A dictionary mapping source concept codes (str) to target concept
+            codes (str), based on the OMOP "Maps to" relationship.
+
+        Raises:
+            Exception: If the vocabulary tables cannot be loaded or the mappings cannot be created.
+        """
         source_omop_vocabularies = self.source_vocabulary.omop_vocabularies
         target_omop_vocabularies = self.target_vocabulary.omop_vocabularies
 
@@ -142,6 +227,27 @@ def create_concept_to_parent_dict(
     concept_relationship: pl.LazyFrame,
     omop_vocabularies: List[str]
 ) -> pl.LazyFrame:
+    """
+    Creates a mapping of concept IDs to their parent concept IDs based on the "Is a"
+    relationship in the OMOP vocabulary.
+
+    This function filters the provided concept data to include only those belonging to
+    the specified OMOP vocabularies. It then joins the concept data with the concept
+    relationships to identify parent-child relationships based on the "Is a" relationship.
+    The result is a LazyFrame that contains concept IDs and their corresponding parent concept IDs.
+
+    Args:
+        concept (pl.LazyFrame): The concept table in lazy format, containing details such as
+        concept_id and vocabulary_id.
+        concept_relationship (pl.LazyFrame): The concept relationship table in lazy format,
+        which contains the relationships between different concepts.
+        omop_vocabularies (List[str]): A list of vocabulary IDs representing the OMOP vocabularies
+        to be included in the mapping.
+
+    Returns:
+        pl.LazyFrame: A LazyFrame containing the mapping of each concept ID to its corresponding
+        parent concept ID. The output will have two columns: "concept_id" and "parent_concept_id".
+    """
     concept_to_parent_mapping_df = concept.filter(
         pl.col("vocabulary_id").is_in(omop_vocabularies)
     ).select("concept_id").join(
@@ -159,6 +265,29 @@ def create_concept_to_mapped_concepts_dict(
     concept_relationship: pl.LazyFrame,
     omop_vocabularies: List[str]
 ) -> pl.LazyFrame:
+    """
+    Creates a mapping of concept IDs to their corresponding mapped concept IDs
+    based on the "Maps to" relationship in the OMOP vocabulary.
+
+    This function filters the provided concept data to only include those
+    belonging to the specified OMOP vocabularies. It then joins the concept
+    data with the concept relationships to identify mappings and returns a
+    LazyFrame with each concept ID mapped to its unique corresponding
+    concept IDs based on the "Maps to" relationship.
+
+    Args:
+        concept (pl.LazyFrame): The concept table in lazy format, containing the
+        concept details like concept_id and vocabulary_id.
+        concept_relationship (pl.LazyFrame): The concept relationship table in
+        lazy format, which contains the relationships between different concepts.
+        omop_vocabularies (List[str]): A list of vocabulary IDs representing the
+        OMOP vocabularies to be included in the mapping.
+
+    Returns:
+        pl.LazyFrame: A LazyFrame containing the mapping of each concept ID to its
+        unique mapped concept IDs. The output will have two columns: "concept_id"
+        and "mapped_concept_ids".
+    """
     concept_to_mapped_concept_ids = concept.filter(
         pl.col("vocabulary_id").is_in(omop_vocabularies)
     ).select(
@@ -225,6 +354,27 @@ def get_vocabulary_mapping(
     source_vocabulary: Vocabulary,
     target_vocabulary: Vocabulary
 ) -> VocabularyMapping:
+    """
+    Retrieves a vocabulary mapping between a source and target vocabulary.
+
+    This function checks if a translation between the specified source and target
+    vocabularies is supported. If supported, it returns the appropriate vocabulary
+    mapping from the cache or generates it if necessary. If the translation is not
+    supported, a ValueError is raised, listing the available supported translations.
+
+    Args:
+        vocabulary_cache_dir (Path): Directory where vocabulary mappings are cached.
+        source_vocabulary (Vocabulary): The source vocabulary for translation.
+        target_vocabulary (Vocabulary): The target vocabulary for translation.
+
+    Returns:
+        VocabularyMapping: A mapping object that provides translation between
+        the source and target vocabulary.
+
+    Raises:
+        ValueError: If there is no supported translation between the source and
+        target vocabularies.
+    """
     vocabulary_tuple = (source_vocabulary.vocabulary_name, target_vocabulary.vocabulary_name)
     if vocabulary_tuple in SUPPORTED_TRANSLATIONS:
         return SUPPORTED_TRANSLATIONS[vocabulary_tuple](
