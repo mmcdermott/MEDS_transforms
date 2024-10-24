@@ -7,8 +7,8 @@ up from this one).
 ## Step 0: Installation
 
 ```bash
-conda create -n meds-transform python=3.12
-conda activate meds-transform
+conda create -n MEDS python=3.12
+conda activate MEDS
 # Get the latest version of MEDS_transforms from pypi
 LATEST_VERSION=$(pip index versions "meds-transforms" 2>/dev/null | egrep -o '([0-9]+\.){2}[0-9]+' | head -n 1)
 export VERSION=$LATEST_VERSION # or whatever version you want, at the time of writing this is "0.0.8"
@@ -79,7 +79,7 @@ additional argument
 
 ```bash
 export N_WORKERS=5
-./run.sh $MIMICIV_RAW_DIR $MIMICIV_PRE_MEDS_DIR $MIMICIV_MEDS_DIR do_unzip=false \
+./run.sh $MIMICIV_RAW_DIR $MIMICIV_PRE_MEDS_DIR $MIMICIV_MEDS_DIR do_unzip=true \
     stage_runner_fp=slurm_runner.yaml
 ```
 
