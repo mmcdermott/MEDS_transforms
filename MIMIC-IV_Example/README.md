@@ -9,7 +9,10 @@ up from this one).
 ```bash
 conda create -n MEDS python=3.12
 conda activate MEDS
-pip install "MEDS_transforms[local_parallelism,slurm_parallelism]"
+# Get the latest version of MEDS_transforms from pypi
+LATEST_VERSION=$(pip index versions "meds-transforms" 2>/dev/null | egrep -o '([0-9]+\.){2}[0-9]+' | head -n 1)
+export VERSION=$LATEST_VERSION # or whatever version you want, at the time of writing this is "0.0.8"
+pip install "MEDS_transforms[local_parallelism,slurm_parallelism]==${VERSION}"
 ```
 
 If you want to profile the time and memory costs of your ETL, also install: `pip install hydra-profiler`.
@@ -21,7 +24,6 @@ export MIMICIV_RAW_DIR=??? # set to the directory in which you want to store the
 export MIMICIV_PRE_MEDS_DIR=??? # set to the directory in which you want to store the raw MIMIC-IV data
 export MIMICIV_MEDS_COHORT_DIR=??? # set to the directory in which you want to store the raw MIMIC-IV data
 
-export VERSION=0.0.6 # or whatever version you want
 export URL="https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/$VERSION/MIMIC-IV_Example"
 
 wget $URL/run.sh
@@ -31,6 +33,8 @@ wget $URL/slurm_runner.yaml
 mkdir configs
 cd configs
 wget $URL/configs/extract_MIMIC.yaml
+wget $URL/configs/pre_MEDS.yaml
+wget $URL/configs/event_configs.yaml
 cd ..
 chmod +x run.sh
 chmod +x pre_MEDS.py
