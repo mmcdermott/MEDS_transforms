@@ -78,7 +78,7 @@ To use a specific stage runner file (e.g., to set different parallelism options)
 additional argument
 
 ```bash
-export N_WORKERS=8
+export N_WORKERS=5
 ./run.sh $MIMICIV_RAW_DIR $MIMICIV_PRE_MEDS_DIR $MIMICIV_MEDS_DIR do_unzip=false \
     stage_runner_fp=local_parallelism_runner.yaml
 ```
