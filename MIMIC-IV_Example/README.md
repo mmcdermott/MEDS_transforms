@@ -11,7 +11,7 @@ conda create -n meds-transform python=3.12
 conda activate meds-transform
 # Get the latest version of MEDS_transforms from pypi
 LATEST_VERSION=$(pip index versions "meds-transforms" 2>/dev/null | egrep -o '([0-9]+\.){2}[0-9]+' | head -n 1)
-export VERSION=LATEST_VERSION # or whatever version you want, at the time of writing this is "0.0.8"
+export VERSION=$LATEST_VERSION # or whatever version you want, at the time of writing this is "0.0.8"
 pip install "MEDS_transforms[local_parallelism,slurm_parallelism]==${VERSION}"
 ```
 
@@ -20,9 +20,9 @@ If you want to profile the time and memory costs of your ETL, also install: `pip
 ## Step 0.5: Set-up
 Set some environment variables and download the necessary files:
 ```bash
-export MIMICIV_RAW_DIR=/storage/shared/mimiciv/meds_tab_tutorial/raw/ # set to the directory in which you want to store the raw MIMIC-IV data
-export MIMICIV_PRE_MEDS_DIR=/storage/shared/mimiciv/meds_tab_tutorial/pre_meds/ # set to the directory in which you want to store the raw MIMIC-IV data
-export MIMICIV_MEDS_COHORT_DIR=/storage/shared/mimiciv/meds_tab_tutorial/meds/ # set to the directory in which you want to store the raw MIMIC-IV data
+export MIMICIV_RAW_DIR=??? # set to the directory in which you want to store the raw MIMIC-IV data
+export MIMICIV_PRE_MEDS_DIR=??? # set to the directory in which you want to store the raw MIMIC-IV data
+export MIMICIV_MEDS_COHORT_DIR=??? # set to the directory in which you want to store the raw MIMIC-IV data
 
 export URL="https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/$VERSION/MIMIC-IV_Example"
 
