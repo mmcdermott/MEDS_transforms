@@ -9,7 +9,9 @@ up from this one).
 ```bash
 conda create -n meds-transform python=3.12
 conda activate meds-transform
-export VERSION=0.0.8 # or whatever version you want
+# Get the latest version of MEDS_transforms from pypi
+LATEST_VERSION=$(pip index versions "meds-transforms" 2>/dev/null | egrep -o '([0-9]+\.){2}[0-9]+' | head -n 1)
+export VERSION=LATEST_VERSION # or whatever version you want, at the time of writing this is "0.0.8"
 pip install "MEDS_transforms[local_parallelism,slurm_parallelism]==${VERSION}"
 ```
 
