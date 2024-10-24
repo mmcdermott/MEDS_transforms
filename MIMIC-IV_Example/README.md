@@ -80,7 +80,7 @@ additional argument
 ```bash
 export N_WORKERS=5
 ./run.sh $MIMICIV_RAW_DIR $MIMICIV_PRE_MEDS_DIR $MIMICIV_MEDS_DIR do_unzip=false \
-    stage_runner_fp=local_parallelism_runner.yaml
+    stage_runner_fp=slurm_runner.yaml
 ```
 
 The `N_WORKERS` environment variable set before the command controls how many parallel workers should be used
