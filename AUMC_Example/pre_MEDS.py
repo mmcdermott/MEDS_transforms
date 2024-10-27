@@ -19,6 +19,7 @@ from MEDS_transforms.utils import get_shard_prefix, hydra_loguru_init, write_laz
 ADMISSION_ID = "admissionid"
 PATIENT_ID = "patientid"
 
+
 def load_raw_aumc_file(fp: Path, **kwargs) -> pl.LazyFrame:
     """Load a raw AUMCdb file into a Polars DataFrame.
 
@@ -44,28 +45,29 @@ def process_patient_and_admissions(df: pl.LazyFrame) -> pl.LazyFrame:
     """
 
     origin_pseudotime = pl.datetime(
-        year = pl.col("admissionyeargroup").str.extract(r"(2003|2010)").cast(pl.Int32),
-        month = 1, day = 1
+        year=pl.col("admissionyeargroup").str.extract(r"(2003|2010)").cast(pl.Int32), month=1, day=1
     )
 
-    # TODO: consider using better logic to infer date of birth for patients 
+    # TODO: consider using better logic to infer date of birth for patients
     #       with more than one admission.
-    age_in_years = ((
-        pl.col("agegroup").str.extract("(\\d{2}).?$").cast(pl.Int32) + 
-        pl.col("agegroup").str.extract("^(\\d{2})").cast(pl.Int32)
-    ) / 2).ceil()
+    age_in_years = (
+        (
+            pl.col("agegroup").str.extract("(\\d{2}).?$").cast(pl.Int32)
+            + pl.col("agegroup").str.extract("^(\\d{2})").cast(pl.Int32)
+        )
+        / 2
+    ).ceil()
     age_in_days = age_in_years * 365.25
     # We assume that the patient was born at the midpoint of the year as we don't know the actual birthdate
     pseudo_date_of_birth = origin_pseudotime - pl.duration(days=(age_in_days - 365.25 / 2))
     pseudo_date_of_death = origin_pseudotime + pl.duration(milliseconds=pl.col("dateofdeath"))
 
-
     return df.filter(pl.col("admissioncount") == 1).select(
-        PATIENT_ID, 
+        PATIENT_ID,
         pseudo_date_of_birth.alias("dateofbirth"),
         "gender",
         origin_pseudotime.alias("firstadmittedattime"),
-        pseudo_date_of_death.alias("dateofdeath")
+        pseudo_date_of_death.alias("dateofdeath"),
     ), df.select(PATIENT_ID, ADMISSION_ID)
 
 
@@ -80,20 +82,21 @@ def join_and_get_pseudotime_fntr(
 
     Also raises specified warning strings via the logger for uncertain columns.
 
-    Args: 
+    Args:
         table_name: name of the AUMCdb table that should be joined
         offset_col: list of all columns that contain time offsets since the patient's first admission
-        pseudotime_col: list of all timestamp columns derived from `offset_col` and the linked `patient` 
+        pseudotime_col: list of all timestamp columns derived from `offset_col` and the linked `patient`
             table
-        output_data_cols: list of all data columns included in the output 
+        output_data_cols: list of all data columns included in the output
         warning_items: any warnings noted in the table_preprocessors.yaml
 
-    Example: 
-        All args except `table_name` are taken from the table_preprocessors.yaml. For example, for the 
+    Example:
+        All args except `table_name` are taken from the table_preprocessors.yaml. For example, for the
         table `numericitems`, we have the following yaml configuration:
 
+
         numericitems:
-            offset_col: 
+            offset_col:
                 - "measuredat"
                 - "registeredat"
                 - "updatedat"
@@ -110,7 +113,7 @@ def join_and_get_pseudotime_fntr(
             warning_items:
                 - "How should we deal with `registeredat` and `updatedat`?"
 
-    Returns: 
+    Returns:
         Function that expects the raw data stored in the `table_name` table and the joined output of the
         `process_patient_and_admissions` function. Both inputs are expected to be `pl.DataFrame`s.
     """
@@ -163,7 +166,7 @@ def main(cfg: DictConfig):
 
     Inputs are the raw AUMCdb files, read from the `input_dir` config parameter. Output files are written
     in processed form and as Parquet files to the `cohort_dir` config parameter. Hydra is used to manage
-    configuration parameters and logging. 
+    configuration parameters and logging.
     """
 
     hydra_loguru_init()

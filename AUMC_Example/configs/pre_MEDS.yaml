@@ -11,4 +11,3 @@ hydra:
     dir: ${log_dir}
   sweep:
     dir: ${log_dir}
-

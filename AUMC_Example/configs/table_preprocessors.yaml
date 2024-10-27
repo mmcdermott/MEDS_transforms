@@ -7,7 +7,7 @@ admissions:
     - "dischargedattime"
   output_data_cols:
     - "location"
-    - "urgency" 
+    - "urgency"
     - "origin"
     - "destination"
     - "weightgroup"
@@ -17,7 +17,7 @@ admissions:
     - "specialty"
 
 numericitems:
-  offset_col: 
+  offset_col:
     - "measuredat"
     - "registeredat"
     - "updatedat"
