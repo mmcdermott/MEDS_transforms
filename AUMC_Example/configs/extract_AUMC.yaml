@@ -31,7 +31,5 @@ stages:
   - split_and_shard_subjects
   - convert_to_sharded_events
   - merge_to_MEDS_cohort
-  - extract_code_metadata
   - finalize_MEDS_metadata
   - finalize_MEDS_data
-
