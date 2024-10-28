@@ -7,8 +7,8 @@ set -e
 function display_help() {
     echo "Usage: $0 <AUMC_RAW_DIR> <AUMC_PRE_MEDS_DIR> <AUMC_MEDS_COHORT_DIR>"
     echo
-    echo "This script processes MIMIC-IV data through several steps, handling raw data conversion,"
-    echo "sharding events, splitting subjects, converting to sharded events, and merging into a MEDS cohort."
+    echo "This script processes the AUMCdb (AmsterdamUMCdb, Amsterdam University Medical Center database, short version: AUMC) data through several steps,"
+    echo "handling raw data conversion, sharding events, splitting subjects, converting to sharded events, and merging into a MEDS cohort."
     echo
     echo "Arguments:"
     echo "  AUMC_RAW_DIR                                Directory containing raw AUMCdb data files."
