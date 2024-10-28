@@ -28,8 +28,16 @@ def load_raw_aumc_file(fp: Path, **kwargs) -> pl.LazyFrame:
 
     Returns:
         The Polars DataFrame containing the AUMCdb data.
+    Example:
+    >>> load_raw_aumc_file(Path("processitems.csv")).collect()
+        ┌─────────────┬────────┬──────────────────────┬──────────┬───────────┬──────────┐
+        │ admissionid ┆ itemid ┆ item                 ┆ start    ┆ stop      ┆ duration │
+        │ ---         ┆ ---    ┆ ---                  ┆ ---      ┆ ---       ┆ ---      │
+        │ i64         ┆ i64    ┆ str                  ┆ i64      ┆ i64       ┆ i64      │
+        ╞═════════════╪════════╪══════════════════════╪══════════╪═══════════╪══════════╡
+        │ 1           ┆ 1      ┆ "Pulse"              ┆ 0        ┆ 100000    ┆ 100000   │
+        └─────────────┴────────┴──────────────────────┴──────────┴───────────┴──────────┘
     """
-
     return pl.scan_csv(fp, infer_schema_length=10000000, encoding="utf8-lossy", **kwargs)
 
 
@@ -79,8 +87,26 @@ def join_and_get_pseudotime_fntr(
     warning_items: list[str] | None = None,
 ) -> Callable[[pl.LazyFrame, pl.LazyFrame], pl.LazyFrame]:
     """Returns a function that joins a dataframe to the `patient` table and adds pseudotimes.
-
     Also raises specified warning strings via the logger for uncertain columns.
+    All args except `table_name` are taken from the table_preprocessors.yaml. For example, for the
+    table `numericitems`, we have the following yaml configuration:
+    numericitems:
+        offset_col:
+            - "measuredat"
+            - "registeredat"
+            - "updatedat"
+        pseudotime_col:
+            - "measuredattime"
+            - "registeredattime"
+            - "updatedattime"
+        output_data_cols:
+            - "item"
+            - "value"
+            - "unit"
+            - "registeredby"
+            - "updatedby"
+        warning_items:
+            - "How should we deal with `registeredat` and `updatedat`?"
 
     Args:
         table_name: name of the AUMCdb table that should be joined
@@ -90,32 +116,21 @@ def join_and_get_pseudotime_fntr(
         output_data_cols: list of all data columns included in the output
         warning_items: any warnings noted in the table_preprocessors.yaml
 
-    Example:
-        All args except `table_name` are taken from the table_preprocessors.yaml. For example, for the
-        table `numericitems`, we have the following yaml configuration:
-
-
-        numericitems:
-            offset_col:
-                - "measuredat"
-                - "registeredat"
-                - "updatedat"
-            pseudotime_col:
-                - "measuredattime"
-                - "registeredattime"
-                - "updatedattime"
-            output_data_cols:
-                - "item"
-                - "value"
-                - "unit"
-                - "registeredby"
-                - "updatedby"
-            warning_items:
-                - "How should we deal with `registeredat` and `updatedat`?"
-
     Returns:
         Function that expects the raw data stored in the `table_name` table and the joined output of the
         `process_patient_and_admissions` function. Both inputs are expected to be `pl.DataFrame`s.
+
+    Examples:
+        >>> func = join_and_get_pseudotime_fntr("numericitems", ["measuredat", "registeredat", "updatedat"],
+        ["measuredattime", "registeredattime", "updatedattime"],
+        ["item", "value", "unit", "registeredby", "updatedby"],
+        ["How should we deal with `registeredat` and `updatedat`?"])`
+        >>> df = load_raw_aumc_file(in_fp)
+        >>> raw_admissions_df = load_raw_aumc_file(Path("admissions.csv"))
+        >>> patient_df, link_df = process_patient_and_admissions(raw_admissions_df)
+        >>> processed_df = func(df, patient_df)
+        >>> type(processed_df)
+        <class 'polars.lazy.LazyFrame'>
     """
 
     if output_data_cols is None:
