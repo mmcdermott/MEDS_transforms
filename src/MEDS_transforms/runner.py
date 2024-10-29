@@ -68,7 +68,41 @@ def get_script_from_name(stage_name: str) -> str | None:
 def get_parallelization_args(
     parallelization_cfg: dict | DictConfig | None, default_parallelization_cfg: dict | DictConfig
 ) -> list[str]:
-    """Gets the parallelization args."""
+    """Extracts the specific parallelization arguments given the default and stage-specific configurations.
+
+    Args:
+        parallelization_cfg: The stage-specific parallelization configuration.
+        default_parallelization_cfg: The default parallelization configuration.
+
+    Returns:
+        A list of command-line arguments for parallelization.
+
+    Examples:
+        >>> get_parallelization_args({}, {})
+        []
+        >>> get_parallelization_args(None, {"n_workers": 4})
+        []
+        >>> get_parallelization_args({"n_workers": 2, "launcher_params": 'foo'}, {})
+        Traceback (most recent call last):
+            ...
+        ValueError: If launcher_params is provided, launcher must also be provided.
+        >>> get_parallelization_args({"n_workers": 2}, {})
+        ['--multirun', 'worker="range(0,2)"']
+        >>> get_parallelization_args(
+        ...     {"launcher": "slurm"},
+        ...     {"n_workers": 3, "launcher": "joblib"}
+        ... )
+        ['--multirun', 'worker="range(0,3)"', 'hydra/launcher=slurm']
+        >>> get_parallelization_args(
+        ...     {"n_workers": 2, "launcher": "joblib"},
+        ...     {"n_workers": 5, "launcher_params": {"foo": "bar"}},
+        ... )
+        ['--multirun', 'worker="range(0,2)"', 'hydra/launcher=joblib', 'hydra.launcher.foo=bar']
+        >>> get_parallelization_args(
+        ...     {"n_workers": 5, "launcher_params": {"biz": "baz"}, "launcher": "slurm"}, {}
+        ... )
+        ['--multirun', 'worker="range(0,5)"', 'hydra/launcher=slurm', 'hydra.launcher.biz=baz']
+    """
 
     if parallelization_cfg is None:
         return []
@@ -96,10 +130,10 @@ def get_parallelization_args(
         launcher = None
 
     if launcher is None:
-        return parallelization_args
-
         if "launcher_params" in parallelization_cfg:
             raise ValueError("If launcher_params is provided, launcher must also be provided.")
+
+        return parallelization_args
 
     parallelization_args.append(f"hydra/launcher={launcher}")
 
@@ -116,7 +150,12 @@ def get_parallelization_args(
     return parallelization_args
 
 
-def run_stage(cfg: DictConfig, stage_name: str, default_parallelization_cfg: dict | DictConfig | None = None):
+def run_stage(
+    cfg: DictConfig,
+    stage_name: str,
+    default_parallelization_cfg: dict | DictConfig | None = None,
+    runner_fn: callable = subprocess.run,  # For dependency injection
+):
     """Runs a single stage of the pipeline.
 
     Args:
