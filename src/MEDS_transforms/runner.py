@@ -33,6 +33,20 @@ def get_script_from_name(stage_name: str) -> str | None:
 
     Returns:
         The script name for the given stage name.
+
+    Examples:
+        >>> get_script_from_name("shard_events")
+        'MEDS_extract-shard_events'
+        >>> get_script_from_name("fit_vocabulary_indices")
+        'MEDS_transform-fit_vocabulary_indices'
+        >>> get_script_from_name("filter_subjects")
+        'MEDS_transform-filter_subjects'
+        >>> get_script_from_name("reorder_measurements")
+        'MEDS_transform-reorder_measurements'
+        >>> get_script_from_name("nonexistent_stage")
+        Traceback (most recent call last):
+            ...
+        ValueError: Could not find a script for stage nonexistent_stage.
     """
 
     try:
