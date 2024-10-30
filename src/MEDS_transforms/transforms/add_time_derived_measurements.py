@@ -330,6 +330,26 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         │ 2          ┆ 2023-01-03 12:00:00 ┆ time_of_day//[12,18) │
         │ 3          ┆ 2022-01-01 18:00:00 ┆ time_of_day//[18,24) │
         └────────────┴─────────────────────┴──────────────────────┘
+        >>> time_of_day_fntr(DictConfig({"endpoints": []}))
+        Traceback (most recent call last):
+            ...
+        ValueError: The 'endpoints' key must contain at least one endpoint for time of day categories.
+        >>> time_of_day_fntr(DictConfig({"endpoints": [6, 12, 36]}))
+        Traceback (most recent call last):
+            ...
+        ValueError: All endpoints must be between 0 and 24 inclusive. Got: [6, 12, 36]
+        >>> time_of_day_fntr(DictConfig({"endpoints": [6, 1.2]}))
+        Traceback (most recent call last):
+            ...
+        ValueError: All endpoints must be integer, whole-hour boundaries, but got: [6, 1.2]
+        >>> time_of_day_fntr(DictConfig({"endpoints": [6, 6]}))
+        Traceback (most recent call last):
+            ...
+        ValueError: All endpoints must be unique. Got: [6, 6]
+        >>> time_of_day_fntr(DictConfig({"endpoints": [6, 12, 10]}))
+        Traceback (most recent call last):
+            ...
+        ValueError: All endpoints must be in sorted order. Got: [6, 12, 10]
     """
     if not cfg.endpoints:
         raise ValueError("The 'endpoints' key must contain at least one endpoint for time of day categories.")
@@ -337,8 +357,10 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         raise ValueError(f"All endpoints must be between 0 and 24 inclusive. Got: {cfg.endpoints}")
     if not all(isinstance(endpoint, int) for endpoint in cfg.endpoints):
         raise ValueError(f"All endpoints must be integer, whole-hour boundaries, but got: {cfg.endpoints}")
-    if len(cfg.endpoints) != len(set(cfg.endpoints)) or cfg.endpoints != sorted(cfg.endpoints):
-        raise ValueError(f"All endpoints must be unique and in sorted order. Got: {cfg.endpoints}")
+    if len(cfg.endpoints) != len(set(cfg.endpoints)):
+        raise ValueError(f"All endpoints must be unique. Got: {cfg.endpoints}")
+    if cfg.endpoints != sorted(cfg.endpoints):
+        raise ValueError(f"All endpoints must be in sorted order. Got: {cfg.endpoints}")
 
     def fn(df: pl.LazyFrame) -> pl.LazyFrame:
         hour = pl.col("time").dt.hour()
@@ -365,6 +387,27 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
 
 
 def add_time_derived_measurements_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
+    """Adds all requested time-derived measurements to a DataFrame.
+
+    Args:
+        stage_cfg: The configuration for the time-derived measurements. Recognized time derived functors
+            include the following keys:
+                - "age": The configuration for the age function.
+                - "time_of_day": The configuration for the time of day function.
+
+    Returns:
+        A function that adds all requested time-derived measurements to a DataFrame.
+
+    Raises:
+        ValueError: If an unrecognized time-derived measurement is requested.
+
+    Examples:
+        >>> add_time_derived_measurements_fntr(DictConfig({"buzz": {}}))
+        Traceback (most recent call last):
+            ...
+        ValueError: Unknown time-derived measurement: buzz
+    """
+
     compute_fns = []
     # We use the raw stages object as the induced `stage_cfg` has extra properties like the input and output
     # directories.

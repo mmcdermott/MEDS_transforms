@@ -95,18 +95,18 @@ def extract_values_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.La
         match out_col_n:
             case str() if out_col_n in MANDATORY_TYPES:
                 expr = expr.cast(MANDATORY_TYPES[out_col_n])
-                if out_col_n == subject_id_field:
+                if out_col_n == subject_id_field:  # pragma: no cover
                     logger.warning(
                         f"You should almost CERTAINLY not be extracting {subject_id_field} as a value."
                     )
-                if out_col_n == "time":
+                if out_col_n == "time":  # pragma: no cover
                     logger.warning("Warning: `time` is being extracted post-hoc!")
-            case str() if out_col_n in DEPRECATED_NAMES:
+            case str() if out_col_n in DEPRECATED_NAMES:  # pragma: no cover
                 logger.warning(
                     f"Deprecated column name: {out_col_n} -> {DEPRECATED_NAMES[out_col_n]}. "
                     "This column name will not be re-typed."
                 )
-            case str():
+            case str():  # pragma: no cover
                 pass
             case _:
                 raise ValueError(f"Invalid column name: {out_col_n}")

@@ -131,3 +131,23 @@ def test_split_and_shard():
         event_conversion_config_fp="{input_dir}/event_cfgs.yaml",
         want_outputs={"metadata/.shards.json": EXPECTED_SPLITS},
     )
+
+    # Should error without event config file.
+    single_stage_tester(
+        script=SPLIT_AND_SHARD_SCRIPT,
+        stage_name="split_and_shard_subjects",
+        stage_kwargs={
+            "split_fracs.train": 4 / 6,
+            "split_fracs.tuning": 1 / 6,
+            "split_fracs.held_out": 1 / 6,
+            "n_subjects_per_shard": 2,
+        },
+        config_name="extract",
+        input_files={
+            "data/subjects/[0-6).parquet": pl.read_csv(StringIO(SUBJECTS_CSV)),
+            "data/admit_vitals/[0-10).parquet": pl.read_csv(StringIO(ADMIT_VITALS_0_10_CSV)),
+            "data/admit_vitals/[10-16).parquet": pl.read_csv(StringIO(ADMIT_VITALS_10_16_CSV)),
+        },
+        event_conversion_config_fp="{input_dir}/event_cfgs.yaml",
+        should_error=True,
+    )

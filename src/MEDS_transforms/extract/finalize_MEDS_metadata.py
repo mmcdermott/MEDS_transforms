@@ -147,7 +147,7 @@ def main(cfg: DictConfig):
         etl_metadata.dataset_version: The version of the dataset being extracted.
     """
 
-    if cfg.worker != 0:
+    if cfg.worker != 0:  # pragma: no cover
         logger.info("Non-zero worker found in reduce-only stage. Exiting")
         return
 
@@ -219,7 +219,7 @@ def main(cfg: DictConfig):
     for split, cnt in seen_splits.items():
         if cnt:
             logger.info(f"Split {split} has {cnt} subjects")
-        else:
+        else:  # pragma: no cover
             logger.warning(f"Split {split} not found in shards map")
 
     subject_splits_tbl = pa.Table.from_pylist(subject_splits, schema=subject_split_schema)
