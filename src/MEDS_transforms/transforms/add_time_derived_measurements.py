@@ -387,6 +387,27 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
 
 
 def add_time_derived_measurements_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
+    """Adds all requested time-derived measurements to a DataFrame.
+
+    Args:
+        stage_cfg: The configuration for the time-derived measurements. Recognized time derived functors
+            include the following keys:
+                - "age": The configuration for the age function.
+                - "time_of_day": The configuration for the time of day function.
+
+    Returns:
+        A function that adds all requested time-derived measurements to a DataFrame.
+
+    Raises:
+        ValueError: If an unrecognized time-derived measurement is requested.
+
+    Examples:
+        >>> add_time_derived_measurements_fntr(DictConfig({"buzz": {}}))
+        Traceback (most recent call last):
+            ...
+        ValueError: Unknown time-derived measurement: buzz
+    """
+
     compute_fns = []
     # We use the raw stages object as the induced `stage_cfg` has extra properties like the input and output
     # directories.
