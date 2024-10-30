@@ -695,7 +695,7 @@ def run_map_reduce(cfg: DictConfig):
 
     logger.info("Starting reduction process")
 
-    while not all(is_complete_parquet_file(fp) for fp in all_out_fps):
+    while not all(is_complete_parquet_file(fp) for fp in all_out_fps):  # pragma: no cover
         logger.info("Waiting to begin reduction for all files to be written...")
         time.sleep(cfg.polling_time)
 
