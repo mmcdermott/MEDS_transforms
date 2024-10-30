@@ -811,7 +811,7 @@ def main(cfg: DictConfig):
                             event_cfgs=copy.deepcopy(event_cfgs),
                             do_dedup_text_and_numeric=cfg.stage_cfg.get("do_dedup_text_and_numeric", False),
                         )
-                    except Exception as e:
+                    except Exception as e:  # pragma: no cover
                         raise ValueError(
                             f"Error converting {str(shard_fp.resolve())} for {sp}/{input_prefix}: {e}"
                         ) from e
