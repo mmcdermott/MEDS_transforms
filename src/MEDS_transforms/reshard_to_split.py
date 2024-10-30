@@ -112,7 +112,7 @@ def main(cfg: DictConfig):
 
     max_iters = cfg.get("max_iters", 10)
     iters = 0
-    while not valid_json_file(shards_fp) and iters < max_iters:
+    while not valid_json_file(shards_fp) and iters < max_iters:  # pragma: no cover
         logger.info(f"Waiting to begin until shards map is written. Iteration {iters}/{max_iters}...")
         time.sleep(cfg.polling_time)
         iters += 1
