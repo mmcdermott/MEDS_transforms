@@ -352,13 +352,23 @@ def shuffle_shards(shards: list[str], cfg: DictConfig) -> list[str]:
         The shuffled list of shards.
 
     Examples:
-        >>> cfg = DictConfig({"worker": 1})
         >>> shards = ["train/0", "train/1", "tuning", "held_out"]
-        >>> shuffle_shards(shards, cfg)
+        >>> shuffle_shards(shards, DictConfig({"worker": 1}))
         ['train/1', 'held_out', 'tuning', 'train/0']
-        >>> cfg = DictConfig({"worker": 2})
-        >>> shuffle_shards(shards, cfg)
+        >>> shuffle_shards(shards, DictConfig({"worker": 2}))
         ['tuning', 'held_out', 'train/1', 'train/0']
+
+        It can also shuffle the shards without a worker ID, but the order is then based on the time, which
+        is not consistent across runs.
+        >>> sorted(shuffle_shards(shards, DictConfig({})))
+        ['held_out', 'train/0', 'train/1', 'tuning']
+
+        If the shards aren't unique, it will error
+        >>> shards = ["train/0", "train/0", "tuning", "held_out"]
+        >>> shuffle_shards(shards, DictConfig({"worker": 1}))
+        Traceback (most recent call last):
+            ...
+        ValueError: Hash collision for shard train/0 with add_str 1!
     """
 
     if "worker" in cfg:
@@ -368,10 +378,10 @@ def shuffle_shards(shards: list[str], cfg: DictConfig) -> list[str]:
 
     shard_keys = []
     for shard in shards:
-        shard_hash = hashlib.sha256((add_str + shard).encode("utf-8")).hexdigest()
+        shard_hash = int(hashlib.sha256((add_str + shard).encode("utf-8")).hexdigest(), 16)
         if shard_hash in shard_keys:
             raise ValueError(f"Hash collision for shard {shard} with add_str {add_str}!")
-        shard_keys.append(int(shard_hash, 16))
+        shard_keys.append(shard_hash)
 
     return [shard for _, shard in sorted(zip(shard_keys, shards))]
 
