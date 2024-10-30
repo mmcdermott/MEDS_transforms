@@ -297,7 +297,7 @@ def main(cfg: DictConfig):
 
     log_dir = Path(cfg.log_dir)
 
-    if cfg.get("do_profile", False):
+    if cfg.get("do_profile", False):  # pragma: no cover
         try:
             import hydra_profiler  # noqa: F401
         except ImportError as e:
