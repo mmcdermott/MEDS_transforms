@@ -112,3 +112,18 @@ def test_shard_events():
         },
         df_check_kwargs={"check_column_order": False},
     )
+
+    # Should error without event conversion config.
+    single_stage_tester(
+        script=SHARD_EVENTS_SCRIPT,
+        stage_name="shard_events",
+        stage_kwargs={"row_chunksize": 10},
+        config_name="extract",
+        input_files={
+            "subjects.csv": SUBJECTS_CSV,
+            "admit_vitals.csv": ADMIT_VITALS_CSV,
+            "admit_vitals.parquet": pl.read_csv(StringIO(ADMIT_VITALS_CSV)),
+        },
+        event_conversion_config_fp="{input_dir}/event_cfgs.yaml",
+        should_error=True,
+    )

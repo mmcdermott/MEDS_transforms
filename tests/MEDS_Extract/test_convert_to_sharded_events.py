@@ -336,6 +336,24 @@ def test_convert_to_sharded_events():
         df_check_kwargs={"check_row_order": False, "check_column_order": False, "check_dtypes": False},
     )
 
+    # If we don't provide the event_cfgs.yaml file, the script should error.
+    single_stage_tester(
+        script=CONVERT_TO_SHARDED_EVENTS_SCRIPT,
+        stage_name="convert_to_sharded_events",
+        stage_kwargs={"do_dedup_text_and_numeric": True},
+        config_name="extract",
+        input_files={
+            "data/subjects/[0-6).parquet": pl.read_csv(StringIO(SUBJECTS_CSV)),
+            "data/admit_vitals/[0-10).parquet": pl.read_csv(StringIO(ADMIT_VITALS_0_10_CSV)),
+            "data/admit_vitals/[10-16).parquet": pl.read_csv(StringIO(ADMIT_VITALS_10_16_CSV)),
+            "metadata/.shards.json": SHARDS_JSON,
+        },
+        event_conversion_config_fp="{input_dir}/event_cfgs.yaml",
+        shards_map_fp="{input_dir}/metadata/.shards.json",
+        test_name="Stage tester: convert_to_sharded_events ; with dedup",
+        should_error=True,
+    )
+
     single_stage_tester(
         script=CONVERT_TO_SHARDED_EVENTS_SCRIPT,
         stage_name="convert_to_sharded_events",
