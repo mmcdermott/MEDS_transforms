@@ -165,6 +165,20 @@ def normalize(
         │ 2          ┆ 2022-10-02 00:00:00 ┆ 2    ┆ null          │
         │ 3          ┆ 2022-10-02 00:00:00 ┆ 5    ┆ null          │
         └────────────┴─────────────────────┴──────┴───────────────┘
+
+        Note that while this function is robust to the inclusion of the default row index column name, it
+        doesn't retain any extra columns after the operation. If you want to retain the row index, you should
+        file a GitHub issue with this request and we can add it in a future release.
+        >>> MEDS_df = MEDS_df.with_columns(pl.lit(1).alias("_row_idx"), pl.lit(2).alias("foobar"))
+        >>> normalize(MEDS_df.head(1).lazy(), code_metadata, ["unit"]).collect()
+        shape: (1, 4)
+        ┌────────────┬─────────────────────┬──────┬───────────────┐
+        │ subject_id ┆ time                ┆ code ┆ numeric_value │
+        │ ---        ┆ ---                 ┆ ---  ┆ ---           │
+        │ u32        ┆ datetime[μs]        ┆ u32  ┆ f64           │
+        ╞════════════╪═════════════════════╪══════╪═══════════════╡
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ 0    ┆ -2.0          │
+        └────────────┴─────────────────────┴──────┴───────────────┘
     """
 
     if code_modifiers is None:
