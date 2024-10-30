@@ -426,12 +426,26 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
         ValueError: Missing needed columns {'missing'} for local matcher 0:
             [(col("missing")) == (String(CODE//TEMP_2))].all_horizontal()
         Columns available: 'code', 'initial_idx', 'subject_id', 'time'
+
+        It will throw an error if the match and revise configuration is missing.
         >>> stage_cfg = DictConfig({"global_code_end": "foo"})
         >>> cfg = DictConfig({"stage_cfg": stage_cfg})
         >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
         Traceback (most recent call last):
             ...
         ValueError: Invalid match and revise configuration...
+
+        It does not accept invalid modes.
+        >>> stage_cfg = DictConfig({
+        ...     "global_code_end": "foo",
+        ...     "_match_revise_mode": "foobar",
+        ...     "_match_revise": [{"_matcher": {"code": "CODE//TEMP_2"}}]
+        ... })
+        >>> cfg = DictConfig({"stage_cfg": stage_cfg})
+        >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
+        Traceback (most recent call last):
+            ...
+        ValueError: Invalid match and revise mode: foobar
     """
     try:
         validate_match_revise(stage_cfg)
