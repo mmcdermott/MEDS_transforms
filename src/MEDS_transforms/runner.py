@@ -375,7 +375,7 @@ def load_yaml_file(path: str | None) -> dict | DictConfig:
 
     try:
         return OmegaConf.load(path)
-    except Exception as e:
+    except Exception as e:  # pragma: no cover
         logger.warning(f"Failed to load {path} as an OmegaConf: {e}. Trying as a plain YAML file.")
         yaml_text = path.read_text()
         return yaml.load(yaml_text, Loader=Loader)
