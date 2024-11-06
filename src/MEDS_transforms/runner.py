@@ -82,6 +82,8 @@ def get_parallelization_args(
         []
         >>> get_parallelization_args(None, {"n_workers": 4})
         []
+        >>> get_parallelization_args({"launcher": "joblib"}, {})
+        ['--multirun', 'worker="range(0,1)"', 'hydra/launcher=joblib']
         >>> get_parallelization_args({"n_workers": 2, "launcher_params": 'foo'}, {})
         Traceback (most recent call last):
             ...
