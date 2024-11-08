@@ -1,7 +1,7 @@
 default_language_version:
   python: python3.12
 
-exclude: "docs/index.md|MIMIC-IV_Example/README.md|eICU_Example/README.md"
+exclude: "docs/index.md|MIMIC-IV_Example/README.md|eICU_Example/README.md|AUMCdb_Example/README.md"
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
