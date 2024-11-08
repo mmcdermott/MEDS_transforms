@@ -292,44 +292,9 @@ def test_pipeline():
             **{f"data/{k}": v for k, v in MEDS_SHARDS.items()},
             code_metadata_filepath: MEDS_CODE_METADATA,
             subject_splits_filepath: SPLITS_DF,
-        },
-        should_error=True,
-        pipeline_config_fp="{input_dir}/pipeline.yaml",
-        test_name="Runner should error without pipeline.yaml",
-        do_include_dirs=False,
-    )
-
-    single_stage_tester(
-        script=RUNNER_SCRIPT,
-        config_name="runner",
-        stage_name=None,
-        stage_kwargs=None,
-        do_pass_stage_name=False,
-        do_use_config_yaml=False,
-        input_files={
-            **{f"data/{k}": v for k, v in MEDS_SHARDS.items()},
-            code_metadata_filepath: MEDS_CODE_METADATA,
-            subject_splits_filepath: SPLITS_DF,
-            "pipeline.json": partial(add_params, PIPELINE_YAML),
-        },
-        should_error=True,
-        pipeline_config_fp="{input_dir}/pipeline.json",
-        test_name="Runner should error when pipeline is not in yaml format",
-    )
-
-    single_stage_tester(
-        script=RUNNER_SCRIPT,
-        config_name="runner",
-        stage_name=None,
-        stage_kwargs=None,
-        do_pass_stage_name=False,
-        do_use_config_yaml=False,
-        input_files={
-            **{f"data/{k}": v for k, v in MEDS_SHARDS.items()},
-            code_metadata_filepath: MEDS_CODE_METADATA,
-            subject_splits_filepath: SPLITS_DF,
             "_preprocess.yaml": partial(add_params, PIPELINE_YAML),
         },
+        do_include_dirs=False,
         should_error=True,
         pipeline_config_fp="{input_dir}/_preprocess.yaml",
         test_name="Runner should fail if the pipeline config has an invalid name",
@@ -348,6 +313,7 @@ def test_pipeline():
             subject_splits_filepath: SPLITS_DF,
             "pipeline.yaml": partial(add_params, PIPELINE_NO_STAGES_YAML),
         },
+        do_include_dirs=False,
         should_error=True,
         pipeline_config_fp="{input_dir}/pipeline.yaml",
         test_name="Runner should fail if the pipeline has no stages",

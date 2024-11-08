@@ -279,13 +279,7 @@ def main(cfg: DictConfig):
     pipeline.
     """
 
-    hydra_loguru_init()
-
     pipeline_config_fp = Path(cfg.pipeline_config_fp)
-    if not pipeline_config_fp.exists():
-        raise FileNotFoundError(f"Pipeline configuration file {pipeline_config_fp} does not exist.")
-    if not pipeline_config_fp.suffix == ".yaml":
-        raise ValueError(f"Pipeline configuration file {pipeline_config_fp} must have a .yaml extension.")
     if pipeline_config_fp.stem in RESERVED_CONFIG_NAMES:
         raise ValueError(
             f"Pipeline configuration file {pipeline_config_fp} must not have a name in "
@@ -296,6 +290,8 @@ def main(cfg: DictConfig):
     stages = pipeline_config.get("stages", [])
     if not stages:
         raise ValueError("Pipeline configuration must specify at least one stage.")
+
+    hydra_loguru_init()
 
     log_dir = Path(cfg.log_dir)
 
