@@ -82,6 +82,8 @@ def get_parallelization_args(
         []
         >>> get_parallelization_args(None, {"n_workers": 4})
         []
+        >>> get_parallelization_args({"launcher": "joblib"}, {})
+        ['--multirun', 'worker="range(0,1)"', 'hydra/launcher=joblib']
         >>> get_parallelization_args({"n_workers": 2, "launcher_params": 'foo'}, {})
         Traceback (most recent call last):
             ...
@@ -277,13 +279,7 @@ def main(cfg: DictConfig):
     pipeline.
     """
 
-    hydra_loguru_init()
-
     pipeline_config_fp = Path(cfg.pipeline_config_fp)
-    if not pipeline_config_fp.exists():
-        raise FileNotFoundError(f"Pipeline configuration file {pipeline_config_fp} does not exist.")
-    if not pipeline_config_fp.suffix == ".yaml":
-        raise ValueError(f"Pipeline configuration file {pipeline_config_fp} must have a .yaml extension.")
     if pipeline_config_fp.stem in RESERVED_CONFIG_NAMES:
         raise ValueError(
             f"Pipeline configuration file {pipeline_config_fp} must not have a name in "
@@ -294,6 +290,8 @@ def main(cfg: DictConfig):
     stages = pipeline_config.get("stages", [])
     if not stages:
         raise ValueError("Pipeline configuration must specify at least one stage.")
+
+    hydra_loguru_init()
 
     log_dir = Path(cfg.log_dir)
 
@@ -373,7 +371,7 @@ def load_yaml_file(path: str | None) -> dict | DictConfig:
 
     try:
         return OmegaConf.load(path)
-    except Exception as e:
+    except Exception as e:  # pragma: no cover
         logger.warning(f"Failed to load {path} as an OmegaConf: {e}. Trying as a plain YAML file.")
         yaml_text = path.read_text()
         return yaml.load(yaml_text, Loader=Loader)

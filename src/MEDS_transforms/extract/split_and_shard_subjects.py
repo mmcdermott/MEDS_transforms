@@ -251,7 +251,7 @@ def main(cfg: DictConfig):
         if not external_splits_json_fp.exists():
             raise FileNotFoundError(f"External splits JSON file not found at {external_splits_json_fp}")
 
-        logger.info(f"Reading external splits from {str(cfg.stage_cfg.external_splits_json_fp.resolve())}")
+        logger.info(f"Reading external splits from {str(external_splits_json_fp.resolve())}")
         external_splits = json.loads(external_splits_json_fp.read_text())
 
         size_strs = ", ".join(f"{k}: {len(v)}" for k, v in external_splits.items())

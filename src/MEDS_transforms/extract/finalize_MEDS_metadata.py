@@ -2,6 +2,7 @@
 """Utilities for finalizing the metadata files for extracted MEDS datasets."""
 
 import json
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -17,12 +18,9 @@ from meds import (
     code_metadata_schema,
     dataset_metadata_filepath,
     dataset_metadata_schema,
-    held_out_split,
     subject_id_field,
     subject_split_schema,
     subject_splits_filepath,
-    train_split,
-    tuning_split,
 )
 from omegaconf import DictConfig
 
@@ -206,12 +204,10 @@ def main(cfg: DictConfig):
     logger.info("Creating subject splits from {str(shards_map_fp.resolve())}")
     shards_map = json.loads(shards_map_fp.read_text())
     subject_splits = []
-    seen_splits = {train_split: 0, tuning_split: 0, held_out_split: 0}
+    seen_splits = defaultdict(int)
     for shard, subject_ids in shards_map.items():
         split = "/".join(shard.split("/")[:-1])
 
-        if split not in seen_splits:
-            seen_splits[split] = 0
         seen_splits[split] += len(subject_ids)
 
         subject_splits.extend([{subject_id_field: pid, "split": split} for pid in subject_ids])
