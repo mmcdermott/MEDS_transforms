@@ -33,6 +33,20 @@ def get_script_from_name(stage_name: str) -> str | None:
 
     Returns:
         The script name for the given stage name.
+
+    Examples:
+        >>> get_script_from_name("shard_events")
+        'MEDS_extract-shard_events'
+        >>> get_script_from_name("fit_vocabulary_indices")
+        'MEDS_transform-fit_vocabulary_indices'
+        >>> get_script_from_name("filter_subjects")
+        'MEDS_transform-filter_subjects'
+        >>> get_script_from_name("reorder_measurements")
+        'MEDS_transform-reorder_measurements'
+        >>> get_script_from_name("nonexistent_stage")
+        Traceback (most recent call last):
+            ...
+        ValueError: Could not find a script for stage nonexistent_stage.
     """
 
     try:
@@ -54,7 +68,43 @@ def get_script_from_name(stage_name: str) -> str | None:
 def get_parallelization_args(
     parallelization_cfg: dict | DictConfig | None, default_parallelization_cfg: dict | DictConfig
 ) -> list[str]:
-    """Gets the parallelization args."""
+    """Extracts the specific parallelization arguments given the default and stage-specific configurations.
+
+    Args:
+        parallelization_cfg: The stage-specific parallelization configuration.
+        default_parallelization_cfg: The default parallelization configuration.
+
+    Returns:
+        A list of command-line arguments for parallelization.
+
+    Examples:
+        >>> get_parallelization_args({}, {})
+        []
+        >>> get_parallelization_args(None, {"n_workers": 4})
+        []
+        >>> get_parallelization_args({"launcher": "joblib"}, {})
+        ['--multirun', 'worker="range(0,1)"', 'hydra/launcher=joblib']
+        >>> get_parallelization_args({"n_workers": 2, "launcher_params": 'foo'}, {})
+        Traceback (most recent call last):
+            ...
+        ValueError: If launcher_params is provided, launcher must also be provided.
+        >>> get_parallelization_args({"n_workers": 2}, {})
+        ['--multirun', 'worker="range(0,2)"']
+        >>> get_parallelization_args(
+        ...     {"launcher": "slurm"},
+        ...     {"n_workers": 3, "launcher": "joblib"}
+        ... )
+        ['--multirun', 'worker="range(0,3)"', 'hydra/launcher=slurm']
+        >>> get_parallelization_args(
+        ...     {"n_workers": 2, "launcher": "joblib"},
+        ...     {"n_workers": 5, "launcher_params": {"foo": "bar"}},
+        ... )
+        ['--multirun', 'worker="range(0,2)"', 'hydra/launcher=joblib', 'hydra.launcher.foo=bar']
+        >>> get_parallelization_args(
+        ...     {"n_workers": 5, "launcher_params": {"biz": "baz"}, "launcher": "slurm"}, {}
+        ... )
+        ['--multirun', 'worker="range(0,5)"', 'hydra/launcher=slurm', 'hydra.launcher.biz=baz']
+    """
 
     if parallelization_cfg is None:
         return []
@@ -82,10 +132,10 @@ def get_parallelization_args(
         launcher = None
 
     if launcher is None:
-        return parallelization_args
-
         if "launcher_params" in parallelization_cfg:
             raise ValueError("If launcher_params is provided, launcher must also be provided.")
+
+        return parallelization_args
 
     parallelization_args.append(f"hydra/launcher={launcher}")
 
@@ -102,12 +152,68 @@ def get_parallelization_args(
     return parallelization_args
 
 
-def run_stage(cfg: DictConfig, stage_name: str, default_parallelization_cfg: dict | DictConfig | None = None):
+def run_stage(
+    cfg: DictConfig,
+    stage_name: str,
+    default_parallelization_cfg: dict | DictConfig | None = None,
+    runner_fn: callable = subprocess.run,  # For dependency injection
+):
     """Runs a single stage of the pipeline.
 
     Args:
         cfg: The configuration for the entire pipeline.
         stage_name: The name of the stage to run.
+
+    Raises:
+        ValueError: If the stage fails to run.
+
+    Examples:
+        >>> def fake_shell_succeed(cmd, shell, capture_output):
+        ...     print(cmd)
+        ...     return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=b"", stderr=b"")
+        >>> def fake_shell_fail(cmd, shell, capture_output):
+        ...     print(cmd)
+        ...     return subprocess.CompletedProcess(args=cmd, returncode=1, stdout=b"", stderr=b"")
+        >>> cfg = OmegaConf.create({
+        ...     "pipeline_config_fp": "pipeline_config.yaml",
+        ...     "do_profile": False,
+        ...     "_local_pipeline_config": {
+        ...         "stage_configs": {
+        ...             "shard_events": {},
+        ...             "fit_vocabulary_indices": {"_script": "foobar"},
+        ...         },
+        ...     },
+        ...     "_stage_runners": {
+        ...         "shard_events": {"_script": "not used"},
+        ...         "fit_vocabulary_indices": {},
+        ...         "baz": {"script": "baz_script"},
+        ...     },
+        ... })
+        >>> run_stage(cfg, "shard_events", runner_fn=fake_shell_succeed) # doctest: +NORMALIZE_WHITESPACE
+        MEDS_extract-shard_events --config-dir=... --config-name=pipeline_config
+            'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=shard_events
+        >>> run_stage(
+        ...     cfg, "fit_vocabulary_indices", runner_fn=fake_shell_succeed
+        ... ) # doctest: +NORMALIZE_WHITESPACE
+        foobar --config-dir=... --config-name=pipeline_config
+            'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=fit_vocabulary_indices
+        >>> run_stage(cfg, "baz", runner_fn=fake_shell_succeed) # doctest: +NORMALIZE_WHITESPACE
+        baz_script --config-dir=... --config-name=pipeline_config
+            'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=baz
+        >>> cfg.do_profile = True
+        >>> run_stage(cfg, "baz", runner_fn=fake_shell_succeed) # doctest: +NORMALIZE_WHITESPACE
+        baz_script --config-dir=... --config-name=pipeline_config
+            'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=baz
+            ++hydra.callbacks.profiler._target_=hydra_profiler.profiler.ProfilerCallback
+        >>> cfg._stage_runners.baz.parallelize = {"n_workers": 2}
+        >>> cfg.do_profile = False
+        >>> run_stage(cfg, "baz", runner_fn=fake_shell_succeed) # doctest: +NORMALIZE_WHITESPACE
+        baz_script --config-dir=... --config-name=pipeline_config --multirun
+            'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=baz worker="range(0,2)"
+        >>> run_stage(cfg, "baz", runner_fn=fake_shell_fail)
+        Traceback (most recent call last):
+            ...
+        ValueError: Stage baz failed via ...
     """
 
     if default_parallelization_cfg is None:
@@ -147,7 +253,7 @@ def run_stage(cfg: DictConfig, stage_name: str, default_parallelization_cfg: dic
 
     full_cmd = " ".join(command_parts)
     logger.info(f"Running command: {full_cmd}")
-    command_out = subprocess.run(full_cmd, shell=True, capture_output=True)
+    command_out = runner_fn(full_cmd, shell=True, capture_output=True)
 
     # https://stackoverflow.com/questions/21953835/run-subprocess-and-print-output-to-logging
     # https://loguru.readthedocs.io/en/stable/api/logger.html#loguru._logger.Logger.parse
@@ -173,13 +279,7 @@ def main(cfg: DictConfig):
     pipeline.
     """
 
-    hydra_loguru_init()
-
     pipeline_config_fp = Path(cfg.pipeline_config_fp)
-    if not pipeline_config_fp.exists():
-        raise FileNotFoundError(f"Pipeline configuration file {pipeline_config_fp} does not exist.")
-    if not pipeline_config_fp.suffix == ".yaml":
-        raise ValueError(f"Pipeline configuration file {pipeline_config_fp} must have a .yaml extension.")
     if pipeline_config_fp.stem in RESERVED_CONFIG_NAMES:
         raise ValueError(
             f"Pipeline configuration file {pipeline_config_fp} must not have a name in "
@@ -191,9 +291,11 @@ def main(cfg: DictConfig):
     if not stages:
         raise ValueError("Pipeline configuration must specify at least one stage.")
 
+    hydra_loguru_init()
+
     log_dir = Path(cfg.log_dir)
 
-    if cfg.get("do_profile", False):
+    if cfg.get("do_profile", False):  # pragma: no cover
         try:
             import hydra_profiler  # noqa: F401
         except ImportError as e:
@@ -229,6 +331,37 @@ def main(cfg: DictConfig):
 
 
 def load_yaml_file(path: str | None) -> dict | DictConfig:
+    """Loads a YAML file as an OmegaConf object.
+
+    Args:
+        path: The path to the YAML file.
+
+    Returns:
+        The OmegaConf object representing the YAML file, or None if no path is provided.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+
+    Examples:
+        >>> load_yaml_file(None)
+        {}
+        >>> load_yaml_file("nonexistent_file.yaml")
+        Traceback (most recent call last):
+            ...
+        FileNotFoundError: File nonexistent_file.yaml does not exist.
+        >>> import tempfile
+        >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as f:
+        ...     _ = f.write(b"foo: bar")
+        ...     f.flush()
+        ...     load_yaml_file(f.name)
+        {'foo': 'bar'}
+        >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as f:
+        ...     cfg = OmegaConf.create({"foo": "bar"})
+        ...     OmegaConf.save(cfg, f.name)
+        ...     load_yaml_file(f.name)
+        {'foo': 'bar'}
+    """
+
     if not path:
         return {}
 
@@ -238,7 +371,7 @@ def load_yaml_file(path: str | None) -> dict | DictConfig:
 
     try:
         return OmegaConf.load(path)
-    except Exception as e:
+    except Exception as e:  # pragma: no cover
         logger.warning(f"Failed to load {path} as an OmegaConf: {e}. Trying as a plain YAML file.")
         yaml_text = path.read_text()
         return yaml.load(yaml_text, Loader=Loader)

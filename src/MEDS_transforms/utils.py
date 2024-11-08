@@ -110,7 +110,21 @@ def get_package_version() -> str:
 
 
 def get_script_docstring(filename: str | None = None) -> str:
-    """Returns the docstring of the main function of the script from which this function was called."""
+    """Returns the docstring of the main function of the calling script or the file specified.
+
+    Args:
+        filename: The name of the file to get the docstring from. If None, the calling script's docstring is
+            returned.
+
+    Returns:
+        str: The docstring of the main function of the specified file, if it exists.
+
+    Examples:
+        >>> get_script_docstring()
+        ''
+        >>> get_script_docstring("reshard_to_split")
+        'Re-shard a MEDS cohort to in a manner that subdivides subject splits.'
+    """
 
     if filename is not None:
         main_module = importlib.import_module(f"MEDS_transforms.{filename}")
@@ -129,7 +143,7 @@ def current_script_name() -> str:
     main_func = getattr(main_module, "main", None)
     if main_func and callable(main_func):
         func_module = main_func.__module__
-        if func_module == "__main__":
+        if func_module == "__main__":  # pragma: no cover
             return Path(sys.argv[0]).stem
         else:
             return func_module.split(".")[-1]

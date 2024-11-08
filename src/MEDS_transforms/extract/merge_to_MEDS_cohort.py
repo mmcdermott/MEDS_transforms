@@ -137,7 +137,7 @@ def merge_subdirs_and_sort(
         ...     merge_subdirs_and_sort(
         ...         sp_dir,
         ...         event_subsets=["subdir1", "subdir2"],
-        ...         unique_by=["subject_id", "time", "code"],
+        ...         unique_by=["subject_id", "time", "code", "missing_col_will_not_error"],
         ...         additional_sort_by=["code", "numeric_value"]
         ...     ).select("subject_id", "time", "code").collect()
         shape: (6, 3)
@@ -153,6 +153,42 @@ def merge_subdirs_and_sort(
         │ 2          ┆ 20   ┆ B    │
         │ 3          ┆ 8    ┆ E    │
         └────────────┴──────┴──────┘
+        >>> with TemporaryDirectory() as tmpdir:
+        ...     sp_dir = Path(tmpdir)
+        ...     (sp_dir / "subdir1").mkdir()
+        ...     df1.write_parquet(sp_dir / "subdir1" / "file1.parquet")
+        ...     df2.write_parquet(sp_dir / "subdir1" / "file2.parquet")
+        ...     (sp_dir / "subdir2").mkdir()
+        ...     df3.write_parquet(sp_dir / "subdir2" / "df.parquet")
+        ...     # We just display the subject ID, time, and code columns as the numeric value column
+        ...     # is not guaranteed to be deterministic in the output given some rows will be dropped due to
+        ...     # the unique-by constraint.
+        ...     merge_subdirs_and_sort(
+        ...         sp_dir,
+        ...         event_subsets=["subdir1", "subdir2"],
+        ...         unique_by=352.2, # This will error
+        ...     )
+        Traceback (most recent call last):
+            ...
+        ValueError: Invalid unique_by value: 352.2
+        >>> with TemporaryDirectory() as tmpdir:
+        ...     sp_dir = Path(tmpdir)
+        ...     (sp_dir / "subdir1").mkdir()
+        ...     df1.write_parquet(sp_dir / "subdir1" / "file1.parquet")
+        ...     df2.write_parquet(sp_dir / "subdir1" / "file2.parquet")
+        ...     (sp_dir / "subdir2").mkdir()
+        ...     df3.write_parquet(sp_dir / "subdir2" / "df.parquet")
+        ...     # We just display the subject ID, time, and code columns as the numeric value column
+        ...     # is not guaranteed to be deterministic in the output given some rows will be dropped due to
+        ...     # the unique-by constraint.
+        ...     merge_subdirs_and_sort(
+        ...         sp_dir,
+        ...         event_subsets=["subdir1", "subdir2", "subdir3", "this is missing so will error"],
+        ...         unique_by=None,
+        ...     )
+        Traceback (most recent call last):
+            ...
+        RuntimeError: Number of found subsets (2) does not match number of subsets in event_config (4): ...
     """
     files_to_read = [fp for es in event_subsets for fp in (sp_dir / es).glob("*.parquet")]
     if not files_to_read:

@@ -344,6 +344,52 @@ def extract_event(
         │ 2          ┆ DISCHARGE//Home ┆ 2021-01-05 15:23:45 ┆ AOx4              ┆ Home       │
         │ 3          ┆ DISCHARGE//SNF  ┆ 2021-01-06 16:34:56 ┆ AOx4              ┆ SNF        │
         └────────────┴─────────────────┴─────────────────────┴───────────────────┴────────────┘
+
+        If we make a non-key field use the `col(...)` syntax, it will log a warning but parse the field.
+        >>> valid_discharge_event_cfg = {
+        ...     "code": ["DISCHARGE", "col(discharge_location)"],
+        ...     "time": "col(discharge_time)",
+        ...     "categorical_value": "col(discharge_status)", # Note the raw dtype of this col is str
+        ...     "text_value": "discharge_location", # Note the raw dtype of this col is categorical
+        ... }
+        >>> extract_event(complex_raw_data, valid_discharge_event_cfg)
+        shape: (6, 5)
+        ┌────────────┬─────────────────┬─────────────────────┬───────────────────┬────────────┐
+        │ subject_id ┆ code            ┆ time                ┆ categorical_value ┆ text_value │
+        │ ---        ┆ ---             ┆ ---                 ┆ ---               ┆ ---        │
+        │ u8         ┆ str             ┆ datetime[μs]        ┆ str               ┆ str        │
+        ╞════════════╪═════════════════╪═════════════════════╪═══════════════════╪════════════╡
+        │ 1          ┆ DISCHARGE//Home ┆ 2021-01-01 11:23:45 ┆ AOx4              ┆ Home       │
+        │ 1          ┆ DISCHARGE//SNF  ┆ 2021-01-02 12:34:56 ┆ AO                ┆ SNF        │
+        │ 2          ┆ DISCHARGE//Home ┆ 2021-01-03 13:45:56 ┆ AAO               ┆ Home       │
+        │ 2          ┆ DISCHARGE//SNF  ┆ 2021-01-04 14:56:45 ┆ AOx3              ┆ SNF        │
+        │ 2          ┆ DISCHARGE//Home ┆ 2021-01-05 15:23:45 ┆ AOx4              ┆ Home       │
+        │ 3          ┆ DISCHARGE//SNF  ┆ 2021-01-06 16:34:56 ┆ AOx4              ┆ SNF        │
+        └────────────┴─────────────────┴─────────────────────┴───────────────────┴────────────┘
+
+        If a `categorical_value` field is of non-string type, it will be converted.
+        >>> valid_admission_event_cfg = {
+        ...     "code": ["ADMISSION", "col(admission_type)"],
+        ...     "time": "col(admission_time)",
+        ...     "time_format": "%Y-%m-%d %H:%M:%S",
+        ...     "categorical_value": "severity_score",
+        ... }
+        >>> extract_event(complex_raw_data, valid_admission_event_cfg)
+        shape: (6, 4)
+        ┌────────────┬──────────────┬─────────────────────┬───────────────────┐
+        │ subject_id ┆ code         ┆ time                ┆ categorical_value │
+        │ ---        ┆ ---          ┆ ---                 ┆ ---               │
+        │ u8         ┆ str          ┆ datetime[μs]        ┆ str               │
+        ╞════════════╪══════════════╪═════════════════════╪═══════════════════╡
+        │ 1          ┆ ADMISSION//A ┆ 2021-01-01 00:00:00 ┆ 1.0               │
+        │ 1          ┆ ADMISSION//B ┆ 2021-01-02 00:00:00 ┆ 2.0               │
+        │ 2          ┆ ADMISSION//C ┆ 2021-01-03 00:00:00 ┆ 3.0               │
+        │ 2          ┆ ADMISSION//D ┆ 2021-01-04 00:00:00 ┆ 4.0               │
+        │ 2          ┆ ADMISSION//E ┆ 2021-01-05 00:00:00 ┆ 5.0               │
+        │ 3          ┆ ADMISSION//F ┆ 2021-01-06 00:00:00 ┆ 6.0               │
+        └────────────┴──────────────┴─────────────────────┴───────────────────┘
+
+        More examples:
         >>> extract_event(complex_raw_data, valid_death_event_cfg)
         shape: (3, 3)
         ┌────────────┬───────┬─────────────────────┐
@@ -395,6 +441,10 @@ def extract_event(
         Traceback (most recent call last):
             ...
         ValueError: Source column 'discharge_time' for event column foobar is not numeric, string, or categorical! Cannot be used as an event col.
+        >>> extract_event(complex_raw_data, {"code": "col(NOT_PRESENT)", "time": None})
+        Traceback (most recent call last):
+            ...
+        KeyError: "Source column 'NOT_PRESENT' for event column code not found in DataFrame schema."
     """  # noqa: E501
     event_cfg = copy.deepcopy(event_cfg)
     event_exprs = {"subject_id": pl.col("subject_id")}
@@ -761,7 +811,7 @@ def main(cfg: DictConfig):
                             event_cfgs=copy.deepcopy(event_cfgs),
                             do_dedup_text_and_numeric=cfg.stage_cfg.get("do_dedup_text_and_numeric", False),
                         )
-                    except Exception as e:
+                    except Exception as e:  # pragma: no cover
                         raise ValueError(
                             f"Error converting {str(shard_fp.resolve())} for {sp}/{input_prefix}: {e}"
                         ) from e

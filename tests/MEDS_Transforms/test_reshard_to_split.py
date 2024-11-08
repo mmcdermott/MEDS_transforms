@@ -4,7 +4,6 @@ Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, ra
 scripts.
 """
 
-
 from meds import subject_id_field
 
 from tests.MEDS_Transforms import RESHARD_TO_SPLIT_SCRIPT
@@ -207,7 +206,7 @@ def test_reshard_to_split():
     single_stage_transform_tester(
         transform_script=RESHARD_TO_SPLIT_SCRIPT,
         stage_name="reshard_to_split",
-        transform_stage_kwargs={"n_patients_per_shard": 2, "+train_only": True},
+        transform_stage_kwargs={"n_subjects_per_shard": 2, "+train_only": True},
         want_data=WANT_SHARDS,
         input_shards=IN_SHARDS,
         input_shards_map=IN_SHARDS_MAP,
