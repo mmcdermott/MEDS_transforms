@@ -653,7 +653,7 @@ def map_over(
                 .collect()[subject_id_field]
                 .to_list()
             )
-            read_fn = read_and_filter_fntr(train_subjects, read_fn)
+            read_fn = read_and_filter_fntr(pl.col("subject_id").is_in(train_subjects), read_fn)
         else:
             raise FileNotFoundError(
                 f"Train split requested, but shard prefixes can't be used and "
