@@ -136,6 +136,17 @@ def test_shard_events():
         stage_name="shard_events",
         stage_kwargs={"row_chunksize": 10},
         config_name="extract",
+        input_files={"event_cfgs.yaml": EVENT_CFGS_YAML},
+        event_conversion_config_fp="{input_dir}/event_cfgs.yaml",
+        should_error=True,
+        test_name="Shard events should error when missing all input files",
+    )
+
+    single_stage_tester(
+        script=SHARD_EVENTS_SCRIPT,
+        stage_name="shard_events",
+        stage_kwargs={"row_chunksize": 10},
+        config_name="extract",
         input_files={"subjects.csv": EMPTY_SUBJECTS_CSV, "event_cfgs.yaml": EVENT_CFGS_YAML},
         event_conversion_config_fp="{input_dir}/event_cfgs.yaml",
         should_error=True,
