@@ -405,6 +405,9 @@ def single_stage_tester(
     if df_check_kwargs is None:
         df_check_kwargs = {}
 
+    if stage_kwargs is None:
+        stage_kwargs = {}
+
     with input_dataset(input_files) as (input_dir, cohort_dir):
         for k, v in pipeline_kwargs.items():
             if type(v) is str and "{input_dir}" in v:
