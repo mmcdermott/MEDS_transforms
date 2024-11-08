@@ -103,6 +103,12 @@ EXPECTED_SPLITS = {
     "held_out/0": [1500733],
 }
 
+EXTERNAL_SPLITS = {
+    "train": [239684, 1195293, 68729, 814703],
+    "tuning": [754281],
+    "held_out": [1500733],
+}
+
 SUBJECT_SPLITS_DF = pl.DataFrame(
     {
         "subject_id": [239684, 1195293, 68729, 814703, 754281, 1500733],
@@ -144,7 +150,7 @@ def test_split_and_shard():
         },
         config_name="extract",
         input_files={
-            "external_splits.json": EXPECTED_SPLITS,
+            "external_splits.json": EXTERNAL_SPLITS,
             "data/subjects/[0-6).parquet": pl.read_csv(StringIO(SUBJECTS_CSV)),
             "data/admit_vitals/[0-10).parquet": pl.read_csv(StringIO(ADMIT_VITALS_0_10_CSV)),
             "data/admit_vitals/[10-16).parquet": pl.read_csv(StringIO(ADMIT_VITALS_10_16_CSV)),
