@@ -409,6 +409,9 @@ def single_stage_tester(
         for k, v in pipeline_kwargs.items():
             if type(v) is str and "{input_dir}" in v:
                 pipeline_kwargs[k] = v.format(input_dir=str(input_dir.resolve()))
+        for k, v in stage_kwargs.items():
+            if type(v) is str and "{input_dir}" in v:
+                stage_kwargs[k] = v.format(input_dir=str(input_dir.resolve()))
 
         pipeline_config_kwargs = {
             "hydra.verbose": hydra_verbose,
