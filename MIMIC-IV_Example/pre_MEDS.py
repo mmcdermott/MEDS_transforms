@@ -299,9 +299,9 @@ def main(cfg: DictConfig):
 
         logger.info(f"Loading {str(df_to_load_fp.resolve())} for manipulating other dataframes...")
         if df_to_load_fp.suffix in [".csv.gz"]:
-            df = read_fn(df_to_load_fp, columns=cols)
+            df = df_to_load_read_fn(df_to_load_fp, columns=cols)
         else:
-            df = read_fn(df_to_load_fp)
+            df = df_to_load_read_fn(df_to_load_fp)
         logger.info(f"  Loaded in {datetime.now() - st}")
 
         for fp in fps:
