@@ -229,7 +229,7 @@ def main(cfg: DictConfig):
         )
         exit(0)
 
-    all_fps = list(input_dir.glob("**/*.*"))
+    all_fps = list(input_dir.rglob("*/*.*"))
 
     dfs_to_load = {}
     seen_fps = {}
