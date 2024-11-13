@@ -11,13 +11,13 @@ from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.utils import hydra_loguru_init
 from MEDS_transforms.vocabulary_mapping import OmopConceptRelationshipMapping, Vocabulary, VocabularyMapping
 
-ICD9 = Vocabulary("ICD9", ["ICD9CM", "ICD9sPCS"])
-ICD10 = Vocabulary("ICD10", ["ICD10CM", "ICD10PCS"])
+ICD9 = Vocabulary("ICD9", ("ICD9CM", "ICD9sPCS"))
+ICD10 = Vocabulary("ICD10", ("ICD10CM", "ICD10PCS"))
 
 SUPPORTED_VOCABULARIES = [ICD9, ICD10]
 # TODO: might change this to Dict[Tuple[str, str], List[VocabularyMapping]] as there could be multiple mapping
 #  strategies to convert from the source to target vocabularies
-SUPPORTED_TRANSLATIONS = {(ICD9.vocabulary_name, ICD10.vocabulary_name): OmopConceptRelationshipMapping}
+SUPPORTED_TRANSLATIONS = {(ICD9, ICD10): OmopConceptRelationshipMapping}
 
 
 def get_vocabulary(vocabulary_name: str) -> Vocabulary:
@@ -46,7 +46,7 @@ def get_vocabulary(vocabulary_name: str) -> Vocabulary:
     Examples:
         >>> vocab = get_vocabulary("ICD9")
         >>> print(vocab)
-        Vocabulary(vocabulary_name='ICD9', omop_vocabularies=['ICD9CM', 'ICD9sPCS'])
+        Vocabulary(vocabulary_name='ICD9', omop_vocabularies=('ICD9CM', 'ICD9sPCS'))
         >>> vocab = get_vocabulary("invalid_vocabulary")
         Traceback (most recent call last):
         ...
@@ -61,7 +61,9 @@ def get_vocabulary(vocabulary_name: str) -> Vocabulary:
         f"{vocabulary_name} is not a supported vocabulary\n"
         f"Supported vocabularies: {[_.vocabulary_name for _ in SUPPORTED_VOCABULARIES]}\n"
         f"Supported translations: "
-        + "\n".join([f"from {s} to {t}" for s, t in SUPPORTED_TRANSLATIONS.keys()])
+        + "\n".join(
+            [f"from {s.vocabulary_name} to {t.vocabulary_name}" for s, t in SUPPORTED_TRANSLATIONS.keys()]
+        )
     )
 
 
@@ -95,34 +97,27 @@ def get_vocabulary_mapping(
         target vocabularies.
 
      Examples:
-        >>> from pathlib import Path
-        >>> from MEDS_transforms.vocabulary_mapping import Vocabulary, VocabularyMapping
-        >>> from MEDS_transforms.vocabulary_mapping import OmopConceptRelationshipMapping
-        >>> source_vocab = Vocabulary("ICD9", ["ICD9CM"])
-        >>> target_vocab = Vocabulary("ICD10", ["ICD10CM"])
         >>> vocab_cache_dir = Path("/mock/cache/dir")
-        >>> mapping = get_vocabulary_mapping(vocab_cache_dir, source_vocab, target_vocab)
+        >>> mapping = get_vocabulary_mapping(vocab_cache_dir, ICD9, ICD10)
         >>> isinstance(mapping, OmopConceptRelationshipMapping)
         True
-        >>> unsupported_vocab = Vocabulary("SNOMED", ["SNOMEDCT"])
-        >>> get_vocabulary_mapping(vocab_cache_dir, unsupported_vocab, target_vocab)
+        >>> unsupported_vocab = Vocabulary("SNOMED", ("SNOMEDCT"))
+        >>> get_vocabulary_mapping(vocab_cache_dir, unsupported_vocab, ICD10)
         Traceback (most recent call last):
         ...
         ValueError: Supported translations: from ICD9 to ICD10
         But the given pair is ('SNOMED', 'ICD10')
     """
-    vocabulary_tuple = (
-        source_vocabulary.vocabulary_name,
-        target_vocabulary.vocabulary_name,
-    )
-    if vocabulary_tuple in SUPPORTED_TRANSLATIONS:
-        return SUPPORTED_TRANSLATIONS[vocabulary_tuple](
+    if (source_vocabulary, target_vocabulary) in SUPPORTED_TRANSLATIONS:
+        return SUPPORTED_TRANSLATIONS[(source_vocabulary, target_vocabulary)](
             vocabulary_cache_dir, source_vocabulary, target_vocabulary
         )
     raise ValueError(
         "Supported translations: "
-        + "\n".join([f"from {s} to {t}" for s, t in SUPPORTED_TRANSLATIONS.keys()])
-        + f"\nBut the given pair is {vocabulary_tuple}"
+        + "\n".join(
+            [f"from {s.vocabulary_name} to {t.vocabulary_name}" for s, t in SUPPORTED_TRANSLATIONS.keys()]
+        )
+        + f"\nBut the given pair is {source_vocabulary.vocabulary_name, target_vocabulary.vocabulary_name}"
     )
 
 
@@ -139,10 +134,6 @@ def add_metadata_translation(
 
     Examples:
         >>> import tempfile
-        >>> from pathlib import Path
-        >>> import polars as pl
-        >>> from omegaconf import DictConfig, OmegaConf
-        >>> from MEDS_transforms.vocabulary_mapping import Vocabulary
         >>> code_metadata = pl.DataFrame({
         ...     "code": ["ICD9CM//V9.60", "ICD9CM//V15", "None_ICD9_code"],
         ... })

@@ -5,10 +5,10 @@ from pathlib import Path
 import polars as pl
 
 
-@dataclass
+@dataclass(frozen=True)
 class Vocabulary:
     vocabulary_name: str
-    omop_vocabularies: list[str]
+    omop_vocabularies: tuple[str, ...]
 
 
 class VocabularyMapping(ABC):
@@ -90,7 +90,7 @@ class OmopConceptRelationshipMapping(VocabularyMapping):
     """
 
     @staticmethod
-    def create_hash(concept_ids: list[str]) -> str:
+    def create_hash(concept_ids: list[str | int]) -> str:
         """Creates a unique hash string from a list of concept IDs by sorting and concatenating them with a
         hyphen ("-").
 
@@ -103,8 +103,10 @@ class OmopConceptRelationshipMapping(VocabularyMapping):
         Examples:
             >>> OmopConceptRelationshipMapping.create_hash([3, 1, 2])
             '1-2-3'
+            >>> OmopConceptRelationshipMapping.create_hash([3, 1, 2, 2])
+            '1-2-3'
         """
-        return "-".join(map(str, sorted(concept_ids)))
+        return "-".join(map(str, sorted(set(concept_ids))))
 
     def get_code_mappings(self) -> dict[str, str]:
         """Retrieves mappings between source concept codes and target concept codes based on the OMOP 'Maps
@@ -121,9 +123,6 @@ class OmopConceptRelationshipMapping(VocabularyMapping):
 
         Examples:
             >>> import tempfile
-            >>> from pathlib import Path
-            >>> import polars as pl
-            >>> from MEDS_transforms.vocabulary_mapping import Vocabulary
             >>> source_vocab = Vocabulary("ICD9", ["ICD9CM"])
             >>> target_vocab = Vocabulary("ICD10", ["ICD10CM"])
 
@@ -265,7 +264,7 @@ def try_loading_vocabulary_table(vocabulary_cache_dir: Path, vocabulary_table: s
         wildcard_path = vocabulary_cache_dir / vocabulary_table / "*.parquet"
         data_frame_lazy = pl.scan_parquet(wildcard_path)
         # Try to load some data
-        data_frame_lazy.head(10).collect()
+        data_frame_lazy.head(1).collect()
         return data_frame_lazy
     except pl.exceptions.ComputeError:
         # Handle the error
