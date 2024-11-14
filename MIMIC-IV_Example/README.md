@@ -8,7 +8,10 @@ be run from this directory or from the directory in which the files in Step 0.5.
 ```bash
 conda create -n MEDS python=3.12
 conda activate MEDS
-pip install "MEDS_transforms[local_parallelism,slurm_parallelism]"
+# Get the latest version of MEDS_transforms from pypi
+LATEST_VERSION=$(pip index versions "meds-transforms" 2>/dev/null | egrep -o '([0-9]+\.){2}[0-9]+' | head -n 1)
+export VERSION=$LATEST_VERSION # or whatever version you want, at the time of writing this is "0.0.8"
+pip install "MEDS_transforms[local_parallelism,slurm_parallelism]==${VERSION}"
 ```
 
 If you want to profile the time and memory costs of your ETL, also install: `pip install hydra-profiler`.
@@ -20,9 +23,7 @@ export MIMICIV_RAW_DIR=??? # set to the directory in which you want to store the
 export MIMICIV_PRE_MEDS_DIR=??? # set to the directory in which you want to store the intermediate MEDS MIMIC-IV data
 export MIMICIV_MEDS_COHORT_DIR=??? # set to the directory in which you want to store the final MEDS MIMIC-IV data
 
-export VERSION=0.0.6 # or whatever version you want
-# export URL="https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/$VERSION/MIMIC-IV_Example"
-export URL="https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/refs/heads/main/MIMIC-IV_Example"
+export URL="https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/$VERSION/MIMIC-IV_Example"
 
 wget $URL/run.sh
 wget $URL/pre_MEDS.py
