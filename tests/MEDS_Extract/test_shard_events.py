@@ -21,6 +21,10 @@ MRN,dob,eye_color,height
 68729,03/09/1978,HAZEL,160.3953106166676
 """
 
+EMPTY_SUBJECTS_CSV = """
+MRN,dob,eye_color,height
+"""
+
 ADMIT_VITALS_CSV = """
 subject_id,admit_date,disch_date,department,vitals_date,HR,temp
 239684,"05/11/2010, 17:41:51","05/11/2010, 19:27:19",CARDIAC,"05/11/2010, 18:57:18",112.6,95.5
@@ -111,4 +115,40 @@ def test_shard_events():
             "data/admit_vitals/[10-16).parquet": pl.read_csv(StringIO(ADMIT_VITALS_CSV))[10:],
         },
         df_check_kwargs={"check_column_order": False},
+    )
+
+    single_stage_tester(
+        script=SHARD_EVENTS_SCRIPT,
+        stage_name="shard_events",
+        stage_kwargs={"row_chunksize": 10},
+        config_name="extract",
+        input_files={
+            "subjects.csv": SUBJECTS_CSV,
+            "admit_vitals.csv": ADMIT_VITALS_CSV,
+        },
+        event_conversion_config_fp="{input_dir}/event_cfgs.yaml",
+        should_error=True,
+        test_name="Shard events should error without event conversion config",
+    )
+
+    single_stage_tester(
+        script=SHARD_EVENTS_SCRIPT,
+        stage_name="shard_events",
+        stage_kwargs={"row_chunksize": 10},
+        config_name="extract",
+        input_files={"event_cfgs.yaml": EVENT_CFGS_YAML},
+        event_conversion_config_fp="{input_dir}/event_cfgs.yaml",
+        should_error=True,
+        test_name="Shard events should error when missing all input files",
+    )
+
+    single_stage_tester(
+        script=SHARD_EVENTS_SCRIPT,
+        stage_name="shard_events",
+        stage_kwargs={"row_chunksize": 10},
+        config_name="extract",
+        input_files={"subjects.csv": EMPTY_SUBJECTS_CSV, "event_cfgs.yaml": EVENT_CFGS_YAML},
+        event_conversion_config_fp="{input_dir}/event_cfgs.yaml",
+        should_error=True,
+        test_name="Shard events should error when an input file is empty",
     )

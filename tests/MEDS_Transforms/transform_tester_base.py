@@ -4,7 +4,6 @@ Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, ra
 scripts.
 """
 
-
 from collections import defaultdict
 from io import StringIO
 from pathlib import Path
@@ -158,6 +157,7 @@ def remap_inputs_for_transform(
     input_shards: dict[str, pl.DataFrame] | None = None,
     input_shards_map: dict[str, list[int]] | None = None,
     input_splits_map: dict[str, list[int]] | None = None,
+    splits_fp: Path | str | None = subject_splits_filepath,
 ) -> dict[str, FILE_T]:
     unified_inputs = {}
 
@@ -192,7 +192,9 @@ def remap_inputs_for_transform(
 
         input_splits_df = pl.DataFrame(input_splits_as_df)
 
-    unified_inputs[subject_splits_filepath] = input_splits_df
+    if splits_fp is not None:
+        # This case is added for error testing; not for general use.
+        unified_inputs[splits_fp] = input_splits_df
 
     return unified_inputs
 

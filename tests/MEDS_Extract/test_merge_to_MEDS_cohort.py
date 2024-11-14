@@ -250,7 +250,7 @@ data/held_out/0: |-2
 )
 
 
-def test_convert_to_sharded_events():
+def test_merge_to_MEDS_cohort():
     single_stage_tester(
         script=MERGE_TO_MEDS_COHORT_SCRIPT,
         stage_name="merge_to_MEDS_cohort",
@@ -265,4 +265,19 @@ def test_convert_to_sharded_events():
         shards_map_fp="{input_dir}/metadata/.shards.json",
         want_outputs=WANT_OUTPUTS,
         df_check_kwargs={"check_column_order": False},
+    )
+
+    # Should error without event conversion file
+    single_stage_tester(
+        script=MERGE_TO_MEDS_COHORT_SCRIPT,
+        stage_name="merge_to_MEDS_cohort",
+        stage_kwargs=None,
+        config_name="extract",
+        input_files={
+            **INPUT_SHARDS,
+            "metadata/.shards.json": SHARDS_JSON,
+        },
+        event_conversion_config_fp="{input_dir}/event_cfgs.yaml",
+        shards_map_fp="{input_dir}/metadata/.shards.json",
+        should_error=True,
     )

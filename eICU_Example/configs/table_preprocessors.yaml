@@ -1,8 +1,10 @@
-admissiondx:
+admissionDx:
   offset_col: "admitdxenteredoffset"
   pseudotime_col: "admitDxEnteredTimestamp"
-  output_data_cols: ["admitdxname", "admitdxid"]
-  warning_items: ["How should we use `admitdxtest`?", "How should we use `admitdxpath`?"]
+  output_data_cols: ["admitdxname", "admissiondxid"]
+  warning_items:
+    - "How should we use `admitdxtest`?"
+    - "How should we use `admitdxpath`?"
 
 allergy:
   offset_col: "allergyenteredoffset"
