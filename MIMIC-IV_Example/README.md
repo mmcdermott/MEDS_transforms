@@ -1,8 +1,7 @@
 # MIMIC-IV Example
 
 This is an example of how to extract a MEDS dataset from MIMIC-IV. All scripts in this README are assumed to
-be run **not** from this directory but from the root directory of this entire repository (e.g., one directory
-up from this one).
+be run from this directory or from the directory in which the files in Step 0.5. were downloaded.
 
 ## Step 0: Installation
 
@@ -21,8 +20,8 @@ If you want to profile the time and memory costs of your ETL, also install: `pip
 Set some environment variables and download the necessary files:
 ```bash
 export MIMICIV_RAW_DIR=??? # set to the directory in which you want to store the raw MIMIC-IV data
-export MIMICIV_PRE_MEDS_DIR=??? # set to the directory in which you want to store the raw MIMIC-IV data
-export MIMICIV_MEDS_COHORT_DIR=??? # set to the directory in which you want to store the raw MIMIC-IV data
+export MIMICIV_PRE_MEDS_DIR=??? # set to the directory in which you want to store the intermediate MEDS MIMIC-IV data
+export MIMICIV_MEDS_COHORT_DIR=??? # set to the directory in which you want to store the final MEDS MIMIC-IV data
 
 export URL="https://raw.githubusercontent.com/mmcdermott/MEDS_transforms/$VERSION/MIMIC-IV_Example"
 
@@ -50,18 +49,18 @@ the root directory of where the resulting _core data files_ are stored -- e.g., 
 ## Step 1.5: Download MIMIC-IV Metadata files
 
 ```bash
-cd $MIMIC_RAW_DIR
-export MIMIC_URL=https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map
-wget $MIMIC_URL/d_labitems_to_loinc.csv
-wget $MIMIC_URL/inputevents_to_rxnorm.csv
-wget $MIMIC_URL/lab_itemid_to_loinc.csv
-wget $MIMIC_URL/meas_chartevents_main.csv
-wget $MIMIC_URL/meas_chartevents_value.csv
-wget $MIMIC_URL/numerics-summary.csv
-wget $MIMIC_URL/outputevents_to_loinc.csv
-wget $MIMIC_URL/proc_datetimeevents.csv
-wget $MIMIC_URL/proc_itemid.csv
-wget $MIMIC_URL/waveforms-summary.csv
+cd $MIMICIV_RAW_DIR
+export MIMICIV_RAW_DIR=https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map
+wget $MIMICIV_RAW_DIR/d_labitems_to_loinc.csv
+wget $MIMICIV_RAW_DIR/inputevents_to_rxnorm.csv
+wget $MIMICIV_RAW_DIR/lab_itemid_to_loinc.csv
+wget $MIMICIV_RAW_DIR/meas_chartevents_main.csv
+wget $MIMICIV_RAW_DIR/meas_chartevents_value.csv
+wget $MIMICIV_RAW_DIR/numerics-summary.csv
+wget $MIMICIV_RAW_DIR/outputevents_to_loinc.csv
+wget $MIMICIV_RAW_DIR/proc_datetimeevents.csv
+wget $MIMICIV_RAW_DIR/proc_itemid.csv
+wget $MIMICIV_RAW_DIR/waveforms-summary.csv
 ```
 
 ## Step 2: Run the MEDS ETL
@@ -69,9 +68,11 @@ wget $MIMIC_URL/waveforms-summary.csv
 To run the MEDS ETL, run the following command:
 
 ```bash
-./run.sh $MIMICIV_RAW_DIR $MIMICIV_PRE_MEDS_DIR $MIMICIV_MEDS_DIR do_unzip=true
+./run.sh $MIMICIV_RAW_DIR $MIMICIV_PRE_MEDS_DIR $MIMICIV_MEDS_COHORT_DIR do_unzip=true
 ```
-
+> [!NOTE] 
+> This can take up large amounts of memory if not parallelized. You can reduce the shard size to reduce memory usage by setting the `shard_size` parameter in the `extract_MIMIC.yaml` file.
+> Check that your environment variables are set correctly.
 To not unzip the `.csv.gz` files, set `do_unzip=false` instead of `do_unzip=true`.
 
 To use a specific stage runner file (e.g., to set different parallelism options), you can specify it as an

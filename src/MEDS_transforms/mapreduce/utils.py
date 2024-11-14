@@ -134,6 +134,7 @@ def rwlock_wrap(
     compute_fn: Callable[[DF_T], DF_T],
     do_overwrite: bool = False,
     out_fp_checker: Callable[[Path], bool] = default_file_checker,
+    register_lock_fn: Callable[[Path], tuple[datetime, Path]] = register_lock,  # For dependency injection
 ) -> bool:
     """Wrap a series of file-in file-out map transformations on a dataframe with caching and locking.
 
@@ -161,6 +162,8 @@ def rwlock_wrap(
         >>> import polars as pl
         >>> import tempfile
         >>> directory = tempfile.TemporaryDirectory()
+        >>> read_fn = pl.read_csv
+        >>> write_fn = pl.DataFrame.write_csv
         >>> root = Path(directory.name)
         >>> # For this example we'll use a simple CSV file, but in practice we *strongly* recommend using
         >>> # Parquet files for performance reasons.
@@ -168,9 +171,8 @@ def rwlock_wrap(
         >>> out_fp = root / "output.csv"
         >>> in_df = pl.DataFrame({"a": [1, 3, 3], "b": [2, 4, 5], "c": [3, -1, 6]})
         >>> in_df.write_csv(in_fp)
-        >>> read_fn = pl.read_csv
-        >>> write_fn = pl.DataFrame.write_csv
-        >>> compute_fn = lambda df: df.with_columns(pl.col("c") * 2).filter(pl.col("c") > 4)
+        >>> def compute_fn(df: pl.DataFrame) -> pl.DataFrame:
+        ...     return df.with_columns(pl.col("c") * 2).filter(pl.col("c") > 4)
         >>> result_computed = rwlock_wrap(in_fp, out_fp, read_fn, write_fn, compute_fn)
         >>> assert result_computed
         >>> print(out_fp.read_text())
@@ -178,21 +180,108 @@ def rwlock_wrap(
         1,2,6
         3,5,12
         <BLANKLINE>
+        >>> in_df_2 = pl.DataFrame({"a": [1], "b": [3], "c": [-1]})
+        >>> in_fp_2 = root / "input_2.csv"
+        >>> in_df_2.write_csv(in_fp_2)
+        >>> compute_fn = lambda df: df
+        >>> result_computed = rwlock_wrap(in_fp_2, out_fp, read_fn, write_fn, compute_fn, do_overwrite=True)
+        >>> assert result_computed
+        >>> print(out_fp.read_text())
+        a,b,c
+        1,3,-1
+        <BLANKLINE>
         >>> out_fp.unlink()
         >>> compute_fn = lambda df: df.with_columns(pl.col("c") * 2).filter(pl.col("d") > 4)
         >>> rwlock_wrap(in_fp, out_fp, read_fn, write_fn, compute_fn)
         Traceback (most recent call last):
             ...
         polars.exceptions.ColumnNotFoundError: unable to find column "d"; valid columns: ["a", "b", "c"]
+        >>> assert not out_fp.is_file() # Out file should not be created when the process crashes
+
+        If we check the locks during computation, one should be present
         >>> cache_directory = root / f".output.csv_cache"
         >>> lock_dir = cache_directory / "locks"
-        >>> assert not list(lock_dir.iterdir())
+        >>> assert not list(lock_dir.iterdir()), "Lock dir starts empty"
         >>> def lock_dir_checker_fn(df: pl.DataFrame) -> pl.DataFrame:
         ...     print(f"Lock dir empty? {not (list(lock_dir.iterdir()))}")
         ...     return df
         >>> result_computed = rwlock_wrap(in_fp, out_fp, read_fn, write_fn, lock_dir_checker_fn)
         Lock dir empty? False
-        >>> assert result_computed
+        >>> result_computed
+        True
+        >>> assert not list(lock_dir.iterdir()), "Lock dir should be empty again"
+        >>> out_fp.unlink()
+
+        If we register a lock before we run, the process won't actually compute
+        >>> compute_fn = lambda df: df
+        >>> lock_time, lock_fp = register_lock(cache_directory)
+        >>> result_computed = rwlock_wrap(in_fp, out_fp, read_fn, write_fn, compute_fn)
+        >>> result_computed
+        False
+        >>> len(list(lock_dir.iterdir())) # The lock file at lock_fp should still exist
+        1
+        >>> lock_fp.unlink()
+        >>> assert not list(lock_dir.iterdir()), "Lock dir should be empty again"
+
+        If two processes collide when writing locks during lock registration before reading, the one that
+        writes a lock with an earlier timestamp wins and the later one does not read:
+        >>> def read_fn_and_print(in_fp: Path) -> pl.DataFrame:
+        ...     print("Reading!")
+        ...     return read_fn(in_fp)
+        >>> def register_lock_with_conflict_fntr(early: bool) -> callable:
+        ...     fake_lock_time = datetime(2021, 1, 1, 0, 0, 0) if early else datetime(5000, 1, 2, 0, 0, 0)
+        ...     def fn(cache_directory: Path) -> tuple[datetime, Path]:
+        ...         lock_fp = cache_directory / "locks" / f"{fake_lock_time.strftime(LOCK_TIME_FMT)}.json"
+        ...         lock_fp.write_text(json.dumps({"start": fake_lock_time.strftime(LOCK_TIME_FMT)}))
+        ...         return register_lock(cache_directory)
+        ...     return fn
+        >>> result_computed = rwlock_wrap(
+        ...     in_fp, out_fp, read_fn_and_print, write_fn, compute_fn,
+        ...     register_lock_fn=register_lock_with_conflict_fntr(early=True)
+        ... )
+        >>> result_computed
+        False
+        >>> len(list(lock_dir.iterdir())) # The lock file added during the registration should still exist.
+        1
+        >>> next(lock_dir.iterdir()).unlink()
+        >>> result_computed = rwlock_wrap(
+        ...     in_fp, out_fp, read_fn_and_print, write_fn, compute_fn,
+        ...     register_lock_fn=register_lock_with_conflict_fntr(early=False)
+        ... )
+        Reading!
+        >>> result_computed
+        True
+        >>> len(list(lock_dir.iterdir())) # The lock file added during the registration should still exist.
+        1
+        >>> next(lock_dir.iterdir()).unlink()
+        >>> out_fp.unlink()
+
+        If two processes collide when writing locks during reading, the one that writes a lock with an earlier
+        timestamp wins:
+        >>> def read_fn_with_lock_fntr(early: bool) -> callable:
+        ...     fake_lock_time = datetime(2021, 1, 1, 0, 0, 0) if early else datetime(5000, 1, 2, 0, 0, 0)
+        ...     def fn(in_fp: Path) -> pl.DataFrame:
+        ...         print("Reading!")
+        ...         df = read_fn(in_fp)
+        ...         lock_fp = lock_dir / f"{fake_lock_time.strftime(LOCK_TIME_FMT)}.json"
+        ...         lock_fp.write_text(json.dumps({"start": fake_lock_time.strftime(LOCK_TIME_FMT)}))
+        ...         return df
+        ...     return fn
+        >>> result_computed = rwlock_wrap(in_fp, out_fp, read_fn_with_lock_fntr(True), write_fn, compute_fn)
+        Reading!
+        >>> result_computed
+        False
+        >>> len(list(lock_dir.iterdir())) # The lock file added during the read should still exist.
+        1
+        >>> next(lock_dir.iterdir()).unlink()
+        >>> result_computed = rwlock_wrap(in_fp, out_fp, read_fn_with_lock_fntr(False), write_fn, compute_fn)
+        Reading!
+        >>> result_computed
+        True
+        >>> len(list(lock_dir.iterdir())) # The lock file added during the read should still exist.
+        1
+        >>> next(lock_dir.iterdir()).unlink()
+        >>> out_fp.unlink()
         >>> directory.cleanup()
     """
 
@@ -212,7 +301,7 @@ def rwlock_wrap(
         logger.info(f"{out_fp} is in progress as of {earliest_lock_time}. Returning.")
         return False
 
-    st_time, lock_fp = register_lock(cache_directory)
+    st_time, lock_fp = register_lock_fn(cache_directory)
 
     logger.info(f"Registered lock at {st_time}. Double checking no earlier locks have been registered.")
     earliest_lock_time = get_earliest_lock(cache_directory)
@@ -263,13 +352,23 @@ def shuffle_shards(shards: list[str], cfg: DictConfig) -> list[str]:
         The shuffled list of shards.
 
     Examples:
-        >>> cfg = DictConfig({"worker": 1})
         >>> shards = ["train/0", "train/1", "tuning", "held_out"]
-        >>> shuffle_shards(shards, cfg)
+        >>> shuffle_shards(shards, DictConfig({"worker": 1}))
         ['train/1', 'held_out', 'tuning', 'train/0']
-        >>> cfg = DictConfig({"worker": 2})
-        >>> shuffle_shards(shards, cfg)
+        >>> shuffle_shards(shards, DictConfig({"worker": 2}))
         ['tuning', 'held_out', 'train/1', 'train/0']
+
+        It can also shuffle the shards without a worker ID, but the order is then based on the time, which
+        is not consistent across runs.
+        >>> sorted(shuffle_shards(shards, DictConfig({})))
+        ['held_out', 'train/0', 'train/1', 'tuning']
+
+        If the shards aren't unique, it will error
+        >>> shards = ["train/0", "train/0", "tuning", "held_out"]
+        >>> shuffle_shards(shards, DictConfig({"worker": 1}))
+        Traceback (most recent call last):
+            ...
+        ValueError: Hash collision for shard train/0 with add_str 1!
     """
 
     if "worker" in cfg:
@@ -279,10 +378,10 @@ def shuffle_shards(shards: list[str], cfg: DictConfig) -> list[str]:
 
     shard_keys = []
     for shard in shards:
-        shard_hash = hashlib.sha256((add_str + shard).encode("utf-8")).hexdigest()
+        shard_hash = int(hashlib.sha256((add_str + shard).encode("utf-8")).hexdigest(), 16)
         if shard_hash in shard_keys:
             raise ValueError(f"Hash collision for shard {shard} with add_str {add_str}!")
-        shard_keys.append(int(shard_hash, 16))
+        shard_keys.append(shard_hash)
 
     return [shard for _, shard in sorted(zip(shard_keys, shards))]
 

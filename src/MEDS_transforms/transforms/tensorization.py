@@ -75,6 +75,19 @@ def convert_to_NRT(df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
         time_delta_days
         [[nan 12.]
          [nan  0.]]
+
+    With the wrong number of time delta columns, it doesn't work:
+        >>> nrt = convert_to_NRT(df.drop("time_delta_days").lazy())
+        Traceback (most recent call last):
+            ...
+        ValueError: Expected at least one time delta column, found none
+        >>> nrt = convert_to_NRT(
+        ...     df.with_columns(pl.lit([1, 2]).alias("time_delta_hours")).lazy()
+        ... ) # doctest: +NORMALIZE_WHITESPACE
+        Traceback (most recent call last):
+            ...
+        ValueError: Expected exactly one time delta column, found columns:
+            ['time_delta_days', 'time_delta_hours']
     """
 
     # There should only be one time delta column, but this ensures we catch it regardless of the unit of time
@@ -93,10 +106,6 @@ def convert_to_NRT(df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
     if all((not v) for v in tensors_dict.values()):
         logger.warning("All columns are empty. Returning an empty tensor dict.")
         return JointNestedRaggedTensorDict({})
-
-    for k, v in tensors_dict.items():
-        if not v:
-            raise ValueError(f"Column {k} is empty")
 
     return JointNestedRaggedTensorDict(tensors_dict)
 

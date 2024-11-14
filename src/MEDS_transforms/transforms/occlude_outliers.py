@@ -54,6 +54,22 @@ def occlude_outliers_fntr(
         │ 2          ┆ A    ┆ 2         ┆ null          ┆ false                   │
         │ 2          ┆ C    ┆ 2         ┆ 1.0           ┆ true                    │
         └────────────┴──────┴───────────┴───────────────┴─────────────────────────┘
+
+        If no standard deviation cutoff is provided, the function should return the input DataFrame unchanged:
+        >>> stage_cfg = DictConfig({})
+        >>> fn = occlude_outliers_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn(data).collect()
+        shape: (4, 4)
+        ┌────────────┬──────┬───────────┬───────────────┐
+        │ subject_id ┆ code ┆ modifier1 ┆ numeric_value │
+        │ ---        ┆ ---  ┆ ---       ┆ ---           │
+        │ i64        ┆ str  ┆ i64       ┆ f64           │
+        ╞════════════╪══════╪═══════════╪═══════════════╡
+        │ 1          ┆ A    ┆ 1         ┆ 15.0          │
+        │ 1          ┆ B    ┆ 1         ┆ 16.0          │
+        │ 2          ┆ A    ┆ 2         ┆ 3.9           │
+        │ 2          ┆ C    ┆ 2         ┆ 1.0           │
+        └────────────┴──────┴───────────┴───────────────┘
     """
 
     stddev_cutoff = stage_cfg.get("stddev_cutoff", None)

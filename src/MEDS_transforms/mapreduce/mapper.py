@@ -426,12 +426,26 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
         ValueError: Missing needed columns {'missing'} for local matcher 0:
             [(col("missing")) == (String(CODE//TEMP_2))].all_horizontal()
         Columns available: 'code', 'initial_idx', 'subject_id', 'time'
+
+        It will throw an error if the match and revise configuration is missing.
         >>> stage_cfg = DictConfig({"global_code_end": "foo"})
         >>> cfg = DictConfig({"stage_cfg": stage_cfg})
         >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
         Traceback (most recent call last):
             ...
         ValueError: Invalid match and revise configuration...
+
+        It does not accept invalid modes.
+        >>> stage_cfg = DictConfig({
+        ...     "global_code_end": "foo",
+        ...     "_match_revise_mode": "foobar",
+        ...     "_match_revise": [{"_matcher": {"code": "CODE//TEMP_2"}}]
+        ... })
+        >>> cfg = DictConfig({"stage_cfg": stage_cfg})
+        >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
+        Traceback (most recent call last):
+            ...
+        ValueError: Invalid match and revise mode: foobar
     """
     try:
         validate_match_revise(stage_cfg)
@@ -639,13 +653,13 @@ def map_over(
                 .collect()[subject_id_field]
                 .to_list()
             )
-            read_fn = read_and_filter_fntr(train_subjects, read_fn)
+            read_fn = read_and_filter_fntr(pl.col("subject_id").is_in(train_subjects), read_fn)
         else:
             raise FileNotFoundError(
                 f"Train split requested, but shard prefixes can't be used and "
                 f"subject split file not found at {str(split_fp.resolve())}."
             )
-    elif includes_only_train:
+    elif includes_only_train:  # pragma: no cover
         raise ValueError("All splits should be used, but shard iterator is returning only train splits?!?")
 
     if is_match_revise(cfg.stage_cfg):
