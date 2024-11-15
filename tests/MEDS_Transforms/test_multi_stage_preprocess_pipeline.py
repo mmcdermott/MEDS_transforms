@@ -17,7 +17,6 @@ In this test, the following stages are run:
 The stage configuration arguments will be as given in the yaml block below:
 """
 
-
 from datetime import datetime
 
 import polars as pl
