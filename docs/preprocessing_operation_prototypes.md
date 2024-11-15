@@ -69,7 +69,7 @@ simplicity).
 
 ##### Operation Steps
 
-1. Per-shard, filter the pateint data to satisfy desired set of patient or other data critieria.
+1. Per-shard, filter the pateint data to satisfy desired set of patient or other data criteria.
 2. Per-shard, group by code and collect some aggregate statistics. Optionally also compute statistics across
     all codes.
 3. Reduce the per-shard aggregate files into a unified `metadata/codes.parquet` file.

@@ -28,6 +28,7 @@ These types can be combined or filtered via two modes:
     - Two key-value pairs, where the first key is `"output"` and the value is the column expression and the
       second key is `"matcher"` and the value is the matcher dictionary.
 """
+
 from __future__ import annotations
 
 import re

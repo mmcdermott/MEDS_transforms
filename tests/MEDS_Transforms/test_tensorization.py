@@ -6,7 +6,6 @@ Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, ra
 scripts.
 """
 
-
 from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 
 from tests.MEDS_Transforms import TENSORIZATION_SCRIPT
