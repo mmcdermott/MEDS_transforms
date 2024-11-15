@@ -4,7 +4,6 @@ Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, ra
 scripts.
 """
 
-
 from datetime import datetime
 
 import polars as pl

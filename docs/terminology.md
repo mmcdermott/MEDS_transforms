@@ -16,7 +16,7 @@ output layer logit identification, etc.
 A single measurable quantity observed about the patient during their care. These observations can take on many
 forms, such as observing a diagnostic code being applied to the patient, observing a patient's admission or
 transfer from one unit to another, observing a laboratory test result, but always correspond to a single
-measureable unit about a single patient. They are encoded in MEDS datasets as a single row in the main MEDS
+measurable unit about a single patient. They are encoded in MEDS datasets as a single row in the main MEDS
 schema.
 
 #### An _event_ or _patient event_
