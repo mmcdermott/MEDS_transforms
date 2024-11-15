@@ -247,7 +247,7 @@ def check_NRT_output(
     want_nrt: JointNestedRaggedTensorDict,
     msg: str,
 ):
-    got_nrt = JointNestedRaggedTensorDict.load(output_fp)
+    got_nrt = JointNestedRaggedTensorDict(tensors_fp=output_fp)
 
     # assert got_nrt.schema == want_nrt.schema, (
     #    f"Expected the schema of the NRT at {output_fp} to be equal to the target.\n"
