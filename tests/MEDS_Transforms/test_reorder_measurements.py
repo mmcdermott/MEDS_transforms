@@ -4,7 +4,6 @@ Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, ra
 scripts.
 """
 
-
 from tests.MEDS_Transforms import REORDER_MEASUREMENTS_SCRIPT
 from tests.MEDS_Transforms.transform_tester_base import single_stage_transform_tester
 from tests.utils import parse_meds_csvs

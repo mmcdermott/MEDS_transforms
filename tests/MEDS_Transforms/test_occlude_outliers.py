@@ -4,7 +4,6 @@ Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, ra
 scripts.
 """
 
-
 import polars as pl
 
 from tests.MEDS_Transforms import OCCLUDE_OUTLIERS_SCRIPT
