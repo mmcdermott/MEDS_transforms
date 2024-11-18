@@ -177,16 +177,16 @@ AGGREGATIONS = [
 
 
 def test_aggregate_code_metadata():
-    # single_stage_transform_tester(
-    #    transform_script=AGGREGATE_CODE_METADATA_SCRIPT,
-    #    stage_name="aggregate_code_metadata",
-    #    transform_stage_kwargs={"aggregations": AGGREGATIONS, "do_summarize_over_all_codes": True},
-    #    want_metadata=WANT_OUTPUT_CODE_METADATA_FILE,
-    #    input_code_metadata=MEDS_CODE_METADATA_FILE,
-    #    do_use_config_yaml=True,
-    #    assert_no_other_outputs=False,
-    #    df_check_kwargs={"check_column_order": False},
-    # )
+    single_stage_transform_tester(
+        transform_script=AGGREGATE_CODE_METADATA_SCRIPT,
+        stage_name="aggregate_code_metadata",
+        transform_stage_kwargs={"aggregations": AGGREGATIONS, "do_summarize_over_all_codes": True},
+        want_metadata=WANT_OUTPUT_CODE_METADATA_FILE,
+        input_code_metadata=MEDS_CODE_METADATA_FILE,
+        do_use_config_yaml=True,
+        assert_no_other_outputs=False,
+        df_check_kwargs={"check_column_order": False},
+    )
 
     # Test with shards re-mapped so it has to use the splits file.
     remapped_shards = {str(i): v for i, v in enumerate(MEDS_SHARDS.values())}
@@ -202,14 +202,14 @@ def test_aggregate_code_metadata():
         input_shards=remapped_shards,
     )
 
-    # single_stage_transform_tester(
-    #    transform_script=AGGREGATE_CODE_METADATA_SCRIPT,
-    #    stage_name="aggregate_code_metadata",
-    #    transform_stage_kwargs={"aggregations": AGGREGATIONS, "do_summarize_over_all_codes": True},
-    #    want_metadata=WANT_OUTPUT_CODE_METADATA_FILE,
-    #    input_code_metadata=MEDS_CODE_METADATA_FILE,
-    #    do_use_config_yaml=True,
-    #    input_shards=remapped_shards,
-    #    splits_fp=None,
-    #    should_error=True,
-    # )
+    single_stage_transform_tester(
+        transform_script=AGGREGATE_CODE_METADATA_SCRIPT,
+        stage_name="aggregate_code_metadata",
+        transform_stage_kwargs={"aggregations": AGGREGATIONS, "do_summarize_over_all_codes": True},
+        want_metadata=WANT_OUTPUT_CODE_METADATA_FILE,
+        input_code_metadata=MEDS_CODE_METADATA_FILE,
+        do_use_config_yaml=True,
+        input_shards=remapped_shards,
+        splits_fp=None,
+        should_error=True,
+    )
