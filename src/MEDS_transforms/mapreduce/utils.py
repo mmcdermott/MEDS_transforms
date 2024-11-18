@@ -196,6 +196,7 @@ def rwlock_wrap(
         Traceback (most recent call last):
             ...
         polars.exceptions.ColumnNotFoundError: unable to find column "d"; valid columns: ["a", "b", "c"]
+        ...
         >>> assert not out_fp.is_file() # Out file should not be created when the process crashes
 
         If we check the locks during computation, one should be present

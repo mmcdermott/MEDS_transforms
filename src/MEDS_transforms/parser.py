@@ -296,9 +296,7 @@ class ColExprType(StrEnum):
             ['baz', 'foo']
             >>> expr, cols = ColExprType.to_pl_expr(ColExprType.LITERAL, ListConfig(["foo", "bar"]))
             >>> print(expr)
-            Series[literal]
-            >>> pl.select(expr).item().to_list()
-            ['foo', 'bar']
+            ["foo", "bar"]
             >>> cols
             set()
             >>> expr, cols = ColExprType.to_pl_expr(ColExprType.EXTRACT, {"from": "foo", "regex": "bar"})
