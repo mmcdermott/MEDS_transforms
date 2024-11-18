@@ -91,8 +91,8 @@ defaults:
   - _preprocess
   - _self_
 
-input_dir: {{input_dir}}
-cohort_dir: {{cohort_dir}}
+input_dir: {input_dir}
+cohort_dir: {cohort_dir}
 """
 
 PIPELINE_YAML = f"""
@@ -176,48 +176,42 @@ A test pipeline for the MEDS-transforms pipeline runner.
 
 
 def test_pipeline():
+    shared_kwargs = {
+        "config_name": "runner",
+        "stage_name": None,
+        "stage_kwargs": None,
+        "do_pass_stage_name": False,
+        "do_use_config_yaml": False,
+        "do_include_dirs": False,
+        "hydra_verbose": False,
+    }
+
     single_stage_tester(
         script=str(RUNNER_SCRIPT) + " -h",
-        config_name="runner",
-        stage_name=None,
-        stage_kwargs=None,
-        do_pass_stage_name=False,
-        do_use_config_yaml=False,
         input_files={},
         want_outputs={},
         assert_no_other_outputs=True,
         should_error=False,
         test_name="Runner Help Test",
-        do_include_dirs=False,
-        hydra_verbose=False,
         stdout_regex=exact_str_regex(NO_ARGS_HELP_STR.strip()),
+        **shared_kwargs,
     )
 
     single_stage_tester(
         script=str(RUNNER_SCRIPT) + " -h",
-        config_name="runner",
-        stage_name=None,
-        stage_kwargs=None,
-        do_pass_stage_name=False,
-        do_use_config_yaml=False,
         input_files={"pipeline.yaml": partial(add_params, PIPELINE_YAML)},
         want_outputs={},
         assert_no_other_outputs=True,
         should_error=False,
         pipeline_config_fp="{input_dir}/pipeline.yaml",
         test_name="Runner Help Test",
-        do_include_dirs=False,
-        hydra_verbose=False,
         stdout_regex=exact_str_regex(WITH_CONFIG_HELP_STR.strip()),
+        **shared_kwargs,
     )
 
+    shared_kwargs["script"] = RUNNER_SCRIPT
+
     single_stage_tester(
-        script=RUNNER_SCRIPT,
-        config_name="runner",
-        stage_name=None,
-        stage_kwargs=None,
-        do_pass_stage_name=False,
-        do_use_config_yaml=False,
         input_files={
             **{f"data/{k}": v for k, v in MEDS_SHARDS.items()},
             code_metadata_filepath: MEDS_CODE_METADATA,
@@ -242,17 +236,11 @@ def test_pipeline():
         pipeline_config_fp="{input_dir}/pipeline.yaml",
         stage_runner_fp="{input_dir}/stage_runner.yaml",
         test_name="Runner Test",
-        do_include_dirs=False,
         df_check_kwargs={"check_column_order": False},
+        **shared_kwargs,
     )
 
     single_stage_tester(
-        script=RUNNER_SCRIPT,
-        config_name="runner",
-        stage_name=None,
-        stage_kwargs=None,
-        do_pass_stage_name=False,
-        do_use_config_yaml=False,
         input_files={
             **{f"data/{k}": v for k, v in MEDS_SHARDS.items()},
             code_metadata_filepath: MEDS_CODE_METADATA,
@@ -277,44 +265,32 @@ def test_pipeline():
         pipeline_config_fp="{input_dir}/pipeline.yaml",
         stage_runner_fp="{input_dir}/stage_runner.yaml",
         test_name="Runner Test with parallelism",
-        do_include_dirs=False,
         df_check_kwargs={"check_column_order": False},
+        **shared_kwargs,
     )
 
     single_stage_tester(
-        script=RUNNER_SCRIPT,
-        config_name="runner",
-        stage_name=None,
-        stage_kwargs=None,
-        do_pass_stage_name=False,
-        do_use_config_yaml=False,
         input_files={
             **{f"data/{k}": v for k, v in MEDS_SHARDS.items()},
             code_metadata_filepath: MEDS_CODE_METADATA,
             subject_splits_filepath: SPLITS_DF,
             "_preprocess.yaml": partial(add_params, PIPELINE_YAML),
         },
-        do_include_dirs=False,
         should_error=True,
         pipeline_config_fp="{input_dir}/_preprocess.yaml",
         test_name="Runner should fail if the pipeline config has an invalid name",
+        **shared_kwargs,
     )
 
     single_stage_tester(
-        script=RUNNER_SCRIPT,
-        config_name="runner",
-        stage_name=None,
-        stage_kwargs=None,
-        do_pass_stage_name=False,
-        do_use_config_yaml=False,
         input_files={
             **{f"data/{k}": v for k, v in MEDS_SHARDS.items()},
             code_metadata_filepath: MEDS_CODE_METADATA,
             subject_splits_filepath: SPLITS_DF,
             "pipeline.yaml": partial(add_params, PIPELINE_NO_STAGES_YAML),
         },
-        do_include_dirs=False,
         should_error=True,
         pipeline_config_fp="{input_dir}/pipeline.yaml",
         test_name="Runner should fail if the pipeline has no stages",
+        **shared_kwargs,
     )
