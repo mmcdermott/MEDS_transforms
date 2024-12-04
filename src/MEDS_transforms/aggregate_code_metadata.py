@@ -443,6 +443,39 @@ def mapper_fntr(
         │ C    ┆ 1         ┆ [5.0, 7.5]        │
         │ D    ┆ null      ┆ []                │
         └──────┴───────────┴───────────────────┘
+
+    Empty dataframes are handled as you would expect
+        >>> df_empty = pl.DataFrame({
+        ...     "code": [],
+        ...     "modifier1": [],
+        ...     "modifier_ignored": [],
+        ...     "subject_id": [],
+        ...     "numeric_value": [],
+        ... }, schema=df.schema)
+        >>> stage_cfg = DictConfig({"aggregations": ["values/sum_sqd", "values/min", "values/max"]})
+        >>> mapper = mapper_fntr(stage_cfg, code_modifiers)
+        >>> mapper(df_empty.lazy()).collect()
+        shape: (0, 5)
+        ┌──────┬───────────┬────────────────┬────────────┬────────────┐
+        │ code ┆ modifier1 ┆ values/sum_sqd ┆ values/min ┆ values/max │
+        │ ---  ┆ ---       ┆ ---            ┆ ---        ┆ ---        │
+        │ str  ┆ i64       ┆ f64            ┆ f64        ┆ f64        │
+        ╞══════╪═══════════╪════════════════╪════════════╪════════════╡
+        └──────┴───────────┴────────────────┴────────────┴────────────┘
+        >>> stage_cfg = DictConfig({
+        ...     "aggregations": ["values/sum_sqd", "values/min", "values/max"],
+        ...     "do_summarize_over_all_codes": True,
+        ... })
+        >>> mapper = mapper_fntr(stage_cfg, code_modifiers)
+        >>> mapper(df_empty.lazy()).collect()
+        shape: (1, 5)
+        ┌──────┬───────────┬────────────────┬────────────┬────────────┐
+        │ code ┆ modifier1 ┆ values/sum_sqd ┆ values/min ┆ values/max │
+        │ ---  ┆ ---       ┆ ---            ┆ ---        ┆ ---        │
+        │ str  ┆ i64       ┆ f64            ┆ f64        ┆ f64        │
+        ╞══════╪═══════════╪════════════════╪════════════╪════════════╡
+        │ null ┆ null      ┆ 0.0            ┆ null       ┆ null       │
+        └──────┴───────────┴────────────────┴────────────┴────────────┘
     """
 
     code_key_columns = validate_args_and_get_code_cols(stage_cfg, code_modifiers)
@@ -542,10 +575,38 @@ def reducer_fntr(
         ...     "values/max": [2],
         ...     "values/quantiles": [[]],
         ... })
+        >>> df_empty = pl.DataFrame({
+        ...     "code": [],
+        ...     "modifier1": [],
+        ...     "code/n_subjects": [],
+        ...     "code/n_occurrences": [],
+        ...     "values/n_subjects": [],
+        ...     "values/n_occurrences": [],
+        ...     "values/n_ints": [],
+        ...     "values/sum": [],
+        ...     "values/sum_sqd": [],
+        ...     "values/min": [],
+        ...     "values/max": [],
+        ...     "values/quantiles": [],
+        ... }, schema=df_3.schema)
+        >>> df_null_empty = pl.DataFrame({
+        ...     "code": [None],
+        ...     "modifier1": [None],
+        ...     "code/n_subjects": [0],
+        ...     "code/n_occurrences": [0],
+        ...     "values/n_subjects": [0],
+        ...     "values/n_occurrences": [0],
+        ...     "values/n_ints": [0],
+        ...     "values/sum": [0],
+        ...     "values/sum_sqd": [0],
+        ...     "values/min": [None],
+        ...     "values/max": [None],
+        ...     "values/quantiles": [None],
+        ... }, schema=df_3.schema)
         >>> code_modifiers = ["modifier1"]
         >>> stage_cfg = DictConfig({"aggregations": ["code/n_subjects", "values/n_ints"]})
         >>> reducer = reducer_fntr(stage_cfg, code_modifiers)
-        >>> reducer(df_1, df_2, df_3)
+        >>> reducer(df_1, df_2, df_3, df_empty, df_null_empty)
         shape: (7, 4)
         ┌──────┬───────────┬─────────────────┬───────────────┐
         │ code ┆ modifier1 ┆ code/n_subjects ┆ values/n_ints │
@@ -572,7 +633,7 @@ def reducer_fntr(
         ... })
         >>> stage_cfg = DictConfig({"aggregations": ["code/n_occurrences", "values/sum"]})
         >>> reducer = reducer_fntr(stage_cfg, code_modifiers)
-        >>> reducer(df_1, df_2, df_3)
+        >>> reducer(df_1, df_2, df_3, df_empty, df_null_empty)
         shape: (7, 4)
         ┌──────┬───────────┬────────────────────┬────────────┐
         │ code ┆ modifier1 ┆ code/n_occurrences ┆ values/sum │
@@ -589,7 +650,7 @@ def reducer_fntr(
         └──────┴───────────┴────────────────────┴────────────┘
         >>> stage_cfg = DictConfig({"aggregations": ["values/n_subjects", "values/n_occurrences"]})
         >>> reducer = reducer_fntr(stage_cfg, code_modifiers)
-        >>> reducer(df_1, df_2, df_3)
+        >>> reducer(df_1, df_2, df_3, df_empty, df_null_empty)
         shape: (7, 4)
         ┌──────┬───────────┬───────────────────┬──────────────────────┐
         │ code ┆ modifier1 ┆ values/n_subjects ┆ values/n_occurrences │
@@ -629,7 +690,7 @@ def reducer_fntr(
         ...     "aggregations": [{"name": "values/quantiles", "quantiles": [0.25, 0.5, 0.75]}],
         ... })
         >>> reducer = reducer_fntr(stage_cfg, code_modifiers)
-        >>> reducer(df_1, df_2, df_3).unnest("values/quantiles")
+        >>> reducer(df_1, df_2, df_3, df_empty, df_null_empty).unnest("values/quantiles")
         shape: (7, 5)
         ┌──────┬───────────┬──────────────────────┬─────────────────────┬──────────────────────┐
         │ code ┆ modifier1 ┆ values/quantile/0.25 ┆ values/quantile/0.5 ┆ values/quantile/0.75 │

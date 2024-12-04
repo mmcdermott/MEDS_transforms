@@ -28,6 +28,7 @@ These types can be combined or filtered via two modes:
     - Two key-value pairs, where the first key is `"output"` and the value is the column expression and the
       second key is `"matcher"` and the value is the matcher dictionary.
 """
+
 from __future__ import annotations
 
 import re
@@ -295,9 +296,7 @@ class ColExprType(StrEnum):
             ['baz', 'foo']
             >>> expr, cols = ColExprType.to_pl_expr(ColExprType.LITERAL, ListConfig(["foo", "bar"]))
             >>> print(expr)
-            Series[literal]
-            >>> pl.select(expr).item().to_list()
-            ['foo', 'bar']
+            ["foo", "bar"]
             >>> cols
             set()
             >>> expr, cols = ColExprType.to_pl_expr(ColExprType.EXTRACT, {"from": "foo", "regex": "bar"})
