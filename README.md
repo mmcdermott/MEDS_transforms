@@ -271,7 +271,7 @@ In this structure, `$INPUT_FILE_STEM` is the stem of the input file name, `$EVEN
 particular kind of event that can be extracted from the input file, `$CODE` is the code for the event, either
 as a constant string or (with the syntax `"col($COLUMN)"` the name of the column in the raw data to be read to
 get the code), and `$TIME` is the time for the event, either as `null` to indicate the event has a
-null time (e.g., a static measurement) or with the `"col($COLUMN)"` syntax refenced above, and all
+null time (e.g., a static measurement) or with the `"col($COLUMN)"` syntax referenced above, and all
 subsequent key-value pairs are mappings from the MEDS column name to the raw column name in the input data.
 Here, these mappings can _only_ point to columns in the input data, not constant values, and the input data
 columns must be either string or categorical types (in which case they will be converted to categorical) or
