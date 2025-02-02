@@ -142,7 +142,7 @@ def scan_with_row_idx(fp: Path, columns: Sequence[str], **scan_kwargs) -> pl.Laz
         case ".csv":
             logger.debug(f"Reading {str(fp.resolve())} as CSV with kwargs:\n{kwargs_strs(kwargs)}.")
             df = pl.scan_csv(fp, **kwargs)
-        case ".parquet":
+        case ".parquet" | ".par":
             if "infer_schema_length" in kwargs:
                 infer_schema_length = kwargs.pop("infer_schema_length")
                 logger.info(f"Ignoring infer_schema_length={infer_schema_length} for Parquet files.")
@@ -346,8 +346,8 @@ def main(cfg: DictConfig):
 
     seen_files = set()
     input_files_to_subshard = []
-    for fmt in ["parquet", "csv", "csv.gz"]:
-        files_in_fmt = set(list(raw_cohort_dir.glob(f"*.{fmt}")) + list(raw_cohort_dir.glob(f"**/*.{fmt}")))
+    for fmt in ["parquet", "par", "csv", "csv.gz"]:
+        files_in_fmt = set(raw_cohort_dir.rglob(f"*.{fmt}"))
         for f in files_in_fmt:
             if get_shard_prefix(raw_cohort_dir, f) in seen_files:
                 logger.warning(f"Skipping {f} as it has already been added in a preferred format.")
