@@ -3,6 +3,7 @@
 
 import copy
 import json
+import logging
 import random
 from collections.abc import Sequence
 from functools import partial, reduce
@@ -10,7 +11,6 @@ from pathlib import Path
 
 import hydra
 import polars as pl
-from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 from omegaconf.listconfig import ListConfig
 
@@ -18,6 +18,8 @@ from MEDS_transforms.extract import CONFIG_YAML
 from MEDS_transforms.extract.shard_events import META_KEYS
 from MEDS_transforms.mapreduce.mapper import rwlock_wrap
 from MEDS_transforms.utils import is_col_field, parse_col_field, stage_init, write_lazyframe
+
+logger = logging.getLogger(__name__)
 
 
 def in_format(fmt: str, ts_name: str) -> pl.Expr:

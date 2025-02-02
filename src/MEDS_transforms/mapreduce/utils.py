@@ -2,14 +2,16 @@
 
 import hashlib
 import json
+import logging
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import TypeVar
 
 import pyarrow.parquet as pq
-from loguru import logger
 from omegaconf import DictConfig
+
+logger = logging.getLogger(__name__)
 
 LOCK_TIME_FMT = "%Y-%m-%dT%H:%M:%S.%f"
 DF_T = TypeVar("DF_T")

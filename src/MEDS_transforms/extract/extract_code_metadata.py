@@ -2,6 +2,7 @@
 """Utilities for extracting code metadata about the codes produced for the MEDS events."""
 
 import copy
+import logging
 import random
 import time
 from datetime import datetime
@@ -10,8 +11,9 @@ from pathlib import Path
 
 import hydra
 import polars as pl
-from loguru import logger
 from omegaconf import DictConfig, OmegaConf
+
+logger = logging.getLogger(__name__)
 
 from MEDS_transforms.extract import CONFIG_YAML, MEDS_METADATA_MANDATORY_TYPES
 from MEDS_transforms.extract.convert_to_sharded_events import get_code_expr

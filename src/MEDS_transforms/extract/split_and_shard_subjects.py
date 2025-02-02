@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import json
+import logging
 import math
 from collections.abc import Sequence
 from pathlib import Path
@@ -7,11 +8,12 @@ from pathlib import Path
 import hydra
 import numpy as np
 import polars as pl
-from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms.extract import CONFIG_YAML
 from MEDS_transforms.utils import stage_init
+
+logger = logging.getLogger(__name__)
 
 
 def shard_subjects(

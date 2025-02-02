@@ -1,17 +1,19 @@
 #!/usr/bin/env python
 """Functions for tensorizing MEDS datasets."""
 
+import logging
 from functools import partial
 
 import hydra
 import polars as pl
-from loguru import logger
 from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 from omegaconf import DictConfig
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over
 from MEDS_transforms.mapreduce.utils import shard_iterator
+
+logger = logging.getLogger(__name__)
 
 
 def convert_to_NRT(df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
