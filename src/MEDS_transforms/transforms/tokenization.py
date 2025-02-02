@@ -9,16 +9,18 @@ as those have been normalized alongside codes into integer indices (in the outpu
 columns of concern here thus are `subject_id`, `time`, `code`, `numeric_value`.
 """
 
+import logging
 from pathlib import Path
 
 import hydra
 import polars as pl
-from loguru import logger
 from omegaconf import DictConfig, OmegaConf
+
+logger = logging.getLogger(__name__)
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.utils import rwlock_wrap, shard_iterator
-from MEDS_transforms.utils import hydra_loguru_init, write_lazyframe
+from MEDS_transforms.utils import write_lazyframe
 
 SECONDS_PER_MINUTE = 60.0
 SECONDS_PER_HOUR = SECONDS_PER_MINUTE * 60.0
@@ -250,9 +252,12 @@ def extract_seq_of_subject_events(df: pl.LazyFrame) -> pl.LazyFrame:
     version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
 )
 def main(cfg: DictConfig):
-    """TODO."""
+    """Tokenizes the dataset in accordance with the aggregated code metadata.
 
-    hydra_loguru_init()
+    Note that you _must_ run several other stages first, pending tokenization mode, including
+    `fit_vocabulary_indices` and `aggregate_code_metadata` with the appropriate aggregations. See the
+    `stage_configs` for arg options.
+    """
 
     logger.info(
         f"Running with config:\n{OmegaConf.to_yaml(cfg)}\n"

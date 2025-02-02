@@ -146,6 +146,29 @@ def test_split_and_shard():
             "split_fracs.tuning": 1 / 6,
             "split_fracs.held_out": 1 / 6,
             "n_subjects_per_shard": 2,
+        },
+        config_name="extract",
+        input_files={
+            "data/subjects/[0-6).parquet": (
+                pl.read_csv(StringIO(SUBJECTS_CSV)).with_columns(pl.col("MRN").cast(pl.UInt32))
+            ),
+            "data/admit_vitals/[0-10).parquet": pl.read_csv(StringIO(ADMIT_VITALS_0_10_CSV)),
+            "data/admit_vitals/[10-16).parquet": pl.read_csv(StringIO(ADMIT_VITALS_10_16_CSV)),
+            "event_cfgs.yaml": EVENT_CFGS_YAML,
+        },
+        event_conversion_config_fp="{input_dir}/event_cfgs.yaml",
+        want_outputs={"metadata/.shards.json": EXPECTED_SPLITS},
+        test_name="split_and_shard_subjects should accommodate different, but resolvable dtypes.",
+    )
+
+    single_stage_tester(
+        script=SPLIT_AND_SHARD_SCRIPT,
+        stage_name="split_and_shard_subjects",
+        stage_kwargs={
+            "split_fracs.train": 4 / 6,
+            "split_fracs.tuning": 1 / 6,
+            "split_fracs.held_out": 1 / 6,
+            "n_subjects_per_shard": 2,
             "external_splits_json_fp": "{input_dir}/external_splits.json",
         },
         config_name="extract",
