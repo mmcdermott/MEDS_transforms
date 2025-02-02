@@ -229,7 +229,11 @@ def normalize(
     version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
 )
 def main(cfg: DictConfig):
-    """TODO."""
+    """Normalizes the numeric values in accordance with the aggregated code metadata.
+
+    Note that the appropriate aggregations from `aggregate_code_metadata` _must_ be run before this stage
+    (typically directly before).
+    """
 
     map_over(cfg, compute_fn=normalize)
 

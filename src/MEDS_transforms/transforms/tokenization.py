@@ -252,7 +252,12 @@ def extract_seq_of_subject_events(df: pl.LazyFrame) -> pl.LazyFrame:
     version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
 )
 def main(cfg: DictConfig):
-    """TODO."""
+    """Tokenizes the dataset in accordance with the aggregated code metadata.
+
+    Note that you _must_ run several other stages first, pending tokenization mode, including
+    `fit_vocabulary_indices` and `aggregate_code_metadata` with the appropriate aggregations. See the
+    `stage_configs` for arg options.
+    """
 
     logger.info(
         f"Running with config:\n{OmegaConf.to_yaml(cfg)}\n"
