@@ -787,7 +787,12 @@ def run_map_reduce(cfg: DictConfig):
     version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
 )
 def main(cfg: DictConfig):
-    """Computes code metadata."""
+    """Computes code metadata.
+
+    Note that the output of this stage includes a `null` code row if
+    `stage_configs.STAGE_NAME.do_summarize_over_all_codes` is True. This row contains the total counts across
+    all codes, _not_ the counts for rows with a code that is `null`, which should not happen.
+    """
 
     run_map_reduce(cfg)
 
