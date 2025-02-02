@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import copy
 import gzip
+import logging
 import random
 import warnings
 from collections.abc import Sequence
@@ -10,19 +11,14 @@ from pathlib import Path
 
 import hydra
 import polars as pl
-from loguru import logger
 from meds import subject_id_field
 from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms.extract import CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import rwlock_wrap
-from MEDS_transforms.utils import (
-    get_shard_prefix,
-    hydra_loguru_init,
-    is_col_field,
-    parse_col_field,
-    write_lazyframe,
-)
+from MEDS_transforms.utils import get_shard_prefix, is_col_field, parse_col_field, write_lazyframe
+
+logger = logging.getLogger(__name__)
 
 ROW_IDX_NAME = "__row_idx__"
 META_KEYS = {"time_format", "_metadata"}
@@ -142,7 +138,7 @@ def scan_with_row_idx(fp: Path, columns: Sequence[str], **scan_kwargs) -> pl.Laz
         case ".csv":
             logger.debug(f"Reading {str(fp.resolve())} as CSV with kwargs:\n{kwargs_strs(kwargs)}.")
             df = pl.scan_csv(fp, **kwargs)
-        case ".parquet":
+        case ".parquet" | ".par":
             if "infer_schema_length" in kwargs:
                 infer_schema_length = kwargs.pop("infer_schema_length")
                 logger.info(f"Ignoring infer_schema_length={infer_schema_length} for Parquet files.")
@@ -325,7 +321,6 @@ def main(cfg: DictConfig):
         stage_configs.shard_events.infer_schema_length (int): The number of rows to read in to infer the
             schema (only used if the source files are csvs).
     """
-    hydra_loguru_init()
 
     logger.info(
         f"Running with config:\n{OmegaConf.to_yaml(cfg)}\n"
@@ -346,8 +341,8 @@ def main(cfg: DictConfig):
 
     seen_files = set()
     input_files_to_subshard = []
-    for fmt in ["parquet", "csv", "csv.gz"]:
-        files_in_fmt = set(list(raw_cohort_dir.glob(f"*.{fmt}")) + list(raw_cohort_dir.glob(f"**/*.{fmt}")))
+    for fmt in ["parquet", "par", "csv", "csv.gz"]:
+        files_in_fmt = set(raw_cohort_dir.rglob(f"*.{fmt}"))
         for f in files_in_fmt:
             if get_shard_prefix(raw_cohort_dir, f) in seen_files:
                 logger.warning(f"Skipping {f} as it has already been added in a preferred format.")

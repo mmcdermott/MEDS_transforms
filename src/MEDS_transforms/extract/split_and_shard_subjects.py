@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import json
+import logging
 import math
 from collections.abc import Sequence
 from pathlib import Path
@@ -7,11 +8,12 @@ from pathlib import Path
 import hydra
 import numpy as np
 import polars as pl
-from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms.extract import CONFIG_YAML
 from MEDS_transforms.utils import stage_init
+
+logger = logging.getLogger(__name__)
 
 
 def shard_subjects(
@@ -238,7 +240,7 @@ def main(cfg: DictConfig):
 
     logger.info(f"Joining all subject IDs from {len(dfs)} dataframes")
     subject_ids = (
-        pl.concat(dfs)
+        pl.concat(dfs, how="vertical_relaxed")
         .select(pl.col("subject_id").drop_nulls().drop_nans().unique())
         .collect(streaming=True)["subject_id"]
         .to_numpy(use_pyarrow=True)

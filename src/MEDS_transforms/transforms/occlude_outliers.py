@@ -121,7 +121,11 @@ def occlude_outliers_fntr(
     version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
 )
 def main(cfg: DictConfig):
-    """TODO."""
+    """Occludes outliers in accordance with the aggregated code metadata.
+
+    Note that the aggregation stage with the appropriate aggregates must be run first! See the stage configs
+    for arguments.
+    """
 
     map_over(cfg, compute_fn=occlude_outliers_fntr)
 

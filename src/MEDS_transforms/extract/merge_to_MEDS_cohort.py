@@ -1,15 +1,17 @@
 #!/usr/bin/env python
+import logging
 from functools import partial
 from pathlib import Path
 
 import hydra
 import polars as pl
-from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms.extract import CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over
 from MEDS_transforms.mapreduce.utils import shard_iterator_by_shard_map
+
+logger = logging.getLogger(__name__)
 
 
 def merge_subdirs_and_sort(

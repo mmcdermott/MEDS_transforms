@@ -2,15 +2,15 @@
 
 import importlib
 import inspect
-import os
+import logging
 import sys
 from pathlib import Path
 from typing import Any
 
-import hydra
 import polars as pl
-from loguru import logger
 from omegaconf import DictConfig, OmegaConf
+
+logger = logging.getLogger(__name__)
 
 from MEDS_transforms import __package_name__ as package_name
 from MEDS_transforms import __version__ as package_version
@@ -68,8 +68,6 @@ def stage_init(cfg: DictConfig) -> tuple[Path, Path, Path]:
 
     Returns: The data input directory, stage output directory, and metadata input directory.
     """
-    hydra_loguru_init()
-
     logger.info(
         f"Running {current_script_name()} with the following configuration:\n{OmegaConf.to_yaml(cfg)}"
     )
@@ -382,16 +380,6 @@ OmegaConf.register_new_resolver("current_script_name", current_script_name, repl
 OmegaConf.register_new_resolver("populate_stage", populate_stage, replace=False)
 OmegaConf.register_new_resolver("get_package_version", get_package_version, replace=False)
 OmegaConf.register_new_resolver("get_package_name", get_package_name, replace=False)
-
-
-def hydra_loguru_init() -> None:
-    """Adds loguru output to the logs that hydra scrapes.
-
-    Must be called from a hydra main!
-    """
-    hydra_path = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
-    logfile_name = hydra.core.hydra_config.HydraConfig.get().job.name
-    logger.add(os.path.join(hydra_path, f"{logfile_name}.log"))
 
 
 def get_shard_prefix(base_path: Path, fp: Path) -> str:

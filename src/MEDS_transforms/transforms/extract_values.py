@@ -1,16 +1,18 @@
 #!/usr/bin/env python
 """Transformations for extracting numeric and/or categorical values from the MEDS dataset."""
+import logging
 from collections.abc import Callable
 
 import hydra
 import polars as pl
-from loguru import logger
 from meds import subject_id_field
 from omegaconf import DictConfig
 
 from MEDS_transforms import DEPRECATED_NAMES, INFERRED_STAGE_KEYS, MANDATORY_TYPES, PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over
 from MEDS_transforms.parser import cfg_to_expr
+
+logger = logging.getLogger(__name__)
 
 
 def extract_values_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
@@ -128,7 +130,10 @@ def extract_values_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.La
     version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
 )
 def main(cfg: DictConfig):
-    """TODO."""
+    """Extracts values from one field of the data into others. Useful for things like converting to numerics.
+
+    Useful with the match-and-revise formulation. See the stage configs for args and the tests for examples.
+    """
 
     map_over(cfg, compute_fn=extract_values_fntr)
 

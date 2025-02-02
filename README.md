@@ -19,18 +19,18 @@ format in a scalable, parallelizable manner, as well as general configuration ma
 pipelines over MEDS data. In progress functions include more model-specific pre-processing steps for MEDS
 data.
 
-Examples of these capabilities in action can be seen in the `MIMIC-IV_Example` directory,
-which contains a working, end-to-end examples to extract MEDS formatted data from MIMIC-IV v2.2. A working
-example for eICU v2.0 is also present, though needs to be adapted to recent interface improvements. These
-directories also have `README.md` files with more detailed information on how to run the scripts in those
-directories.
+Examples of these capabilities in action can be seen in a few places:
+
+1. The [ETL template repository](https://github.com/mmcdermott/ETL_MEDS_Template) and its realizations, which use MEDS-Transforms extraction code to build MEDS
+    datasets. Concrete examples exist for [MIMIC-IV](https://github.com/mmcdermott/MIMIC_IV_MEDS),
+    [eICU](https://github.com/mmcdermott/eICU_MEDS), [NWICU](https://github.com/rvandewater/NWICU_MEDS), and
+    [AUMCdb](https://github.com/prockenschaub/AUMCdb_MEDS).
+2. For pre-processing data for modeling in [MEDS-torch](https://github.com/Oufattole/meds-torch)
 
 ## Installation
 
 - For a pypi installation, install with `pip install MEDS-transforms`.
 - For a local installation, clone this repository and run `pip install .` from the repository root.
-- For running the MIMIC-IV example, install the optional MIMIC dependencies as well with
-    `pip install MEDS-transforms[examples]`.
 - To support same-machine, process-based parallelism, install the optional joblib dependencies with
     `pip install MEDS-transforms[local_parallelism]`.
 - To support cluster-based parallelism, install the optional submitit dependencies with
@@ -55,8 +55,7 @@ The fundamental design philosophy of this repository can be summarized as follow
     leveraging more workers to process these shards in parallel. This parallelization is seamlessly enabled
     with the configuration schema used in the scripts in this repository. This style of parallelization
     does not require complex packages to manage, complex systems of parallelization support, and can be
-    employed on single machines or across clusters. Through this style of parallelism, the MIMIC-IV ETL
-    included in this repository has been run end to end in under ten minutes with suitable parallelization.
+    employed on single machines or across clusters.
 3. _Simple, Modular, and Testable_: Each stage of the pipelines demonstrated in this repository is designed
     to be simple, modular, and testable. Each operation is a single script that can be run independently of
     the others, and each stage is designed to do a small amount of work and be easily testable in isolation.
@@ -81,9 +80,7 @@ The fundamental design philosophy of this repository can be summarized as follow
     designing pipelines that can be, wherever possible, run identically save for configuration file inputs
     across disparate datasets. Configuration files also can be easier to communicate to local data experts,
     who may not have Python expertise, providing another benefit. This design philosophy is not absolute,
-    however, and local code can and _should_ be used where appropriate -- see the `MIMIC-IV_Example` and
-    `eICU_Example` directories for examples of how and where per-dataset code can be leveraged in concert
-    with the configurable aspects of the standardized MEDS extraction pipeline.
+    however, and local code can and _should_ be used where appropriate.
 
 ## Intended Usage
 

@@ -1,6 +1,7 @@
 """Basic utilities for parallelizable map operations on sharded MEDS datasets with caching and locking."""
 
 import inspect
+import logging
 from collections.abc import Callable, Generator
 from datetime import datetime
 from enum import Enum, StrEnum, auto
@@ -10,13 +11,14 @@ from typing import Any, NotRequired, TypedDict, TypeVar
 
 import hydra
 import polars as pl
-from loguru import logger
 from meds import subject_id_field, subject_splits_filepath
 from omegaconf import DictConfig, ListConfig
 
 from ..parser import is_matcher, matcher_to_expr
 from ..utils import stage_init, write_lazyframe
 from .utils import rwlock_wrap, shard_iterator
+
+logger = logging.getLogger(__name__)
 
 DF_T = TypeVar("DF_T")
 

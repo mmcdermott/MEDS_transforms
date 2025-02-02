@@ -1,14 +1,16 @@
 #!/usr/bin/env python
 """Transformations for adding time-derived measurements (e.g., a subject's age) to a MEDS dataset."""
+import logging
 from collections.abc import Callable
 
 import hydra
 import polars as pl
-from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms import INFERRED_STAGE_KEYS, PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over
+
+logger = logging.getLogger(__name__)
 
 
 def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[[pl.DataFrame], pl.DataFrame]:
