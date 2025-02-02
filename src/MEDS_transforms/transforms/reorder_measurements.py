@@ -1,15 +1,17 @@
 #!/usr/bin/env python
 """A polars-to-polars transformation function for filtering subjects by sequence length."""
+import logging
 from collections.abc import Callable
 
 import hydra
 import polars as pl
-from loguru import logger
 from omegaconf import DictConfig, ListConfig
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over
 from MEDS_transforms.utils import get_smallest_valid_uint_type
+
+logger = logging.getLogger(__name__)
 
 
 def reorder_by_code_fntr(

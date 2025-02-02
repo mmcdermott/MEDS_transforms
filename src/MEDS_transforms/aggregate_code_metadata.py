@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Utilities for grouping and/or reducing MEDS cohort files by code to collect metadata properties."""
 
+import logging
 import time
 from collections.abc import Callable, Sequence
 from datetime import datetime
@@ -11,7 +12,6 @@ from typing import NamedTuple
 import hydra
 import polars as pl
 import polars.selectors as cs
-from loguru import logger
 from meds import subject_id_field
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
@@ -19,6 +19,8 @@ from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over
 from MEDS_transforms.mapreduce.utils import is_complete_parquet_file
 from MEDS_transforms.utils import write_lazyframe
+
+logger = logging.getLogger(__name__)
 
 
 class METADATA_FN(StrEnum):

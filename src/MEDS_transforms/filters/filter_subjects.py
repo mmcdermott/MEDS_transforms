@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 """A polars-to-polars transformation function for filtering subjects by sequence length."""
+import logging
 from collections.abc import Callable
 from functools import partial
 
 import hydra
 import polars as pl
-from loguru import logger
 from omegaconf import DictConfig
+
+logger = logging.getLogger(__name__)
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import map_over

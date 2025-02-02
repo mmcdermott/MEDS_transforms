@@ -13,7 +13,6 @@ from pathlib import Path
 
 import hydra
 import yaml
-from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
 try:
@@ -21,8 +20,11 @@ try:
 except ImportError:  # pragma: no cover
     from yaml import Loader
 
+import logging
+
 from MEDS_transforms import RESERVED_CONFIG_NAMES, RUNNER_CONFIG_YAML
-from MEDS_transforms.utils import hydra_loguru_init
+
+logger = logging.getLogger(__name__)
 
 
 def get_script_from_name(stage_name: str) -> str | None:
@@ -256,7 +258,6 @@ def run_stage(
     command_out = runner_fn(full_cmd, shell=True, capture_output=True)
 
     # https://stackoverflow.com/questions/21953835/run-subprocess-and-print-output-to-logging
-    # https://loguru.readthedocs.io/en/stable/api/logger.html#loguru._logger.Logger.parse
 
     stderr = command_out.stderr.decode()
     stdout = command_out.stdout.decode()
@@ -290,8 +291,6 @@ def main(cfg: DictConfig):
     stages = pipeline_config.get("stages", [])
     if not stages:
         raise ValueError("Pipeline configuration must specify at least one stage.")
-
-    hydra_loguru_init()
 
     log_dir = Path(cfg.log_dir)
 

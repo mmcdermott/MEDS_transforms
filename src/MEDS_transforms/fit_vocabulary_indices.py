@@ -1,16 +1,20 @@
 #!/usr/bin/env python
 """Simple helper functions to define a consistent code vocabulary for normalizing a MEDS dataset."""
+import logging
 from collections.abc import Callable
 from enum import StrEnum
 from pathlib import Path
 
 import hydra
 import polars as pl
-from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.utils import hydra_loguru_init
+
+# This is to ensure that the custom resolvers are added.
+from MEDS_transforms.utils import *  # noqa: F401, F403
+
+logger = logging.getLogger(__name__)
 
 
 class VOCABULARY_ORDERING(StrEnum):
@@ -196,8 +200,6 @@ VOCABULARY_ORDERING_METHODS: dict[VOCABULARY_ORDERING, INDEX_ASSIGNMENT_FN] = {
 )
 def main(cfg: DictConfig):
     """TODO."""
-
-    hydra_loguru_init()
 
     logger.info(
         f"Running with config:\n{OmegaConf.to_yaml(cfg)}\n"

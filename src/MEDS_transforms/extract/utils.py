@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import gzip
+import logging
 import warnings
 from collections.abc import Callable
 from enum import StrEnum
@@ -7,7 +8,8 @@ from pathlib import Path
 from typing import TypeVar
 
 import polars as pl
-from loguru import logger
+
+logger = logging.getLogger(__name__)
 
 
 class SupportedFileFormats(StrEnum):

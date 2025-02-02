@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import copy
 import gzip
+import logging
 import random
 import warnings
 from collections.abc import Sequence
@@ -10,19 +11,14 @@ from pathlib import Path
 
 import hydra
 import polars as pl
-from loguru import logger
 from meds import subject_id_field
 from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms.extract import CONFIG_YAML
 from MEDS_transforms.mapreduce.mapper import rwlock_wrap
-from MEDS_transforms.utils import (
-    get_shard_prefix,
-    hydra_loguru_init,
-    is_col_field,
-    parse_col_field,
-    write_lazyframe,
-)
+from MEDS_transforms.utils import get_shard_prefix, is_col_field, parse_col_field, write_lazyframe
+
+logger = logging.getLogger(__name__)
 
 ROW_IDX_NAME = "__row_idx__"
 META_KEYS = {"time_format", "_metadata"}
@@ -325,7 +321,6 @@ def main(cfg: DictConfig):
         stage_configs.shard_events.infer_schema_length (int): The number of rows to read in to infer the
             schema (only used if the source files are csvs).
     """
-    hydra_loguru_init()
 
     logger.info(
         f"Running with config:\n{OmegaConf.to_yaml(cfg)}\n"

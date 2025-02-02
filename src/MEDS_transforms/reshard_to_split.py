@@ -2,6 +2,7 @@
 """Utilities for re-sharding a MEDS cohort to subsharded splits."""
 
 import json
+import logging
 import time
 from collections import defaultdict
 from functools import partial
@@ -9,7 +10,6 @@ from pathlib import Path
 
 import hydra
 import polars as pl
-from loguru import logger
 from meds import subject_id_field, subject_splits_filepath, time_field
 from omegaconf import DictConfig
 
@@ -17,6 +17,8 @@ from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.extract.split_and_shard_subjects import shard_subjects
 from MEDS_transforms.mapreduce.utils import rwlock_wrap, shard_iterator, shuffle_shards
 from MEDS_transforms.utils import stage_init, write_lazyframe
+
+logger = logging.getLogger(__name__)
 
 
 def valid_json_file(fp: Path) -> bool:

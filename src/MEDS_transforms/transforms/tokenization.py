@@ -9,16 +9,18 @@ as those have been normalized alongside codes into integer indices (in the outpu
 columns of concern here thus are `subject_id`, `time`, `code`, `numeric_value`.
 """
 
+import logging
 from pathlib import Path
 
 import hydra
 import polars as pl
-from loguru import logger
 from omegaconf import DictConfig, OmegaConf
+
+logger = logging.getLogger(__name__)
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce.utils import rwlock_wrap, shard_iterator
-from MEDS_transforms.utils import hydra_loguru_init, write_lazyframe
+from MEDS_transforms.utils import write_lazyframe
 
 SECONDS_PER_MINUTE = 60.0
 SECONDS_PER_HOUR = SECONDS_PER_MINUTE * 60.0
@@ -251,8 +253,6 @@ def extract_seq_of_subject_events(df: pl.LazyFrame) -> pl.LazyFrame:
 )
 def main(cfg: DictConfig):
     """TODO."""
-
-    hydra_loguru_init()
 
     logger.info(
         f"Running with config:\n{OmegaConf.to_yaml(cfg)}\n"

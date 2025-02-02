@@ -2,6 +2,7 @@
 """Utilities for finalizing the metadata files for extracted MEDS datasets."""
 
 import json
+import logging
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -11,7 +12,6 @@ import jsonschema
 import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
-from loguru import logger
 from meds import __version__ as MEDS_VERSION
 from meds import (
     code_metadata_filepath,
@@ -26,6 +26,8 @@ from omegaconf import DictConfig
 
 from MEDS_transforms.extract import CONFIG_YAML, MEDS_METADATA_MANDATORY_TYPES
 from MEDS_transforms.utils import stage_init
+
+logger = logging.getLogger(__name__)
 
 
 def get_and_validate_code_metadata_schema(code_metadata: pl.DataFrame, do_retype: bool = True) -> pa.Table:
