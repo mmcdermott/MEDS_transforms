@@ -24,6 +24,9 @@ import logging
 
 from MEDS_transforms import RESERVED_CONFIG_NAMES, RUNNER_CONFIG_YAML
 
+# This is to ensure that the custom resolvers are added.
+from MEDS_transforms.utils import *  # noqa: F401, F403
+
 logger = logging.getLogger(__name__)
 
 
