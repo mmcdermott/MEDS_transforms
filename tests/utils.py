@@ -310,7 +310,7 @@ def input_dataset(input_files: dict[str, FILE_T] | None = None):
             match data:
                 case pl.DataFrame() if fp.suffix == "":
                     data.write_parquet(fp.with_suffix(".parquet"), use_pyarrow=True)
-                case pl.DataFrame() if fp.suffix == ".parquet":
+                case pl.DataFrame() if fp.suffix in {".parquet", ".par"}:
                     data.write_parquet(fp, use_pyarrow=True)
                 case pl.DataFrame() if fp.suffix == ".csv":
                     data.write_csv(fp)
