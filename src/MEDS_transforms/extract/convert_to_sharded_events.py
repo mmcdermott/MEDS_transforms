@@ -389,6 +389,56 @@ def extract_event(
         │ 3          ┆ ADMISSION//F ┆ 2021-01-06 00:00:00 ┆ 6.0               │
         └────────────┴──────────────┴─────────────────────┴───────────────────┘
 
+        Column types:
+        >>> raw_data_with_types = pl.DataFrame({
+        ...     "subject_id": [1, 1, 2, 2],
+        ...     "code": ["A", "B", "C", "D"],
+        ...     "time": ["2021-01-01", "2021-01-02", "2021-01-03", "2021-01-04"],
+        ...     "boolean": [True, False, True, False],
+        ... })
+        >>> event_cfg_bool = {
+        ...     "code": "col(code)",
+        ...     "time": "col(time)",
+        ...     "time_format": "%Y-%m-%d",
+        ...     "boolean_value": "boolean",
+        ... }
+        >>> extract_event(raw_data_with_types, event_cfg_bool)
+        shape: (4, 4)
+        ┌────────────┬──────┬─────────────────────┬───────────────┐
+        │ subject_id ┆ code ┆ time                ┆ boolean_value │
+        │ ---        ┆ ---  ┆ ---                 ┆ ---           │
+        │ i64        ┆ str  ┆ datetime[μs]        ┆ bool          │
+        ╞════════════╪══════╪═════════════════════╪═══════════════╡
+        │ 1          ┆ A    ┆ 2021-01-01 00:00:00 ┆ true          │
+        │ 1          ┆ B    ┆ 2021-01-02 00:00:00 ┆ false         │
+        │ 2          ┆ C    ┆ 2021-01-03 00:00:00 ┆ true          │
+        │ 2          ┆ D    ┆ 2021-01-04 00:00:00 ┆ false         │
+        └────────────┴──────┴─────────────────────┴───────────────┘
+        >>> raw_data_with_types = pl.DataFrame({
+        ...     "subject_id": [1, 1, 2, 2],
+        ...     "code": ["A", "B", "C", "D"],
+        ...     "time": ["2021-01-01", "2021-01-02", "2021-01-03", "2021-01-04"],
+        ...     "boolean": [1, 0, 2, 0],
+        ... })
+        >>> event_cfg_bool = {
+        ...     "code": "col(code)",
+        ...     "time": "col(time)",
+        ...     "time_format": "%Y-%m-%d",
+        ...     "boolean_value": "boolean",
+        ... }
+        >>> extract_event(raw_data_with_types, event_cfg_bool)
+        shape: (4, 4)
+        ┌────────────┬──────┬─────────────────────┬───────────────┐
+        │ subject_id ┆ code ┆ time                ┆ boolean_value │
+        │ ---        ┆ ---  ┆ ---                 ┆ ---           │
+        │ i64        ┆ str  ┆ datetime[μs]        ┆ bool          │
+        ╞════════════╪══════╪═════════════════════╪═══════════════╡
+        │ 1          ┆ A    ┆ 2021-01-01 00:00:00 ┆ true          │
+        │ 1          ┆ B    ┆ 2021-01-02 00:00:00 ┆ false         │
+        │ 2          ┆ C    ┆ 2021-01-03 00:00:00 ┆ true          │
+        │ 2          ┆ D    ┆ 2021-01-04 00:00:00 ┆ false         │
+        └────────────┴──────┴─────────────────────┴───────────────┘
+
         More examples:
         >>> extract_event(complex_raw_data, valid_death_event_cfg)
         shape: (3, 3)
@@ -440,7 +490,7 @@ def extract_event(
         >>> extract_event(complex_raw_data, {"code": "test", "time": None, "foobar": "discharge_time"})
         Traceback (most recent call last):
             ...
-        ValueError: Source column 'discharge_time' for event column foobar is not numeric, string, or categorical! Cannot be used as an event col.
+        ValueError: Source column 'discharge_time' for event column foobar is not numeric, string, bool, or categorical! Cannot be used as an event col.
         >>> extract_event(complex_raw_data, {"code": "col(NOT_PRESENT)", "time": None})
         Traceback (most recent call last):
             ...
@@ -517,6 +567,7 @@ def extract_event(
         is_numeric = df.schema[v].is_numeric()
         is_str = df.schema[v] == pl.Utf8
         is_cat = isinstance(df.schema[v], pl.Categorical)
+        is_bool = df.schema[v] == pl.Boolean
         match k:
             case "numeric_value" if is_numeric:
                 pass
@@ -532,11 +583,14 @@ def extract_event(
             case "categorical_value" if not is_str:
                 logger.warning(f"Converting categorical_value to string for {code_expr}")
                 col = col.cast(pl.Utf8)
+            case "boolean_value" if not is_bool:
+                logger.warning(f"Converting boolean_value to boolean for {code_expr}")
+                col = col.cast(pl.Boolean)
             case _ if is_str:
                 pass
-            case _ if not (is_numeric or is_str or is_cat):
+            case _ if not (is_numeric or is_str or is_cat or is_bool):
                 raise ValueError(
-                    f"Source column '{v}' for event column {k} is not numeric, string, or categorical! "
+                    f"Source column '{v}' for event column {k} is not numeric, string, bool, or categorical! "
                     "Cannot be used as an event col."
                 )
 
