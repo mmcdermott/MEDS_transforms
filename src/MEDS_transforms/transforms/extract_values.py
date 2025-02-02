@@ -130,7 +130,10 @@ def extract_values_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.La
     version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
 )
 def main(cfg: DictConfig):
-    """TODO."""
+    """Extracts values from one field of the data into others. Useful for things like converting to numerics.
+
+    Useful with the match-and-revise formulation. See the stage configs for args and the tests for examples.
+    """
 
     map_over(cfg, compute_fn=extract_values_fntr)
 

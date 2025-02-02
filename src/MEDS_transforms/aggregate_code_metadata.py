@@ -789,7 +789,7 @@ def run_map_reduce(cfg: DictConfig):
     version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
 )
 def main(cfg: DictConfig):
-    """Computes code metadata.
+    """Aggregates code metadata across shards.
 
     Note that the output of this stage includes a `null` code row if
     `stage_configs.STAGE_NAME.do_summarize_over_all_codes` is True. This row contains the total counts across

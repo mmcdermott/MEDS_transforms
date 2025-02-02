@@ -116,7 +116,10 @@ def convert_to_NRT(df: pl.LazyFrame) -> JointNestedRaggedTensorDict:
     version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
 )
 def main(cfg: DictConfig):
-    """TODO."""
+    """Tensorizes the data into the nested ragged tensor formulation.
+
+    See the stage configs for args.
+    """
 
     map_over(
         cfg,
