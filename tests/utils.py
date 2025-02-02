@@ -350,11 +350,13 @@ def check_outputs(
         output_fp = cohort_dir / output_name
 
         files_found = [str(fp.relative_to(cohort_dir)) for fp in cohort_dir.glob("**/*{file_suffix}")]
+        all_files_found = [str(fp.relative_to(cohort_dir)) for fp in cohort_dir.rglob("*")]
 
         if not output_fp.is_file():
             raise AssertionError(
                 f"Wanted {output_fp.relative_to(cohort_dir)} to exist. "
-                f"{len(files_found)} {file_suffix} files found: {', '.join(files_found)}"
+                f"{len(files_found)} {file_suffix} files found with suffix: {', '.join(files_found)}. "
+                f"{len(all_files_found)} generic files found: {', '.join(all_files_found)}."
             )
 
         msg = f"Expected {output_fp.relative_to(cohort_dir)} to be equal to the target"
