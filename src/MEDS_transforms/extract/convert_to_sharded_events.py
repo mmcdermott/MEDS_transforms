@@ -389,6 +389,56 @@ def extract_event(
         │ 3          ┆ ADMISSION//F ┆ 2021-01-06 00:00:00 ┆ 6.0               │
         └────────────┴──────────────┴─────────────────────┴───────────────────┘
 
+        Column types:
+        >>> raw_data_with_types = pl.DataFrame({
+        ...     "subject_id": [1, 1, 2, 2],
+        ...     "code": ["A", "B", "C", "D"],
+        ...     "time": ["2021-01-01", "2021-01-02", "2021-01-03", "2021-01-04"],
+        ...     "boolean": [True, False, True, False],
+        ... })
+        >>> event_cfg_bool = {
+        ...     "code": "col(code)",
+        ...     "time": "col(time)",
+        ...     "time_format": "%Y-%m-%d",
+        ...     "boolean_value": "boolean",
+        ... }
+        >>> extract_event(raw_data_with_types, event_cfg_bool)
+        shape: (4, 4)
+        ┌────────────┬──────┬─────────────────────┬───────────────┐
+        │ subject_id ┆ code ┆ time                ┆ boolean_value │
+        │ ---        ┆ ---  ┆ ---                 ┆ ---           │
+        │ i64        ┆ str  ┆ datetime[μs]        ┆ bool          │
+        ╞════════════╪══════╪═════════════════════╪═══════════════╡
+        │ 1          ┆ A    ┆ 2021-01-01 00:00:00 ┆ True          │
+        │ 1          ┆ B    ┆ 2021-01-02 00:00:00 ┆ False         │
+        │ 2          ┆ C    ┆ 2021-01-03 00:00:00 ┆ True          │
+        │ 2          ┆ D    ┆ 2021-01-04 00:00:00 ┆ False         │
+        └────────────┴──────┴─────────────────────┴───────────────┘
+        >>> raw_data_with_types = pl.DataFrame({
+        ...     "subject_id": [1, 1, 2, 2],
+        ...     "code": ["A", "B", "C", "D"],
+        ...     "time": ["2021-01-01", "2021-01-02", "2021-01-03", "2021-01-04"],
+        ...     "boolean": [1, 0, 2, 0],
+        ... })
+        >>> event_cfg_bool = {
+        ...     "code": "col(code)",
+        ...     "time": "col(time)",
+        ...     "time_format": "%Y-%m-%d",
+        ...     "boolean_value": "boolean",
+        ... }
+        >>> extract_event(raw_data_with_types, event_cfg_bool)
+        shape: (4, 4)
+        ┌────────────┬──────┬─────────────────────┬───────────────┐
+        │ subject_id ┆ code ┆ time                ┆ boolean_value │
+        │ ---        ┆ ---  ┆ ---                 ┆ ---           │
+        │ i64        ┆ str  ┆ datetime[μs]        ┆ bool          │
+        ╞════════════╪══════╪═════════════════════╪═══════════════╡
+        │ 1          ┆ A    ┆ 2021-01-01 00:00:00 ┆ True          │
+        │ 1          ┆ B    ┆ 2021-01-02 00:00:00 ┆ False         │
+        │ 2          ┆ C    ┆ 2021-01-03 00:00:00 ┆ True          │
+        │ 2          ┆ D    ┆ 2021-01-04 00:00:00 ┆ False         │
+        └────────────┴──────┴─────────────────────┴───────────────┘
+
         More examples:
         >>> extract_event(complex_raw_data, valid_death_event_cfg)
         shape: (3, 3)
