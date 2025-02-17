@@ -442,6 +442,22 @@ def extract_event(
         └────────────┴──────┴─────────────────────┴───────────────┘
 
         More examples:
+        >>> extract_event(
+        ...     raw_data_with_types.with_columns(time=in_format("%Y-%m-%d", "time")), event_cfg_bool
+        ... )
+        shape: (4, 4)
+        ┌────────────┬──────┬─────────────────────┬───────────────┐
+        │ subject_id ┆ code ┆ time                ┆ boolean_value │
+        │ ---        ┆ ---  ┆ ---                 ┆ ---           │
+        │ i64        ┆ str  ┆ datetime[μs]        ┆ bool          │
+        ╞════════════╪══════╪═════════════════════╪═══════════════╡
+        │ 1          ┆ A    ┆ 2021-01-01 00:00:00 ┆ true          │
+        │ 1          ┆ B    ┆ 2021-01-02 00:00:00 ┆ false         │
+        │ 2          ┆ C    ┆ 2021-01-03 00:00:00 ┆ true          │
+        │ 2          ┆ D    ┆ 2021-01-04 00:00:00 ┆ false         │
+        └────────────┴──────┴─────────────────────┴───────────────┘
+
+        More examples:
         >>> extract_event(complex_raw_data, valid_death_event_cfg)
         shape: (3, 3)
         ┌────────────┬───────┬─────────────────────┐
@@ -532,7 +548,14 @@ def extract_event(
     match ts:
         case str() if is_col_field(ts):
             ts_name = parse_col_field(ts)
-            if isinstance(ts_format, (ListConfig, list)):
+            if df.schema[ts_name] == pl.Datetime:
+                logger.info(f"{ts_name} should already be of Datetime type")
+                if ts_format is not None:
+                    logging.warning(
+                        f"Time format {ts_format} ignored for {ts_name} as it is already Datetime"
+                    )
+                event_exprs["time"] = pl.col(ts_name)
+            elif isinstance(ts_format, (ListConfig, list)):
                 logger.info(f"Adding time column {ts_name} in possible formats {', '.join(ts_format)}")
                 assert len(ts_format) > 0, "Time format list is empty"
                 event_exprs["time"] = pl.coalesce(*(in_format(fmt, ts_name) for fmt in ts_format))
