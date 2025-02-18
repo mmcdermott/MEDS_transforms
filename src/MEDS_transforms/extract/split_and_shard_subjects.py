@@ -59,6 +59,12 @@ def shard_subjects(
         >>> subjects = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], dtype=int)
         >>> shard_subjects(subjects, n_subjects_per_shard=3)
         {'train/0': [9, 4, 8], 'train/1': [2, 1, 10], 'train/2': [6, 5], 'tuning/0': [3], 'held_out/0': [7]}
+        >>> shard_subjects(subjects, 3, split_fracs_dict={'train': 0.8, 'tuning': 0.2, 'held_out': None})
+        {'train/0': [5, 9, 6], 'train/1': [3, 10, 8], 'train/2': [1, 2], 'tuning/0': [7, 4]}
+        >>> shard_subjects(subjects, 3, split_fracs_dict={'train': 0.8, 'held_out': None})
+        Traceback (most recent call last):
+            ...
+        ValueError: The sum of the split fractions must be equal to 1. Got 0.8 through {'train': 0.8}.
         >>> external_splits = {
         ...     'taskA/held_out': np.array([8, 9, 10], dtype=int),
         ...     'taskB/held_out': np.array([10, 8, 9], dtype=int),
@@ -107,6 +113,14 @@ def shard_subjects(
     subject_ids_to_split = subjects[~is_in_external_split]
 
     splits = external_splits
+
+    if split_fracs_dict is not None and None in split_fracs_dict.values():
+        filtered_split_fracs_dict = {k: v for k, v in split_fracs_dict.items() if v is not None}
+        logger.info(
+            "Ignoring splits with null fraction: "
+            + ", ".join(set(split_fracs_dict).difference(filtered_split_fracs_dict))
+        )
+        split_fracs_dict = filtered_split_fracs_dict
 
     splits_cover = sum(split_fracs_dict.values()) if split_fracs_dict else 0
 
