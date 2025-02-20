@@ -17,7 +17,8 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-  "polars~=1.14", "pyarrow", "nested_ragged_tensors>=0.0.8", "hydra-core", "numpy", "meds==0.3.3", "filelock",
+  "polars~=1.14", "pyarrow", "nested_ragged_tensors>=0.0.8", "hydra-core", "numpy", "meds==0.3.3",
+  "portalocker",
 ]
 
 [tool.setuptools_scm]

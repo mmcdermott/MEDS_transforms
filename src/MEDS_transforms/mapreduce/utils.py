@@ -8,8 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import TypeVar
 
+import portalocker
 import pyarrow.parquet as pq
-from filelock import FileLock, Timeout
 from omegaconf import DictConfig
 
 logger = logging.getLogger(__name__)
@@ -139,26 +139,25 @@ def rwlock_wrap(
             logger.info(f"{out_fp} exists; returning.")
             return False
 
-    lock_fp = str(out_fp) + ".lock"
-    lock = FileLock(lock_fp)
     try:
-        lock.acquire(timeout=0)
-    except Timeout:
-        logger.info(f"Lock found at {lock_fp}. Returning.")
+        out_fp.parent.mkdir(exist_ok=True, parents=True)
+        write_mode = "wb" if out_fp.suffix in {".parquet", ".par"} else "w"
+        with portalocker.Lock(out_fp, write_mode, timeout=0) as out_fh:
+            st_time = datetime.now()
+            logger.info(f"Reading input dataframe from {in_fp}")
+            df = read_fn(in_fp)
+            logger.info("Read dataset")
+            df = compute_fn(df)
+            logger.info(f"Writing final output to {out_fp}")
+            write_fn(df, out_fh)
+            logger.info(f"Succeeded in {datetime.now() - st_time}")
+            return True
+    except portalocker.exceptions.LockException:
+        logger.info(f"{out_fp} is already being worked on by another process. Aborting computation.")
         return False
-
-    try:
-        st_time = datetime.now()
-        logger.info(f"Reading input dataframe from {in_fp}")
-        df = read_fn(in_fp)
-        logger.info("Read dataset")
-        df = compute_fn(df)
-        logger.info(f"Writing final output to {out_fp}")
-        write_fn(df, out_fp)
-        logger.info(f"Succeeded in {datetime.now() - st_time}")
-        return True
-    finally:
-        lock.release()
+    except Exception as e:
+        out_fp.unlink()
+        raise e
 
 
 def shuffle_shards(shards: list[str], cfg: DictConfig) -> list[str]:
