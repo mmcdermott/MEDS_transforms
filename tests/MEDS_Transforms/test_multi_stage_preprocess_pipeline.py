@@ -11,17 +11,12 @@ In this test, the following stages are run:
   - fit_normalization
   - fit_vocabulary_indices
   - normalization
-  - tokenization
-  - tensorization
 
 The stage configuration arguments will be as given in the yaml block below:
 """
 
-from datetime import datetime
-
 import polars as pl
 from meds import subject_id_field
-from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 
 from tests.MEDS_Transforms import (
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT,
@@ -30,8 +25,6 @@ from tests.MEDS_Transforms import (
     FIT_VOCABULARY_INDICES_SCRIPT,
     NORMALIZATION_SCRIPT,
     OCCLUDE_OUTLIERS_SCRIPT,
-    TENSORIZATION_SCRIPT,
-    TOKENIZATION_SCRIPT,
 )
 from tests.MEDS_Transforms.transform_tester_base import multi_stage_transform_tester, parse_shards_yaml
 
@@ -773,7 +766,7 @@ held_out/0
 # Note we have dropped the row in the held out shard that doesn't have a code in the vocabulary!
 WANT_NORMALIZATION = parse_shards_yaml(
     f"""
-"normalization/train/0": |-2
+"data/train/0": |-2
   {subject_id_field},time,code,numeric_value
   239684,,6,
   239684,,7,
@@ -832,13 +825,13 @@ WANT_NORMALIZATION = parse_shards_yaml(
   1195293,"06/20/2010, 20:50:04",2,nan
   1195293,"06/20/2010, 20:50:04",3,
 
-"normalization/train/1": |-2
+"data/train/1": |-2
   {subject_id_field},time,code,numeric_value
 
-"normalization/tuning/0": |-2
+"data/tuning/0": |-2
   {subject_id_field},time,code,numeric_value
 
-"normalization/held_out/0": |-2
+"data/held_out/0": |-2
   {subject_id_field},time,code,numeric_value
   1500733,,6,
   1500733,,7,
@@ -863,187 +856,6 @@ WANT_NORMALIZATION = parse_shards_yaml(
     code=pl.UInt8,
 )
 
-TOKENIZATION_SCHEMA_DF_SCHEMA = {
-    subject_id_field: pl.Int64,
-    "code": pl.List(pl.UInt8),
-    "numeric_value": pl.List(pl.Float32),
-    "start_time": pl.Datetime("us"),
-    "time": pl.List(pl.Datetime("us")),
-}
-WANT_TOKENIZATION_SCHEMAS = {
-    "tokenization/schemas/train/0": pl.DataFrame(
-        {
-            subject_id_field: [239684, 1195293],
-            "code": [[6, 7], [5, 7]],
-            "numeric_value": [[None, None], [None, None]],
-            "start_time": [datetime(1980, 12, 28), datetime(1978, 6, 20)],
-            "time": [
-                [
-                    datetime(1980, 12, 28, 0, 0, 0),
-                    datetime(2010, 5, 11, 17, 41, 51),
-                    datetime(2010, 5, 11, 17, 48, 48),
-                    datetime(2010, 5, 11, 18, 25, 35),
-                    datetime(2010, 5, 11, 18, 57, 18),
-                    datetime(2010, 5, 11, 19, 27, 19),
-                ],
-                [
-                    datetime(1978, 6, 20, 0, 0, 0),
-                    datetime(2010, 6, 20, 19, 23, 52),
-                    datetime(2010, 6, 20, 19, 25, 32),
-                    datetime(2010, 6, 20, 19, 45, 19),
-                    datetime(2010, 6, 20, 20, 12, 31),
-                    datetime(2010, 6, 20, 20, 24, 44),
-                    datetime(2010, 6, 20, 20, 41, 33),
-                    datetime(2010, 6, 20, 20, 50, 4),
-                ],
-            ],
-        },
-        schema=TOKENIZATION_SCHEMA_DF_SCHEMA,
-    ),
-    "tokenization/schemas/train/1": pl.DataFrame(
-        {k: [] for k in [subject_id_field, "code", "numeric_value", "start_time", "time"]},
-        schema=TOKENIZATION_SCHEMA_DF_SCHEMA,
-    ),
-    "tokenization/schemas/tuning/0": pl.DataFrame(
-        {k: [] for k in [subject_id_field, "code", "numeric_value", "start_time", "time"]},
-        schema=TOKENIZATION_SCHEMA_DF_SCHEMA,
-    ),
-    "tokenization/schemas/held_out/0": pl.DataFrame(
-        {
-            subject_id_field: [1500733],
-            "code": [[6, 7]],
-            "numeric_value": [[None, None]],
-            "start_time": [datetime(1986, 7, 20)],
-            "time": [
-                [
-                    datetime(1986, 7, 20, 0, 0, 0),
-                    datetime(2010, 6, 3, 14, 54, 38),
-                    datetime(2010, 6, 3, 15, 39, 49),
-                    datetime(2010, 6, 3, 16, 20, 49),
-                    datetime(2010, 6, 3, 16, 44, 26),
-                ]
-            ],
-        },
-        schema=TOKENIZATION_SCHEMA_DF_SCHEMA,
-    ),
-}
-
-
-TOKENIZATION_EVENT_SEQS_DF_SCHEMA = {
-    subject_id_field: pl.Int64,
-    "code": pl.List(pl.List(pl.UInt8)),
-    "numeric_value": pl.List(pl.List(pl.Float32)),
-    "time_delta_days": pl.List(pl.Float32),
-}
-
-WANT_TOKENIZATION_EVENT_SEQS = {
-    "tokenization/event_seqs/train/0": pl.DataFrame(
-        {
-            subject_id_field: [239684, 1195293],
-            "code": [
-                [[10, 4], [11, 2, 1, 8, 9], [11, 2, 8, 9], [12, 2, 8, 9], [12, 2, 8, 9], [12, 2, 3]],
-                [
-                    [10, 4],
-                    [12, 2, 1, 8, 9],
-                    [12, 2, 8, 9],
-                    [12, 2, 8, 9],
-                    [12, 2, 8, 9],
-                    [12, 2, 8, 9],
-                    [12, 2, 8, 9],
-                    [12, 2, 3],
-                ],
-            ],
-            "numeric_value": [
-                [
-                    [float("nan"), float("nan")],
-                    [float("nan"), float("nan"), float("nan"), float("nan"), float("nan")],
-                    [float("nan"), float("nan"), float("nan"), float("nan")],
-                    [float("nan"), float("nan"), 0.9341503977775574, float("nan")],
-                    [float("nan"), float("nan"), 0.6264293789863586, float("nan")],
-                    [float("nan"), float("nan"), float("nan")],
-                ],
-                [
-                    [float("nan"), float("nan")],
-                    [float("nan"), float("nan"), float("nan"), -0.7583094239234924, -0.0889078751206398],
-                    [float("nan"), float("nan"), 1.2034040689468384, -0.0889078751206398],
-                    [float("nan"), float("nan"), float("nan"), -0.6222330927848816],
-                    [float("nan"), float("nan"), 0.5879650115966797, -1.1555582284927368],
-                    [float("nan"), float("nan"), -1.2583553791046143, -0.0889078751206398],
-                    [float("nan"), float("nan"), -1.3352841138839722, 2.04443359375],
-                    [float("nan"), float("nan"), float("nan")],
-                ],
-            ],
-            "time_delta_days": (
-                WANT_TOKENIZATION_SCHEMAS["tokenization/schemas/train/0"]
-                .select(
-                    pl.col("time")
-                    .list.diff()
-                    .list.eval((pl.element().dt.total_seconds() / 86400).fill_null(float("nan")))
-                )["time"]
-                .to_list()
-            ),
-        },
-        schema=TOKENIZATION_EVENT_SEQS_DF_SCHEMA,
-    ),
-    "tokenization/event_seqs/train/1": pl.DataFrame(
-        {k: [] for k in [subject_id_field, "code", "numeric_value", "time_delta_days"]},
-        schema=TOKENIZATION_EVENT_SEQS_DF_SCHEMA,
-    ),
-    "tokenization/event_seqs/tuning/0": pl.DataFrame(
-        {k: [] for k in [subject_id_field, "code", "numeric_value", "time_delta_days"]},
-        schema=TOKENIZATION_EVENT_SEQS_DF_SCHEMA,
-    ),
-    "tokenization/event_seqs/held_out/0": pl.DataFrame(
-        {
-            subject_id_field: [1500733],
-            "code": [
-                [
-                    [10, 4],
-                    [11, 2, 8, 9],
-                    [11, 2, 8, 9],
-                    [11, 2, 8, 9],
-                    [11, 2, 3],
-                ]
-            ],
-            "numeric_value": [
-                [
-                    [float("nan"), float("nan")],
-                    [float("nan"), float("nan"), float("nan"), -0.0889078751206398],
-                    [float("nan"), float("nan"), float("nan"), 1.5111083984375],
-                    [float("nan"), float("nan"), float("nan"), 0.4444173276424408],
-                    [float("nan"), float("nan"), float("nan")],
-                ]
-            ],
-            "time_delta_days": (
-                WANT_TOKENIZATION_SCHEMAS["tokenization/schemas/held_out/0"]
-                .select(
-                    pl.col("time")
-                    .list.diff()
-                    .list.eval((pl.element().dt.total_seconds() / 86400).fill_null(float("nan")))
-                )["time"]
-                .to_list()
-            ),
-        },
-        schema=TOKENIZATION_EVENT_SEQS_DF_SCHEMA,
-    ),
-}
-
-
-WANT_NRTs = {
-    "data/train/0.nrt": JointNestedRaggedTensorDict(
-        WANT_TOKENIZATION_EVENT_SEQS["tokenization/event_seqs/train/0"]
-        .select("time_delta_days", "code", "numeric_value")
-        .to_dict(as_series=False)
-    ),
-    "data/train/1.nrt": JointNestedRaggedTensorDict({}),  # this shard was fully filtered out.
-    "data/tuning/0.nrt": JointNestedRaggedTensorDict({}),  # this shard was fully filtered out.
-    "data/held_out/0.nrt": JointNestedRaggedTensorDict(
-        WANT_TOKENIZATION_EVENT_SEQS["tokenization/event_seqs/held_out/0"]
-        .select("time_delta_days", "code", "numeric_value")
-        .to_dict(as_series=False)
-    ),
-}
-
 
 def test_pipeline():
     multi_stage_transform_tester(
@@ -1055,8 +867,6 @@ def test_pipeline():
             AGGREGATE_CODE_METADATA_SCRIPT,
             FIT_VOCABULARY_INDICES_SCRIPT,
             NORMALIZATION_SCRIPT,
-            TOKENIZATION_SCRIPT,
-            TENSORIZATION_SCRIPT,
         ],
         stage_names=[
             "filter_subjects",
@@ -1066,8 +876,6 @@ def test_pipeline():
             "fit_normalization",
             "fit_vocabulary_indices",
             "normalization",
-            "tokenization",
-            "tensorization",
         ],
         stage_configs=STAGE_CONFIG_YAML,
         want_metadata={
@@ -1080,9 +888,6 @@ def test_pipeline():
             **WANT_TIME_DERIVED,
             **WANT_OCCLUDE_OUTLIERS,
             **WANT_NORMALIZATION,
-            **WANT_TOKENIZATION_SCHEMAS,
-            **WANT_TOKENIZATION_EVENT_SEQS,
-            **WANT_NRTs,
         },
         input_code_metadata=MEDS_CODE_METADATA,
     )
