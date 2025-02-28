@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
+from meds import parent_codes_field, time_field
 from omegaconf import OmegaConf
 from polars.testing import assert_frame_equal
 from yaml import load as load_yaml
@@ -49,9 +50,17 @@ def parse_meds_csvs(
     def reader(csv_str: str) -> pl.DataFrame:
         cols = csv_str.strip().split("\n")[0].split(",")
         read_schema = {k: v for k, v in default_read_schema.items() if k in cols}
-        return pl.read_csv(StringIO(csv_str), schema=read_schema).with_columns(
-            pl.col("time").str.strptime(MEDS_PL_SCHEMA["time"], DEFAULT_CSV_TS_FORMAT)
-        )
+
+        df = pl.read_csv(StringIO(csv_str), schema=read_schema)
+
+        if time_field in cols:
+            df = df.with_columns(
+                pl.col(time_field).str.strptime(MEDS_PL_SCHEMA[time_field], DEFAULT_CSV_TS_FORMAT)
+            )
+        if parent_codes_field in cols:
+            df = df.with_columns(pl.col(parent_codes_field).str.split(", "))
+
+        return df.select(cols)
 
     if isinstance(csvs, str):
         return reader(csvs)
