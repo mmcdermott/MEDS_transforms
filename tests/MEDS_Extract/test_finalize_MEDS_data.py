@@ -7,7 +7,7 @@ scripts.
 import polars as pl
 
 from tests.MEDS_Extract import FINALIZE_DATA_SCRIPT
-from tests.utils import parse_shards_yaml, single_stage_tester
+from tests.utils import MEDS_transforms_pipeline_tester, parse_shards_yaml
 
 INPUT_SHARDS = parse_shards_yaml(
     """
@@ -100,7 +100,7 @@ WANT_OUTPUTS = {
 
 
 def test_convert_to_sharded_events():
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=FINALIZE_DATA_SCRIPT,
         stage_name="finalize_MEDS_data",
         stage_kwargs=None,

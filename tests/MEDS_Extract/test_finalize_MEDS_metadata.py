@@ -12,7 +12,7 @@ from meds import code_metadata_filepath, dataset_metadata_filepath, subject_spli
 
 from MEDS_transforms.utils import get_package_version as get_meds_transform_version
 from tests.MEDS_Extract import FINALIZE_METADATA_SCRIPT
-from tests.utils import single_stage_tester
+from tests.utils import MEDS_transforms_pipeline_tester
 
 SHARDS_JSON = {
     "train/0": [239684, 1195293],
@@ -90,7 +90,7 @@ WANT_OUTPUTS = {
 
 
 def test_convert_to_sharded_events():
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=FINALIZE_METADATA_SCRIPT,
         stage_name="finalize_MEDS_metadata",
         stage_kwargs=None,

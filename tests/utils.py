@@ -248,36 +248,41 @@ def add_params(templ_str: str, **kwargs):
 
 
 @contextmanager
-def input_dataset(input_files: dict[str, FILE_T] | None = None):
+def input_dataset(input_dir: Path | None = None, input_files: dict[str, FILE_T] | None = None):
     with tempfile.TemporaryDirectory() as d:
-        input_dir = Path(d) / "input_cohort"
         cohort_dir = Path(d) / "output_cohort"
 
-        for filename, data in input_files.items():
-            fp = input_dir / filename
-            fp.parent.mkdir(parents=True, exist_ok=True)
+        if input_dir is not None:
+            assert not input_files
+        else:
+            input_dir = Path(d) / "input_cohort"
+            for filename, data in input_files.items():
+                fp = input_dir / filename
+                fp.parent.mkdir(parents=True, exist_ok=True)
 
-            match data:
-                case pl.DataFrame() if fp.suffix == "":
-                    data.write_parquet(fp.with_suffix(".parquet"), use_pyarrow=True)
-                case pl.DataFrame() if fp.suffix in {".parquet", ".par"}:
-                    data.write_parquet(fp, use_pyarrow=True)
-                case pl.DataFrame() if fp.suffix == ".csv":
-                    data.write_csv(fp)
-                case dict() if fp.suffix == "":
-                    fp.with_suffix(".json").write_text(json.dumps(data))
-                case dict() if fp.suffix.endswith(".json"):
-                    fp.write_text(json.dumps(data))
-                case str():
-                    fp.write_text(data.strip())
-                case _ if callable(data):
-                    data_str = data(
-                        input_dir=str(input_dir.resolve()),
-                        cohort_dir=str(cohort_dir.resolve()),
-                    )
-                    fp.write_text(data_str)
-                case _:
-                    raise ValueError(f"Unknown data type {type(data)} for file {fp.relative_to(input_dir)}")
+                match data:
+                    case pl.DataFrame() if fp.suffix == "":
+                        data.write_parquet(fp.with_suffix(".parquet"), use_pyarrow=True)
+                    case pl.DataFrame() if fp.suffix in {".parquet", ".par"}:
+                        data.write_parquet(fp, use_pyarrow=True)
+                    case pl.DataFrame() if fp.suffix == ".csv":
+                        data.write_csv(fp)
+                    case dict() if fp.suffix == "":
+                        fp.with_suffix(".json").write_text(json.dumps(data))
+                    case dict() if fp.suffix.endswith(".json"):
+                        fp.write_text(json.dumps(data))
+                    case str():
+                        fp.write_text(data.strip())
+                    case _ if callable(data):
+                        data_str = data(
+                            input_dir=str(input_dir.resolve()),
+                            cohort_dir=str(cohort_dir.resolve()),
+                        )
+                        fp.write_text(data_str)
+                    case _:
+                        raise ValueError(
+                            f"Unknown data type {type(data)} for file {fp.relative_to(input_dir)}"
+                        )
 
         yield input_dir, cohort_dir
 
@@ -331,7 +336,7 @@ def check_outputs(
         )
 
 
-def single_stage_tester(
+def MEDS_transforms_pipeline_tester(
     script: str | Path,
     stage_name: str | None,
     stage_kwargs: dict[str, str] | None,
@@ -342,6 +347,7 @@ def single_stage_tester(
     should_error: bool = False,
     config_name: str = "preprocess",
     input_files: dict[str, FILE_T] | None = None,
+    input_dir: Path | None = None,
     df_check_kwargs: dict | None = None,
     test_name: str | None = None,
     do_include_dirs: bool = True,
@@ -358,7 +364,7 @@ def single_stage_tester(
     if stage_kwargs is None:
         stage_kwargs = {}
 
-    with input_dataset(input_files) as (input_dir, cohort_dir):
+    with input_dataset(input_dir, input_files) as (input_dir, cohort_dir):
         for k, v in pipeline_kwargs.items():
             if type(v) is str and "{input_dir}" in v:
                 pipeline_kwargs[k] = v.format(input_dir=str(input_dir.resolve()))
@@ -417,68 +423,3 @@ def single_stage_tester(
                 f"Script stdout:\n{stdout}\n"
                 f"Script stderr:\n{stderr}\n"
             ) from e
-
-
-def multi_stage_tester(
-    scripts: list[str | Path],
-    stage_names: list[str],
-    stage_configs: dict[str, str] | str | None,
-    do_pass_stage_name: bool | dict[str, bool] = True,
-    want_outputs: dict[str, pl.DataFrame] | None = None,
-    assert_no_other_outputs: bool = False,
-    config_name: str = "preprocess",
-    input_files: dict[str, FILE_T] | None = None,
-    **pipeline_kwargs,
-):
-    with input_dataset(input_files) as (input_dir, cohort_dir):
-        match stage_configs:
-            case None:
-                stage_configs = {}
-            case str():
-                stage_configs = load_yaml(stage_configs, Loader=Loader)
-            case dict():
-                pass
-            case _:
-                raise ValueError(f"Unknown stage_configs type: {type(stage_configs)}")
-
-        match do_pass_stage_name:
-            case True:
-                do_pass_stage_name = {stage_name: True for stage_name in stage_names}
-            case False:
-                do_pass_stage_name = {stage_name: False for stage_name in stage_names}
-            case dict():
-                pass
-            case _:
-                raise ValueError(f"Unknown do_pass_stage_name type: {type(do_pass_stage_name)}")
-
-        pipeline_config_kwargs = {
-            "input_dir": str(input_dir.resolve()),
-            "cohort_dir": str(cohort_dir.resolve()),
-            "stages": stage_names,
-            "stage_configs": stage_configs,
-            "hydra.verbose": True,
-            **pipeline_kwargs,
-        }
-
-        script_outputs = {}
-        n_stages = len(stage_names)
-        for i, (stage, script) in enumerate(zip(stage_names, scripts)):
-            script_outputs[stage] = run_command(
-                script=script,
-                hydra_kwargs=pipeline_config_kwargs,
-                do_use_config_yaml=True,
-                config_name=config_name,
-                test_name=f"Multi stage transform {i}/{n_stages}: {stage}",
-                stage_name=stage,
-                do_pass_stage_name=do_pass_stage_name[stage],
-            )
-
-        try:
-            check_outputs(
-                cohort_dir,
-                want_outputs=want_outputs,
-                assert_no_other_outputs=assert_no_other_outputs,
-                check_column_order=False,
-            )
-        except Exception as e:
-            raise AssertionError(f"{n_stages}-stage pipeline ({stage_names}) failed--{e}") from e

@@ -30,7 +30,7 @@ from tests.MEDS_Transforms import (
     OCCLUDE_OUTLIERS_SCRIPT,
 )
 from tests.MEDS_Transforms.transform_tester_base import MEDS_SHARDS, SPLITS_DF
-from tests.utils import add_params, exact_str_regex, parse_shards_yaml, single_stage_tester
+from tests.utils import MEDS_transforms_pipeline_tester, add_params, exact_str_regex, parse_shards_yaml
 
 MEDS_CODE_METADATA = pl.DataFrame(
     {
@@ -967,7 +967,7 @@ def test_pipeline():
         "hydra_verbose": False,
     }
 
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=str(RUNNER_SCRIPT) + " -h",
         input_files={},
         want_outputs={},
@@ -978,7 +978,7 @@ def test_pipeline():
         **shared_kwargs,
     )
 
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=str(RUNNER_SCRIPT) + " -h",
         input_files={"pipeline.yaml": partial(add_params, PIPELINE_YAML)},
         want_outputs={},
@@ -992,7 +992,7 @@ def test_pipeline():
 
     shared_kwargs["script"] = RUNNER_SCRIPT
 
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         input_files={
             **{f"data/{k}": v for k, v in MEDS_SHARDS.items()},
             code_metadata_filepath: MEDS_CODE_METADATA,
@@ -1018,7 +1018,7 @@ def test_pipeline():
         **shared_kwargs,
     )
 
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         input_files={
             **{f"data/{k}": v for k, v in MEDS_SHARDS.items()},
             code_metadata_filepath: MEDS_CODE_METADATA,
@@ -1044,7 +1044,7 @@ def test_pipeline():
         **shared_kwargs,
     )
 
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         input_files={
             **{f"data/{k}": v for k, v in MEDS_SHARDS.items()},
             code_metadata_filepath: MEDS_CODE_METADATA,
@@ -1057,7 +1057,7 @@ def test_pipeline():
         **shared_kwargs,
     )
 
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         input_files={
             **{f"data/{k}": v for k, v in MEDS_SHARDS.items()},
             code_metadata_filepath: MEDS_CODE_METADATA,

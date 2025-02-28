@@ -9,7 +9,7 @@ from io import StringIO
 import polars as pl
 
 from tests.MEDS_Extract import SPLIT_AND_SHARD_SCRIPT
-from tests.utils import single_stage_tester
+from tests.utils import MEDS_transforms_pipeline_tester
 
 SUBJECTS_CSV = """
 MRN,dob,eye_color,height
@@ -118,7 +118,7 @@ SUBJECT_SPLITS_DF = pl.DataFrame(
 
 
 def test_split_and_shard():
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=SPLIT_AND_SHARD_SCRIPT,
         stage_name="split_and_shard_subjects",
         stage_kwargs={
@@ -138,7 +138,7 @@ def test_split_and_shard():
         want_outputs={"metadata/.shards.json": EXPECTED_SPLITS},
     )
 
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=SPLIT_AND_SHARD_SCRIPT,
         stage_name="split_and_shard_subjects",
         stage_kwargs={
@@ -161,7 +161,7 @@ def test_split_and_shard():
         test_name="split_and_shard_subjects should accommodate different, but resolvable dtypes.",
     )
 
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=SPLIT_AND_SHARD_SCRIPT,
         stage_name="split_and_shard_subjects",
         stage_kwargs={
@@ -184,7 +184,7 @@ def test_split_and_shard():
         test_name="Split and shard events should work with an external splits file.",
     )
 
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=SPLIT_AND_SHARD_SCRIPT,
         stage_name="split_and_shard_subjects",
         stage_kwargs={
@@ -204,7 +204,7 @@ def test_split_and_shard():
         test_name="Split and shard events should error without an event config file.",
     )
 
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=SPLIT_AND_SHARD_SCRIPT,
         stage_name="split_and_shard_subjects",
         stage_kwargs={

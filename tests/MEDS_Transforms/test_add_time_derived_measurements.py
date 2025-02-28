@@ -4,11 +4,12 @@ Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, ra
 scripts.
 """
 
+from pathlib import Path
+
 from meds import subject_id_field
 
 from tests.MEDS_Transforms import ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT
-from tests.MEDS_Transforms.transform_tester_base import single_stage_transform_tester
-from tests.utils import parse_meds_csvs
+from tests.utils import MEDS_transforms_pipeline_tester, parse_meds_csvs
 
 AGE_CALCULATION_STR = """
 See `add_time_derived_measurements.py` for the source of the constant value.
@@ -229,18 +230,19 @@ WANT_HELD_OUT_0 = f"""
 
 WANT_SHARDS = parse_meds_csvs(
     {
-        "train/0": WANT_TRAIN_0,
-        "train/1": WANT_TRAIN_1,
-        "tuning/0": WANT_TUNING_0,
-        "held_out/0": WANT_HELD_OUT_0,
+        "data/train/0": WANT_TRAIN_0,
+        "data/train/1": WANT_TRAIN_1,
+        "data/tuning/0": WANT_TUNING_0,
+        "data/held_out/0": WANT_HELD_OUT_0,
     }
 )
 
 
-def test_add_time_derived_measurements():
-    single_stage_transform_tester(
-        transform_script=ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT,
+def test_add_time_derived_measurements(simple_static_MEDS: Path):
+    MEDS_transforms_pipeline_tester(
+        script=ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT,
         stage_name="add_time_derived_measurements",
-        transform_stage_kwargs={"age": {"DOB_code": "DOB"}},
-        want_data=WANT_SHARDS,
+        stage_kwargs={"age": {"DOB_code": "DOB"}},
+        want_outputs=WANT_SHARDS,
+        input_dir=simple_static_MEDS,
     )

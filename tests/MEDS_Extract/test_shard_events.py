@@ -9,7 +9,7 @@ from io import StringIO
 import polars as pl
 
 from tests.MEDS_Extract import SHARD_EVENTS_SCRIPT
-from tests.utils import single_stage_tester
+from tests.utils import MEDS_transforms_pipeline_tester
 
 SUBJECTS_CSV = """
 MRN,dob,eye_color,height
@@ -97,7 +97,7 @@ admit_vitals:
 
 
 def test_shard_events():
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=SHARD_EVENTS_SCRIPT,
         stage_name="shard_events",
         stage_kwargs={"row_chunksize": 10},
@@ -117,7 +117,7 @@ def test_shard_events():
         df_check_kwargs={"check_column_order": False},
     )
 
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=SHARD_EVENTS_SCRIPT,
         stage_name="shard_events",
         stage_kwargs={"row_chunksize": 10},
@@ -137,7 +137,7 @@ def test_shard_events():
         test_name="Shard events should accept .par files as parquet files.",
     )
 
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=SHARD_EVENTS_SCRIPT,
         stage_name="shard_events",
         stage_kwargs={"row_chunksize": 10},
@@ -151,7 +151,7 @@ def test_shard_events():
         test_name="Shard events should error without event conversion config",
     )
 
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=SHARD_EVENTS_SCRIPT,
         stage_name="shard_events",
         stage_kwargs={"row_chunksize": 10},
@@ -162,7 +162,7 @@ def test_shard_events():
         test_name="Shard events should error when missing all input files",
     )
 
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=SHARD_EVENTS_SCRIPT,
         stage_name="shard_events",
         stage_kwargs={"row_chunksize": 10},

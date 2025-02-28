@@ -5,7 +5,7 @@ scripts.
 """
 
 from tests.MEDS_Extract import MERGE_TO_MEDS_COHORT_SCRIPT
-from tests.utils import parse_shards_yaml, single_stage_tester
+from tests.utils import MEDS_transforms_pipeline_tester, parse_shards_yaml
 
 EVENT_CFGS_YAML = """
 subjects:
@@ -251,7 +251,7 @@ data/held_out/0: |-2
 
 
 def test_merge_to_MEDS_cohort():
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=MERGE_TO_MEDS_COHORT_SCRIPT,
         stage_name="merge_to_MEDS_cohort",
         stage_kwargs=None,
@@ -268,7 +268,7 @@ def test_merge_to_MEDS_cohort():
     )
 
     # Should error without event conversion file
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=MERGE_TO_MEDS_COHORT_SCRIPT,
         stage_name="merge_to_MEDS_cohort",
         stage_kwargs=None,

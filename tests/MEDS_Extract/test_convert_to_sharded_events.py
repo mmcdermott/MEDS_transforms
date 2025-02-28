@@ -9,7 +9,7 @@ from io import StringIO
 import polars as pl
 
 from tests.MEDS_Extract import CONVERT_TO_SHARDED_EVENTS_SCRIPT
-from tests.utils import parse_shards_yaml, single_stage_tester
+from tests.utils import MEDS_transforms_pipeline_tester, parse_shards_yaml
 
 SUBJECTS_CSV = """
 MRN,dob,eye_color,height
@@ -317,7 +317,7 @@ data/held_out/0/admit_vitals/[10-16).parquet: |-2
 
 
 def test_convert_to_sharded_events():
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=CONVERT_TO_SHARDED_EVENTS_SCRIPT,
         stage_name="convert_to_sharded_events",
         stage_kwargs={"do_dedup_text_and_numeric": True},
@@ -337,7 +337,7 @@ def test_convert_to_sharded_events():
     )
 
     # If we don't provide the event_cfgs.yaml file, the script should error.
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=CONVERT_TO_SHARDED_EVENTS_SCRIPT,
         stage_name="convert_to_sharded_events",
         stage_kwargs={"do_dedup_text_and_numeric": True},
@@ -354,7 +354,7 @@ def test_convert_to_sharded_events():
         should_error=True,
     )
 
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=CONVERT_TO_SHARDED_EVENTS_SCRIPT,
         stage_name="convert_to_sharded_events",
         stage_kwargs={"do_dedup_text_and_numeric": False},

@@ -7,7 +7,7 @@ scripts.
 import polars as pl
 
 from tests.MEDS_Extract import EXTRACT_CODE_METADATA_SCRIPT
-from tests.utils import parse_shards_yaml, single_stage_tester
+from tests.utils import MEDS_transforms_pipeline_tester, parse_shards_yaml
 
 INPUT_SHARDS = parse_shards_yaml(
     """
@@ -183,7 +183,7 @@ WANT_OUTPUTS = {
 
 
 def test_convert_to_sharded_events():
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=EXTRACT_CODE_METADATA_SCRIPT,
         stage_name="extract_code_metadata",
         stage_kwargs=None,
@@ -203,7 +203,7 @@ def test_convert_to_sharded_events():
     )
 
     # The script should error if the event config file is missing.
-    single_stage_tester(
+    MEDS_transforms_pipeline_tester(
         script=EXTRACT_CODE_METADATA_SCRIPT,
         stage_name="extract_code_metadata",
         stage_kwargs=None,
