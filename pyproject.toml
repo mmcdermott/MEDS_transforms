@@ -17,7 +17,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-  "polars~=1.14", "pyarrow", "nested_ragged_tensors>=0.0.8", "hydra-core", "numpy", "meds==0.3.3", "filelock",
+  "polars~=1.14", "pyarrow", "hydra-core", "numpy", "meds==0.3.3", "filelock",
 ]
 
 [tool.setuptools_scm]
@@ -57,8 +57,6 @@ MEDS_transform-add_time_derived_measurements = "MEDS_transforms.transforms.add_t
 MEDS_transform-extract_values = "MEDS_transforms.transforms.extract_values:main"
 MEDS_transform-normalization = "MEDS_transforms.transforms.normalization:main"
 MEDS_transform-occlude_outliers = "MEDS_transforms.transforms.occlude_outliers:main"
-MEDS_transform-tensorization = "MEDS_transforms.transforms.tensorization:main"
-MEDS_transform-tokenization = "MEDS_transforms.transforms.tokenization:main"
 
 # Runner
 MEDS_transform-runner = "MEDS_transforms.runner:main"

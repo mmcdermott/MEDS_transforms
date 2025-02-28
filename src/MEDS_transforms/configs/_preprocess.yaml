@@ -33,5 +33,3 @@ stages:
   - fit_normalization
   - fit_vocabulary_indices
   - normalization
-  - tokenization
-  - tensorization

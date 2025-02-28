@@ -11,8 +11,6 @@ In this test, the following stages are run:
   - fit_normalization
   - fit_vocabulary_indices
   - normalization
-  - tokenization
-  - tensorization
 
 The stage configuration arguments will be as given in the yaml block below:
 """
@@ -29,7 +27,6 @@ from tests.MEDS_Transforms import (
     FIT_VOCABULARY_INDICES_SCRIPT,
     NORMALIZATION_SCRIPT,
     OCCLUDE_OUTLIERS_SCRIPT,
-    TOKENIZATION_SCRIPT,
 )
 from tests.MEDS_Transforms.test_multi_stage_preprocess_pipeline import (
     MEDS_CODE_METADATA,
@@ -40,9 +37,6 @@ from tests.MEDS_Transforms.test_multi_stage_preprocess_pipeline import (
     WANT_NORMALIZATION,
     WANT_OCCLUDE_OUTLIERS,
     WANT_TIME_DERIVED,
-    WANT_TOKENIZATION_EVENT_SEQS,
-    WANT_TOKENIZATION_SCHEMAS,
-    WANT_NRTs,
 )
 from tests.MEDS_Transforms.transform_tester_base import MEDS_SHARDS, SPLITS_DF
 from tests.utils import add_params, exact_str_regex, single_stage_tester
@@ -68,9 +62,6 @@ fit_vocabulary_indices:
 
 normalization:
   script: "python {NORMALIZATION_SCRIPT}"
-
-tokenization:
-  script: "python {TOKENIZATION_SCRIPT}"
     """
 else:
     STAGE_RUNNER_YAML = f"""
@@ -113,8 +104,6 @@ stages:
   - fit_normalization
   - fit_vocabulary_indices
   - normalization
-  - tokenization
-  - tensorization
 
 stage_configs:
   filter_subjects:
@@ -227,9 +216,6 @@ def test_pipeline():
             **WANT_TIME_DERIVED,
             **WANT_OCCLUDE_OUTLIERS,
             **WANT_NORMALIZATION,
-            **WANT_TOKENIZATION_SCHEMAS,
-            **WANT_TOKENIZATION_EVENT_SEQS,
-            **WANT_NRTs,
         },
         assert_no_other_outputs=False,
         should_error=False,
@@ -256,9 +242,6 @@ def test_pipeline():
             **WANT_TIME_DERIVED,
             **WANT_OCCLUDE_OUTLIERS,
             **WANT_NORMALIZATION,
-            **WANT_TOKENIZATION_SCHEMAS,
-            **WANT_TOKENIZATION_EVENT_SEQS,
-            **WANT_NRTs,
         },
         assert_no_other_outputs=False,
         should_error=False,
