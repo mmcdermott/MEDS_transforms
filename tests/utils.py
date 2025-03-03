@@ -8,9 +8,7 @@ from io import StringIO
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import polars as pl
-from nested_ragged_tensors.ragged_numpy import JointNestedRaggedTensorDict
 from omegaconf import OmegaConf
 from polars.testing import assert_frame_equal
 from yaml import load as load_yaml
@@ -242,54 +240,6 @@ def check_json(want: dict | Callable, got: dict, msg: str):
         raise AssertionError(f"{msg}: {e}") from e
 
 
-def check_NRT_output(
-    output_fp: Path,
-    want_nrt: JointNestedRaggedTensorDict,
-    msg: str,
-):
-    got_nrt = JointNestedRaggedTensorDict(tensors_fp=output_fp)
-
-    # assert got_nrt.schema == want_nrt.schema, (
-    #    f"Expected the schema of the NRT at {output_fp} to be equal to the target.\n"
-    #    f"Wanted:\n{want_nrt.schema}\n"
-    #    f"Got:\n{got_nrt.schema}"
-    # )
-
-    want_tensors = want_nrt.tensors
-    got_tensors = got_nrt.tensors
-
-    assert got_tensors.keys() == want_tensors.keys(), (
-        f"{msg}:\n" f"Wanted:\n{list(want_tensors.keys())}\n" f"Got:\n{list(got_tensors.keys())}"
-    )
-
-    for k in want_tensors.keys():
-        want_v = want_tensors[k]
-        got_v = got_tensors[k]
-
-        assert type(want_v) is type(
-            got_v
-        ), f"{msg}: Wanted {k} to be of type {type(want_v)}, got {type(got_v)}."
-
-        if isinstance(want_v, list):
-            assert len(want_v) == len(got_v), (
-                f"Expected list {k} of the NRT at {output_fp} to be of the same length as the target.\n"
-                f"Wanted:\n{len(want_v)}\n"
-                f"Got:\n{len(got_v)}"
-            )
-            for i, (want_i, got_i) in enumerate(zip(want_v, got_v)):
-                assert np.array_equal(want_i, got_i, equal_nan=True), (
-                    f"Expected tensor {k}[{i}] of the NRT at {output_fp} to be equal to the target.\n"
-                    f"Wanted:\n{want_i}\n"
-                    f"Got:\n{got_i}"
-                )
-        else:
-            assert np.array_equal(want_v, got_v, equal_nan=True), (
-                f"Expected tensor {k} of the NRT at {output_fp} to be equal to the target.\n"
-                f"Wanted:\n{want_v}\n"
-                f"Got:\n{got_v}"
-            )
-
-
 FILE_T = pl.DataFrame | dict[str, Any] | str
 
 
@@ -365,8 +315,6 @@ def check_outputs(
             case ".parquet":
                 got_df = pl.read_parquet(output_fp, glob=False)
                 assert_df_equal(want, got_df, msg=msg, **df_check_kwargs)
-            case ".nrt":
-                check_NRT_output(output_fp, want, msg=msg)
             case ".json":
                 got = json.loads(output_fp.read_text())
                 check_json(want, got, msg=msg)
