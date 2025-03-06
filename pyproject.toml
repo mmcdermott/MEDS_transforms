@@ -64,3 +64,10 @@ MEDS_transform-runner = "MEDS_transforms.runner:main"
 [project.urls]
 Homepage = "https://github.com/mmcdermott/MEDS_transforms"
 Issues = "https://github.com/mmcdermott/MEDS_transforms/issues"
+
+[tool.pytest.ini_options]
+addopts = [
+  "--color=yes",
+  "--doctest-modules",
+  "--ignore=docs",
+]
