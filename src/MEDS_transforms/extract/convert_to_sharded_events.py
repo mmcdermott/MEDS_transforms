@@ -851,7 +851,7 @@ def main(cfg: DictConfig):
     event_conversion_cfg = OmegaConf.load(event_conversion_cfg_fp)
     logger.info(f"Event conversion config:\n{OmegaConf.to_yaml(event_conversion_cfg)}")
 
-    tables_to_ignore = event_conversion_cfg.pop("tables_to_ignore", [])
+    event_conversion_cfg.pop("tables_to_ignore", [])
     default_subject_id_col = event_conversion_cfg.pop("subject_id_col", "subject_id")
 
     subject_subsharded_dir.mkdir(parents=True, exist_ok=True)

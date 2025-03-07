@@ -227,7 +227,7 @@ def retrieve_columns(event_conversion_cfg: DictConfig) -> dict[str, list[str]]:
     prefix_to_columns = {}
 
     default_subject_id_col = event_conversion_cfg.pop("subject_id_col", subject_id_field)
-    tables_to_ignore = event_conversion_cfg.pop("tables_to_ignore", [])
+    event_conversion_cfg.pop("tables_to_ignore", [])
 
     for input_prefix, event_cfgs in event_conversion_cfg.items():
 
