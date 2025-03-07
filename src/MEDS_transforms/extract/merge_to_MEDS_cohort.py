@@ -201,7 +201,7 @@ def merge_subdirs_and_sort(
             "Number of found subsets ({}) does not match "
             "number of subsets in event_config ({}): {}. "
             "HINT: your raw data might not match you event_config.yaml file, please check your data or use "
-            "the ignore_tables flag ".format(len(dirs_to_read), len(event_subsets), sp_dir)
+            "the tables_to_ignore flag ".format(len(dirs_to_read), len(event_subsets), sp_dir)
         )
 
     file_strs = "\n".join(f"  - {str(fp.resolve())}" for fp in files_to_read)
