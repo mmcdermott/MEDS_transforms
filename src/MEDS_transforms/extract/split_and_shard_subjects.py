@@ -237,6 +237,8 @@ def main(cfg: DictConfig):
     dfs = []
 
     default_subject_id_col = event_conversion_cfg.pop("subject_id_col", "subject_id")
+    tables_to_ignore = event_conversion_cfg.pop("tables_to_ignore", [])
+
     for input_prefix, event_cfgs in event_conversion_cfg.items():
         input_subject_id_column = event_cfgs.get("subject_id_col", default_subject_id_col)
 

@@ -306,11 +306,11 @@ def get_events_and_metadata_by_metadata_fp(event_configs: dict | DictConfig) -> 
     out = {}
 
     for file_pfx, event_cfgs_for_pfx in event_configs.items():
-        if file_pfx == "subject_id_col":
+        if file_pfx == "subject_id_col" or file_pfx == "tables_to_ignore":
             continue
 
         for event_key, event_cfg in event_cfgs_for_pfx.items():
-            if event_key == "subject_id_col":
+            if event_key == "subject_id_col" or event_key == "tables_to_ignore":
                 continue
 
             for metadata_pfx, metadata_cfg in event_cfg.get("_metadata", {}).items():

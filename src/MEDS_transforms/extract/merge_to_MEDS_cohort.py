@@ -199,7 +199,9 @@ def merge_subdirs_and_sort(
     if len(dirs_to_read := {fp.parent for fp in files_to_read}) != len(event_subsets):
         raise RuntimeError(
             "Number of found subsets ({}) does not match "
-            "number of subsets in event_config ({}): {}".format(len(dirs_to_read), len(event_subsets), sp_dir)
+            "number of subsets in event_config ({}): {}. "
+            "HINT: your raw data might not match you event_config.yaml file, please check your data or use "
+            "the ignore_tables flag ".format(len(dirs_to_read), len(event_subsets), sp_dir)
         )
 
     file_strs = "\n".join(f"  - {str(fp.resolve())}" for fp in files_to_read)
@@ -265,6 +267,11 @@ def main(cfg: DictConfig):
     """
     event_conversion_cfg = OmegaConf.load(cfg.event_conversion_config_fp)
     event_conversion_cfg.pop("subject_id_col", None)
+    tables_to_ignore = event_conversion_cfg.pop("tables_to_ignore", None)
+    if tables_to_ignore:
+        logger.warning(f"Ignoring tables: {tables_to_ignore}")
+        for table in tables_to_ignore:
+            event_conversion_cfg.pop(table, None)
 
     read_fn = partial(
         merge_subdirs_and_sort,
