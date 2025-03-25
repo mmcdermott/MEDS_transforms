@@ -24,8 +24,6 @@ if os.environ.get("DO_USE_LOCAL_SCRIPTS", "0") == "1":
     EXTRACT_VALUES_SCRIPT = transforms_root / "extract_values.py"
     NORMALIZATION_SCRIPT = transforms_root / "normalization.py"
     OCCLUDE_OUTLIERS_SCRIPT = transforms_root / "occlude_outliers.py"
-    TENSORIZATION_SCRIPT = transforms_root / "tensorization.py"
-    TOKENIZATION_SCRIPT = transforms_root / "tokenization.py"
 else:
     # Root Source
     AGGREGATE_CODE_METADATA_SCRIPT = "MEDS_transform-aggregate_code_metadata"
@@ -42,5 +40,3 @@ else:
     EXTRACT_VALUES_SCRIPT = "MEDS_transform-extract_values"
     NORMALIZATION_SCRIPT = "MEDS_transform-normalization"
     OCCLUDE_OUTLIERS_SCRIPT = "MEDS_transform-occlude_outliers"
-    TENSORIZATION_SCRIPT = "MEDS_transform-tensorization"
-    TOKENIZATION_SCRIPT = "MEDS_transform-tokenization"

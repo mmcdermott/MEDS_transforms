@@ -47,10 +47,6 @@ def kwargs_strs(kwargs: dict) -> str:
 def scan_with_row_idx(fp: Path, columns: Sequence[str], **scan_kwargs) -> pl.LazyFrame:
     """Scans a file into a polars lazyframe and adds a row index with name `ROW_IDX_NAME`.
 
-    Note that we don't put ``row_index_name=ROW_IDX_NAME`` in the kwargs because it is not well supported in
-    polars currently, pending https://github.com/pola-rs/polars/issues/15730. Instead, we add it at the end,
-    which seems to work.
-
     Args:
         fp: The file path to read. Must be either a ".csv", ".csv.gz", or ".parquet" file.
         columns: A list of column names to read from the file.
@@ -121,7 +117,10 @@ def scan_with_row_idx(fp: Path, columns: Sequence[str], **scan_kwargs) -> pl.Laz
         ValueError: Unsupported file type: .json
     """
 
-    kwargs = {**scan_kwargs}
+    kwargs = {
+        **scan_kwargs,
+        "row_index_name": ROW_IDX_NAME,
+    }
     match "".join(fp.suffixes).lower():
         case ".csv.gz":
             if columns:
@@ -134,7 +133,7 @@ def scan_with_row_idx(fp: Path, columns: Sequence[str], **scan_kwargs) -> pl.Laz
             with gzip.open(fp, mode="rb") as f:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore", category=UserWarning)
-                    return pl.read_csv(f, **kwargs).with_row_index(ROW_IDX_NAME).lazy()
+                    return pl.read_csv(f, **kwargs).lazy()
         case ".csv":
             logger.debug(f"Reading {str(fp.resolve())} as CSV with kwargs:\n{kwargs_strs(kwargs)}.")
             df = pl.scan_csv(fp, **kwargs)
@@ -149,11 +148,9 @@ def scan_with_row_idx(fp: Path, columns: Sequence[str], **scan_kwargs) -> pl.Laz
             raise ValueError(f"Unsupported file type: {fp.suffix}")
 
     if columns:
-        columns = [*columns]
+        columns = [ROW_IDX_NAME, *columns]
         logger.debug(f"Selecting columns: {columns}")
         df = df.select(columns)
-
-    df = df.with_row_index(ROW_IDX_NAME)
 
     logger.debug(f"Returning df with columns: {', '.join(df.collect_schema().names())}")
     return df
@@ -208,7 +205,7 @@ def retrieve_columns(event_conversion_cfg: DictConfig) -> dict[str, list[str]]:
         ...         "med": {"code": "col(medication)", "time": "medtime"}
         ...     }
         ... })
-        >>> retrieve_columns(cfg) # doctest: +NORMALIZE_WHITESPACE
+        >>> retrieve_columns(cfg)
         {'hosp/patients': ['eye_color', 'height', 'mod_col', 'subject_id_global'],
          'icu/chartevents': ['HR', 'charttime', 'itemid', 'mod_lab', 'subject_id_icu', 'value', 'valuenum',
                              'valueuom'],

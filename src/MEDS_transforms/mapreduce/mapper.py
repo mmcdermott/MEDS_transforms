@@ -422,11 +422,11 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
         ... })
         >>> cfg = DictConfig({"stage_cfg": stage_cfg})
         >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
-        >>> match_revise_fn(df.lazy()).collect() # doctest: +NORMALIZE_WHITESPACE
+        >>> match_revise_fn(df.lazy()).collect()
         Traceback (most recent call last):
             ...
         ValueError: Missing needed columns {'missing'} for local matcher 0:
-            [(col("missing")) == (String(CODE//TEMP_2))].all_horizontal()
+            [(col("missing")) == ("CODE//TEMP_2")].all_horizontal()
         Columns available: 'code', 'initial_idx', 'subject_id', 'time'
 
         It will throw an error if the match and revise configuration is missing.

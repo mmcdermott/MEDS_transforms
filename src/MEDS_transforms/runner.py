@@ -194,25 +194,25 @@ def run_stage(
         ...         "baz": {"script": "baz_script"},
         ...     },
         ... })
-        >>> run_stage(cfg, "shard_events", runner_fn=fake_shell_succeed) # doctest: +NORMALIZE_WHITESPACE
+        >>> run_stage(cfg, "shard_events", runner_fn=fake_shell_succeed)
         MEDS_extract-shard_events --config-dir=... --config-name=pipeline_config
             'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=shard_events
         >>> run_stage(
         ...     cfg, "fit_vocabulary_indices", runner_fn=fake_shell_succeed
-        ... ) # doctest: +NORMALIZE_WHITESPACE
+        ... )
         foobar --config-dir=... --config-name=pipeline_config
             'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=fit_vocabulary_indices
-        >>> run_stage(cfg, "baz", runner_fn=fake_shell_succeed) # doctest: +NORMALIZE_WHITESPACE
+        >>> run_stage(cfg, "baz", runner_fn=fake_shell_succeed)
         baz_script --config-dir=... --config-name=pipeline_config
             'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=baz
         >>> cfg.do_profile = True
-        >>> run_stage(cfg, "baz", runner_fn=fake_shell_succeed) # doctest: +NORMALIZE_WHITESPACE
+        >>> run_stage(cfg, "baz", runner_fn=fake_shell_succeed)
         baz_script --config-dir=... --config-name=pipeline_config
             'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=baz
             ++hydra.callbacks.profiler._target_=hydra_profiler.profiler.ProfilerCallback
         >>> cfg._stage_runners.baz.parallelize = {"n_workers": 2}
         >>> cfg.do_profile = False
-        >>> run_stage(cfg, "baz", runner_fn=fake_shell_succeed) # doctest: +NORMALIZE_WHITESPACE
+        >>> run_stage(cfg, "baz", runner_fn=fake_shell_succeed)
         baz_script --config-dir=... --config-name=pipeline_config --multirun
             'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=baz worker="range(0,2)"
         >>> run_stage(cfg, "baz", runner_fn=fake_shell_fail)
@@ -351,7 +351,6 @@ def load_yaml_file(path: str | None) -> dict | DictConfig:
         Traceback (most recent call last):
             ...
         FileNotFoundError: File nonexistent_file.yaml does not exist.
-        >>> import tempfile
         >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as f:
         ...     _ = f.write(b"foo: bar")
         ...     f.flush()

@@ -17,14 +17,14 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-  "polars~=1.14", "pyarrow", "nested_ragged_tensors>=0.0.8", "hydra-core", "numpy", "meds==0.3.3", "filelock",
+  "polars~=1.26", "pyarrow", "hydra-core", "numpy", "meds==0.3.3", "filelock",
 ]
 
 [tool.setuptools_scm]
 
 [project.optional-dependencies]
 dev = ["pre-commit<4"]
-tests = ["pytest", "pytest-cov", "rootutils", "hydra-joblib-launcher"]
+tests = ["pytest", "pytest-cov", "rootutils", "hydra-joblib-launcher", "meds_testing_helpers>=0.2.1"]
 local_parallelism = ["hydra-joblib-launcher"]
 slurm_parallelism = ["hydra-submitit-launcher"]
 docs = [
@@ -57,8 +57,6 @@ MEDS_transform-add_time_derived_measurements = "MEDS_transforms.transforms.add_t
 MEDS_transform-extract_values = "MEDS_transforms.transforms.extract_values:main"
 MEDS_transform-normalization = "MEDS_transforms.transforms.normalization:main"
 MEDS_transform-occlude_outliers = "MEDS_transforms.transforms.occlude_outliers:main"
-MEDS_transform-tensorization = "MEDS_transforms.transforms.tensorization:main"
-MEDS_transform-tokenization = "MEDS_transforms.transforms.tokenization:main"
 
 # Runner
 MEDS_transform-runner = "MEDS_transforms.runner:main"
@@ -66,3 +64,12 @@ MEDS_transform-runner = "MEDS_transforms.runner:main"
 [project.urls]
 Homepage = "https://github.com/mmcdermott/MEDS_transforms"
 Issues = "https://github.com/mmcdermott/MEDS_transforms/issues"
+
+[tool.pytest.ini_options]
+addopts = [
+  "--color=yes",
+  "--doctest-modules",
+  "--ignore=docs",
+  "--doctest-glob=*.md",
+]
+doctest_optionflags = ["NORMALIZE_WHITESPACE", "ELLIPSIS"]
