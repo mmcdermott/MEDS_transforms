@@ -196,13 +196,13 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
 
     Examples:
         >>> no_aggs_cfg = DictConfig({"other_key": "other_value"})
-        >>> validate_args_and_get_code_cols(no_aggs_cfg, None) # doctest: +NORMALIZE_WHITESPACE
+        >>> validate_args_and_get_code_cols(no_aggs_cfg, None)
         Traceback (most recent call last):
             ...
         ValueError: Stage config must contain an 'aggregations' field. Got:
             other_key: other_value
         >>> invalid_agg_cfg = DictConfig({"aggregations": ["INVALID"]})
-        >>> validate_args_and_get_code_cols(invalid_agg_cfg, None) # doctest: +NORMALIZE_WHITESPACE
+        >>> validate_args_and_get_code_cols(invalid_agg_cfg, None)
         Traceback (most recent call last):
             ...
         ValueError: Metadata aggregation function INVALID not found in METADATA_FN enumeration. Values are:
@@ -741,7 +741,7 @@ def reducer_fntr(
 
         df = renamed_dfs[0]
         for rdf in renamed_dfs[1:]:
-            df = df.join(rdf, on=code_key_columns, how="full", join_nulls=True, coalesce=True)
+            df = df.join(rdf, on=code_key_columns, how="full", nulls_equal=True, coalesce=True)
 
         return df.select(*code_key_columns, **agg_operations).sort(code_key_columns)
 

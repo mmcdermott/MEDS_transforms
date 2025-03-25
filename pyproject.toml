@@ -17,7 +17,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-  "polars~=1.14", "pyarrow", "hydra-core", "numpy", "meds==0.3.3", "filelock",
+  "polars~=1.26", "pyarrow", "hydra-core", "numpy", "meds==0.3.3", "filelock",
 ]
 
 [tool.setuptools_scm]
@@ -64,3 +64,12 @@ MEDS_transform-runner = "MEDS_transforms.runner:main"
 [project.urls]
 Homepage = "https://github.com/mmcdermott/MEDS_transforms"
 Issues = "https://github.com/mmcdermott/MEDS_transforms/issues"
+
+[tool.pytest.ini_options]
+addopts = [
+  "--color=yes",
+  "--doctest-modules",
+  "--ignore=docs",
+  "--doctest-glob=*.md",
+]
+doctest_optionflags = ["NORMALIZE_WHITESPACE", "ELLIPSIS"]

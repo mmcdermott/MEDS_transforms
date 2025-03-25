@@ -35,7 +35,7 @@ def get_and_validate_data_schema(df: pl.LazyFrame, stage_cfg: DictConfig) -> pa.
 
     Examples:
         >>> df = pl.DataFrame({})
-        >>> get_and_validate_data_schema(df.lazy(), dict(do_retype=False)) # doctest: +NORMALIZE_WHITESPACE
+        >>> get_and_validate_data_schema(df.lazy(), dict(do_retype=False))
         Traceback (most recent call last):
             ...
         ValueError: MEDS Data DataFrame must have a 'subject_id' column of type Int64.
@@ -43,7 +43,7 @@ def get_and_validate_data_schema(df: pl.LazyFrame, stage_cfg: DictConfig) -> pa.
                         Datetime(time_unit='us', time_zone=None).
                     MEDS Data DataFrame must have a 'code' column of type String.
                     MEDS Data DataFrame must have a 'numeric_value' column of type Float32.
-        >>> get_and_validate_data_schema(df.lazy(), {}) # doctest: +NORMALIZE_WHITESPACE
+        >>> get_and_validate_data_schema(df.lazy(), {})
         Traceback (most recent call last):
             ...
         ValueError: MEDS Data DataFrame must have a 'subject_id' column of type Int64.
@@ -54,7 +54,7 @@ def get_and_validate_data_schema(df: pl.LazyFrame, stage_cfg: DictConfig) -> pa.
         ...     "time": [datetime(2021, 1, 1), datetime(2021, 1, 2)],
         ...     "code": ["A", "B"], "text_value": ["1", None], "numeric_value": [None, 34.2]
         ... })
-        >>> get_and_validate_data_schema(df.lazy(), dict(do_retype=False)) # doctest: +NORMALIZE_WHITESPACE
+        >>> get_and_validate_data_schema(df.lazy(), dict(do_retype=False))
         Traceback (most recent call last):
             ...
         ValueError: MEDS Data 'subject_id' column must be of type Int64. Got UInt32.

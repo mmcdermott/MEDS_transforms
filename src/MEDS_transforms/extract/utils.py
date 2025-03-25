@@ -115,7 +115,7 @@ def get_supported_fp(root_dir: Path, file_prefix: str | Path) -> tuple[Path, Cal
         ...     tmpdir = Path(tmpdir)
         ...     fp = tmpdir / "test.json"
         ...     df.write_json(fp)
-        ...     get_supported_fp(tmpdir, "test") # doctest: +NORMALIZE_WHITESPACE
+        ...     get_supported_fp(tmpdir, "test")
         Traceback (most recent call last):
             ...
         FileNotFoundError: No files found with prefix: test and allowed suffixes
