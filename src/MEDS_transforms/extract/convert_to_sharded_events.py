@@ -21,6 +21,8 @@ from MEDS_transforms.utils import is_col_field, parse_col_field, stage_init, wri
 
 logger = logging.getLogger(__name__)
 
+pl.enable_string_cache()
+
 
 def in_format(fmt: str, ts_name: str) -> pl.Expr:
     """Returns an expression formatting the column ``ts_name`` in time format ``fmt``."""
@@ -43,12 +45,12 @@ def get_code_expr(code_field: str | list | ListConfig) -> tuple[pl.Expr, pl.Expr
 
     Examples:
         >>> print(*get_code_expr("A"))
-        String(A).strict_cast(String) None set()
-        >>> print(*get_code_expr("col(B)")) # doctest: +NORMALIZE_WHITESPACE
-        col("B").strict_cast(String).fill_null([String(UNK)]) col("B").is_not_null() {'B'}
-        >>> print(*get_code_expr(["col(A)", "B"])) # doctest: +NORMALIZE_WHITESPACE
-        [([(col("A").strict_cast(String).fill_null([String(UNK)])) + (String(//))]) +
-           (String(B).strict_cast(String))]
+        "A".strict_cast(String) None set()
+        >>> print(*get_code_expr("col(B)"))
+        col("B").strict_cast(String).fill_null(["UNK"]) col("B").is_not_null() {'B'}
+        >>> print(*get_code_expr(["col(A)", "B"]))
+        [([(col("A").strict_cast(String).fill_null(["UNK"])) + ("//")]) +
+           ("B".strict_cast(String))]
         col("A").is_not_null()
         {'A'}
         >>> get_code_expr(34)
@@ -62,9 +64,9 @@ def get_code_expr(code_field: str | list | ListConfig) -> tuple[pl.Expr, pl.Expr
 
     Note that it only takes the first column field for the null filter, not all of them.
         >>> expr, null_filter, cols = get_code_expr(["col(A)", "col(c)"])
-        >>> print(expr) # doctest: +NORMALIZE_WHITESPACE
-        [([(col("A").strict_cast(String).fill_null([String(UNK)])) + (String(//))]) +
-           (col("c").strict_cast(String).fill_null([String(UNK)]))]
+        >>> print(expr)
+        [([(col("A").strict_cast(String).fill_null(["UNK"])) + ("//")]) +
+           (col("c").strict_cast(String).fill_null(["UNK"]))]
         >>> print(null_filter)
         col("A").is_not_null()
         >>> print(sorted(cols))
@@ -817,8 +819,7 @@ def convert_to_events(
         except Exception as e:
             raise ValueError(f"Error extracting event {event_name}: {e}") from e
 
-    df = pl.concat(event_dfs, how="diagonal_relaxed")
-    return df
+    return pl.concat(event_dfs, how="diagonal_relaxed")
 
 
 @hydra.main(version_base=None, config_path=str(CONFIG_YAML.parent), config_name=CONFIG_YAML.stem)

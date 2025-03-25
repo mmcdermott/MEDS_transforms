@@ -205,7 +205,7 @@ def retrieve_columns(event_conversion_cfg: DictConfig) -> dict[str, list[str]]:
         ...         "med": {"code": "col(medication)", "time": "medtime"}
         ...     }
         ... })
-        >>> retrieve_columns(cfg) # doctest: +NORMALIZE_WHITESPACE
+        >>> retrieve_columns(cfg)
         {'hosp/patients': ['eye_color', 'height', 'mod_col', 'subject_id_global'],
          'icu/chartevents': ['HR', 'charttime', 'itemid', 'mod_lab', 'subject_id_icu', 'value', 'valuenum',
                              'valueuom'],

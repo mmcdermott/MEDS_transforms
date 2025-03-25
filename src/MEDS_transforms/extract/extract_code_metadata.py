@@ -279,7 +279,7 @@ def get_events_and_metadata_by_metadata_fp(event_configs: dict | DictConfig) -> 
         ...         },
         ...     },
         ... }
-        >>> get_events_and_metadata_by_metadata_fp(event_configs) # doctest: +NORMALIZE_WHITESPACE
+        >>> get_events_and_metadata_by_metadata_fp(event_configs)
         {'proc_datetimeevents': [{'code': ['PROCEDURE', 'START', 'col(itemid)'],
                                   '_metadata': {'desc': ['omop_concept_name', 'label']}},
                                  {'code': ['PROCEDURE', 'END', 'col(itemid)'],

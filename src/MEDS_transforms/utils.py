@@ -242,26 +242,26 @@ def populate_stage(
         ...     },
         ... })
         >>> args = [root_config[k] for k in ["input_dir", "cohort_dir", "stages", "stage_configs"]]
-        >>> populate_stage("stage1", *args) # doctest: +NORMALIZE_WHITESPACE
+        >>> populate_stage("stage1", *args)
         {'is_metadata': False, 'data_input_dir': '/a/b/data', 'metadata_input_dir': '/a/b/metadata',
          'output_dir': '/c/d/stage1', 'reducer_output_dir': None}
-        >>> populate_stage("stage2", *args) # doctest: +NORMALIZE_WHITESPACE
+        >>> populate_stage("stage2", *args)
         {'is_metadata': True, 'data_input_dir': '/c/d/stage1', 'metadata_input_dir': '/a/b/metadata',
          'output_dir': '/c/d/stage2', 'reducer_output_dir': '/c/d/stage2', 'train_only': True}
-        >>> populate_stage("stage3", *args) # doctest: +NORMALIZE_WHITESPACE
+        >>> populate_stage("stage3", *args)
         {'is_metadata': None, 'output_dir': '/g/h', 'data_input_dir': '/c/d/stage1',
          'metadata_input_dir': '/c/d/stage2', 'reducer_output_dir': None}
-        >>> populate_stage("stage4", *args) # doctest: +NORMALIZE_WHITESPACE
+        >>> populate_stage("stage4", *args)
         {'data_input_dir': '/e/f', 'is_metadata': False,
          'metadata_input_dir': '/c/d/stage2', 'output_dir': '/c/d/stage4', 'reducer_output_dir': None}
-        >>> populate_stage("stage5", *args) # doctest: +NORMALIZE_WHITESPACE
+        >>> populate_stage("stage5", *args)
         {'aggregations': ['foo'], 'train_only': None, 'is_metadata': True, 'data_input_dir': '/c/d/stage4',
          'metadata_input_dir': '/c/d/stage2', 'output_dir': '/c/d/stage5',
          'reducer_output_dir': '/c/d/metadata'}
-        >>> populate_stage("stage6", *args) # doctest: +NORMALIZE_WHITESPACE
+        >>> populate_stage("stage6", *args)
         {'is_metadata': False, 'data_input_dir': '/c/d/stage4',
          'metadata_input_dir': '/c/d/metadata', 'output_dir': '/c/d/data', 'reducer_output_dir': None}
-        >>> populate_stage("stage7", *args) # doctest: +NORMALIZE_WHITESPACE
+        >>> populate_stage("stage7", *args)
         Traceback (most recent call last):
             ...
         ValueError: 'stage7' is not a valid stage name. Options are: stage1, stage2, stage3, stage4, stage5,

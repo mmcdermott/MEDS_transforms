@@ -211,7 +211,7 @@ def normalize(
             code_metadata.lazy().select(cols_to_select),
             on=["code"] + code_modifiers,
             how="inner",
-            join_nulls=True,
+            nulls_equal=True,
         )
         .select(
             idx_col,
