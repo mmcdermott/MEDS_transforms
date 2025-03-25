@@ -31,7 +31,6 @@ def valid_json_file(fp: Path) -> bool:
         True if the file is a valid JSON file, False otherwise.
 
     Examples:
-        >>> import tempfile
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     fp = Path(tmpdir) / "test.json"
         ...     valid_json_file(fp)
@@ -79,7 +78,6 @@ def write_json(d: dict, fp: Path) -> None:
         fp: Path to the file.
 
     Examples:
-        >>> import tempfile
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     fp = Path(tmpdir) / "test.json"
         ...     write_json({"foo": "bar"}, fp)

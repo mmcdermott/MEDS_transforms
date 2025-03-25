@@ -28,7 +28,6 @@ def is_complete_parquet_file(fp: Path) -> bool:
         True if the parquet file is complete, False otherwise.
 
     Examples:
-        >>> import tempfile, polars as pl
         >>> df = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
         >>> with tempfile.NamedTemporaryFile() as tmp:
         ...     df.write_parquet(tmp)
@@ -90,8 +89,6 @@ def rwlock_wrap(
         True if the computation was run, False otherwise.
 
     Examples:
-        >>> import polars as pl
-        >>> import tempfile
         >>> directory = tempfile.TemporaryDirectory()
         >>> read_fn = pl.read_csv
         >>> write_fn = pl.DataFrame.write_csv
@@ -249,8 +246,6 @@ def shard_iterator(
         seeded by the worker ID in ``cfg``, if provided, otherwise it is left unseeded.
 
     Examples:
-        >>> from tempfile import TemporaryDirectory
-        >>> import polars as pl
         >>> df = pl.DataFrame({
         ...     "subject_id": [1, 2, 3, 4, 5, 6, 7, 8, 9],
         ...     "code": ["A", "B", "C", "D", "E", "F", "G", "H", "I"],
@@ -269,7 +264,7 @@ def shard_iterator(
 
     By default, this will load all shards in the input directory and write specify their appropriate output
     directories:
-        >>> with TemporaryDirectory() as tmp:
+        >>> with tempfile.TemporaryDirectory() as tmp:
         ...     root = Path(tmp)
         ...     input_dir = root / "data"
         ...     output_dir = root / "output"
@@ -279,7 +274,7 @@ def shard_iterator(
         ...         "worker": 1,
         ...     })
         ...     fps, includes_only_train = shard_iterator(cfg)
-        >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps] # doctest: +NORMALIZE_WHITESPACE
+        >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps]
         [(PosixPath('data/train/1.parquet'),  PosixPath('output/train/1.parquet')),
          (PosixPath('data/held_out.parquet'), PosixPath('output/held_out.parquet')),
          (PosixPath('data/tuning.parquet'),   PosixPath('output/tuning.parquet')),
@@ -288,7 +283,7 @@ def shard_iterator(
         False
 
     Different workers will shuffle the shards differently:
-        >>> with TemporaryDirectory() as tmp:
+        >>> with tempfile.TemporaryDirectory() as tmp:
         ...     root = Path(tmp)
         ...     input_dir = root / "data"
         ...     output_dir = root / "output"
@@ -298,7 +293,7 @@ def shard_iterator(
         ...         "worker": 2,
         ...     })
         ...     fps, includes_only_train = shard_iterator(cfg)
-        >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps] # doctest: +NORMALIZE_WHITESPACE
+        >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps]
         [(PosixPath('data/tuning.parquet'),   PosixPath('output/tuning.parquet')),
          (PosixPath('data/held_out.parquet'), PosixPath('output/held_out.parquet')),
          (PosixPath('data/train/1.parquet'),  PosixPath('output/train/1.parquet')),
@@ -308,7 +303,7 @@ def shard_iterator(
 
     We can also make it look within a specific input subdir of the data directory and change the output
     suffix. Note that using a specific input subdir is _different_ than requesting it load only train.
-        >>> with TemporaryDirectory() as tmp:
+        >>> with tempfile.TemporaryDirectory() as tmp:
         ...     root = Path(tmp)
         ...     input_dir = root / "data"
         ...     output_dir = root / "output"
@@ -318,7 +313,7 @@ def shard_iterator(
         ...         "worker": 1,
         ...     })
         ...     fps, includes_only_train = shard_iterator(cfg, in_prefix="train", out_suffix=".csv")
-        >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps] # doctest: +NORMALIZE_WHITESPACE
+        >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps]
         [(PosixPath('data/train/0.parquet'),  PosixPath('output/0.csv')),
          (PosixPath('data/train/1.parquet'),  PosixPath('output/1.csv'))]
         >>> includes_only_train
@@ -326,7 +321,7 @@ def shard_iterator(
 
     We can also make it load only 'train' shards, in the case that there are shards with a valid "train/"
     prefix.
-        >>> with TemporaryDirectory() as tmp:
+        >>> with tempfile.TemporaryDirectory() as tmp:
         ...     root = Path(tmp)
         ...     input_dir = root / "data"
         ...     output_dir = root / "output"
@@ -339,7 +334,7 @@ def shard_iterator(
         ...         "worker": 1,
         ...     })
         ...     fps, includes_only_train = shard_iterator(cfg)
-        >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps] # doctest: +NORMALIZE_WHITESPACE
+        >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps]
         [(PosixPath('data/train/1.parquet'),  PosixPath('output/train/1.parquet')),
          (PosixPath('data/train/0.parquet'),  PosixPath('output/train/0.parquet'))]
         >>> includes_only_train
@@ -347,7 +342,7 @@ def shard_iterator(
 
     The train prefix used is precisely `train/` -- other uses of train will not work:
         >>> wrong_pfx_shards = {"train": [1, 2, 3], "train_1": [4, 5, 6], "train-2": [7, 8, 9]}
-        >>> with TemporaryDirectory() as tmp:
+        >>> with tempfile.TemporaryDirectory() as tmp:
         ...     root = Path(tmp)
         ...     input_dir = root / "data"
         ...     output_dir = root / "output"
@@ -360,7 +355,7 @@ def shard_iterator(
         ...         "worker": 1,
         ...     })
         ...     fps, includes_only_train = shard_iterator(cfg)
-        >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps] # doctest: +NORMALIZE_WHITESPACE
+        >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps]
         [(PosixPath('data/train_1.parquet'),  PosixPath('output/train_1.parquet')),
          (PosixPath('data/train-2.parquet'),  PosixPath('output/train-2.parquet')),
          (PosixPath('data/train.parquet'),  PosixPath('output/train.parquet'))]
@@ -370,7 +365,7 @@ def shard_iterator(
     If there are no such shards, then it loads them all and assumes the filtering will be handled via the
     splits parquet file.
         >>> no_pfx_shards = {"0": [1, 2, 3], "1": [4, 5, 6], "2": [7, 8, 9]}
-        >>> with TemporaryDirectory() as tmp:
+        >>> with tempfile.TemporaryDirectory() as tmp:
         ...     root = Path(tmp)
         ...     input_dir = root / "data"
         ...     output_dir = root / "output"
@@ -383,7 +378,7 @@ def shard_iterator(
         ...         "worker": 1,
         ...     })
         ...     fps, includes_only_train = shard_iterator(cfg)
-        >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps] # doctest: +NORMALIZE_WHITESPACE
+        >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps]
         [(PosixPath('data/0.parquet'), PosixPath('output/0.parquet')),
          (PosixPath('data/1.parquet'), PosixPath('output/1.parquet')),
          (PosixPath('data/2.parquet'), PosixPath('output/2.parquet'))]
@@ -466,19 +461,17 @@ def shard_iterator_by_shard_map(cfg: DictConfig) -> tuple[list[str], bool]:
         ValueError: If the `train_only` key is present in the configuration.
 
     Examples:
-        >>> from tempfile import NamedTemporaryFile, TemporaryDirectory
-        >>> import json
         >>> shard_iterator_by_shard_map(DictConfig({}))
         Traceback (most recent call last):
             ...
         ValueError: shards_map_fp must be present in the configuration for a map-based shard iterator.
-        >>> with NamedTemporaryFile() as tmp:
+        >>> with tempfile.NamedTemporaryFile() as tmp:
         ...     cfg = DictConfig({"shards_map_fp": tmp.name, "stage_cfg": {"train_only": True}})
         ...     shard_iterator_by_shard_map(cfg)
         Traceback (most recent call last):
             ...
         ValueError: train_only is not supported for this stage.
-        >>> with TemporaryDirectory() as tmp:
+        >>> with tempfile.TemporaryDirectory() as tmp:
         ...     tmp = Path(tmp)
         ...     shards_map_fp = tmp / "shards_map.json"
         ...     cfg = DictConfig({"shards_map_fp": shards_map_fp, "stage_cfg": {"train_only": False}})
@@ -487,7 +480,7 @@ def shard_iterator_by_shard_map(cfg: DictConfig) -> tuple[list[str], bool]:
             ...
         FileNotFoundError: Shard map file not found at ...shards_map.json
         >>> shards = {"train/0": [1, 2, 3, 4], "train/1": [5, 6, 7], "tuning": [8], "held_out": [9]}
-        >>> with NamedTemporaryFile() as tmp:
+        >>> with tempfile.NamedTemporaryFile() as tmp:
         ...     _ = Path(tmp.name).write_text(json.dumps(shards))
         ...     cfg = DictConfig({
         ...         "shards_map_fp": tmp.name,
@@ -495,7 +488,7 @@ def shard_iterator_by_shard_map(cfg: DictConfig) -> tuple[list[str], bool]:
         ...         "stage_cfg": {"data_input_dir": "data", "output_dir": "output"},
         ...     })
         ...     fps, includes_only_train = shard_iterator_by_shard_map(cfg)
-        >>> fps # doctest: +NORMALIZE_WHITESPACE
+        >>> fps
         [(PosixPath('data/train/1'),  PosixPath('output/train/1.parquet')),
          (PosixPath('data/held_out'), PosixPath('output/held_out.parquet')),
          (PosixPath('data/tuning'),   PosixPath('output/tuning.parquet')),

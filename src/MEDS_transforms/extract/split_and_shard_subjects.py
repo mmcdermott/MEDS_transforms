@@ -69,7 +69,7 @@ def shard_subjects(
         ...     'taskA/held_out': np.array([8, 9, 10], dtype=int),
         ...     'taskB/held_out': np.array([10, 8, 9], dtype=int),
         ... }
-        >>> shard_subjects(subjects, 3, external_splits) # doctest: +NORMALIZE_WHITESPACE
+        >>> shard_subjects(subjects, 3, external_splits)
         {'train/0': [5, 7, 4],
          'train/1': [1, 2],
          'tuning/0': [3],

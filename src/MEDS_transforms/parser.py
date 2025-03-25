@@ -59,7 +59,7 @@ def is_matcher(matcher_cfg: dict[str, Any]) -> tuple[bool, str | None]:
         (False, "Matcher configuration must be a dictionary with string keys. Got {'foo': 'bar', 32: 'baz'}")
         >>> is_matcher({"foo": {"regex": "bar"}})
         (True, None)
-        >>> is_matcher({"foo": {"regex": "bar", "group_index": 0}}) # doctest: +NORMALIZE_WHITESPACE
+        >>> is_matcher({"foo": {"regex": "bar", "group_index": 0}})
         (False, "If the matcher spec is a dictionary, it must have only a 'regex' key.
                  Got {'regex': 'bar', 'group_index': 0} for foo")
         >>> is_matcher({})
@@ -99,17 +99,17 @@ def matcher_to_expr(matcher_cfg: DictConfig | dict) -> tuple[pl.Expr, set[str]]:
     Examples:
         >>> expr, cols = matcher_to_expr({"foo": "bar", "buzz": "baz"})
         >>> print(expr)
-        [(col("foo")) == (String(bar))].all_horizontal([[(col("buzz")) == (String(baz))]])
+        [(col("foo")) == ("bar")].all_horizontal([[(col("buzz")) == ("baz")]])
         >>> sorted(cols)
         ['buzz', 'foo']
         >>> expr, cols = matcher_to_expr(DictConfig({"foo": "bar", "buzz": "baz"}))
         >>> print(expr)
-        [(col("foo")) == (String(bar))].all_horizontal([[(col("buzz")) == (String(baz))]])
+        [(col("foo")) == ("bar")].all_horizontal([[(col("buzz")) == ("baz")]])
         >>> sorted(cols)
         ['buzz', 'foo']
         >>> expr, cols = matcher_to_expr(DictConfig({"foo": "bar", "buzz": {"regex": "baz"}}))
         >>> print(expr)
-        [(col("foo")) == (String(bar))].all_horizontal([col("buzz").str.contains([String(baz)])])
+        [(col("foo")) == ("bar")].all_horizontal([col("buzz").str.contains(["baz"])])
         >>> sorted(cols)
         ['buzz', 'foo']
         >>> matcher_to_expr(["foo", "bar"])
@@ -236,7 +236,7 @@ class ColExprType(StrEnum):
             (False, "String interpolation expressions must have a string value. Got ['bar//{foo}']")
             >>> ColExprType.is_valid({"literal": ["baz", 32]})
             (True, None)
-            >>> ColExprType.is_valid({"col": "foo", "str": "bar"}) # doctest: +NORMALIZE_WHITESPACE
+            >>> ColExprType.is_valid({"col": "foo", "str": "bar"})
             (False, "Column expressions can only contain a single key-value pair.
                     Got {'col': 'foo', 'str': 'bar'}")
             >>> ColExprType.is_valid({"foo": "bar"})
@@ -291,7 +291,7 @@ class ColExprType(StrEnum):
             col("foo") {'foo'}
             >>> expr, cols = ColExprType.to_pl_expr(ColExprType.STR, "bar//{foo}//{baz}")
             >>> print(expr)
-            String(bar//).str.concat_horizontal([col("foo"), String(//), col("baz")])
+            "bar//".str.concat_horizontal([col("foo"), "//", col("baz")])
             >>> sorted(cols)
             ['baz', 'foo']
             >>> expr, cols = ColExprType.to_pl_expr(ColExprType.LITERAL, ListConfig(["foo", "bar"]))
@@ -301,7 +301,7 @@ class ColExprType(StrEnum):
             set()
             >>> expr, cols = ColExprType.to_pl_expr(ColExprType.EXTRACT, {"from": "foo", "regex": "bar"})
             >>> print(expr)
-            col("foo").str.extract([String(bar)])
+            col("foo").str.extract(["bar"])
             >>> sorted(cols)
             ['foo']
             >>> ColExprType.to_pl_expr(ColExprType.COL, 32)
@@ -353,14 +353,14 @@ def parse_col_expr(cfg: str | list | dict[str, str] | ListConfig | DictConfig) -
         {'literal': ['foo', 'bar']}
         >>> parse_col_expr({"output": "foo", "matcher": {"bar": "baz"}})
         {'output': {'col': 'foo'}, 'matcher': {'bar': 'baz'}}
-        >>> parse_col_expr({"output": "foo", "matcher": {32: "baz"}}) # doctest: +NORMALIZE_WHITESPACE
+        >>> parse_col_expr({"output": "foo", "matcher": {32: "baz"}})
         Traceback (most recent call last):
             ...
         ValueError: A pre-specified output/matcher configuration must have a valid matcher dictionary. Got
                     cfg['matcher']={32: 'baz'} which has errors: ...
         >>> parse_col_expr({"foo": {"bar": "baz"}})
         {'output': {'col': 'foo'}, 'matcher': {'bar': 'baz'}}
-        >>> parse_col_expr({"foo": {32: "baz"}}) # doctest: +NORMALIZE_WHITESPACE
+        >>> parse_col_expr({"foo": {32: "baz"}})
         Traceback (most recent call last):
             ...
         ValueError: A simple-form conditional expression is expressed with a single key-value pair dict,
@@ -369,7 +369,7 @@ def parse_col_expr(cfg: str | list | dict[str, str] | ListConfig | DictConfig) -
                     has errors: ...
         >>> parse_col_expr(["bar//{foo}", {"str": "bar//UNK"}])
         [{'str': 'bar//{foo}'}, {'str': 'bar//UNK'}]
-        >>> parse_col_expr({"foo": "bar", "buzz": "baz", "fuzz": "fizz"}) # doctest: +NORMALIZE_WHITESPACE
+        >>> parse_col_expr({"foo": "bar", "buzz": "baz", "fuzz": "fizz"})
         Traceback (most recent call last):
             ...
         ValueError: Dictionary column expression must either be explicit output/matcher configs, with two
@@ -378,12 +378,12 @@ def parse_col_expr(cfg: str | list | dict[str, str] | ListConfig | DictConfig) -
                     simple-form conditional expression with a single key-value pair where the key is the
                     conditional value and the value is a valid matcher dict. Got a dictionary with 3 elements:
                     {'foo': 'bar', 'buzz': 'baz', 'fuzz': 'fizz'}
-        >>> parse_col_expr(('foo', 'bar')) # doctest: +NORMALIZE_WHITESPACE
+        >>> parse_col_expr(('foo', 'bar'))
         Traceback (most recent call last):
             ...
         ValueError: A simple column expression must be a string, list, or dictionary.
                     Got <class 'tuple'>: ('foo', 'bar')
-        >>> parse_col_expr({"col": "foo", "str": "bar"}) # doctest: +NORMALIZE_WHITESPACE
+        >>> parse_col_expr({"col": "foo", "str": "bar"})
         Traceback (most recent call last):
             ...
         ValueError: Dictionary column expression must either be explicit output/matcher configs, with two
@@ -392,7 +392,7 @@ def parse_col_expr(cfg: str | list | dict[str, str] | ListConfig | DictConfig) -
                     simple-form conditional expression with a single key-value pair where the key is the
                     conditional value and the value is a valid matcher dict. Got a dictionary with 2 elements:
                     {'col': 'foo', 'str': 'bar'}
-        >>> parse_col_expr(["foo", 32]) # doctest: +NORMALIZE_WHITESPACE
+        >>> parse_col_expr(["foo", 32])
         Traceback (most recent call last):
             ...
         ValueError: If a list (which coalesces columns), all elements must be strings or dictionaries.
@@ -463,34 +463,34 @@ def structured_expr_to_pl(cfg: dict | list[dict] | ListConfig | DictConfig) -> t
     Examples:
         >>> expr, cols = structured_expr_to_pl([{"col": "foo"}, {"str": "bar//{baz}"}, {"literal": "fizz"}])
         >>> print(expr)
-        col("foo").coalesce([String(bar//).str.concat_horizontal([col("baz")]), String(fizz)])
+        col("foo").coalesce(["bar//".str.concat_horizontal([col("baz")]), "fizz"])
         >>> sorted(cols)
         ['baz', 'foo']
         >>> expr, cols = structured_expr_to_pl({"output": {"literal": "foo"}, "matcher": {"bar": "baz"}})
         >>> print(expr)
-        .when([(col("bar")) == (String(baz))].all_horizontal()).then(String(foo)).otherwise(null)
+        .when([(col("bar")) == ("baz")].all_horizontal()).then("foo").otherwise(null)
         >>> sorted(cols)
         ['bar']
         >>> expr, cols = structured_expr_to_pl({"extract": {"from": "foo", "regex": r"b/(.*)"}})
         >>> print(expr)
-        col("foo").str.extract([String(b/(.*))])
+        col("foo").str.extract(["b/(.*)"])
         >>> sorted(cols)
         ['foo']
         >>> expr, cols = structured_expr_to_pl({"extract": {"from": "foo", "regex": "bar", "group_index": 0}})
         >>> print(expr)
-        col("foo").str.extract([String(bar)])
+        col("foo").str.extract(["bar"])
         >>> sorted(cols)
         ['foo']
         >>> structured_expr_to_pl(["foo", 32])
         Traceback (most recent call last):
             ...
         ValueError: Error processing list config on field 1 for ['foo', 32]
-        >>> structured_expr_to_pl({"output": 32, "matcher": {"bar": "baz"}}) # doctest: +NORMALIZE_WHITESPACE
+        >>> structured_expr_to_pl({"output": 32, "matcher": {"bar": "baz"}})
         Traceback (most recent call last):
             ...
         ValueError: Error processing output/matcher config output expression for
                     {'output': 32, 'matcher': {'bar': 'baz'}}
-        >>> structured_expr_to_pl({"output": "foo", "matcher": {32: "baz"}}) # doctest: +NORMALIZE_WHITESPACE
+        >>> structured_expr_to_pl({"output": "foo", "matcher": {32: "baz"}})
         Traceback (most recent call last):
             ...
         ValueError: A pre-specified output/matcher configuration must have a valid matcher dictionary. Got

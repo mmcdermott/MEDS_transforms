@@ -44,7 +44,7 @@ def get_and_validate_code_metadata_schema(code_metadata: pl.DataFrame, do_retype
 
     Examples:
         >>> df = pl.DataFrame({})
-        >>> get_and_validate_code_metadata_schema(df, do_retype=False) # doctest: +NORMALIZE_WHITESPACE
+        >>> get_and_validate_code_metadata_schema(df, do_retype=False)
         Traceback (most recent call last):
             ...
         ValueError: Code metadata DataFrame must have a 'code' column of type String.
@@ -61,7 +61,7 @@ def get_and_validate_code_metadata_schema(code_metadata: pl.DataFrame, do_retype
         description: [[null]]
         parent_codes: [[null]]
         >>> df = pl.DataFrame({"code": ["A"], "description": [1], "parent_codes": [3.2], "foo": [34.2]})
-        >>> get_and_validate_code_metadata_schema(df, do_retype=False) # doctest: +NORMALIZE_WHITESPACE
+        >>> get_and_validate_code_metadata_schema(df, do_retype=False)
         Traceback (most recent call last):
             ...
         ValueError: Code metadata 'description' column must be of type String. Got Int64.
