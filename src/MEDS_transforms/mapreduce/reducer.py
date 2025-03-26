@@ -1,5 +1,7 @@
 """Basic utilities for serialized reduce operations on sharded MEDS datasets with caching and locking."""
 
+import logging
+import time
 from collections.abc import Callable, Generator
 from datetime import datetime
 from functools import partial
@@ -7,10 +9,11 @@ from pathlib import Path
 from typing import TypeVar
 
 import polars as pl
-from loguru import logger
 from omegaconf import DictConfig
 
 from ..utils import write_lazyframe
+
+logger = logging.getLogger(__name__)
 
 DF_T = TypeVar("DF_T")
 
@@ -23,12 +26,6 @@ def join_merger_fntr(cfg: DictConfig) -> REDUCE_FN_T:
     raise NotImplementedError("Join merging not yet implemented")
 
 
-def take_new_and_error(new: DF_T, disk: DF_T | None) -> DF_T:
-    if disk is not None:
-        raise FileExistsError(f"File already exists on disk")
-    return new
-
-
 def reduce_over(
     cfg: DictConfig,
     all_out_fps: list[Path],
@@ -36,6 +33,7 @@ def reduce_over(
     read_fn: Callable[[Path], DF_T] = partial(pl.scan_parquet, glob=False),
     write_fn: Callable[[DF_T, Path], None] = write_lazyframe,
     merge_fn: REDUCE_FN_T | None = None,
+    reducer_fn: REDUCE_FN_T | None = None,
 ) -> list[Path]:
     if cfg.worker != 0:
         logger.info("Mapping stage completed. Exiting")
