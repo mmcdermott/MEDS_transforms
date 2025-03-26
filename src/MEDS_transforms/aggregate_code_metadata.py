@@ -16,8 +16,7 @@ from meds import subject_id_field
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce.mapper import map_over
-from MEDS_transforms.mapreduce.utils import is_complete_parquet_file
+from MEDS_transforms.mapreduce import is_complete_parquet_file, map_over
 from MEDS_transforms.utils import write_lazyframe
 
 logger = logging.getLogger(__name__)

@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 from MEDS_transforms.extract import CONFIG_YAML, MEDS_METADATA_MANDATORY_TYPES
 from MEDS_transforms.extract.convert_to_sharded_events import get_code_expr
 from MEDS_transforms.extract.utils import get_supported_fp
-from MEDS_transforms.mapreduce.mapper import rwlock_wrap
+from MEDS_transforms.mapreduce import rwlock_wrap
 from MEDS_transforms.parser import cfg_to_expr
 from MEDS_transforms.utils import stage_init, write_lazyframe
 

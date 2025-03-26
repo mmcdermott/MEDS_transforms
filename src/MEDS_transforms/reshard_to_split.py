@@ -15,7 +15,7 @@ from omegaconf import DictConfig
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.extract.split_and_shard_subjects import shard_subjects
-from MEDS_transforms.mapreduce.utils import rwlock_wrap, shard_iterator, shuffle_shards
+from MEDS_transforms.mapreduce import rwlock_wrap, shard_iterator, shuffle_shards
 from MEDS_transforms.utils import stage_init, write_lazyframe
 
 logger = logging.getLogger(__name__)

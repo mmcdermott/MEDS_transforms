@@ -16,7 +16,7 @@ from omegaconf.listconfig import ListConfig
 
 from MEDS_transforms.extract import CONFIG_YAML
 from MEDS_transforms.extract.shard_events import META_KEYS
-from MEDS_transforms.mapreduce.mapper import rwlock_wrap
+from MEDS_transforms.mapreduce import rwlock_wrap
 from MEDS_transforms.utils import is_col_field, parse_col_field, stage_init, write_lazyframe
 
 logger = logging.getLogger(__name__)

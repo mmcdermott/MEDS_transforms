@@ -8,8 +8,7 @@ import polars as pl
 from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms.extract import CONFIG_YAML
-from MEDS_transforms.mapreduce.mapper import map_over
-from MEDS_transforms.mapreduce.utils import shard_iterator_by_shard_map
+from MEDS_transforms.mapreduce import map_over, shard_iterator_by_shard_map
 
 logger = logging.getLogger(__name__)
 
