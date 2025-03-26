@@ -6,12 +6,8 @@ scripts.
 
 import polars as pl
 
-from tests.MEDS_Transforms import AGGREGATE_CODE_METADATA_SCRIPT
-from tests.MEDS_Transforms.transform_tester_base import (
-    MEDS_CODE_METADATA_SCHEMA,
-    MEDS_SHARDS,
-    single_stage_transform_tester,
-)
+from tests import AGGREGATE_CODE_METADATA_SCRIPT
+from tests.transform_tester_base import MEDS_CODE_METADATA_SCHEMA, MEDS_SHARDS, single_stage_transform_tester
 
 WANT_OUTPUT_CODE_METADATA_FILE = """
 code,code/n_occurrences,code/n_subjects,values/n_occurrences,values/n_subjects,values/sum,values/sum_sqd,values/n_ints,values/min,values/max,description,parent_codes

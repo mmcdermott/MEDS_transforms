@@ -8,7 +8,7 @@ dynamic = ["version"]
 authors = [
   { name="Matthew McDermott", email="mattmcdermott8@gmail.com" },
 ]
-description = "MEDS ETL and transformation functions leveraging a sharding-based parallelism model & polars."
+description = "A framework for compiling simple, mapreduce style pipelines over MEDS datasets."
 readme = "README.md"
 requires-python = ">=3.11"
 classifiers = [
@@ -34,16 +34,6 @@ docs = [
 ]
 
 [project.scripts]
-# MEDS_extract
-MEDS_extract-split_and_shard_subjects = "MEDS_transforms.extract.split_and_shard_subjects:main"
-MEDS_extract-shard_events = "MEDS_transforms.extract.shard_events:main"
-MEDS_extract-convert_to_sharded_events = "MEDS_transforms.extract.convert_to_sharded_events:main"
-MEDS_extract-merge_to_MEDS_cohort = "MEDS_transforms.extract.merge_to_MEDS_cohort:main"
-MEDS_extract-extract_code_metadata = "MEDS_transforms.extract.extract_code_metadata:main"
-MEDS_extract-finalize_MEDS_metadata = "MEDS_transforms.extract.finalize_MEDS_metadata:main"
-MEDS_extract-finalize_MEDS_data = "MEDS_transforms.extract.finalize_MEDS_data:main"
-
-# MEDS_transform
 ## General
 MEDS_transform-aggregate_code_metadata = "MEDS_transforms.aggregate_code_metadata:main"
 MEDS_transform-fit_vocabulary_indices = "MEDS_transforms.fit_vocabulary_indices:main"
