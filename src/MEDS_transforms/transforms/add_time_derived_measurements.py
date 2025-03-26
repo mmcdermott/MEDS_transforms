@@ -8,7 +8,7 @@ import polars as pl
 from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms import INFERRED_STAGE_KEYS, PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import map_over
+from MEDS_transforms.mapreduce import map_stage
 
 logger = logging.getLogger(__name__)
 
@@ -440,4 +440,4 @@ def add_time_derived_measurements_fntr(stage_cfg: DictConfig) -> Callable[[pl.La
 def main(cfg: DictConfig):
     """Adds time-derived measurements to a MEDS cohort as separate observations at each unique time."""
 
-    map_over(cfg, compute_fn=add_time_derived_measurements_fntr)
+    map_stage(cfg, compute_fn=add_time_derived_measurements_fntr)

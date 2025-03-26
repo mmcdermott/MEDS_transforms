@@ -11,7 +11,7 @@ from omegaconf import DictConfig
 logger = logging.getLogger(__name__)
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import map_over
+from MEDS_transforms.mapreduce import map_stage
 
 
 def filter_subjects_by_num_measurements(df: pl.LazyFrame, min_measurements_per_subject: int) -> pl.LazyFrame:
@@ -264,4 +264,4 @@ def filter_subjects_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.L
 def main(cfg: DictConfig):
     """TODO."""
 
-    map_over(cfg, compute_fn=filter_subjects_fntr)
+    map_stage(cfg, compute_fn=filter_subjects_fntr)

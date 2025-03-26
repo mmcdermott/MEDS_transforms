@@ -8,7 +8,7 @@ import polars as pl
 from omegaconf import DictConfig, ListConfig
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import map_over
+from MEDS_transforms.mapreduce import map_stage
 from MEDS_transforms.utils import get_smallest_valid_uint_type
 
 logger = logging.getLogger(__name__)
@@ -183,4 +183,4 @@ def main(cfg: DictConfig):
             quotes: ``'stage_configs.reorder_measurements.ordered_code_patterns=["foo$", "bar", "foo.*"]'``.
     """
 
-    map_over(cfg, reorder_by_code_fntr)
+    map_stage(cfg, reorder_by_code_fntr)
