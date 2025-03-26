@@ -2,61 +2,43 @@
 
 import logging
 import time
-from collections.abc import Callable, Generator
-from datetime import datetime
-from functools import partial
+from collections.abc import Callable
 from pathlib import Path
-from typing import TypeVar
 
-import polars as pl
-from omegaconf import DictConfig
+import polars.selectors as cs
 
-from ..utils import write_lazyframe
+from .read_fn import READ_FN_T
+from .rwlock import WRITE_FN_T
+from .types import DF_T
 
 logger = logging.getLogger(__name__)
 
-DF_T = TypeVar("DF_T")
-
 REDUCE_FN_T = Callable[[DF_T, DF_T | None], DF_T]
-SHARD_GEN_T = Generator[tuple[Path, Path], None, None]
-SHARD_ITR_FNTR_T = Callable[[DictConfig], SHARD_GEN_T]
-
-
-def join_merger_fntr(cfg: DictConfig) -> REDUCE_FN_T:
-    raise NotImplementedError("Join merging not yet implemented")
 
 
 def reduce_over(
-    cfg: DictConfig,
-    all_out_fps: list[Path],
-    compute_fn: REDUCE_FN_T,
-    read_fn: Callable[[Path], DF_T] = partial(pl.scan_parquet, glob=False),
-    write_fn: Callable[[DF_T, Path], None] = write_lazyframe,
-    merge_fn: REDUCE_FN_T | None = None,
-    reducer_fn: REDUCE_FN_T | None = None,
-) -> list[Path]:
-    if cfg.worker != 0:
-        logger.info("Mapping stage completed. Exiting")
-        return
+    in_fps: list[Path],
+    out_fp: Path,
+    polling_time: float,
+    read_fn: READ_FN_T,
+    write_fn: WRITE_FN_T,
+    reduce_fn: REDUCE_FN_T,
+    merge_fp: Path,
+    merge_fn: REDUCE_FN_T,
+    do_overwrite: bool = False,
+) -> Path:
+    if out_fp.is_file() and not do_overwrite:
+        raise FileExistsError(f"Output file already exists: {str(out_fp.resolve())}")
 
-    logger.info("Starting reduction process")
-
-    start = datetime.now()
-
-    while not all(fp.is_file() for fp in all_out_fps):
+    while not all(fp.is_file() for fp in in_fps):
         logger.info("Waiting to begin reduction for all files to be written...")
-        time.sleep(cfg.polling_time)
+        time.sleep(polling_time)
 
-    reduced = reducer_fn(*[read_fn(fp) for fp in all_out_fps])
+    reduced = reduce_fn(*[read_fn(fp) for fp in in_fps]).with_columns(cs.numeric().shrink_dtype().name.keep())
 
-    reducer_fp = Path(cfg.stage_cfg.reduced_output_fp)
-    on_disk = read_fn(reducer_fp) if reducer_fp.is_file() else None
+    if merge_fp.is_file():
+        reduced = merge_fn(reduced, read_fn(merge_fp))
 
-    if merge_fn is None:
-        merge_fn = join_merger_fntr(cfg)
-
-    reduced = merge_fn(reduced, on_disk)
-    write_fn(reduced, reducer_fp)
-
-    logger.info(f"Finished reduction in {datetime.now() - start}")
-    return reduced
+    out_fp.parent.mkdir(parents=True, exist_ok=True)
+    write_fn(reduced, out_fp)
+    return out_fp

@@ -1,7 +1,7 @@
 """Basic utilities for parallelizable map operations on sharded MEDS datasets with caching and locking."""
 
 import logging
-from collections.abc import Callable, Generator
+from collections.abc import Callable
 from functools import partial
 from pathlib import Path
 
@@ -22,7 +22,8 @@ def map_over(
     compute_fn: COMPUTE_FN_T | None = None,
     write_fn: Callable[[DF_T, Path], None] = write_lazyframe,
     do_overwrite: bool = False,
-) -> Generator[Path, None, None]:
+) -> list[Path]:
+    all_out_fps = []
     for in_fp, out_fp in shards:
         logger.info(f"Processing {str(in_fp.resolve())} into {str(out_fp.resolve())}")
         rwlock_wrap(
@@ -33,4 +34,5 @@ def map_over(
             compute_fn,
             do_overwrite=do_overwrite,
         )
-        yield out_fp
+        all_out_fps.append(out_fp)
+    return all_out_fps

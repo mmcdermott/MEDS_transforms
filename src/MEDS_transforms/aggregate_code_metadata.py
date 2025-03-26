@@ -1,11 +1,8 @@
 """Utilities for grouping and/or reducing MEDS cohort files by code to collect metadata properties."""
 
 import logging
-import time
 from collections.abc import Callable, Sequence
-from datetime import datetime
 from enum import StrEnum
-from pathlib import Path
 from typing import NamedTuple
 
 import hydra
@@ -15,8 +12,7 @@ from meds import subject_id_field
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import is_complete_parquet_file, map_over
-from MEDS_transforms.utils import write_lazyframe
+from MEDS_transforms.mapreduce import mapreduce_stage
 
 logger = logging.getLogger(__name__)
 
@@ -746,43 +742,6 @@ def reducer_fntr(
     return reducer
 
 
-def run_map_reduce(cfg: DictConfig):
-    """Stored separately so it can be easily imported into the pre-built extraction pipelines."""
-    all_out_fps = map_over(cfg, compute_fn=mapper_fntr)
-
-    if cfg.worker != 0:
-        logger.info("Code metadata mapping completed. Exiting")
-        return
-
-    logger.info("Starting reduction process")
-
-    while not all(is_complete_parquet_file(fp) for fp in all_out_fps):  # pragma: no cover
-        logger.info("Waiting to begin reduction for all files to be written...")
-        time.sleep(cfg.polling_time)
-
-    start = datetime.now()
-    logger.info("All map shards complete! Starting code metadata reduction computation.")
-    reducer_fp = Path(cfg.stage_cfg.reducer_output_dir) / "codes.parquet"
-    reducer_fp.parent.mkdir(parents=True, exist_ok=True)
-
-    reducer_fn = reducer_fntr(cfg.stage_cfg, cfg.get("code_modifiers", None))
-    reduced = reducer_fn(*[pl.scan_parquet(fp, glob=False) for fp in all_out_fps]).with_columns(
-        cs.numeric().shrink_dtype().name.keep()
-    )
-
-    old_metadata_fp = Path(cfg.stage_cfg.metadata_input_dir) / "codes.parquet"
-    join_cols = ["code", *cfg.get("code_modifier_cols", [])]
-
-    if old_metadata_fp.exists():
-        logger.info(f"Joining to existing code metadata at {str(old_metadata_fp.resolve())}")
-        existing = pl.scan_parquet(old_metadata_fp)
-        existing = existing.drop(*[c for c in existing.columns if c in set(reduced.columns) - set(join_cols)])
-        reduced = reduced.join(existing, on=join_cols, how="left", coalesce=True)
-
-    write_lazyframe(reduced, reducer_fp)
-    logger.info(f"Finished reduction in {datetime.now() - start}")
-
-
 @hydra.main(
     version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
 )
@@ -794,4 +753,8 @@ def main(cfg: DictConfig):
     all codes, _not_ the counts for rows with a code that is `null`, which should not happen.
     """
 
-    run_map_reduce(cfg)
+    mapreduce_stage(
+        cfg,
+        compute_fn=mapper_fntr,
+        reduce_fn=reducer_fntr(cfg.stage_cfg, cfg.get("code_modifiers", None)),
+    )
