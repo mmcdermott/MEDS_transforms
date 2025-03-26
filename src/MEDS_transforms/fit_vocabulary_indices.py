@@ -247,3 +247,7 @@ def main(cfg: DictConfig):
     code_metadata.write_parquet(output_fp, use_pyarrow=True)
 
     logger.info(f"Done with {cfg.stage}")
+
+
+OmegaConf.register_new_resolver("current_script_name", lambda: main.__module__.split(".")[-1], replace=True)
+OmegaConf.register_new_resolver("get_script_docstring", lambda: main.__doc__, replace=True)

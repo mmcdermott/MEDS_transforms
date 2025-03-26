@@ -2,15 +2,14 @@
 
 from collections.abc import Callable
 
-import hydra
 import polars as pl
 from omegaconf import DictConfig
 
-from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import map_stage
+from ..stages import registered_stage
 
 
-def filter_measurements_fntr(
+@registered_stage
+def main(
     stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Returns a function that filters subject events to only encompass those with a set of permissible codes.
@@ -163,11 +162,3 @@ def filter_measurements_fntr(
         )
 
     return filter_measurements_fn
-
-
-@hydra.main(
-    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
-)
-def main(cfg: DictConfig):
-    """TODO."""
-    map_stage(cfg, compute_fn=filter_measurements_fntr)

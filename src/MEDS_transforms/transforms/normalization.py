@@ -1,14 +1,12 @@
 """Transformations for normalizing MEDS datasets, across both categorical and continuous dimensions."""
 
-import hydra
 import polars as pl
-from omegaconf import DictConfig
 
-from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import map_stage
+from ..stages import registered_stage
 
 
-def normalize(
+@registered_stage
+def main(
     df: pl.LazyFrame, code_metadata: pl.DataFrame, code_modifiers: list[str] | None = None
 ) -> pl.LazyFrame:
     """Normalize a MEDS dataset across both categorical and continuous dimensions.
@@ -221,16 +219,3 @@ def normalize(
         .sort(idx_col)
         .drop(idx_col)
     )
-
-
-@hydra.main(
-    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
-)
-def main(cfg: DictConfig):
-    """Normalizes the numeric values in accordance with the aggregated code metadata.
-
-    Note that the appropriate aggregations from `aggregate_code_metadata` _must_ be run before this stage
-    (typically directly before).
-    """
-
-    map_stage(cfg, compute_fn=normalize)

@@ -3,13 +3,12 @@
 import logging
 from collections.abc import Callable
 
-import hydra
 import polars as pl
 from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms import INFERRED_STAGE_KEYS
-from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import map_stage
+
+from ..stages import registered_stage
 
 logger = logging.getLogger(__name__)
 
@@ -389,7 +388,8 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
     return fn
 
 
-def add_time_derived_measurements_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
+@registered_stage
+def main(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Adds all requested time-derived measurements to a DataFrame.
 
     Args:
@@ -433,12 +433,3 @@ def add_time_derived_measurements_fntr(stage_cfg: DictConfig) -> Callable[[pl.La
         return df
 
     return fn
-
-
-@hydra.main(
-    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
-)
-def main(cfg: DictConfig):
-    """Adds time-derived measurements to a MEDS cohort as separate observations at each unique time."""
-
-    map_stage(cfg, compute_fn=add_time_derived_measurements_fntr)

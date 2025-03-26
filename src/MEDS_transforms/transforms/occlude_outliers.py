@@ -2,15 +2,14 @@
 
 from collections.abc import Callable
 
-import hydra
 import polars as pl
 from omegaconf import DictConfig
 
-from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import map_stage
+from ..stages import registered_stage
 
 
-def occlude_outliers_fntr(
+@registered_stage
+def main(
     stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Filters subject events to only encompass those with a set of permissible codes.
@@ -115,16 +114,3 @@ def occlude_outliers_fntr(
         )
 
     return occlude_outliers_fn
-
-
-@hydra.main(
-    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
-)
-def main(cfg: DictConfig):
-    """Occludes outliers in accordance with the aggregated code metadata.
-
-    Note that the aggregation stage with the appropriate aggregates must be run first! See the stage configs
-    for arguments.
-    """
-
-    map_stage(cfg, compute_fn=occlude_outliers_fntr)

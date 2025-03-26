@@ -1,9 +1,6 @@
 """Core utilities for MEDS pipelines built with these tools."""
 
-import importlib
-import inspect
 import logging
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -68,9 +65,7 @@ def stage_init(cfg: DictConfig) -> tuple[Path, Path, Path]:
 
     Returns: The data input directory, stage output directory, and metadata input directory.
     """
-    logger.info(
-        f"Running {current_script_name()} with the following configuration:\n{OmegaConf.to_yaml(cfg)}"
-    )
+    logger.info(f"Running stage with the following configuration:\n{OmegaConf.to_yaml(cfg)}")
 
     input_dir = Path(cfg.stage_cfg.data_input_dir)
     output_dir = Path(cfg.stage_cfg.output_dir)
@@ -105,49 +100,6 @@ def get_package_name() -> str:
 def get_package_version() -> str:
     """Returns the version of the python package running this pipeline."""
     return package_version
-
-
-def get_script_docstring(filename: str | None = None) -> str:
-    """Returns the docstring of the main function of the calling script or the file specified.
-
-    Args:
-        filename: The name of the file to get the docstring from. If None, the calling script's docstring is
-            returned.
-
-    Returns:
-        str: The docstring of the main function of the specified file, if it exists.
-
-    Examples:
-        >>> get_script_docstring()
-        ''
-        >>> get_script_docstring("reshard_to_split")
-        'Re-shard a MEDS cohort to in a manner that subdivides subject splits.'
-    """
-
-    if filename is not None:
-        main_module = importlib.import_module(f"MEDS_transforms.{filename}")
-    else:
-        main_module = sys.modules["__main__"]
-    func = getattr(main_module, "main", None)
-    if func and callable(func):
-        return inspect.getdoc(func) or ""
-    return ""
-
-
-def current_script_name() -> str:
-    """Returns the name of the module that called this function."""
-
-    main_module = sys.modules["__main__"]
-    main_func = getattr(main_module, "main", None)
-    if main_func and callable(main_func):
-        func_module = main_func.__module__
-        if func_module == "__main__":  # pragma: no cover
-            return Path(sys.argv[0]).stem
-        else:
-            return func_module.split(".")[-1]
-
-    logger.warning("Can't find main function in __main__ module. Using sys.argv[0] as a fallback.")
-    return Path(sys.argv[0]).stem
 
 
 def is_metadata_stage(stage: dict[str, Any] | DictConfig) -> bool:
@@ -375,8 +327,6 @@ def populate_stage(
     return out
 
 
-OmegaConf.register_new_resolver("get_script_docstring", get_script_docstring, replace=False)
-OmegaConf.register_new_resolver("current_script_name", current_script_name, replace=False)
 OmegaConf.register_new_resolver("populate_stage", populate_stage, replace=False)
 OmegaConf.register_new_resolver("get_package_version", get_package_version, replace=False)
 OmegaConf.register_new_resolver("get_package_name", get_package_name, replace=False)

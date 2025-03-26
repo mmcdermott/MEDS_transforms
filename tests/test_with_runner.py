@@ -931,11 +931,6 @@ NO_ARGS_HELP_STR = """
 MEDS-Transforms Pipeline Runner is a command line tool for running entire MEDS-transform pipelines in a single
 command.
 
-Runs the entire pipeline, end-to-end, based on the configuration provided.
-
-This script will launch many subsidiary commands via `subprocess`, one for each stage of the specified
-pipeline.
-
 **MEDS-transforms Pipeline description:**
 
 No description provided.
@@ -945,11 +940,6 @@ WITH_CONFIG_HELP_STR = """
 == MEDS-Transforms Pipeline Runner ==
 MEDS-Transforms Pipeline Runner is a command line tool for running entire MEDS-transform pipelines in a single
 command.
-
-Runs the entire pipeline, end-to-end, based on the configuration provided.
-
-This script will launch many subsidiary commands via `subprocess`, one for each stage of the specified
-pipeline.
 
 **MEDS-transforms Pipeline description:**
 

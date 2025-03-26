@@ -4,14 +4,13 @@ import logging
 from collections.abc import Callable
 from functools import partial
 
-import hydra
 import polars as pl
 from omegaconf import DictConfig
 
 logger = logging.getLogger(__name__)
 
-from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import map_stage
+
+from ..stages import registered_stage
 
 
 def filter_subjects_by_num_measurements(df: pl.LazyFrame, min_measurements_per_subject: int) -> pl.LazyFrame:
@@ -199,7 +198,8 @@ def filter_subjects_by_num_events(df: pl.LazyFrame, min_events_per_subject: int)
     return df.filter(pl.col("time").n_unique().over("subject_id") >= min_events_per_subject)
 
 
-def filter_subjects_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
+@registered_stage
+def main(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Returns a function that filters subjects by the number of measurements and events they have.
 
     Args:
@@ -256,12 +256,3 @@ def filter_subjects_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.L
         return data
 
     return fn
-
-
-@hydra.main(
-    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
-)
-def main(cfg: DictConfig):
-    """TODO."""
-
-    map_stage(cfg, compute_fn=filter_subjects_fntr)

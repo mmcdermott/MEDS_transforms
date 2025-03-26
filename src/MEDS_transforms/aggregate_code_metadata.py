@@ -5,14 +5,12 @@ from collections.abc import Callable, Sequence
 from enum import StrEnum
 from typing import NamedTuple
 
-import hydra
 import polars as pl
 import polars.selectors as cs
 from meds import subject_id_field
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
-from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import mapreduce_stage
+from .stages import registered_stage
 
 logger = logging.getLogger(__name__)
 
@@ -742,19 +740,4 @@ def reducer_fntr(
     return reducer
 
 
-@hydra.main(
-    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
-)
-def main(cfg: DictConfig):
-    """Aggregates code metadata across shards.
-
-    Note that the output of this stage includes a `null` code row if
-    `stage_configs.STAGE_NAME.do_summarize_over_all_codes` is True. This row contains the total counts across
-    all codes, _not_ the counts for rows with a code that is `null`, which should not happen.
-    """
-
-    mapreduce_stage(
-        cfg,
-        compute_fn=mapper_fntr,
-        reduce_fn=reducer_fntr,
-    )
+main = registered_stage(compute_fn=mapper_fntr, reduce_fn=reducer_fntr)
