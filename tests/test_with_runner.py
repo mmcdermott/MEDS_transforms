@@ -20,16 +20,17 @@ from functools import partial
 import polars as pl
 from meds import code_metadata_filepath, subject_id_field, subject_splits_filepath
 
-from tests import RUNNER_SCRIPT, USE_LOCAL_SCRIPTS
-from tests.MEDS_Transforms import (
+from tests import (
     ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT,
     AGGREGATE_CODE_METADATA_SCRIPT,
     FILTER_SUBJECTS_SCRIPT,
     FIT_VOCABULARY_INDICES_SCRIPT,
     NORMALIZATION_SCRIPT,
     OCCLUDE_OUTLIERS_SCRIPT,
+    RUNNER_SCRIPT,
+    USE_LOCAL_SCRIPTS,
 )
-from tests.MEDS_Transforms.transform_tester_base import MEDS_SHARDS, SPLITS_DF
+from tests.transform_tester_base import MEDS_SHARDS, SPLITS_DF
 from tests.utils import add_params, exact_str_regex, parse_shards_yaml, single_stage_tester
 
 MEDS_CODE_METADATA = pl.DataFrame(
