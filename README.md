@@ -159,7 +159,7 @@ To use this repository as an importable library, the user should follow these st
 
 1. Install the repository as a package.
 2. Design your own transform function in your own codebase and leverage `MEDS_transform` utilities such as
-    `MEDS_transform.mapreduce.mapper.map_over` to easily apply your transform over a sharded MEDS dataset.
+    `MEDS_transforms.mapreduce.mapper.map_over` to easily apply your transform over a sharded MEDS dataset.
 3. Leverage the `MEDS_transforms` configuration schema to enable easy configuration of your pipeline, by
     importing the MEDS transforms configs via your hydra search path and using them as a base for your own
     configuration files, enabling you to intermix your new stage configuration with the existing MEDS
