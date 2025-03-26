@@ -1,5 +1,5 @@
-#!/usr/bin/env python
 """A polars-to-polars transformation function for filtering subjects by sequence length."""
+
 from collections.abc import Callable
 
 import hydra
@@ -128,7 +128,3 @@ def main(cfg: DictConfig):
     """
 
     map_over(cfg, compute_fn=occlude_outliers_fntr)
-
-
-if __name__ == "__main__":  # pragma: no cover
-    main()

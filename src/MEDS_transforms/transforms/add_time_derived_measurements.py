@@ -1,5 +1,5 @@
-#!/usr/bin/env python
 """Transformations for adding time-derived measurements (e.g., a subject's age) to a MEDS dataset."""
+
 import logging
 from collections.abc import Callable
 
@@ -441,7 +441,3 @@ def main(cfg: DictConfig):
     """Adds time-derived measurements to a MEDS cohort as separate observations at each unique time."""
 
     map_over(cfg, compute_fn=add_time_derived_measurements_fntr)
-
-
-if __name__ == "__main__":  # pragma: no cover
-    main()

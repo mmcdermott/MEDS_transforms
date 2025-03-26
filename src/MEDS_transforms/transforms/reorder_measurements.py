@@ -1,5 +1,5 @@
-#!/usr/bin/env python
 """A polars-to-polars transformation function for filtering subjects by sequence length."""
+
 import logging
 from collections.abc import Callable
 
@@ -184,7 +184,3 @@ def main(cfg: DictConfig):
     """
 
     map_over(cfg, reorder_by_code_fntr)
-
-
-if __name__ == "__main__":  # pragma: no cover
-    main()

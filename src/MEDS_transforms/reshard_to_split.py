@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Utilities for re-sharding a MEDS cohort to subsharded splits."""
 
 import json
@@ -164,7 +163,3 @@ def main(cfg: DictConfig):
         )
 
     logger.info(f"Done with {cfg.stage}")
-
-
-if __name__ == "__main__":  # pragma: no cover
-    main()
