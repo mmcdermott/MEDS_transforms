@@ -1,11 +1,6 @@
-from .mapper import map_over  # noqa: F401
-from .utils import (  # noqa: F401
-    is_complete_parquet_file,
-    rwlock_wrap,
-    shard_iterator,
-    shard_iterator_by_shard_map,
-    shuffle_shards,
-)
+from .rwlock import is_complete_parquet_file, rwlock_wrap  # noqa: F401
+from .shard_iteration import shard_iterator, shard_iterator_by_shard_map, shuffle_shards  # noqa: F401
+from .stage import map_stage as map_over  # noqa: F401
 
 __all__ = [
     "map_over",
