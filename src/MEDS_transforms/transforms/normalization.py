@@ -1,6 +1,4 @@
-#!/usr/bin/env python
 """Transformations for normalizing MEDS datasets, across both categorical and continuous dimensions."""
-
 
 import hydra
 import polars as pl
@@ -236,7 +234,3 @@ def main(cfg: DictConfig):
     """
 
     map_over(cfg, compute_fn=normalize)
-
-
-if __name__ == "__main__":  # pragma: no cover
-    main()

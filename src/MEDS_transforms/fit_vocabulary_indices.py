@@ -1,5 +1,5 @@
-#!/usr/bin/env python
 """Simple helper functions to define a consistent code vocabulary for normalizing a MEDS dataset."""
+
 import logging
 from collections.abc import Callable
 from enum import StrEnum
@@ -247,7 +247,3 @@ def main(cfg: DictConfig):
     code_metadata.write_parquet(output_fp, use_pyarrow=True)
 
     logger.info(f"Done with {cfg.stage}")
-
-
-if __name__ == "__main__":  # pragma: no cover
-    main()

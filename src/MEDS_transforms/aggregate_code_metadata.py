@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Utilities for grouping and/or reducing MEDS cohort files by code to collect metadata properties."""
 
 import logging
@@ -797,7 +796,3 @@ def main(cfg: DictConfig):
     """
 
     run_map_reduce(cfg)
-
-
-if __name__ == "__main__":  # pragma: no cover
-    main()
