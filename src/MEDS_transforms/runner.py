@@ -39,8 +39,6 @@ def get_script_from_name(stage_name: str) -> str | None:
         The script name for the given stage name.
 
     Examples:
-        >>> get_script_from_name("shard_events")
-        'MEDS_extract-shard_events'
         >>> get_script_from_name("fit_vocabulary_indices")
         'MEDS_transform-fit_vocabulary_indices'
         >>> get_script_from_name("filter_subjects")
@@ -52,12 +50,6 @@ def get_script_from_name(stage_name: str) -> str | None:
             ...
         ValueError: Could not find a script for stage nonexistent_stage.
     """
-
-    try:
-        _ = importlib.import_module(f"MEDS_transforms.extract.{stage_name}")
-        return f"MEDS_extract-{stage_name}"
-    except ImportError:
-        pass
 
     for pfx in ("MEDS_transforms.transforms", "MEDS_transforms.filters", "MEDS_transforms"):
         try:
@@ -183,19 +175,19 @@ def run_stage(
         ...     "do_profile": False,
         ...     "_local_pipeline_config": {
         ...         "stage_configs": {
-        ...             "shard_events": {},
+        ...             "reshard_to_split": {},
         ...             "fit_vocabulary_indices": {"_script": "foobar"},
         ...         },
         ...     },
         ...     "_stage_runners": {
-        ...         "shard_events": {"_script": "not used"},
+        ...         "reshard_to_split": {"_script": "not used"},
         ...         "fit_vocabulary_indices": {},
         ...         "baz": {"script": "baz_script"},
         ...     },
         ... })
-        >>> run_stage(cfg, "shard_events", runner_fn=fake_shell_succeed)
-        MEDS_extract-shard_events --config-dir=... --config-name=pipeline_config
-            'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=shard_events
+        >>> run_stage(cfg, "reshard_to_split", runner_fn=fake_shell_succeed)
+        MEDS_transform-reshard_to_split --config-dir=... --config-name=pipeline_config
+            'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=reshard_to_split
         >>> run_stage(
         ...     cfg, "fit_vocabulary_indices", runner_fn=fake_shell_succeed
         ... )

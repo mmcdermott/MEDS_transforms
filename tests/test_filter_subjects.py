@@ -6,8 +6,8 @@ scripts.
 
 from meds import subject_id_field
 
-from tests.MEDS_Transforms import FILTER_SUBJECTS_SCRIPT
-from tests.MEDS_Transforms.transform_tester_base import single_stage_transform_tester
+from tests import FILTER_SUBJECTS_SCRIPT
+from tests.transform_tester_base import single_stage_transform_tester
 from tests.utils import parse_meds_csvs
 
 WANT_TRAIN_0 = f"""
