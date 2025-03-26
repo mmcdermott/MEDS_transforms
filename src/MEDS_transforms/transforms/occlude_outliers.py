@@ -7,7 +7,7 @@ import polars as pl
 from omegaconf import DictConfig
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import map_over
+from MEDS_transforms.mapreduce import map_stage
 
 
 def occlude_outliers_fntr(
@@ -127,4 +127,4 @@ def main(cfg: DictConfig):
     for arguments.
     """
 
-    map_over(cfg, compute_fn=occlude_outliers_fntr)
+    map_stage(cfg, compute_fn=occlude_outliers_fntr)

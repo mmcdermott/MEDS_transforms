@@ -9,7 +9,7 @@ from meds import subject_id_field
 from omegaconf import DictConfig
 
 from MEDS_transforms import DEPRECATED_NAMES, INFERRED_STAGE_KEYS, MANDATORY_TYPES, PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import map_over
+from MEDS_transforms.mapreduce import map_stage
 from MEDS_transforms.parser import cfg_to_expr
 
 logger = logging.getLogger(__name__)
@@ -135,4 +135,4 @@ def main(cfg: DictConfig):
     Useful with the match-and-revise formulation. See the stage configs for args and the tests for examples.
     """
 
-    map_over(cfg, compute_fn=extract_values_fntr)
+    map_stage(cfg, compute_fn=extract_values_fntr)

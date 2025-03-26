@@ -7,7 +7,7 @@ import polars as pl
 from omegaconf import DictConfig
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import map_over
+from MEDS_transforms.mapreduce import map_stage
 
 
 def filter_measurements_fntr(
@@ -170,4 +170,4 @@ def filter_measurements_fntr(
 )
 def main(cfg: DictConfig):
     """TODO."""
-    map_over(cfg, compute_fn=filter_measurements_fntr)
+    map_stage(cfg, compute_fn=filter_measurements_fntr)

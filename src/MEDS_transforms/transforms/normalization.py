@@ -5,7 +5,7 @@ import polars as pl
 from omegaconf import DictConfig
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import map_over
+from MEDS_transforms.mapreduce import map_stage
 
 
 def normalize(
@@ -233,4 +233,4 @@ def main(cfg: DictConfig):
     (typically directly before).
     """
 
-    map_over(cfg, compute_fn=normalize)
+    map_stage(cfg, compute_fn=normalize)
