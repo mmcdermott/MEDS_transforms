@@ -8,12 +8,12 @@ from collections.abc import Callable
 from enum import Enum, auto
 from functools import partial
 from pathlib import Path
-from typing import Any, NotRequired, TypedDict, TypeVar
+from typing import Any, NotRequired, TypedDict
 
 import polars as pl
 from omegaconf import DictConfig
 
-DF_T = TypeVar("DF_T")
+from .types import DF_T
 
 COMPUTE_FN_T = Callable[[DF_T], DF_T]
 COMPUTE_FN_UNBOUND_T = Callable[..., DF_T]
@@ -43,8 +43,10 @@ class ComputeFnType(Enum):
     UNBOUND = auto()
     FUNCTOR = auto()
 
+    # A type specifier is omitted here because including future __annotations__ changes the returned
+    # annotation types
     @classmethod
-    def from_fn(compute_fn: ANY_COMPUTE_FN_T) -> "ComputeFnType" | None:
+    def from_fn(cls, compute_fn: ANY_COMPUTE_FN_T):
         """Returns the type of a compute function or None if invalid.
 
         Returns the type of the compute function:
@@ -71,36 +73,36 @@ class ComputeFnType(Enum):
 
         Examples:
             >>> def compute_fn(df: pl.DataFrame) -> pl.DataFrame: return df
-            >>> compute_fn_type(compute_fn)
+            >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.DIRECT: 1>
             >>> def compute_fn(df: pl.DataFrame) -> dict[Any, list[Any]]: return df.to_dict(as_series=False)
-            >>> compute_fn_type(compute_fn)
+            >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.DIRECT: 1>
             >>> def compute_fn(df: pl.DataFrame): return None
-            >>> compute_fn_type(compute_fn)
+            >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.DIRECT: 1>
             >>> def compute_fn(foo: pl.DataFrame): return None
-            >>> compute_fn_type(compute_fn) is None
+            >>> ComputeFnType.from_fn(compute_fn) is None
             True
             >>> def compute_fn(df: pl.DataFrame, cfg: DictConfig) -> pl.DataFrame: return df
-            >>> compute_fn_type(compute_fn)
+            >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.UNBOUND: 2>
             >>> def compute_fn(df: pl.DataFrame, foo: DictConfig) -> pl.DataFrame: return df
-            >>> compute_fn_type(compute_fn) is None
+            >>> ComputeFnType.from_fn(compute_fn) is None
             True
             >>> def compute_fn(df: pl.LazyFrame, cfg: DictConfig): return df
-            >>> compute_fn_type(compute_fn)
+            >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.UNBOUND: 2>
             >>> def compute_fn(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
             ...     return lambda df: df
-            >>> compute_fn_type(compute_fn)
+            >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.FUNCTOR: 3>
             >>> def compute_fn(cfg: DictConfig): return lambda df: df
-            >>> compute_fn_type(compute_fn)
+            >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.FUNCTOR: 3>
             >>> def compute_fn(df: pl.DataFrame, cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
             ...     return lambda df: df
-            >>> print(compute_fn_type(compute_fn))
+            >>> print(ComputeFnType.from_fn(compute_fn))
             None
         """
         sig = inspect.signature(compute_fn)
@@ -117,16 +119,16 @@ class ComputeFnType(Enum):
 
         if has_only_df_param:
             if has_return_annotation:
-                return ComputeFnType.DIRECT if not has_callable_return else None
-            return ComputeFnType.DIRECT
+                return cls.DIRECT if not has_callable_return else None
+            return cls.DIRECT
         elif has_df_param:
             if has_return_annotation:
-                return ComputeFnType.UNBOUND if not has_callable_return else None
-            return ComputeFnType.UNBOUND
+                return cls.UNBOUND if not has_callable_return else None
+            return cls.UNBOUND
         else:
             if has_return_annotation:
-                return ComputeFnType.FUNCTOR if has_callable_return else None
-            return ComputeFnType.FUNCTOR
+                return cls.FUNCTOR if has_callable_return else None
+            return cls.FUNCTOR
 
 
 def identity_fn(df: Any) -> Any:

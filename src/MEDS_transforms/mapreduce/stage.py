@@ -69,12 +69,14 @@ def map_stage(
 
     compute_fn = resolve_compute_fn(cfg, compute_fn)
 
-    all_out_fps = map_over(
-        shards=shards,
-        read_fn=read_fn,
-        write_fn=write_fn,
-        compute_fn=compute_fn,
-        do_overwrite=cfg.do_overwrite,
+    all_out_fps = list(
+        map_over(
+            shards=shards,
+            read_fn=read_fn,
+            write_fn=write_fn,
+            compute_fn=compute_fn,
+            do_overwrite=cfg.do_overwrite,
+        )
     )
     logger.info(f"Finished mapping in {datetime.now() - start}")
     return all_out_fps

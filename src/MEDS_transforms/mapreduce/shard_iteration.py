@@ -337,10 +337,10 @@ def shard_iterator_by_shard_map(cfg: DictConfig) -> tuple[list[InOutFilePair], b
         ...     })
         ...     fps, includes_only_train = shard_iterator_by_shard_map(cfg)
         >>> fps
-        [(PosixPath('data/train/1'),  PosixPath('output/train/1.parquet')),
-         (PosixPath('data/held_out'), PosixPath('output/held_out.parquet')),
-         (PosixPath('data/tuning'),   PosixPath('output/tuning.parquet')),
-         (PosixPath('data/train/0'),  PosixPath('output/train/0.parquet'))]
+        [InOutFilePair(in_fp=PosixPath('data/train/1'), out_fp=PosixPath('output/train/1.parquet')),
+         InOutFilePair(in_fp=PosixPath('data/held_out'), out_fp=PosixPath('output/held_out.parquet')),
+         InOutFilePair(in_fp=PosixPath('data/tuning'), out_fp=PosixPath('output/tuning.parquet')),
+         InOutFilePair(in_fp=PosixPath('data/train/0'), out_fp=PosixPath('output/train/0.parquet'))]
         >>> includes_only_train
         False
     """
