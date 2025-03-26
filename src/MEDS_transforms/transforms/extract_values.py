@@ -8,7 +8,8 @@ import polars as pl
 from meds import subject_id_field
 from omegaconf import DictConfig
 
-from MEDS_transforms import DEPRECATED_NAMES, INFERRED_STAGE_KEYS, MANDATORY_TYPES, PREPROCESS_CONFIG_YAML
+from MEDS_transforms import DEPRECATED_NAMES, INFERRED_STAGE_KEYS, MANDATORY_TYPES
+from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce import map_stage
 from MEDS_transforms.parser import cfg_to_expr
 

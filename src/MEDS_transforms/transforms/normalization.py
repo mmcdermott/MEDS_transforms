@@ -4,7 +4,7 @@ import hydra
 import polars as pl
 from omegaconf import DictConfig
 
-from MEDS_transforms import PREPROCESS_CONFIG_YAML
+from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce import map_stage
 
 

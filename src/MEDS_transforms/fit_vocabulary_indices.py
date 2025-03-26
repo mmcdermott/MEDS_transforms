@@ -9,7 +9,7 @@ import hydra
 import polars as pl
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_transforms import PREPROCESS_CONFIG_YAML
+from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
 
 # This is to ensure that the custom resolvers are added.
 from MEDS_transforms.utils import *  # noqa: F401, F403

@@ -11,7 +11,7 @@ import polars.selectors as cs
 from meds import subject_id_field
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
-from MEDS_transforms import PREPROCESS_CONFIG_YAML
+from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce import mapreduce_stage
 
 logger = logging.getLogger(__name__)

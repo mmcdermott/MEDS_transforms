@@ -7,7 +7,8 @@ import hydra
 import polars as pl
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_transforms import INFERRED_STAGE_KEYS, PREPROCESS_CONFIG_YAML
+from MEDS_transforms import INFERRED_STAGE_KEYS
+from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
 from MEDS_transforms.mapreduce import map_stage
 
 logger = logging.getLogger(__name__)

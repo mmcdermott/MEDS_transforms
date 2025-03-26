@@ -21,12 +21,14 @@ except ImportError:  # pragma: no cover
 
 import logging
 
-from MEDS_transforms import RESERVED_CONFIG_NAMES, RUNNER_CONFIG_YAML
-
 # This is to ensure that the custom resolvers are added.
 from MEDS_transforms.utils import *  # noqa: F401, F403
 
+from .configs import PREPROCESS_CONFIG_YAML, RUNNER_CONFIG_YAML
+
 logger = logging.getLogger(__name__)
+
+RESERVED_CONFIG_NAMES = {c.stem for c in (PREPROCESS_CONFIG_YAML, RUNNER_CONFIG_YAML)}
 
 
 def get_script_from_name(stage_name: str) -> str | None:
