@@ -8,7 +8,7 @@ import polars as pl
 from omegaconf import DictConfig, ListConfig
 
 from MEDS_transforms import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce.mapper import map_over
+from MEDS_transforms.mapreduce import map_over
 from MEDS_transforms.utils import get_smallest_valid_uint_type
 
 logger = logging.getLogger(__name__)
