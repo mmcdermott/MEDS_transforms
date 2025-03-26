@@ -9,7 +9,7 @@ from meds import subject_id_field
 from omegaconf import DictConfig
 
 from MEDS_transforms import DEPRECATED_NAMES, INFERRED_STAGE_KEYS, MANDATORY_TYPES, PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce.mapper import map_over
+from MEDS_transforms.mapreduce import map_over
 from MEDS_transforms.parser import cfg_to_expr
 
 logger = logging.getLogger(__name__)

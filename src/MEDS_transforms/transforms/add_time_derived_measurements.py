@@ -8,7 +8,7 @@ import polars as pl
 from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms import INFERRED_STAGE_KEYS, PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce.mapper import map_over
+from MEDS_transforms.mapreduce import map_over
 
 logger = logging.getLogger(__name__)
 

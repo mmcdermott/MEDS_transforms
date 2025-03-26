@@ -9,7 +9,7 @@ from meds import data_schema
 from omegaconf import DictConfig
 
 from MEDS_transforms.extract import CONFIG_YAML, MEDS_DATA_MANDATORY_TYPES
-from MEDS_transforms.mapreduce.mapper import map_over
+from MEDS_transforms.mapreduce import map_over
 
 
 def get_and_validate_data_schema(df: pl.LazyFrame, stage_cfg: DictConfig) -> pa.Table:
