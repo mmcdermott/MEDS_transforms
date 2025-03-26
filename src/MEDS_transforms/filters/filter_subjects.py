@@ -1,5 +1,5 @@
-#!/usr/bin/env python
 """A polars-to-polars transformation function for filtering subjects by sequence length."""
+
 import logging
 from collections.abc import Callable
 from functools import partial
@@ -265,7 +265,3 @@ def main(cfg: DictConfig):
     """TODO."""
 
     map_over(cfg, compute_fn=filter_subjects_fntr)
-
-
-if __name__ == "__main__":  # pragma: no cover
-    main()

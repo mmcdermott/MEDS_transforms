@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """This script is a helper utility to run entire pipelines from a single script.
 
 To do this effectively, this runner functionally takes a "meta configuration" file that contains:
@@ -379,6 +378,3 @@ def load_yaml_file(path: str | None) -> dict | DictConfig:
 
 
 OmegaConf.register_new_resolver("load_yaml_file", load_yaml_file, replace=True)
-
-if __name__ == "__main__":  # pragma: no cover
-    main()
