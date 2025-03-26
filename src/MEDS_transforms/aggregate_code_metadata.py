@@ -756,5 +756,5 @@ def main(cfg: DictConfig):
     mapreduce_stage(
         cfg,
         compute_fn=mapper_fntr,
-        reduce_fn=reducer_fntr(cfg.stage_cfg, cfg.get("code_modifiers", None)),
+        reduce_fn=reducer_fntr,
     )
