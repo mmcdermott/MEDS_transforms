@@ -30,7 +30,7 @@ def reduce_over(
     if out_fp.is_file() and not do_overwrite:
         raise FileExistsError(f"Output file already exists: {str(out_fp.resolve())}")
 
-    while not all(fp.is_file() for fp in in_fps):
+    while not all(fp.is_file() for fp in in_fps):  # pragma: no cover
         logger.info("Waiting to begin reduction for all files to be written...")
         time.sleep(polling_time)
 

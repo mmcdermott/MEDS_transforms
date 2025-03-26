@@ -183,6 +183,20 @@ def bind_compute_fn(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_COMP
         │ 2   ┆ foo │
         │ 3   ┆ foo │
         └─────┴─────┘
+        >>> def direct_compute_fn(df: pl.DataFrame) -> pl.DataFrame:
+        ...     return df.with_columns(pl.lit("bar").alias("val"))
+        >>> compute_fn = bind_compute_fn(DictConfig({"val": "foo"}), None, direct_compute_fn)
+        >>> compute_fn(pl.DataFrame({"a": [1, 2, 3]}))
+        shape: (3, 2)
+        ┌─────┬─────┐
+        │ a   ┆ val │
+        │ --- ┆ --- │
+        │ i64 ┆ str │
+        ╞═════╪═════╡
+        │ 1   ┆ bar │
+        │ 2   ┆ bar │
+        │ 3   ┆ bar │
+        └─────┴─────┘
         >>> def compute_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         ...     return lambda df: df.with_columns(pl.lit(cfg.val).alias("val"))
         >>> compute_fn = bind_compute_fn(DictConfig({"val": "foo"}), None, compute_fntr)
