@@ -10,7 +10,7 @@ import polars.selectors as cs
 from meds import subject_id_field
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
-from .stages import MEDS_transforms_stage
+from ..stage import MEDS_transforms_stage
 
 logger = logging.getLogger(__name__)
 

@@ -7,10 +7,9 @@ from functools import partial
 import polars as pl
 from omegaconf import DictConfig
 
+from ..stage import MEDS_transforms_stage
+
 logger = logging.getLogger(__name__)
-
-
-from ..stages import MEDS_transforms_stage
 
 
 def filter_subjects_by_num_measurements(df: pl.LazyFrame, min_measurements_per_subject: int) -> pl.LazyFrame:

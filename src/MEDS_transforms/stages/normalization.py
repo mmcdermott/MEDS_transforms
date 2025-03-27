@@ -2,7 +2,7 @@
 
 import polars as pl
 
-from ..stages import MEDS_transforms_stage
+from ..stage import MEDS_transforms_stage
 
 
 def normalize(

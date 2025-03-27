@@ -7,10 +7,9 @@ import polars as pl
 from meds import subject_id_field
 from omegaconf import DictConfig
 
-from MEDS_transforms import DEPRECATED_NAMES, INFERRED_STAGE_KEYS, MANDATORY_TYPES
-from MEDS_transforms.parser import cfg_to_expr
-
-from ..stages import MEDS_transforms_stage
+from .. import DEPRECATED_NAMES, INFERRED_STAGE_KEYS, MANDATORY_TYPES
+from ..parser import cfg_to_expr
+from ..stage import MEDS_transforms_stage
 
 logger = logging.getLogger(__name__)
 

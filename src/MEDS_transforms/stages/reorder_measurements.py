@@ -8,7 +8,7 @@ from omegaconf import DictConfig, ListConfig
 
 from MEDS_transforms.utils import get_smallest_valid_uint_type
 
-from ..stages import MEDS_transforms_stage
+from ..stage import MEDS_transforms_stage
 
 logger = logging.getLogger(__name__)
 

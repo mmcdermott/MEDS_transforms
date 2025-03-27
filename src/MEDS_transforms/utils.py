@@ -9,8 +9,7 @@ from omegaconf import DictConfig, OmegaConf
 
 logger = logging.getLogger(__name__)
 
-from MEDS_transforms import __package_name__ as package_name
-from MEDS_transforms import __version__ as package_version
+from MEDS_transforms import __package_name__, __version__
 
 
 def get_smallest_valid_uint_type(num: int | float | pl.Expr) -> pl.DataType:
@@ -94,12 +93,12 @@ def stage_init(cfg: DictConfig) -> tuple[Path, Path, Path]:
 
 def get_package_name() -> str:
     """Returns the name of the python package running this pipeline."""
-    return package_name
+    return __package_name__
 
 
 def get_package_version() -> str:
     """Returns the version of the python package running this pipeline."""
-    return package_version
+    return __version__
 
 
 def is_metadata_stage(stage: dict[str, Any] | DictConfig) -> bool:

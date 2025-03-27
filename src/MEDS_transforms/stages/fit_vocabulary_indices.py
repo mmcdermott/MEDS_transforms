@@ -8,7 +8,7 @@ from pathlib import Path
 import polars as pl
 from omegaconf import DictConfig, OmegaConf
 
-from .stages import MEDS_transforms_stage
+from ..stage import MEDS_transforms_stage
 
 logger = logging.getLogger(__name__)
 
