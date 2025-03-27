@@ -53,7 +53,7 @@ def get_script_from_name(stage_name: str) -> str | None:
         ValueError: Could not find a script for stage nonexistent_stage.
     """
 
-    for pfx in ("MEDS_transforms.transforms", "MEDS_transforms.filters", "MEDS_transforms"):
+    for pfx in ("MEDS_transforms.stages",):
         try:
             _ = importlib.import_module(f"{pfx}.{stage_name}")
             return f"MEDS_transform-{stage_name}"

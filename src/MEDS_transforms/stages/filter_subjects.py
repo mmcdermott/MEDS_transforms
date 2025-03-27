@@ -4,14 +4,12 @@ import logging
 from collections.abc import Callable
 from functools import partial
 
-import hydra
 import polars as pl
 from omegaconf import DictConfig
 
-logger = logging.getLogger(__name__)
+from ..stage import MEDS_transforms_stage
 
-from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import map_stage
+logger = logging.getLogger(__name__)
 
 
 def filter_subjects_by_num_measurements(df: pl.LazyFrame, min_measurements_per_subject: int) -> pl.LazyFrame:
@@ -199,7 +197,8 @@ def filter_subjects_by_num_events(df: pl.LazyFrame, min_events_per_subject: int)
     return df.filter(pl.col("time").n_unique().over("subject_id") >= min_events_per_subject)
 
 
-def filter_subjects_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
+@MEDS_transforms_stage
+def filter_subjects(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Returns a function that filters subjects by the number of measurements and events they have.
 
     Args:
@@ -216,7 +215,7 @@ def filter_subjects_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.L
         ...     "time":       [1, 1, 1, 1, 1, 1, 2, 3, None, None, 1, 2, 2, None, 1, 2, 3, 1],
         ... })
         >>> stage_cfg = DictConfig({"min_measurements_per_subject": 4, "min_events_per_subject": 2})
-        >>> filter_subjects_fntr(stage_cfg)(df)
+        >>> filter_subjects(stage_cfg)(df)
         shape: (4, 2)
         ┌────────────┬──────┐
         │ subject_id ┆ time │
@@ -229,13 +228,13 @@ def filter_subjects_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.L
         │ 5          ┆ 1    │
         └────────────┴──────┘
     """
-    compute_fns = []
+    map_fns = []
     if stage_cfg.min_measurements_per_subject:
         logger.info(
             f"Filtering subjects with fewer than {stage_cfg.min_measurements_per_subject} measurements "
             "(observations of any kind)."
         )
-        compute_fns.append(
+        map_fns.append(
             partial(
                 filter_subjects_by_num_measurements,
                 min_measurements_per_subject=stage_cfg.min_measurements_per_subject,
@@ -246,22 +245,13 @@ def filter_subjects_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.L
             f"Filtering subjects with fewer than {stage_cfg.min_events_per_subject} events "
             "(unique timepoints)."
         )
-        compute_fns.append(
+        map_fns.append(
             partial(filter_subjects_by_num_events, min_events_per_subject=stage_cfg.min_events_per_subject)
         )
 
     def fn(data: pl.LazyFrame) -> pl.LazyFrame:
-        for compute_fn in compute_fns:
-            data = compute_fn(data)
+        for map_fn in map_fns:
+            data = map_fn(data)
         return data
 
     return fn
-
-
-@hydra.main(
-    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
-)
-def main(cfg: DictConfig):
-    """TODO."""
-
-    map_stage(cfg, compute_fn=filter_subjects_fntr)

@@ -2,15 +2,14 @@
 
 from collections.abc import Callable
 
-import hydra
 import polars as pl
 from omegaconf import DictConfig
 
-from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import map_stage
+from ..stage import MEDS_transforms_stage
 
 
-def filter_measurements_fntr(
+@MEDS_transforms_stage
+def filter_measurements(
     stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Returns a function that filters subject events to only encompass those with a set of permissible codes.
@@ -35,7 +34,7 @@ def filter_measurements_fntr(
         ...     "modifier1":  [1,   1,   2,   2],
         ... }).lazy()
         >>> stage_cfg = DictConfig({"min_subjects_per_code": 2, "min_occurrences_per_code": 3})
-        >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = filter_measurements(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (2, 3)
         ┌────────────┬──────┬───────────┐
@@ -47,7 +46,7 @@ def filter_measurements_fntr(
         │ 1          ┆ B    ┆ 1         │
         └────────────┴──────┴───────────┘
         >>> stage_cfg = DictConfig({"min_subjects_per_code": 1, "min_occurrences_per_code": 4})
-        >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = filter_measurements(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (2, 3)
         ┌────────────┬──────┬───────────┐
@@ -59,7 +58,7 @@ def filter_measurements_fntr(
         │ 2          ┆ A    ┆ 2         │
         └────────────┴──────┴───────────┘
         >>> stage_cfg = DictConfig({"min_subjects_per_code": 1})
-        >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = filter_measurements(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (4, 3)
         ┌────────────┬──────┬───────────┐
@@ -73,7 +72,7 @@ def filter_measurements_fntr(
         │ 2          ┆ C    ┆ 2         │
         └────────────┴──────┴───────────┘
         >>> stage_cfg = DictConfig({"min_subjects_per_code": None, "min_occurrences_per_code": None})
-        >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = filter_measurements(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (4, 3)
         ┌────────────┬──────┬───────────┐
@@ -87,7 +86,7 @@ def filter_measurements_fntr(
         │ 2          ┆ C    ┆ 2         │
         └────────────┴──────┴───────────┘
         >>> stage_cfg = DictConfig({"min_occurrences_per_code": 5})
-        >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = filter_measurements(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (1, 3)
         ┌────────────┬──────┬───────────┐
@@ -112,7 +111,7 @@ def filter_measurements_fntr(
         ...     "_row_idx":   [1,   1,   1,   1],
         ... }).lazy()
         >>> stage_cfg = DictConfig({"min_subjects_per_code": 2, "min_occurrences_per_code": 3})
-        >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = filter_measurements(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (2, 4)
         ┌────────────┬──────┬───────────┬──────────┐
@@ -163,11 +162,3 @@ def filter_measurements_fntr(
         )
 
     return filter_measurements_fn
-
-
-@hydra.main(
-    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
-)
-def main(cfg: DictConfig):
-    """TODO."""
-    map_stage(cfg, compute_fn=filter_measurements_fntr)

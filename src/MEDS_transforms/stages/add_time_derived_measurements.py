@@ -3,13 +3,11 @@
 import logging
 from collections.abc import Callable
 
-import hydra
 import polars as pl
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_transforms import INFERRED_STAGE_KEYS
-from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import map_stage
+from .. import INFERRED_STAGE_KEYS
+from ..stage import MEDS_transforms_stage
 
 logger = logging.getLogger(__name__)
 
@@ -389,7 +387,8 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
     return fn
 
 
-def add_time_derived_measurements_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
+@MEDS_transforms_stage
+def add_time_derived_measurements(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Adds all requested time-derived measurements to a DataFrame.
 
     Args:
@@ -405,21 +404,21 @@ def add_time_derived_measurements_fntr(stage_cfg: DictConfig) -> Callable[[pl.La
         ValueError: If an unrecognized time-derived measurement is requested.
 
     Examples:
-        >>> add_time_derived_measurements_fntr(DictConfig({"buzz": {}}))
+        >>> add_time_derived_measurements(DictConfig({"buzz": {}}))
         Traceback (most recent call last):
             ...
         ValueError: Unknown time-derived measurement: buzz
     """
 
-    compute_fns = []
+    map_fns = []
     # We use the raw stages object as the induced `stage_cfg` has extra properties like the input and output
     # directories.
     for feature_name, feature_cfg in stage_cfg.items():
         match feature_name:
             case "age":
-                compute_fns.append(add_new_events_fntr(age_fntr(feature_cfg)))
+                map_fns.append(add_new_events_fntr(age_fntr(feature_cfg)))
             case "time_of_day":
-                compute_fns.append(add_new_events_fntr(time_of_day_fntr(feature_cfg)))
+                map_fns.append(add_new_events_fntr(time_of_day_fntr(feature_cfg)))
             case str() if feature_name in INFERRED_STAGE_KEYS:
                 continue
             case _:
@@ -428,17 +427,8 @@ def add_time_derived_measurements_fntr(stage_cfg: DictConfig) -> Callable[[pl.La
         logger.info(f"Adding {feature_name} via config: {OmegaConf.to_yaml(feature_cfg)}")
 
     def fn(df: pl.LazyFrame) -> pl.LazyFrame:
-        for compute_fn in compute_fns:
-            df = compute_fn(df)
+        for map_fn in map_fns:
+            df = map_fn(df)
         return df
 
     return fn
-
-
-@hydra.main(
-    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
-)
-def main(cfg: DictConfig):
-    """Adds time-derived measurements to a MEDS cohort as separate observations at each unique time."""
-
-    map_stage(cfg, compute_fn=add_time_derived_measurements_fntr)

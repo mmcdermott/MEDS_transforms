@@ -3,18 +3,18 @@
 import logging
 from collections.abc import Callable
 
-import hydra
 import polars as pl
 from omegaconf import DictConfig, ListConfig
 
-from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import map_stage
 from MEDS_transforms.utils import get_smallest_valid_uint_type
+
+from ..stage import MEDS_transforms_stage
 
 logger = logging.getLogger(__name__)
 
 
-def reorder_by_code_fntr(
+@MEDS_transforms_stage
+def reorder_measurements(
     stage_cfg: DictConfig, code_metadata: pl.DataFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Re-orders a dataframe within the temporal and subject ID ordering via a specified code order.
@@ -40,7 +40,7 @@ def reorder_by_code_fntr(
         ...     "code": ["A", "B", "A", "C"], "modifier1": [1, 2, 1, 2]
         ... })
         >>> stage_cfg = DictConfig({"ordered_code_patterns": ["B", "A"]})
-        >>> fn = reorder_by_code_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = reorder_measurements(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data.lazy()).collect()
         shape: (4, 4)
         ┌────────────┬──────┬──────┬───────────┐
@@ -64,7 +64,7 @@ def reorder_by_code_fntr(
         >>> stage_cfg = DictConfig({
         ...     "ordered_code_patterns": ["ADMISSION.*", "LAB//baza", "LAB//f$", "LAB//b.*", "DISCHARGE"]
         ... })
-        >>> fn = reorder_by_code_fntr(stage_cfg, code_metadata_df)
+        >>> fn = reorder_measurements(stage_cfg, code_metadata_df)
         >>> fn(data.lazy()).collect()
         shape: (6, 3)
         ┌────────────┬──────┬────────────────┐
@@ -79,7 +79,7 @@ def reorder_by_code_fntr(
         │ 2          ┆ 2    ┆ DISCHARGE      │
         │ 2          ┆ 3    ┆ LAB//baz       │
         └────────────┴──────┴────────────────┘
-        >>> fn = reorder_by_code_fntr({}, code_metadata_df)
+        >>> fn = reorder_measurements({}, code_metadata_df)
         >>> fn(data.lazy()).collect()
         shape: (6, 3)
         ┌────────────┬──────┬────────────────┐
@@ -94,11 +94,11 @@ def reorder_by_code_fntr(
         │ 2          ┆ 2    ┆ DISCHARGE      │
         │ 2          ┆ 3    ┆ LAB//baz       │
         └────────────┴──────┴────────────────┘
-        >>> fn = reorder_by_code_fntr({"ordered_code_patterns": "foo"}, code_metadata_df)
+        >>> fn = reorder_measurements({"ordered_code_patterns": "foo"}, code_metadata_df)
         Traceback (most recent call last):
             ...
         ValueError: The 'ordered_code_patterns' field must be a list of strings. Got foo.
-        >>> fn = reorder_by_code_fntr({"ordered_code_patterns": [32]}, code_metadata_df)
+        >>> fn = reorder_measurements({"ordered_code_patterns": [32]}, code_metadata_df)
         Traceback (most recent call last):
             ...
         ValueError: Each element of 'ordered_code_patterns' must be a string. Got 32.
@@ -148,39 +148,3 @@ def reorder_by_code_fntr(
         )
 
     return reorder_fn
-
-
-@hydra.main(
-    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
-)
-def main(cfg: DictConfig):
-    """Reorders measurements within each subject event (unique timepoint) by the specified code order.
-
-    In particular, given a set of [regex crate compatible](https://docs.rs/regex/latest/regex/) regexes in the
-    `stage_cfg.ordered_code_patterns` list, this script will re-order the measurements within each event
-    (unique timepoint) such that the measurements are sorted by the index of the first regex that matches
-    their code in the `ordered_code_patterns` list. So, if the `ordered_code_patterns` list is
-    `["foo$", "bar", "foo.*"]`, and a single subject event has measurements with codes
-    `["foobar", "barbaz", "foo", "quat"]`, the measurements will be re-ordered to the order:
-    `["foo", "foobar", "barbaz", "quat"]`, because:
-      - "foo" matches the first regex in the list (the `foo$` matches any string with "foo" at the end).
-      - "foobar" matches the second regex in the list (the `bar` matches any string with "bar" in it), and
-        "foobar" is the first measurement in the original order that matches this regex.
-      - "barbaz" matches the second regex in the list.
-      - "quat" matches no regex in the list, so it occurs after any measurement that matches a regex.
-
-    All arguments are specified through the command line into the `cfg` object through Hydra.
-
-    The `cfg.stage_cfg` object is a special key that is imputed by OmegaConf to contain the stage-specific
-    configuration arguments based on the global, pipeline-level configuration file. It cannot be overwritten
-    directly on the command line, but can be overwritten implicitly by overwriting components of the
-    `stage_configs.extract_code_metadata` key.
-
-    Args:
-        stage_configs.reorder_measurements.ordered_code_patterns: A list of regex patterns that specify the
-            order of the codes within each subject event (unique timepoint). To specify this on the command
-            line, use the hydra list syntax by enclosing the entire key-value string argument in single
-            quotes: ``'stage_configs.reorder_measurements.ordered_code_patterns=["foo$", "bar", "foo.*"]'``.
-    """
-
-    map_stage(cfg, reorder_by_code_fntr)

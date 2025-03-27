@@ -3,20 +3,19 @@
 import logging
 from collections.abc import Callable
 
-import hydra
 import polars as pl
 from meds import subject_id_field
 from omegaconf import DictConfig
 
-from MEDS_transforms import DEPRECATED_NAMES, INFERRED_STAGE_KEYS, MANDATORY_TYPES
-from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import map_stage
-from MEDS_transforms.parser import cfg_to_expr
+from .. import DEPRECATED_NAMES, INFERRED_STAGE_KEYS, MANDATORY_TYPES
+from ..parser import cfg_to_expr
+from ..stage import MEDS_transforms_stage
 
 logger = logging.getLogger(__name__)
 
 
-def extract_values_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
+@MEDS_transforms_stage
+def extract_values(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Create a function that extracts values from a MEDS cohort.
 
     This functor does not filter the applied dataframe prior to applying the extraction process. It is likely
@@ -33,7 +32,7 @@ def extract_values_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.La
 
     Examples:
         >>> stage_cfg = {"numeric_value": "foo", "categorical_value": "bar"}
-        >>> fn = extract_values_fntr(stage_cfg)
+        >>> fn = extract_values(stage_cfg)
         >>> df = pl.DataFrame({
         ...     "subject_id": [1, 1, 1], "time": [1, 2, 3],
         ...     "foo": ["1", "2", "3"], "bar": [1.0, 2.0, 4.0],
@@ -50,17 +49,17 @@ def extract_values_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.La
         │ 1          ┆ 3    ┆ 3   ┆ 4.0 ┆ 3.0           ┆ 4.0               │
         └────────────┴──────┴─────┴─────┴───────────────┴───────────────────┘
         >>> stage_cfg = {32: "foo"}
-        >>> fn = extract_values_fntr(stage_cfg)
+        >>> fn = extract_values(stage_cfg)
         Traceback (most recent call last):
             ...
         ValueError: Invalid column name: 32
         >>> stage_cfg = {"numeric_value": {"lit": 1}}
-        >>> fn = extract_values_fntr(stage_cfg)
+        >>> fn = extract_values(stage_cfg)
         Traceback (most recent call last):
             ...
         ValueError: Error building expression for numeric_value...
         >>> stage_cfg = {"numeric_value": "foo", "categorical_value": "bar"}
-        >>> fn = extract_values_fntr(stage_cfg)
+        >>> fn = extract_values(stage_cfg)
         >>> df = pl.DataFrame({"subject_id": [1, 1, 1], "time": [1, 2, 3]})
         >>> fn(df)
         Traceback (most recent call last):
@@ -69,7 +68,7 @@ def extract_values_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.La
 
     Note that deprecated column names like "numerical_value" or "timestamp" won't be re-typed.
         >>> stage_cfg = {"numerical_value": "foo"}
-        >>> fn = extract_values_fntr(stage_cfg)
+        >>> fn = extract_values(stage_cfg)
         >>> df = pl.DataFrame({"subject_id": [1, 1, 1], "time": [1, 2, 3], "foo": ["1", "2", "3"]})
         >>> fn(df)
         shape: (3, 4)
@@ -117,23 +116,11 @@ def extract_values_fntr(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.La
         new_cols.append(expr.alias(out_col_n))
         need_cols.update(cols)
 
-    def compute_fn(df: pl.LazyFrame) -> pl.LazyFrame:
+    def map_fn(df: pl.LazyFrame) -> pl.LazyFrame:
         in_cols = set(df.collect_schema().names())
         if not need_cols.issubset(in_cols):
             raise ValueError(f"Missing columns: {sorted(list(need_cols - in_cols))}")
 
         return df.with_columns(new_cols).sort(subject_id_field, "time", maintain_order=True)
 
-    return compute_fn
-
-
-@hydra.main(
-    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
-)
-def main(cfg: DictConfig):
-    """Extracts values from one field of the data into others. Useful for things like converting to numerics.
-
-    Useful with the match-and-revise formulation. See the stage configs for args and the tests for examples.
-    """
-
-    map_stage(cfg, compute_fn=extract_values_fntr)
+    return map_fn

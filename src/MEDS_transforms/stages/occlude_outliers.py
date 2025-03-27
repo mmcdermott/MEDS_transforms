@@ -2,15 +2,14 @@
 
 from collections.abc import Callable
 
-import hydra
 import polars as pl
 from omegaconf import DictConfig
 
-from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import map_stage
+from ..stage import MEDS_transforms_stage
 
 
-def occlude_outliers_fntr(
+@MEDS_transforms_stage
+def occlude_outliers(
     stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Filters subject events to only encompass those with a set of permissible codes.
@@ -41,7 +40,7 @@ def occlude_outliers_fntr(
         ...     "numeric_value": [15., 16., 3.9, 1.0],
         ... }).lazy()
         >>> stage_cfg = DictConfig({"stddev_cutoff": 4.5})
-        >>> fn = occlude_outliers_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = occlude_outliers(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (4, 5)
         ┌────────────┬──────┬───────────┬───────────────┬─────────────────────────┐
@@ -57,7 +56,7 @@ def occlude_outliers_fntr(
 
         If no standard deviation cutoff is provided, the function should return the input DataFrame unchanged:
         >>> stage_cfg = DictConfig({})
-        >>> fn = occlude_outliers_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = occlude_outliers(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (4, 4)
         ┌────────────┬──────┬───────────┬───────────────┐
@@ -115,16 +114,3 @@ def occlude_outliers_fntr(
         )
 
     return occlude_outliers_fn
-
-
-@hydra.main(
-    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
-)
-def main(cfg: DictConfig):
-    """Occludes outliers in accordance with the aggregated code metadata.
-
-    Note that the aggregation stage with the appropriate aggregates must be run first! See the stage configs
-    for arguments.
-    """
-
-    map_stage(cfg, compute_fn=occlude_outliers_fntr)

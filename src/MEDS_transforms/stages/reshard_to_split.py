@@ -9,15 +9,14 @@ from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
 
-import hydra
 import numpy as np
 import polars as pl
 from meds import subject_id_field, subject_splits_filepath, time_field
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
-from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import rwlock_wrap, shard_iterator, shuffle_shards
-from MEDS_transforms.utils import stage_init, write_lazyframe
+from ..mapreduce import rwlock_wrap, shard_iterator, shuffle_shards
+from ..stage import MEDS_transforms_stage
+from ..utils import stage_init, write_lazyframe
 
 logger = logging.getLogger(__name__)
 
@@ -261,9 +260,7 @@ def write_json(d: dict, fp: Path) -> None:
     fp.write_text(json.dumps(d))
 
 
-@hydra.main(
-    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
-)
+@MEDS_transforms_stage
 def main(cfg: DictConfig):
     """Re-shard a MEDS cohort to in a manner that subdivides subject splits."""
 
@@ -338,3 +335,7 @@ def main(cfg: DictConfig):
         )
 
     logger.info(f"Done with {cfg.stage}")
+
+
+OmegaConf.register_new_resolver("current_script_name", lambda: main.__module__.split(".")[-1], replace=True)
+OmegaConf.register_new_resolver("get_script_docstring", lambda: main.__doc__, replace=True)
