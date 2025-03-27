@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 def map_over(
     shards: list[InOutFilePair],
     read_fn: Callable[[Path], DF_T] = partial(pl.scan_parquet, glob=False),
-    compute_fn: COMPUTE_FN_T | None = None,
+    map_fn: COMPUTE_FN_T | None = None,
     write_fn: Callable[[DF_T, Path], None] = write_lazyframe,
     do_overwrite: bool = False,
 ) -> list[Path]:
@@ -31,7 +31,7 @@ def map_over(
             out_fp,
             read_fn,
             write_fn,
-            compute_fn,
+            compute_fn=map_fn,
             do_overwrite=do_overwrite,
         )
         all_out_fps.append(out_fp)

@@ -409,15 +409,15 @@ def add_time_derived_measurements(stage_cfg: DictConfig) -> Callable[[pl.LazyFra
         ValueError: Unknown time-derived measurement: buzz
     """
 
-    compute_fns = []
+    map_fns = []
     # We use the raw stages object as the induced `stage_cfg` has extra properties like the input and output
     # directories.
     for feature_name, feature_cfg in stage_cfg.items():
         match feature_name:
             case "age":
-                compute_fns.append(add_new_events_fntr(age_fntr(feature_cfg)))
+                map_fns.append(add_new_events_fntr(age_fntr(feature_cfg)))
             case "time_of_day":
-                compute_fns.append(add_new_events_fntr(time_of_day_fntr(feature_cfg)))
+                map_fns.append(add_new_events_fntr(time_of_day_fntr(feature_cfg)))
             case str() if feature_name in INFERRED_STAGE_KEYS:
                 continue
             case _:
@@ -426,11 +426,11 @@ def add_time_derived_measurements(stage_cfg: DictConfig) -> Callable[[pl.LazyFra
         logger.info(f"Adding {feature_name} via config: {OmegaConf.to_yaml(feature_cfg)}")
 
     def fn(df: pl.LazyFrame) -> pl.LazyFrame:
-        for compute_fn in compute_fns:
-            df = compute_fn(df)
+        for map_fn in map_fns:
+            df = map_fn(df)
         return df
 
     return fn
 
 
-main = MEDS_transforms_stage(compute_fn=add_time_derived_measurements)
+main = MEDS_transforms_stage(map_fn=add_time_derived_measurements)

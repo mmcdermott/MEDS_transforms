@@ -34,27 +34,27 @@ class StageType(StrEnum):
 
 
 def make_main_fn(
-    compute_fn: ANY_COMPUTE_FN_T | None = None,
+    map_fn: ANY_COMPUTE_FN_T | None = None,
     reduce_fn: ANY_COMPUTE_FN_T | None = None,
 ) -> Callable[[DictConfig], None]:
-    if compute_fn is None:
-        raise ValueError("compute_fn must be provided")
+    if map_fn is None:
+        raise ValueError("map_fn must be provided")
 
     if reduce_fn is None:
-        docstring = inspect.getdoc(compute_fn) or ""
+        docstring = inspect.getdoc(map_fn) or ""
 
-        @functools.wraps(compute_fn)
+        @functools.wraps(map_fn)
         def main_fn(cfg: DictConfig):
-            return map_stage(cfg, compute_fn)
+            return map_stage(cfg, map_fn)
 
     else:
         docstring = (
-            f"Map Stage:\n{inspect.getdoc(compute_fn) or ''}\n\n"
+            f"Map Stage:\n{inspect.getdoc(map_fn) or ''}\n\n"
             f"Reduce stage:\n{inspect.getdoc(reduce_fn) or ''}"
         )
 
         def main_fn(cfg: DictConfig):
-            return mapreduce_stage(cfg, compute_fn, reduce_fn)
+            return mapreduce_stage(cfg, map_fn, reduce_fn)
 
     main_fn.__doc__ = docstring
     return main_fn
@@ -62,7 +62,7 @@ def make_main_fn(
 
 def MEDS_transforms_stage(
     main_fn: Callable[[DictConfig], None] | None = None,
-    compute_fn: ANY_COMPUTE_FN_T | None = None,
+    map_fn: ANY_COMPUTE_FN_T | None = None,
     reduce_fn: ANY_COMPUTE_FN_T | None = None,
     config_path: Path | None = None,
     stage_name: str | None = None,
@@ -72,14 +72,14 @@ def MEDS_transforms_stage(
 
     if main_fn is not None:
         mode = StageType.MAIN
-        if compute_fn is not None or reduce_fn is not None:
-            raise ValueError("Only one of main_fn or compute_fn/reduce_fn should be provided.")
-    elif compute_fn is not None and reduce_fn is not None:
+        if map_fn is not None or reduce_fn is not None:
+            raise ValueError("Only one of main_fn or map_fn/reduce_fn should be provided.")
+    elif map_fn is not None and reduce_fn is not None:
         mode = StageType.MAPREDUCE
-    elif compute_fn is not None:
+    elif map_fn is not None:
         mode = StageType.MAP
     else:
-        raise ValueError("Either main_fn or compute_fn/reduce_fn must be provided.")
+        raise ValueError("Either main_fn or map_fn/reduce_fn must be provided.")
 
     if config_path is None:
         config_path = PREPROCESS_CONFIG_YAML
@@ -91,10 +91,10 @@ def MEDS_transforms_stage(
     )
 
     if stage_name is None:
-        stage_name = (main_fn or compute_fn).__module__.split(".")[-1]
+        stage_name = (main_fn or map_fn).__module__.split(".")[-1]
 
     if mode != StageType.MAIN:
-        main_fn = make_main_fn(compute_fn, reduce_fn)
+        main_fn = make_main_fn(map_fn, reduce_fn)
         main_fn.__name__ = stage_name
 
     if stage_docstring is None:

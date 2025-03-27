@@ -149,4 +149,4 @@ def reorder_measurements(
     return reorder_fn
 
 
-main = MEDS_transforms_stage(compute_fn=reorder_measurements)
+main = MEDS_transforms_stage(map_fn=reorder_measurements)

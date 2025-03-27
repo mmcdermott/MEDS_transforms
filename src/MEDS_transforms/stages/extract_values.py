@@ -115,14 +115,14 @@ def extract_values(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFra
         new_cols.append(expr.alias(out_col_n))
         need_cols.update(cols)
 
-    def compute_fn(df: pl.LazyFrame) -> pl.LazyFrame:
+    def map_fn(df: pl.LazyFrame) -> pl.LazyFrame:
         in_cols = set(df.collect_schema().names())
         if not need_cols.issubset(in_cols):
             raise ValueError(f"Missing columns: {sorted(list(need_cols - in_cols))}")
 
         return df.with_columns(new_cols).sort(subject_id_field, "time", maintain_order=True)
 
-    return compute_fn
+    return map_fn
 
 
-main = MEDS_transforms_stage(compute_fn=extract_values)
+main = MEDS_transforms_stage(map_fn=extract_values)

@@ -227,13 +227,13 @@ def filter_subjects(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFr
         │ 5          ┆ 1    │
         └────────────┴──────┘
     """
-    compute_fns = []
+    map_fns = []
     if stage_cfg.min_measurements_per_subject:
         logger.info(
             f"Filtering subjects with fewer than {stage_cfg.min_measurements_per_subject} measurements "
             "(observations of any kind)."
         )
-        compute_fns.append(
+        map_fns.append(
             partial(
                 filter_subjects_by_num_measurements,
                 min_measurements_per_subject=stage_cfg.min_measurements_per_subject,
@@ -244,16 +244,16 @@ def filter_subjects(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFr
             f"Filtering subjects with fewer than {stage_cfg.min_events_per_subject} events "
             "(unique timepoints)."
         )
-        compute_fns.append(
+        map_fns.append(
             partial(filter_subjects_by_num_events, min_events_per_subject=stage_cfg.min_events_per_subject)
         )
 
     def fn(data: pl.LazyFrame) -> pl.LazyFrame:
-        for compute_fn in compute_fns:
-            data = compute_fn(data)
+        for map_fn in map_fns:
+            data = map_fn(data)
         return data
 
     return fn
 
 
-main = MEDS_transforms_stage(compute_fn=filter_subjects)
+main = MEDS_transforms_stage(map_fn=filter_subjects)

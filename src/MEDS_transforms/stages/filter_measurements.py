@@ -163,4 +163,4 @@ def filter_measurements(
     return filter_measurements_fn
 
 
-main = MEDS_transforms_stage(compute_fn=filter_measurements)
+main = MEDS_transforms_stage(map_fn=filter_measurements)

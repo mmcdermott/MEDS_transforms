@@ -115,4 +115,4 @@ def occlude_outliers(
     return occlude_outliers_fn
 
 
-main = MEDS_transforms_stage(compute_fn=occlude_outliers)
+main = MEDS_transforms_stage(map_fn=occlude_outliers)

@@ -740,4 +740,4 @@ def reducer_fntr(
     return reducer
 
 
-main = MEDS_transforms_stage(compute_fn=mapper_fntr, reduce_fn=reducer_fntr)
+main = MEDS_transforms_stage(map_fn=mapper_fntr, reduce_fn=reducer_fntr)

@@ -22,16 +22,16 @@ from .types import DF_T
 logger = logging.getLogger(__name__)
 
 
-def resolve_mapper_fn(cfg: DictConfig, compute_fn: ANY_COMPUTE_FN_T | None) -> COMPUTE_FN_T:
+def resolve_mapper_fn(cfg: DictConfig, map_fn: ANY_COMPUTE_FN_T | None) -> COMPUTE_FN_T:
     if is_match_revise(cfg.stage_cfg):
-        return match_revise_fntr(cfg, cfg.stage_cfg, compute_fn)
+        return match_revise_fntr(cfg, cfg.stage_cfg, map_fn)
     else:
-        return bind_compute_fn(cfg, cfg.stage_cfg, compute_fn)
+        return bind_compute_fn(cfg, cfg.stage_cfg, map_fn)
 
 
 def map_stage(
     cfg: DictConfig,
-    compute_fn: COMPUTE_FN_T | None = None,
+    map_fn: COMPUTE_FN_T | None = None,
     read_fn: Callable[[Path], DF_T] = partial(pl.scan_parquet, glob=False),
     write_fn: Callable[[DF_T, Path], None] = write_lazyframe,
     shard_iterator_fntr: SHARD_ITR_FNTR_T = shard_iterator,
@@ -68,13 +68,13 @@ def map_stage(
     elif includes_only_train:  # pragma: no cover
         raise ValueError("All splits should be used, but shard iterator is returning only train splits?!?")
 
-    compute_fn = resolve_mapper_fn(cfg, compute_fn)
+    map_fn = resolve_mapper_fn(cfg, map_fn)
 
     all_out_fps = map_over(
         shards=shards,
         read_fn=read_fn,
         write_fn=write_fn,
-        compute_fn=compute_fn,
+        map_fn=map_fn,
         do_overwrite=cfg.do_overwrite,
     )
     logger.info(f"Finished mapping in {datetime.now() - start}")
@@ -93,7 +93,7 @@ def join_and_replace(new: pl.DataFrame, old: pl.DataFrame, join_cols: list[str])
 
 def mapreduce_stage(
     cfg: DictConfig,
-    compute_fn: ANY_COMPUTE_FN_T,
+    map_fn: ANY_COMPUTE_FN_T,
     reduce_fn: REDUCE_FN_T,
     merge_fn: REDUCE_FN_T | None = None,
     read_fn: Callable[[Path], DF_T] = partial(pl.scan_parquet, glob=False),
@@ -102,7 +102,7 @@ def mapreduce_stage(
 ) -> Path:
 
     map_stage_out_fps = map_stage(
-        cfg=cfg, compute_fn=compute_fn, read_fn=read_fn, write_fn=write_fn, shard_iterator_fntr=shard_iterator
+        cfg=cfg, map_fn=map_fn, read_fn=read_fn, write_fn=write_fn, shard_iterator_fntr=shard_iterator
     )
 
     if cfg.worker != 0:
