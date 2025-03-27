@@ -3,6 +3,7 @@
 import functools
 import inspect
 import logging
+from collections.abc import Callable
 from pathlib import Path
 
 import hydra
@@ -14,12 +15,40 @@ from MEDS_transforms.mapreduce import ANY_COMPUTE_FN_T, map_stage, mapreduce_sta
 logger = logging.getLogger(__name__)
 
 
+def make_main_fn(
+    compute_fn: ANY_COMPUTE_FN_T | None = None,
+    reduce_fn: ANY_COMPUTE_FN_T | None = None,
+) -> Callable[[DictConfig], None]:
+    if compute_fn is None:
+        raise ValueError("compute_fn must be provided")
+
+    if reduce_fn is None:
+        docstring = inspect.getdoc(compute_fn) or ""
+
+        @functools.wraps(compute_fn)
+        def main_fn(cfg: DictConfig):
+            return map_stage(cfg, compute_fn)
+
+    else:
+        docstring = (
+            f"Map Stage:\n{inspect.getdoc(compute_fn) or ''}\n\n"
+            f"Reduce stage:\n{inspect.getdoc(reduce_fn) or ''}"
+        )
+
+        def main_fn(cfg: DictConfig):
+            return mapreduce_stage(cfg, compute_fn, reduce_fn)
+
+    main_fn.__doc__ = docstring
+    return main_fn
+
+
 def registered_stage(
-    compute_fn: ANY_COMPUTE_FN_T,
-    stage_name: str | None = None,
-    stage_docstring: str | None = None,
+    main_fn: Callable[[DictConfig], None] | None = None,
+    compute_fn: ANY_COMPUTE_FN_T | None = None,
     reduce_fn: ANY_COMPUTE_FN_T | None = None,
     config_path: Path | None = None,
+    stage_name: str | None = None,
+    stage_docstring: str | None = None,
 ):
     """Wraps or returns a function that can serve as the main function for a stage."""
 
@@ -27,29 +56,16 @@ def registered_stage(
         config_path = PREPROCESS_CONFIG_YAML
 
     if stage_name is None:
-        stage_name = compute_fn.__module__.split(".")[-1]
+        stage_name = (main_fn or compute_fn).__module__.split(".")[-1]
 
     OmegaConf.register_new_resolver("current_script_name", lambda: stage_name, replace=True)
 
-    if reduce_fn is None:
-        if stage_docstring is None:
-            stage_docstring = inspect.getdoc(compute_fn) or ""
+    if main_fn is None:
+        main_fn = make_main_fn(compute_fn, reduce_fn)
+        main_fn.__name__ = stage_name
 
-        @functools.wraps(compute_fn)
-        def main_fn(cfg: DictConfig):
-            return map_stage(cfg, compute_fn)
-
-    else:
-        if stage_docstring is None:
-            compute_fn_docstring = inspect.getdoc(compute_fn) or ""
-            reduce_fn_docstring = inspect.getdoc(reduce_fn) or ""
-            stage_docstring = f"Map Stage:\n{compute_fn_docstring}\n\nReduce stage:\n{reduce_fn_docstring}"
-
-        def main_fn(cfg: DictConfig):
-            return mapreduce_stage(cfg, compute_fn, reduce_fn)
-
-    main_fn.__name__ = stage_name
-    main_fn.__doc__ = stage_docstring
+    if stage_docstring is None:
+        stage_docstring = inspect.getdoc(main_fn) or ""
 
     # Replace $ with $$ in the docstring to avoid issues with OmegaConf
     stage_docstring = stage_docstring.replace("$", "$$")

@@ -257,4 +257,4 @@ def filter_subjects(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFr
     return fn
 
 
-main = registered_stage(filter_subjects)
+main = registered_stage(compute_fn=filter_subjects)

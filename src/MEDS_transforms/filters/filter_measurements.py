@@ -163,4 +163,4 @@ def filter_measurements(
     return filter_measurements_fn
 
 
-main = registered_stage(filter_measurements)
+main = registered_stage(compute_fn=filter_measurements)

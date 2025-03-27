@@ -434,4 +434,4 @@ def add_time_derived_measurements(stage_cfg: DictConfig) -> Callable[[pl.LazyFra
     return fn
 
 
-main = registered_stage(add_time_derived_measurements)
+main = registered_stage(compute_fn=add_time_derived_measurements)

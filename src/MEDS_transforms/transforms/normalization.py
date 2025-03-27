@@ -220,4 +220,4 @@ def normalize(
     )
 
 
-main = registered_stage(normalize)
+main = registered_stage(compute_fn=normalize)

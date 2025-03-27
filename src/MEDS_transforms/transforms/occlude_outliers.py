@@ -115,4 +115,4 @@ def occlude_outliers(
     return occlude_outliers_fn
 
 
-main = registered_stage(occlude_outliers)
+main = registered_stage(compute_fn=occlude_outliers)

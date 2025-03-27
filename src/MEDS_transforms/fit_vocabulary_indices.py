@@ -5,14 +5,10 @@ from collections.abc import Callable
 from enum import StrEnum
 from pathlib import Path
 
-import hydra
 import polars as pl
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
-
-# This is to ensure that the custom resolvers are added.
-from MEDS_transforms.utils import *  # noqa: F401, F403
+from .stages import registered_stage
 
 logger = logging.getLogger(__name__)
 
@@ -195,9 +191,7 @@ VOCABULARY_ORDERING_METHODS: dict[VOCABULARY_ORDERING, INDEX_ASSIGNMENT_FN] = {
 }
 
 
-@hydra.main(
-    version_base=None, config_path=str(PREPROCESS_CONFIG_YAML.parent), config_name=PREPROCESS_CONFIG_YAML.stem
-)
+@registered_stage
 def main(cfg: DictConfig):
     """Assigns integral vocabulary IDs to codes in the metadata file, for use in tokenizing the dataset.
 
@@ -247,7 +241,3 @@ def main(cfg: DictConfig):
     code_metadata.write_parquet(output_fp, use_pyarrow=True)
 
     logger.info(f"Done with {cfg.stage}")
-
-
-OmegaConf.register_new_resolver("current_script_name", lambda: main.__module__.split(".")[-1], replace=True)
-OmegaConf.register_new_resolver("get_script_docstring", lambda: main.__doc__, replace=True)

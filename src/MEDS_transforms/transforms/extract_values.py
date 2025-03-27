@@ -126,4 +126,4 @@ def extract_values(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFra
     return compute_fn
 
 
-main = registered_stage(extract_values)
+main = registered_stage(compute_fn=extract_values)

@@ -149,4 +149,4 @@ def reorder_measurements(
     return reorder_fn
 
 
-main = registered_stage(reorder_measurements)
+main = registered_stage(compute_fn=reorder_measurements)
