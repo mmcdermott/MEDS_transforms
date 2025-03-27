@@ -8,8 +8,7 @@ from omegaconf import DictConfig
 from ..stages import registered_stage
 
 
-@registered_stage
-def main(
+def filter_measurements(
     stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Returns a function that filters subject events to only encompass those with a set of permissible codes.
@@ -34,7 +33,7 @@ def main(
         ...     "modifier1":  [1,   1,   2,   2],
         ... }).lazy()
         >>> stage_cfg = DictConfig({"min_subjects_per_code": 2, "min_occurrences_per_code": 3})
-        >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = filter_measurements(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (2, 3)
         ┌────────────┬──────┬───────────┐
@@ -46,7 +45,7 @@ def main(
         │ 1          ┆ B    ┆ 1         │
         └────────────┴──────┴───────────┘
         >>> stage_cfg = DictConfig({"min_subjects_per_code": 1, "min_occurrences_per_code": 4})
-        >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = filter_measurements(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (2, 3)
         ┌────────────┬──────┬───────────┐
@@ -58,7 +57,7 @@ def main(
         │ 2          ┆ A    ┆ 2         │
         └────────────┴──────┴───────────┘
         >>> stage_cfg = DictConfig({"min_subjects_per_code": 1})
-        >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = filter_measurements(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (4, 3)
         ┌────────────┬──────┬───────────┐
@@ -72,7 +71,7 @@ def main(
         │ 2          ┆ C    ┆ 2         │
         └────────────┴──────┴───────────┘
         >>> stage_cfg = DictConfig({"min_subjects_per_code": None, "min_occurrences_per_code": None})
-        >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = filter_measurements(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (4, 3)
         ┌────────────┬──────┬───────────┐
@@ -86,7 +85,7 @@ def main(
         │ 2          ┆ C    ┆ 2         │
         └────────────┴──────┴───────────┘
         >>> stage_cfg = DictConfig({"min_occurrences_per_code": 5})
-        >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = filter_measurements(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (1, 3)
         ┌────────────┬──────┬───────────┐
@@ -111,7 +110,7 @@ def main(
         ...     "_row_idx":   [1,   1,   1,   1],
         ... }).lazy()
         >>> stage_cfg = DictConfig({"min_subjects_per_code": 2, "min_occurrences_per_code": 3})
-        >>> fn = filter_measurements_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = filter_measurements(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (2, 4)
         ┌────────────┬──────┬───────────┬──────────┐
@@ -162,3 +161,6 @@ def main(
         )
 
     return filter_measurements_fn
+
+
+main = registered_stage(filter_measurements)

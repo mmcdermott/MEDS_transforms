@@ -388,8 +388,7 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
     return fn
 
 
-@registered_stage
-def main(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
+def add_time_derived_measurements(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Adds all requested time-derived measurements to a DataFrame.
 
     Args:
@@ -405,7 +404,7 @@ def main(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
         ValueError: If an unrecognized time-derived measurement is requested.
 
     Examples:
-        >>> add_time_derived_measurements_fntr(DictConfig({"buzz": {}}))
+        >>> add_time_derived_measurements(DictConfig({"buzz": {}}))
         Traceback (most recent call last):
             ...
         ValueError: Unknown time-derived measurement: buzz
@@ -433,3 +432,6 @@ def main(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
         return df
 
     return fn
+
+
+main = registered_stage(add_time_derived_measurements)

@@ -8,8 +8,7 @@ from omegaconf import DictConfig
 from ..stages import registered_stage
 
 
-@registered_stage
-def main(
+def occlude_outliers(
     stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Filters subject events to only encompass those with a set of permissible codes.
@@ -40,7 +39,7 @@ def main(
         ...     "numeric_value": [15., 16., 3.9, 1.0],
         ... }).lazy()
         >>> stage_cfg = DictConfig({"stddev_cutoff": 4.5})
-        >>> fn = occlude_outliers_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = occlude_outliers(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (4, 5)
         ┌────────────┬──────┬───────────┬───────────────┬─────────────────────────┐
@@ -56,7 +55,7 @@ def main(
 
         If no standard deviation cutoff is provided, the function should return the input DataFrame unchanged:
         >>> stage_cfg = DictConfig({})
-        >>> fn = occlude_outliers_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = occlude_outliers(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
         shape: (4, 4)
         ┌────────────┬──────┬───────────┬───────────────┐
@@ -114,3 +113,6 @@ def main(
         )
 
     return occlude_outliers_fn
+
+
+main = registered_stage(occlude_outliers)

@@ -45,7 +45,6 @@ def registered_stage(
             reduce_fn_docstring = inspect.getdoc(reduce_fn) or ""
             stage_docstring = f"Map Stage:\n{compute_fn_docstring}\n\nReduce stage:\n{reduce_fn_docstring}"
 
-        @functools.wraps(compute_fn)
         def main_fn(cfg: DictConfig):
             return mapreduce_stage(cfg, compute_fn, reduce_fn)
 

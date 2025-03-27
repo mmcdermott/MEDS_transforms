@@ -15,8 +15,7 @@ from ..stages import registered_stage
 logger = logging.getLogger(__name__)
 
 
-@registered_stage
-def main(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
+def extract_values(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Create a function that extracts values from a MEDS cohort.
 
     This functor does not filter the applied dataframe prior to applying the extraction process. It is likely
@@ -33,7 +32,7 @@ def main(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
 
     Examples:
         >>> stage_cfg = {"numeric_value": "foo", "categorical_value": "bar"}
-        >>> fn = extract_values_fntr(stage_cfg)
+        >>> fn = extract_values(stage_cfg)
         >>> df = pl.DataFrame({
         ...     "subject_id": [1, 1, 1], "time": [1, 2, 3],
         ...     "foo": ["1", "2", "3"], "bar": [1.0, 2.0, 4.0],
@@ -50,17 +49,17 @@ def main(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
         │ 1          ┆ 3    ┆ 3   ┆ 4.0 ┆ 3.0           ┆ 4.0               │
         └────────────┴──────┴─────┴─────┴───────────────┴───────────────────┘
         >>> stage_cfg = {32: "foo"}
-        >>> fn = extract_values_fntr(stage_cfg)
+        >>> fn = extract_values(stage_cfg)
         Traceback (most recent call last):
             ...
         ValueError: Invalid column name: 32
         >>> stage_cfg = {"numeric_value": {"lit": 1}}
-        >>> fn = extract_values_fntr(stage_cfg)
+        >>> fn = extract_values(stage_cfg)
         Traceback (most recent call last):
             ...
         ValueError: Error building expression for numeric_value...
         >>> stage_cfg = {"numeric_value": "foo", "categorical_value": "bar"}
-        >>> fn = extract_values_fntr(stage_cfg)
+        >>> fn = extract_values(stage_cfg)
         >>> df = pl.DataFrame({"subject_id": [1, 1, 1], "time": [1, 2, 3]})
         >>> fn(df)
         Traceback (most recent call last):
@@ -69,7 +68,7 @@ def main(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
 
     Note that deprecated column names like "numerical_value" or "timestamp" won't be re-typed.
         >>> stage_cfg = {"numerical_value": "foo"}
-        >>> fn = extract_values_fntr(stage_cfg)
+        >>> fn = extract_values(stage_cfg)
         >>> df = pl.DataFrame({"subject_id": [1, 1, 1], "time": [1, 2, 3], "foo": ["1", "2", "3"]})
         >>> fn(df)
         shape: (3, 4)
@@ -125,3 +124,6 @@ def main(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
         return df.with_columns(new_cols).sort(subject_id_field, "time", maintain_order=True)
 
     return compute_fn
+
+
+main = registered_stage(extract_values)

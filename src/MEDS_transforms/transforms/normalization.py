@@ -5,8 +5,7 @@ import polars as pl
 from ..stages import registered_stage
 
 
-@registered_stage
-def main(
+def normalize(
     df: pl.LazyFrame, code_metadata: pl.DataFrame, code_modifiers: list[str] | None = None
 ) -> pl.LazyFrame:
     """Normalize a MEDS dataset across both categorical and continuous dimensions.
@@ -219,3 +218,6 @@ def main(
         .sort(idx_col)
         .drop(idx_col)
     )
+
+
+main = registered_stage(normalize)

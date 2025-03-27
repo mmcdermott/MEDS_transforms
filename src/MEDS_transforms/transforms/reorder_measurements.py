@@ -13,8 +13,7 @@ from ..stages import registered_stage
 logger = logging.getLogger(__name__)
 
 
-@registered_stage
-def main(
+def reorder_measurements(
     stage_cfg: DictConfig, code_metadata: pl.DataFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Re-orders a dataframe within the temporal and subject ID ordering via a specified code order.
@@ -40,7 +39,7 @@ def main(
         ...     "code": ["A", "B", "A", "C"], "modifier1": [1, 2, 1, 2]
         ... })
         >>> stage_cfg = DictConfig({"ordered_code_patterns": ["B", "A"]})
-        >>> fn = reorder_by_code_fntr(stage_cfg, code_metadata_df, ["modifier1"])
+        >>> fn = reorder_measurements(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data.lazy()).collect()
         shape: (4, 4)
         ┌────────────┬──────┬──────┬───────────┐
@@ -64,7 +63,7 @@ def main(
         >>> stage_cfg = DictConfig({
         ...     "ordered_code_patterns": ["ADMISSION.*", "LAB//baza", "LAB//f$", "LAB//b.*", "DISCHARGE"]
         ... })
-        >>> fn = reorder_by_code_fntr(stage_cfg, code_metadata_df)
+        >>> fn = reorder_measurements(stage_cfg, code_metadata_df)
         >>> fn(data.lazy()).collect()
         shape: (6, 3)
         ┌────────────┬──────┬────────────────┐
@@ -79,7 +78,7 @@ def main(
         │ 2          ┆ 2    ┆ DISCHARGE      │
         │ 2          ┆ 3    ┆ LAB//baz       │
         └────────────┴──────┴────────────────┘
-        >>> fn = reorder_by_code_fntr({}, code_metadata_df)
+        >>> fn = reorder_measurements({}, code_metadata_df)
         >>> fn(data.lazy()).collect()
         shape: (6, 3)
         ┌────────────┬──────┬────────────────┐
@@ -94,11 +93,11 @@ def main(
         │ 2          ┆ 2    ┆ DISCHARGE      │
         │ 2          ┆ 3    ┆ LAB//baz       │
         └────────────┴──────┴────────────────┘
-        >>> fn = reorder_by_code_fntr({"ordered_code_patterns": "foo"}, code_metadata_df)
+        >>> fn = reorder_measurements({"ordered_code_patterns": "foo"}, code_metadata_df)
         Traceback (most recent call last):
             ...
         ValueError: The 'ordered_code_patterns' field must be a list of strings. Got foo.
-        >>> fn = reorder_by_code_fntr({"ordered_code_patterns": [32]}, code_metadata_df)
+        >>> fn = reorder_measurements({"ordered_code_patterns": [32]}, code_metadata_df)
         Traceback (most recent call last):
             ...
         ValueError: Each element of 'ordered_code_patterns' must be a string. Got 32.
@@ -148,3 +147,6 @@ def main(
         )
 
     return reorder_fn
+
+
+main = registered_stage(reorder_measurements)

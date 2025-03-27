@@ -198,8 +198,7 @@ def filter_subjects_by_num_events(df: pl.LazyFrame, min_events_per_subject: int)
     return df.filter(pl.col("time").n_unique().over("subject_id") >= min_events_per_subject)
 
 
-@registered_stage
-def main(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
+def filter_subjects(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Returns a function that filters subjects by the number of measurements and events they have.
 
     Args:
@@ -216,7 +215,7 @@ def main(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
         ...     "time":       [1, 1, 1, 1, 1, 1, 2, 3, None, None, 1, 2, 2, None, 1, 2, 3, 1],
         ... })
         >>> stage_cfg = DictConfig({"min_measurements_per_subject": 4, "min_events_per_subject": 2})
-        >>> filter_subjects_fntr(stage_cfg)(df)
+        >>> filter_subjects(stage_cfg)(df)
         shape: (4, 2)
         ┌────────────┬──────┐
         │ subject_id ┆ time │
@@ -256,3 +255,6 @@ def main(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
         return data
 
     return fn
+
+
+main = registered_stage(filter_subjects)
