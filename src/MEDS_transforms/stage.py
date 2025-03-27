@@ -40,6 +40,43 @@ class StageType(StrEnum):
     def from_fns(
         cls, main_fn: MAIN_FN_T | None, map_fn: ANY_COMPUTE_FN_T | None, reduce_fn: ANY_COMPUTE_FN_T | None
     ) -> StageType:
+        """Determines the stage type based on the provided functions.
+
+        Args:
+            main_fn: The main function for the stage. May be None.
+            map_fn: The mapping function for the stage. May be None.
+            reduce_fn: The reducing function for the stage. May be None.
+
+        Returns:
+            StageType: The type of stage determined from the provided functions. If the passed functions do
+                not correspond to a valid stage type, a ValueError will be raised.
+
+        Raises:
+            ValueError: If the provided functions do not correspond to a valid stage type.
+
+        Examples:
+            >>> def main_fn(cfg: DictConfig):
+            ...     pass
+            >>> def map_fn(cfg: DictConfig, stage_cfg: DictConfig):
+            ...     pass
+            >>> def reduce_fn(cfg: DictConfig, stage_cfg: DictConfig):
+            ...     pass
+            >>> StageType.from_fns(main_fn=main_fn, map_fn=None, reduce_fn=None)
+            <StageType.MAIN: 'main'>
+            >>> StageType.from_fns(main_fn=None, map_fn=map_fn, reduce_fn=None)
+            <StageType.MAP: 'map'>
+            >>> StageType.from_fns(main_fn=None, map_fn=map_fn, reduce_fn=reduce_fn)
+            <StageType.MAPREDUCE: 'mapreduce'>
+            >>> StageType.from_fns(main_fn=None, map_fn=None, reduce_fn=None)
+            Traceback (most recent call last):
+                ...
+            ValueError: Either main_fn or map_fn/reduce_fn must be provided.
+            >>> StageType.from_fns(main_fn=main_fn, map_fn=map_fn, reduce_fn=reduce_fn)
+            Traceback (most recent call last):
+                ...
+            ValueError: Only one of main_fn or map_fn/reduce_fn should be provided.
+        """
+
         if main_fn is not None:
             if map_fn is not None or reduce_fn is not None:
                 raise ValueError("Only one of main_fn or map_fn/reduce_fn should be provided.")
