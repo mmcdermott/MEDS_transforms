@@ -9,8 +9,8 @@ from pathlib import Path
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from MEDS_transforms.configs import PREPROCESS_CONFIG_YAML
-from MEDS_transforms.mapreduce import ANY_COMPUTE_FN_T, map_stage, mapreduce_stage
+from .configs import PREPROCESS_CONFIG_YAML
+from .mapreduce import ANY_COMPUTE_FN_T, map_stage, mapreduce_stage
 
 logger = logging.getLogger(__name__)
 
