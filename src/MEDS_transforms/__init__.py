@@ -42,4 +42,5 @@ INFERRED_STAGE_KEYS = {
     "metadata_input_dir",
     "output_dir",
     "reducer_output_dir",
+    "_script",
 }
