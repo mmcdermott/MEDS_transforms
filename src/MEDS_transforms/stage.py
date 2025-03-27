@@ -1,5 +1,7 @@
 """Functions for registering and defining MEDS-transforms stages."""
 
+from __future__ import annotations
+
 import functools
 import inspect
 import logging
@@ -34,6 +36,21 @@ class StageType(StrEnum):
     MAPREDUCE = "mapreduce"
     MAIN = "main"
 
+    @classmethod
+    def from_fns(
+        cls, main_fn: MAIN_FN_T | None, map_fn: ANY_COMPUTE_FN_T | None, reduce_fn: ANY_COMPUTE_FN_T | None
+    ) -> StageType:
+        if main_fn is not None:
+            if map_fn is not None or reduce_fn is not None:
+                raise ValueError("Only one of main_fn or map_fn/reduce_fn should be provided.")
+            return StageType.MAIN
+        elif map_fn is not None and reduce_fn is not None:
+            return StageType.MAPREDUCE
+        elif map_fn is not None:
+            return StageType.MAP
+        else:
+            raise ValueError("Either main_fn or map_fn/reduce_fn must be provided.")
+
 
 def get_stage_main(
     *,
@@ -46,16 +63,7 @@ def get_stage_main(
 ) -> MAIN_FN_T:
     """Wraps or returns a function that can serve as the main function for a stage."""
 
-    if main_fn is not None:
-        mode = StageType.MAIN
-        if map_fn is not None or reduce_fn is not None:
-            raise ValueError("Only one of main_fn or map_fn/reduce_fn should be provided.")
-    elif map_fn is not None and reduce_fn is not None:
-        mode = StageType.MAPREDUCE
-    elif map_fn is not None:
-        mode = StageType.MAP
-    else:
-        raise ValueError("Either main_fn or map_fn/reduce_fn must be provided.")
+    mode = StageType.from_fns(main_fn, map_fn, reduce_fn)
 
     if config_path is None:
         config_path = PREPROCESS_CONFIG_YAML
