@@ -92,12 +92,22 @@ def stage_init(cfg: DictConfig) -> tuple[Path, Path, Path]:
 
 
 def get_package_name() -> str:
-    """Returns the name of the python package running this pipeline."""
+    """Returns the name of the python package running this pipeline.
+
+    Examples:
+        >>> get_package_name()
+        'MEDS_transforms'
+    """
     return __package_name__
 
 
 def get_package_version() -> str:
-    """Returns the version of the python package running this pipeline."""
+    """Returns the version of the python package running this pipeline.
+
+    Examples:
+        >>> get_package_version()
+        '...'
+    """
     return __version__
 
 
