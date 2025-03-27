@@ -4,6 +4,7 @@ import functools
 import inspect
 import logging
 from collections.abc import Callable
+from enum import StrEnum
 from pathlib import Path
 
 import hydra
@@ -13,6 +14,23 @@ from .configs import PREPROCESS_CONFIG_YAML
 from .mapreduce import ANY_COMPUTE_FN_T, map_stage, mapreduce_stage
 
 logger = logging.getLogger(__name__)
+
+
+class StageType(StrEnum):
+    """The types of stages MEDS-Transforms supports.
+
+    Attributes:
+        MAP: A stage that applies a transformation to each data shard of a MEDS dataset, outputting new data
+            shards.
+        MAPREDUCE: A stage that applies a metadata extraction operation to each data shard of a MEDS dataset,
+            then reduces the outputs of those transformations into an updated metadata/codes.parquet file.
+        MAIN: A stage that does not fit into either of the above categories, and provides a direct main
+            function.
+    """
+
+    MAP = "map"
+    MAPREDUCE = "mapreduce"
+    MAIN = "main"
 
 
 def make_main_fn(
@@ -52,6 +70,17 @@ def MEDS_transforms_stage(
 ):
     """Wraps or returns a function that can serve as the main function for a stage."""
 
+    if main_fn is not None:
+        mode = StageType.MAIN
+        if compute_fn is not None or reduce_fn is not None:
+            raise ValueError("Only one of main_fn or compute_fn/reduce_fn should be provided.")
+    elif compute_fn is not None and reduce_fn is not None:
+        mode = StageType.MAPREDUCE
+    elif compute_fn is not None:
+        mode = StageType.MAP
+    else:
+        raise ValueError("Either main_fn or compute_fn/reduce_fn must be provided.")
+
     if config_path is None:
         config_path = PREPROCESS_CONFIG_YAML
 
@@ -64,7 +93,7 @@ def MEDS_transforms_stage(
     if stage_name is None:
         stage_name = (main_fn or compute_fn).__module__.split(".")[-1]
 
-    if main_fn is None:
+    if mode != StageType.MAIN:
         main_fn = make_main_fn(compute_fn, reduce_fn)
         main_fn.__name__ = stage_name
 
