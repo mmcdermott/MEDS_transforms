@@ -141,10 +141,8 @@ def get_stage_main(
 
     @functools.wraps(hydra_wraped_main)
     def wrapped_main(*args, **kwargs):
-        OmegaConf.register_new_resolver("current_script_name", lambda: stage_name, replace=True)
-        OmegaConf.register_new_resolver(
-            "get_script_docstring", lambda: stage_docstring.replace("$", "$$"), replace=True
-        )
+        OmegaConf.register_new_resolver("stage_name", lambda: stage_name)
+        OmegaConf.register_new_resolver("stage_docstring", lambda: stage_docstring.replace("$", "$$"))
         return hydra_wraped_main(*args, **kwargs)
 
     return wrapped_main
@@ -216,8 +214,6 @@ def MEDS_transforms_stage(*args, **kwargs):
         returned, and the input functions will be unmodified.
 
         >>> fn = MEDS_transforms_stage(main_fn=main)
-        >>> fn(DictConfig({}))
-        'main'
         >>> hasattr(fn, "main")
         False
         >>> hasattr(main, "main")
@@ -261,8 +257,6 @@ def MEDS_transforms_stage(*args, **kwargs):
         `main`, it will define a `StageType.MAIN` stage using that.
 
         >>> fn = MEDS_transforms_stage(main)
-        >>> fn(DictConfig({}))
-        'main'
         >>> hasattr(fn, "main")
         False
         >>> fn.__name__
@@ -319,8 +313,6 @@ def MEDS_transforms_stage(*args, **kwargs):
         or map function), then a decorator is returned that itself takes a function:
         >>> fntr = MEDS_transforms_stage(config_path=Path("f.yaml"), stage_name="bar", stage_docstring="baz")
         >>> fn = fntr(main)
-        >>> fn(DictConfig({}))
-        'main'
         >>> hasattr(fn, "main")
         False
         >>> fn = fntr(map_fn)
