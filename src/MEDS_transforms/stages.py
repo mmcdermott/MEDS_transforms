@@ -55,10 +55,14 @@ def MEDS_transforms_stage(
     if config_path is None:
         config_path = PREPROCESS_CONFIG_YAML
 
+    hydra_wrapper = hydra.main(
+        version_base=None,
+        config_path=str(config_path.parent),
+        config_name=config_path.stem,
+    )
+
     if stage_name is None:
         stage_name = (main_fn or compute_fn).__module__.split(".")[-1]
-
-    OmegaConf.register_new_resolver("current_script_name", lambda: stage_name, replace=True)
 
     if main_fn is None:
         main_fn = make_main_fn(compute_fn, reduce_fn)
@@ -67,11 +71,14 @@ def MEDS_transforms_stage(
     if stage_docstring is None:
         stage_docstring = inspect.getdoc(main_fn) or ""
 
-    # Replace $ with $$ in the docstring to avoid issues with OmegaConf
-    stage_docstring = stage_docstring.replace("$", "$$")
+    hydra_wraped_main = hydra_wrapper(main_fn)
 
-    OmegaConf.register_new_resolver("get_script_docstring", lambda: stage_docstring, replace=True)
+    @functools.wraps(hydra_wraped_main)
+    def wrapped_main(*args, **kwargs):
+        OmegaConf.register_new_resolver("current_script_name", lambda: stage_name, replace=True)
+        OmegaConf.register_new_resolver(
+            "get_script_docstring", lambda: stage_docstring.replace("$", "$$"), replace=True
+        )
+        return hydra_wraped_main(*args, **kwargs)
 
-    return hydra.main(version_base=None, config_path=str(config_path.parent), config_name=config_path.stem)(
-        main_fn
-    )
+    return wrapped_main
