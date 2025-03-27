@@ -8,7 +8,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from MEDS_transforms import INFERRED_STAGE_KEYS
 
-from ..stages import registered_stage
+from ..stages import MEDS_transforms_stage
 
 logger = logging.getLogger(__name__)
 
@@ -434,4 +434,4 @@ def add_time_derived_measurements(stage_cfg: DictConfig) -> Callable[[pl.LazyFra
     return fn
 
 
-main = registered_stage(compute_fn=add_time_derived_measurements)
+main = MEDS_transforms_stage(compute_fn=add_time_derived_measurements)

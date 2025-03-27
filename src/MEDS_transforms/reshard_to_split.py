@@ -17,7 +17,7 @@ from omegaconf import DictConfig, OmegaConf
 from MEDS_transforms.mapreduce import rwlock_wrap, shard_iterator, shuffle_shards
 from MEDS_transforms.utils import stage_init, write_lazyframe
 
-from .stages import registered_stage
+from .stages import MEDS_transforms_stage
 
 logger = logging.getLogger(__name__)
 
@@ -261,7 +261,7 @@ def write_json(d: dict, fp: Path) -> None:
     fp.write_text(json.dumps(d))
 
 
-@registered_stage
+@MEDS_transforms_stage
 def main(cfg: DictConfig):
     """Re-shard a MEDS cohort to in a manner that subdivides subject splits."""
 

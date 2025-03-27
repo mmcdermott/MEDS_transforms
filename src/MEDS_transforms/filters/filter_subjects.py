@@ -10,7 +10,7 @@ from omegaconf import DictConfig
 logger = logging.getLogger(__name__)
 
 
-from ..stages import registered_stage
+from ..stages import MEDS_transforms_stage
 
 
 def filter_subjects_by_num_measurements(df: pl.LazyFrame, min_measurements_per_subject: int) -> pl.LazyFrame:
@@ -257,4 +257,4 @@ def filter_subjects(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFr
     return fn
 
 
-main = registered_stage(compute_fn=filter_subjects)
+main = MEDS_transforms_stage(compute_fn=filter_subjects)

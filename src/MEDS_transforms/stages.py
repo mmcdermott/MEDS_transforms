@@ -42,7 +42,7 @@ def make_main_fn(
     return main_fn
 
 
-def registered_stage(
+def MEDS_transforms_stage(
     main_fn: Callable[[DictConfig], None] | None = None,
     compute_fn: ANY_COMPUTE_FN_T | None = None,
     reduce_fn: ANY_COMPUTE_FN_T | None = None,

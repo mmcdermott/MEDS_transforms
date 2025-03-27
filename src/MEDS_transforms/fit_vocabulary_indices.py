@@ -8,7 +8,7 @@ from pathlib import Path
 import polars as pl
 from omegaconf import DictConfig, OmegaConf
 
-from .stages import registered_stage
+from .stages import MEDS_transforms_stage
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +191,7 @@ VOCABULARY_ORDERING_METHODS: dict[VOCABULARY_ORDERING, INDEX_ASSIGNMENT_FN] = {
 }
 
 
-@registered_stage
+@MEDS_transforms_stage
 def main(cfg: DictConfig):
     """Assigns integral vocabulary IDs to codes in the metadata file, for use in tokenizing the dataset.
 

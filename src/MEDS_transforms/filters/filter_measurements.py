@@ -5,7 +5,7 @@ from collections.abc import Callable
 import polars as pl
 from omegaconf import DictConfig
 
-from ..stages import registered_stage
+from ..stages import MEDS_transforms_stage
 
 
 def filter_measurements(
@@ -163,4 +163,4 @@ def filter_measurements(
     return filter_measurements_fn
 
 
-main = registered_stage(compute_fn=filter_measurements)
+main = MEDS_transforms_stage(compute_fn=filter_measurements)

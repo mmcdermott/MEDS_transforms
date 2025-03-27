@@ -8,7 +8,7 @@ from omegaconf import DictConfig, ListConfig
 
 from MEDS_transforms.utils import get_smallest_valid_uint_type
 
-from ..stages import registered_stage
+from ..stages import MEDS_transforms_stage
 
 logger = logging.getLogger(__name__)
 
@@ -149,4 +149,4 @@ def reorder_measurements(
     return reorder_fn
 
 
-main = registered_stage(compute_fn=reorder_measurements)
+main = MEDS_transforms_stage(compute_fn=reorder_measurements)

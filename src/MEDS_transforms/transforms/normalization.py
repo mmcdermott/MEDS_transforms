@@ -2,7 +2,7 @@
 
 import polars as pl
 
-from ..stages import registered_stage
+from ..stages import MEDS_transforms_stage
 
 
 def normalize(
@@ -220,4 +220,4 @@ def normalize(
     )
 
 
-main = registered_stage(compute_fn=normalize)
+main = MEDS_transforms_stage(compute_fn=normalize)

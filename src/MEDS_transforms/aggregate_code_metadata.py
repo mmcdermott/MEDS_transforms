@@ -10,7 +10,7 @@ import polars.selectors as cs
 from meds import subject_id_field
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
-from .stages import registered_stage
+from .stages import MEDS_transforms_stage
 
 logger = logging.getLogger(__name__)
 
@@ -740,4 +740,4 @@ def reducer_fntr(
     return reducer
 
 
-main = registered_stage(compute_fn=mapper_fntr, reduce_fn=reducer_fntr)
+main = MEDS_transforms_stage(compute_fn=mapper_fntr, reduce_fn=reducer_fntr)

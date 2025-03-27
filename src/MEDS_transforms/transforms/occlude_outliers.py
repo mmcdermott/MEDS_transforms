@@ -5,7 +5,7 @@ from collections.abc import Callable
 import polars as pl
 from omegaconf import DictConfig
 
-from ..stages import registered_stage
+from ..stages import MEDS_transforms_stage
 
 
 def occlude_outliers(
@@ -115,4 +115,4 @@ def occlude_outliers(
     return occlude_outliers_fn
 
 
-main = registered_stage(compute_fn=occlude_outliers)
+main = MEDS_transforms_stage(compute_fn=occlude_outliers)

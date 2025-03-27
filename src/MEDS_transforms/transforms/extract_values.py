@@ -10,7 +10,7 @@ from omegaconf import DictConfig
 from MEDS_transforms import DEPRECATED_NAMES, INFERRED_STAGE_KEYS, MANDATORY_TYPES
 from MEDS_transforms.parser import cfg_to_expr
 
-from ..stages import registered_stage
+from ..stages import MEDS_transforms_stage
 
 logger = logging.getLogger(__name__)
 
@@ -126,4 +126,4 @@ def extract_values(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFra
     return compute_fn
 
 
-main = registered_stage(compute_fn=extract_values)
+main = MEDS_transforms_stage(compute_fn=extract_values)
