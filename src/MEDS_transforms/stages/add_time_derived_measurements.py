@@ -387,6 +387,7 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
     return fn
 
 
+@MEDS_transforms_stage
 def add_time_derived_measurements(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Adds all requested time-derived measurements to a DataFrame.
 
@@ -431,6 +432,3 @@ def add_time_derived_measurements(stage_cfg: DictConfig) -> Callable[[pl.LazyFra
         return df
 
     return fn
-
-
-main = MEDS_transforms_stage(map_fn=add_time_derived_measurements)

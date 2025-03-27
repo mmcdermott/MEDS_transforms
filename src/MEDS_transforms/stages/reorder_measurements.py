@@ -13,6 +13,7 @@ from ..stage import MEDS_transforms_stage
 logger = logging.getLogger(__name__)
 
 
+@MEDS_transforms_stage
 def reorder_measurements(
     stage_cfg: DictConfig, code_metadata: pl.DataFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
@@ -147,6 +148,3 @@ def reorder_measurements(
         )
 
     return reorder_fn
-
-
-main = MEDS_transforms_stage(map_fn=reorder_measurements)

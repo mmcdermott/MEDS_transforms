@@ -8,6 +8,7 @@ from omegaconf import DictConfig
 from ..stage import MEDS_transforms_stage
 
 
+@MEDS_transforms_stage
 def filter_measurements(
     stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
@@ -161,6 +162,3 @@ def filter_measurements(
         )
 
     return filter_measurements_fn
-
-
-main = MEDS_transforms_stage(map_fn=filter_measurements)

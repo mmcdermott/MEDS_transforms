@@ -8,6 +8,7 @@ from omegaconf import DictConfig
 from ..stage import MEDS_transforms_stage
 
 
+@MEDS_transforms_stage
 def occlude_outliers(
     stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
@@ -113,6 +114,3 @@ def occlude_outliers(
         )
 
     return occlude_outliers_fn
-
-
-main = MEDS_transforms_stage(map_fn=occlude_outliers)

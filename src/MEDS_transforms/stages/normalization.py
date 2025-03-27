@@ -5,6 +5,7 @@ import polars as pl
 from ..stage import MEDS_transforms_stage
 
 
+@MEDS_transforms_stage
 def normalize(
     df: pl.LazyFrame, code_metadata: pl.DataFrame, code_modifiers: list[str] | None = None
 ) -> pl.LazyFrame:
@@ -218,6 +219,3 @@ def normalize(
         .sort(idx_col)
         .drop(idx_col)
     )
-
-
-main = MEDS_transforms_stage(map_fn=normalize)

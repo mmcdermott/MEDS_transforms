@@ -197,6 +197,7 @@ def filter_subjects_by_num_events(df: pl.LazyFrame, min_events_per_subject: int)
     return df.filter(pl.col("time").n_unique().over("subject_id") >= min_events_per_subject)
 
 
+@MEDS_transforms_stage
 def filter_subjects(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Returns a function that filters subjects by the number of measurements and events they have.
 
@@ -254,6 +255,3 @@ def filter_subjects(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFr
         return data
 
     return fn
-
-
-main = MEDS_transforms_stage(map_fn=filter_subjects)

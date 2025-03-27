@@ -14,6 +14,7 @@ from ..stage import MEDS_transforms_stage
 logger = logging.getLogger(__name__)
 
 
+@MEDS_transforms_stage
 def extract_values(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Create a function that extracts values from a MEDS cohort.
 
@@ -123,6 +124,3 @@ def extract_values(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFra
         return df.with_columns(new_cols).sort(subject_id_field, "time", maintain_order=True)
 
     return map_fn
-
-
-main = MEDS_transforms_stage(map_fn=extract_values)
