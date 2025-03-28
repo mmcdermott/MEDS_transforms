@@ -18,9 +18,12 @@ def run_stage():
     if len(sys.argv) < 2 or sys.argv[1] in ("--help", "-h"):
         print(f"Usage: {sys.argv[0]} <stage_name> [args]")
         print("Available stages:")
-        for name in all_stages:
+        for name in sorted(all_stages):
             print(f"  - {name}")
-        sys.exit(1)
+        if len(sys.argv) < 2:
+            sys.exit(1)
+        else:
+            sys.exit(0)
 
     stage_name = sys.argv[1]
     sys.argv = sys.argv[1:]  # remove dispatcher argument
@@ -29,7 +32,4 @@ def run_stage():
         raise ValueError(f"Stage '{stage_name}' not found.")
 
     main_fn = all_stages[stage_name].load()
-    if not callable(main_fn):
-        raise ValueError(f"Stage '{stage_name}' does not have a callable main function.")
-
     main_fn()
