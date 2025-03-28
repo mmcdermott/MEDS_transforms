@@ -2,7 +2,7 @@
 RUNNER_SCRIPT = "MEDS_transform-pipeline"
 
 # Stages
-__stage_pattern = "MEDS_transform-stage {stage_name}"
+__stage_pattern = "MEDS_transform-stage pkg://MEDS_transforms.configs._preprocess.yaml {stage_name}"
 
 AGGREGATE_CODE_METADATA_SCRIPT = __stage_pattern.format(stage_name="aggregate_code_metadata")
 FIT_VOCABULARY_INDICES_SCRIPT = __stage_pattern.format(stage_name="fit_vocabulary_indices")

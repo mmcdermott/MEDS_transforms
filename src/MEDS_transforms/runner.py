@@ -155,8 +155,11 @@ def run_stage(
         ...     },
         ... })
         >>> run_stage(cfg, "reshard_to_split", runner_fn=fake_shell_succeed)
-        MEDS_transform-stage reshard_to_split --config-dir=... --config-name=pipeline_config
-            'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=reshard_to_split
+        MEDS_transform-stage pipeline_config.yaml reshard_to_split
+            --config-dir=...
+            --config-name=pipeline_config
+            'hydra.searchpath=[pkg://MEDS_transforms.configs]'
+            stage=reshard_to_split
         >>> run_stage(
         ...     cfg, "fit_vocabulary_indices", runner_fn=fake_shell_succeed
         ... )
@@ -195,7 +198,7 @@ def run_stage(
     elif "_script" in stage_config:
         script = stage_config._script
     else:
-        script = f"MEDS_transform-stage {stage_name}"
+        script = f"MEDS_transform-stage {str(pipeline_config_fp)} {stage_name}"
 
     command_parts = [
         script,

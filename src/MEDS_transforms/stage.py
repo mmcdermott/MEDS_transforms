@@ -5,12 +5,9 @@ import inspect
 import logging
 from collections.abc import Callable
 from enum import StrEnum
-from pathlib import Path
 
-import hydra
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 
-from .configs import PREPROCESS_CONFIG_YAML
 from .mapreduce import ANY_COMPUTE_FN_T, map_stage, mapreduce_stage
 
 logger = logging.getLogger(__name__)
@@ -92,22 +89,12 @@ def get_stage_main(
     main_fn: MAIN_FN_T | None = None,
     map_fn: ANY_COMPUTE_FN_T | None = None,
     reduce_fn: ANY_COMPUTE_FN_T | None = None,
-    config_path: Path | None = None,
     stage_name: str | None = None,
     stage_docstring: str | None = None,
 ) -> MAIN_FN_T:
     """Wraps or returns a function that can serve as the main function for a stage."""
 
     mode = StageType.from_fns(main_fn, map_fn, reduce_fn)
-
-    if config_path is None:
-        config_path = PREPROCESS_CONFIG_YAML
-
-    hydra_wrapper = hydra.main(
-        version_base=None,
-        config_path=str(config_path.parent),
-        config_name=config_path.stem,
-    )
 
     if stage_name is None:
         stage_name = (main_fn or map_fn).__module__.split(".")[-1]
@@ -123,7 +110,6 @@ def get_stage_main(
                 return map_stage(cfg, map_fn)
 
             main_fn.__name__ = stage_name
-            main_fn.__doc__ = stage_docstring
 
         case StageType.MAPREDUCE:
             stage_docstring = stage_docstring or (
@@ -135,17 +121,10 @@ def get_stage_main(
                 return mapreduce_stage(cfg, map_fn, reduce_fn)
 
             main_fn.__name__ = stage_name
-            main_fn.__doc__ = stage_docstring
 
-    hydra_wraped_main = hydra_wrapper(main_fn)
+    main_fn.__doc__ = stage_docstring
 
-    @functools.wraps(hydra_wraped_main)
-    def wrapped_main(*args, **kwargs):
-        OmegaConf.register_new_resolver("stage_name", lambda: stage_name)
-        OmegaConf.register_new_resolver("stage_docstring", lambda: stage_docstring.replace("$", "$$"))
-        return hydra_wraped_main(*args, **kwargs)
-
-    return wrapped_main
+    return main_fn
 
 
 def MEDS_transforms_stage(*args, **kwargs):
@@ -186,7 +165,7 @@ def MEDS_transforms_stage(*args, **kwargs):
 
     Args:
         *args: Positional arguments. If used as a decorator, this should be a single function.
-        **kwargs: Keyword arguments. These can include `main_fn`, `map_fn`, `reduce_fn`, `config_path`,
+        **kwargs: Keyword arguments. These can include `main_fn`, `map_fn`, `reduce_fn`,
             `stage_name`, and `stage_docstring`. Other keyword arguments will cause an error. Not all keyword
             arguments are required for all usages of the decorator.
 
@@ -300,7 +279,7 @@ def MEDS_transforms_stage(*args, **kwargs):
         Keyword arguments can be used to specify the config path, stage name, and docstring. These are used to
         modify the returned stage name and docstring, and the config path is used to set up the hydra wrapper:
 
-        >>> @MEDS_transforms_stage(config_path=Path("f.yaml"), stage_name="bar", stage_docstring="baz")
+        >>> @MEDS_transforms_stage(stage_name="bar", stage_docstring="baz")
         ... def special_map(cfg: DictConfig):
         ...     '''Not baz'''
         ...     return "map"
@@ -311,7 +290,7 @@ def MEDS_transforms_stage(*args, **kwargs):
 
         If specified with no positional arguments and only non-determining keyword arguments (meaning no main
         or map function), then a decorator is returned that itself takes a function:
-        >>> fntr = MEDS_transforms_stage(config_path=Path("f.yaml"), stage_name="bar", stage_docstring="baz")
+        >>> fntr = MEDS_transforms_stage(stage_name="bar", stage_docstring="baz")
         >>> fn = fntr(main)
         >>> hasattr(fn, "main")
         False
