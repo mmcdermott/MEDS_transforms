@@ -6,7 +6,6 @@ To do this effectively, this runner functionally takes a "meta configuration" fi
      stage scripts and Hydra launcher configurations for each stage to control parallelism, resources, etc.
 """
 
-import importlib
 import subprocess
 from pathlib import Path
 
@@ -29,38 +28,6 @@ from .configs import PREPROCESS_CONFIG_YAML, RUNNER_CONFIG_YAML
 logger = logging.getLogger(__name__)
 
 RESERVED_CONFIG_NAMES = {c.stem for c in (PREPROCESS_CONFIG_YAML, RUNNER_CONFIG_YAML)}
-
-
-def get_script_from_name(stage_name: str) -> str | None:
-    """Returns the script name for the given stage name.
-
-    Args:
-        stage_name: The name of the stage.
-
-    Returns:
-        The script name for the given stage name.
-
-    Examples:
-        >>> get_script_from_name("fit_vocabulary_indices")
-        'MEDS_transform-fit_vocabulary_indices'
-        >>> get_script_from_name("filter_subjects")
-        'MEDS_transform-filter_subjects'
-        >>> get_script_from_name("reorder_measurements")
-        'MEDS_transform-reorder_measurements'
-        >>> get_script_from_name("nonexistent_stage")
-        Traceback (most recent call last):
-            ...
-        ValueError: Could not find a script for stage nonexistent_stage.
-    """
-
-    for pfx in ("MEDS_transforms.stages",):
-        try:
-            _ = importlib.import_module(f"{pfx}.{stage_name}")
-            return f"MEDS_transform-{stage_name}"
-        except ImportError:
-            pass
-
-    raise ValueError(f"Could not find a script for stage {stage_name}.")
 
 
 def get_parallelization_args(
@@ -188,7 +155,7 @@ def run_stage(
         ...     },
         ... })
         >>> run_stage(cfg, "reshard_to_split", runner_fn=fake_shell_succeed)
-        MEDS_transform-reshard_to_split --config-dir=... --config-name=pipeline_config
+        MEDS_transform-stage reshard_to_split --config-dir=... --config-name=pipeline_config
             'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=reshard_to_split
         >>> run_stage(
         ...     cfg, "fit_vocabulary_indices", runner_fn=fake_shell_succeed
@@ -228,7 +195,7 @@ def run_stage(
     elif "_script" in stage_config:
         script = stage_config._script
     else:
-        script = get_script_from_name(stage_name)
+        script = f"MEDS_transform-stage {stage_name}"
 
     command_parts = [
         script,

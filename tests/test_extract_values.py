@@ -1,8 +1,4 @@
-"""Tests the extract values script.
-
-Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, rather than the installed
-scripts.
-"""
+"""Tests the extract values script."""
 
 from tests import EXTRACT_VALUES_SCRIPT
 from tests.transform_tester_base import parse_shards_yaml, single_stage_transform_tester

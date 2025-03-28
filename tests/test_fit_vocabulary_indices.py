@@ -1,8 +1,4 @@
-"""Tests the fit vocabulary indices script.
-
-Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, rather than the installed
-scripts.
-"""
+"""Tests the fit vocabulary indices script."""
 
 from tests import FIT_VOCABULARY_INDICES_SCRIPT
 from tests.transform_tester_base import parse_code_metadata_csv, single_stage_transform_tester

@@ -1,8 +1,4 @@
-"""Base helper code and data inputs for all transforms integration tests.
-
-Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, rather than the installed
-scripts.
-"""
+"""Base helper code and data inputs for all transforms integration tests."""
 
 from collections import defaultdict
 from io import StringIO

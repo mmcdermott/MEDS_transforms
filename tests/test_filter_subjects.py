@@ -1,8 +1,4 @@
-"""Tests the filter subjects script.
-
-Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, rather than the installed
-scripts.
-"""
+"""Tests the filter subjects script."""
 
 from meds import subject_id_field
 

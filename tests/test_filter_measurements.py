@@ -1,8 +1,4 @@
-"""Tests the filter measurements script.
-
-Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, rather than the installed
-scripts.
-"""
+"""Tests the filter measurements script."""
 
 from tests import FILTER_MEASUREMENTS_SCRIPT
 from tests.transform_tester_base import single_stage_transform_tester
