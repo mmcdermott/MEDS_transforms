@@ -296,7 +296,7 @@ def populate_stage(
     return out
 
 
-def register_structured_config(pipeline_config_path: Path, stage_name: str, stage_docstring: str):
+def register_structured_config(pipeline_config_path: Path, stage_name: str):
     if pipeline_config_path.is_dir():
         raise ValueError(f"Pipeline config path '{pipeline_config_path}' is a directory, not a file.")
 
