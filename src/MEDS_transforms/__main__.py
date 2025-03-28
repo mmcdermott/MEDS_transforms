@@ -1,19 +1,12 @@
 import sys
-from importlib.metadata import entry_points
 
-from . import __package_name__
-
-
-def get_all_stages():
-    """Get all available stages."""
-    eps = entry_points(group=f"{__package_name__}.stages")
-    return {name: eps[name] for name in eps.names}
+from .stages import get_all_registered_stages
 
 
 def run_stage():
     """Run a stage based on command line arguments."""
 
-    all_stages = get_all_stages()
+    all_stages = get_all_registered_stages()
 
     if len(sys.argv) < 2 or sys.argv[1] in ("--help", "-h"):
         print(f"Usage: {sys.argv[0]} <stage_name> [args]")
@@ -31,5 +24,5 @@ def run_stage():
     if stage_name not in all_stages:
         raise ValueError(f"Stage '{stage_name}' not found.")
 
-    main_fn = all_stages[stage_name].load()
+    main_fn = all_stages[stage_name]["entry_point"].load()
     main_fn()

@@ -10,7 +10,7 @@ from pathlib import Path
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from .configs import PREPROCESS_CONFIG_YAML
+from .configs import MAIN_YAML, register_structured_config
 from .mapreduce import ANY_COMPUTE_FN_T, map_stage, mapreduce_stage
 
 logger = logging.getLogger(__name__)
@@ -92,7 +92,7 @@ def get_stage_main(
     main_fn: MAIN_FN_T | None = None,
     map_fn: ANY_COMPUTE_FN_T | None = None,
     reduce_fn: ANY_COMPUTE_FN_T | None = None,
-    config_path: Path | None = None,
+    pipeline_config_path: Path | None = None,
     stage_name: str | None = None,
     stage_docstring: str | None = None,
 ) -> MAIN_FN_T:
@@ -100,13 +100,10 @@ def get_stage_main(
 
     mode = StageType.from_fns(main_fn, map_fn, reduce_fn)
 
-    if config_path is None:
-        config_path = PREPROCESS_CONFIG_YAML
-
     hydra_wrapper = hydra.main(
         version_base=None,
-        config_path=str(config_path.parent),
-        config_name=config_path.stem,
+        config_path=str(MAIN_YAML.parent),
+        config_name=MAIN_YAML.stem,
     )
 
     if stage_name is None:
@@ -137,13 +134,15 @@ def get_stage_main(
             main_fn.__name__ = stage_name
             main_fn.__doc__ = stage_docstring
 
-    hydra_wraped_main = hydra_wrapper(main_fn)
-
-    @functools.wraps(hydra_wraped_main)
+    @functools.wraps(main_fn)
     def wrapped_main(*args, **kwargs):
         OmegaConf.register_new_resolver("stage_name", lambda: stage_name)
         OmegaConf.register_new_resolver("stage_docstring", lambda: stage_docstring.replace("$", "$$"))
-        return hydra_wraped_main(*args, **kwargs)
+
+        register_structured_config(pipeline_config_path, stage_name, stage_docstring)
+
+        hydra_wrapped_main = hydra_wrapper(main_fn)
+        return hydra_wrapped_main(*args, **kwargs)
 
     return wrapped_main
 

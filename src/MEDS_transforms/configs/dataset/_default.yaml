@@ -1,0 +1,7 @@
+defaults:
+  - _base_dataset # A structured config for type safety.
+
+root_dir: ???
+name: ${get_dataset_name_from_root:root_dir}
+version: ${get_dataset_version_from_root:root_dir}
+code_modifiers: []

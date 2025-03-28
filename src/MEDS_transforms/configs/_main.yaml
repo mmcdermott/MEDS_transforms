@@ -1,0 +1,47 @@
+defaults:
+  - dataset: _default
+  - pipeline: pipeline # This is provided via a structured config object
+  - stage: stage # This is provided via a structured config object
+  - _self_
+
+# Global IO
+input_dir: ${dataset.root_dir}
+cohort_dir: ???
+
+# Runtime information
+worker: 0
+seed: 1
+polling_time: 300 # wait time in seconds before beginning reduction steps, where applicable
+log_dir: "${stage.output_dir}/.logs"
+
+etl_metadata:
+  pipeline_name: ${pipeline.name}
+  pipeline_version: ${pipeline.version}
+  dataset_name: ${dataset.name}
+  dataset_version: ${dataset.version}
+  package_name: ${get_package_name:}
+  package_version: ${get_package_version:}
+
+_default_description: |-
+  This is a MEDS pipeline ETL. Please set a more detailed description at the top of your specific pipeline
+  configuration file.
+
+# Hydra
+hydra:
+  job:
+    name: "${stage.name}_${worker}_${now:%Y-%m-%d_%H-%M-%S}"
+  run:
+    dir: "${log_dir}"
+  sweep:
+    dir: "${log_dir}"
+  help:
+    app_name: "MEDS/${stage}"
+    template: |-
+      == ${hydra.help.app_name} ==
+      ${hydra.help.app_name} is a command line tool that provides an interface for running MEDS pipelines.
+
+      **Pipeline description:**
+      ${oc.select:pipeline.description, ${_default_description}}
+
+      **Stage description:**
+      ${oc.select:stage.description, ${stage_docstring:}}
