@@ -13,6 +13,7 @@ worker: 0
 seed: 1
 polling_time: 300 # wait time in seconds before beginning reduction steps, where applicable
 log_dir: "${stage_cfg.output_dir}/.logs"
+do_overwrite: false
 
 etl_metadata:
   pipeline_name: ${pipeline.name}
