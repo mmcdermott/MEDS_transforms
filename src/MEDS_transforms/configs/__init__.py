@@ -379,7 +379,7 @@ def register_structured_config(pipeline_config_path: Path | None, stage_name: st
             "${input_dir}",
             "${cohort_dir}",
             [stage[NAME_KEY] for stage in pipeline.stages],
-            {stage[NAME_KEY]: stage for stage in pipeline.stages},
+            {stage[NAME_KEY]: stage[stage[NAME_KEY]] for stage in pipeline.stages},
         )
     )
 
@@ -389,4 +389,4 @@ def register_structured_config(pipeline_config_path: Path | None, stage_name: st
     cs = ConfigStore.instance()
     cs.store(group="dataset", name="_base_dataset", node=DatasetConfig)
     cs.store(group="pipeline", name="pipeline", node=pipeline)
-    cs.store(group="stage", name="stage", node=stage_cfg)
+    cs.store(group="stage_cfg", name="stage_cfg", node=stage_cfg)

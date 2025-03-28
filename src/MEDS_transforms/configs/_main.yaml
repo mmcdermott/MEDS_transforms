@@ -1,7 +1,7 @@
 defaults:
   - dataset: _default
   - pipeline: pipeline # This is provided via a structured config object
-  - stage: stage # This is provided via a structured config object
+  - stage_cfg: stage_cfg # This is provided via a structured config object
   - _self_
 
 # Global IO
@@ -12,7 +12,7 @@ cohort_dir: ???
 worker: 0
 seed: 1
 polling_time: 300 # wait time in seconds before beginning reduction steps, where applicable
-log_dir: "${stage.output_dir}/.logs"
+log_dir: "${stage_cfg.output_dir}/.logs"
 
 etl_metadata:
   pipeline_name: ${pipeline.name}
@@ -29,13 +29,13 @@ _default_description: |-
 # Hydra
 hydra:
   job:
-    name: "${stage.name}_${worker}_${now:%Y-%m-%d_%H-%M-%S}"
+    name: "${stage_name:}_${worker}_${now:%Y-%m-%d_%H-%M-%S}"
   run:
     dir: "${log_dir}"
   sweep:
     dir: "${log_dir}"
   help:
-    app_name: "MEDS/${stage}"
+    app_name: "MEDS/${stage_name:}"
     template: |-
       == ${hydra.help.app_name} ==
       ${hydra.help.app_name} is a command line tool that provides an interface for running MEDS pipelines.
@@ -44,4 +44,4 @@ hydra:
       ${oc.select:pipeline.description, ${_default_description}}
 
       **Stage description:**
-      ${oc.select:stage.description, ${stage_docstring:}}
+      ${oc.select:stage_cfg.description, ${stage_docstring:}}

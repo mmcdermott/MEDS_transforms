@@ -367,7 +367,7 @@ def single_stage_tester(
         if stage_name is not None:
             pipeline_config_kwargs["pipeline.stages"] = [stage_name]
         if stage_kwargs:
-            pipeline_config_kwargs[f"stage.{stage_name}"] = stage_kwargs
+            pipeline_config_kwargs["stage_cfg"] = stage_kwargs
 
         run_command_kwargs = {
             "script": script,
