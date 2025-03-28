@@ -7,7 +7,7 @@ from pathlib import Path
 import polars as pl
 from meds import subject_id_field, subject_splits_filepath
 
-from tests.utils import FILE_T, multi_stage_tester, parse_shards_yaml, single_stage_tester
+from tests.utils import FILE_T, parse_shards_yaml, single_stage_tester
 
 # Test MEDS data (inputs)
 
@@ -234,26 +234,3 @@ def single_stage_transform_tester(
     base_kwargs["want_outputs"] = want_outputs
 
     single_stage_tester(**base_kwargs)
-
-
-def multi_stage_transform_tester(
-    transform_scripts: list[str | Path],
-    stage_names: list[str],
-    stage_configs: dict[str, str] | str | None,
-    do_pass_stage_name: bool | dict[str, bool] = True,
-    want_data: dict[str, pl.DataFrame] | None = None,
-    want_metadata: pl.DataFrame | None = None,
-    **input_data_kwargs,
-):
-    base_kwargs = {
-        "scripts": transform_scripts,
-        "stage_names": stage_names,
-        "stage_configs": stage_configs,
-        "do_pass_stage_name": do_pass_stage_name,
-        "assert_no_other_outputs": False,  # TODO(mmd): eventually fix
-        "config_name": "preprocess",
-        "input_files": remap_inputs_for_transform(**input_data_kwargs),
-        "want_outputs": {**want_data, **want_metadata},
-    }
-
-    multi_stage_tester(**base_kwargs)
