@@ -379,7 +379,7 @@ def register_structured_config(pipeline_config_path: Path | None, stage_name: st
             "${input_dir}",
             "${cohort_dir}",
             [stage[NAME_KEY] for stage in pipeline.stages],
-            {stage[NAME_KEY]: stage[stage[NAME_KEY]] for stage in pipeline.stages},
+            {stage[NAME_KEY]: copy.deepcopy(stage) for stage in pipeline.stages},
         )
     )
 

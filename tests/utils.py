@@ -143,6 +143,7 @@ def run_command(
     if do_use_config_yaml:
         conf = OmegaConf.create(
             {
+                "defaults": ["_main", "_self_"],
                 **hydra_kwargs,
             }
         )
@@ -364,10 +365,19 @@ def single_stage_tester(
             pipeline_config_kwargs["input_dir"] = str(input_dir.resolve())
             pipeline_config_kwargs["cohort_dir"] = str(cohort_dir.resolve())
 
-        if stage_name is not None:
-            pipeline_config_kwargs["pipeline.stages"] = [stage_name]
-        if stage_kwargs:
-            pipeline_config_kwargs["stage_cfg"] = stage_kwargs
+        if do_use_config_yaml:
+            if stage_name is not None:
+                if stage_kwargs:
+                    pipeline_config_kwargs["pipeline"] = {"stages": [{stage_name: stage_kwargs}]}
+                else:
+                    pipeline_config_kwargs["pipeline"] = {"stages": [stage_name]}
+            else:
+                raise ValueError("stage_name must be provided.")
+        else:
+            if stage_name is not None:
+                pipeline_config_kwargs["pipeline.stages"] = [stage_name]
+            if stage_kwargs:
+                pipeline_config_kwargs["stage_cfg"] = stage_kwargs
 
         run_command_kwargs = {
             "script": script,
