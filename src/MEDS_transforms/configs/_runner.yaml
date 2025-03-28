@@ -24,8 +24,6 @@ hydra:
       ${hydra.help.app_name} is a command line tool for running entire MEDS-transform pipelines in a single
       command.
 
-      ${get_script_docstring:runner}
-
       **MEDS-transforms Pipeline description:**
 
       ${_pipeline_description}

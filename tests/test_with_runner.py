@@ -1,8 +1,5 @@
 """Tests a multi-stage pre-processing pipeline via the Runner utility. Only checks final outputs.
 
-Set the bash env variable `DO_USE_LOCAL_SCRIPTS=1` to use the local py files, rather than the installed
-scripts.
-
 In this test, the following stages are run:
   - filter_subjects
   - add_time_derived_measurements
@@ -20,16 +17,8 @@ from functools import partial
 import polars as pl
 from meds import code_metadata_filepath, subject_id_field, subject_splits_filepath
 
-from tests import RUNNER_SCRIPT, USE_LOCAL_SCRIPTS
-from tests.MEDS_Transforms import (
-    ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT,
-    AGGREGATE_CODE_METADATA_SCRIPT,
-    FILTER_SUBJECTS_SCRIPT,
-    FIT_VOCABULARY_INDICES_SCRIPT,
-    NORMALIZATION_SCRIPT,
-    OCCLUDE_OUTLIERS_SCRIPT,
-)
-from tests.MEDS_Transforms.transform_tester_base import MEDS_SHARDS, SPLITS_DF
+from tests import AGGREGATE_CODE_METADATA_SCRIPT, RUNNER_SCRIPT
+from tests.transform_tester_base import MEDS_SHARDS, SPLITS_DF
 from tests.utils import MEDS_transforms_pipeline_tester, add_params, exact_str_regex, parse_shards_yaml
 
 MEDS_CODE_METADATA = pl.DataFrame(
@@ -835,31 +824,10 @@ WANT_NORMALIZATION = parse_shards_yaml(
 
 # Normally, you wouldn't need to specify all of these scripts, but in testing with local scripts we need to
 # specify them all as they need to point to their python paths.
-if USE_LOCAL_SCRIPTS:
-    STAGE_RUNNER_YAML = f"""
-filter_subjects:
-  script: "python {FILTER_SUBJECTS_SCRIPT}"
-
-add_time_derived_measurements:
-  script: "python {ADD_TIME_DERIVED_MEASUREMENTS_SCRIPT}"
-
-occlude_outliers:
-  script: "python {OCCLUDE_OUTLIERS_SCRIPT}"
-
-fit_normalization:
-  script: "python {AGGREGATE_CODE_METADATA_SCRIPT}"
-
-fit_vocabulary_indices:
-  script: "python {FIT_VOCABULARY_INDICES_SCRIPT}"
-
-normalization:
-  script: "python {NORMALIZATION_SCRIPT}"
-    """
-else:
-    STAGE_RUNNER_YAML = f"""
+STAGE_RUNNER_YAML = f"""
 fit_normalization:
   script: {AGGREGATE_CODE_METADATA_SCRIPT}
-    """
+"""
 
 PARALLEL_STAGE_RUNNER_YAML = f"""
 parallelize:
@@ -909,7 +877,7 @@ stage_configs:
       time_of_day_code: "TIME_OF_DAY"
       endpoints: [6, 12, 18, 24]
   fit_outlier_detection:
-    _script: {("python " if USE_LOCAL_SCRIPTS else "") + str(AGGREGATE_CODE_METADATA_SCRIPT)}
+    _script: {str(AGGREGATE_CODE_METADATA_SCRIPT)}
     aggregations:
       - "values/n_occurrences"
       - "values/sum"
@@ -930,11 +898,6 @@ NO_ARGS_HELP_STR = """
 MEDS-Transforms Pipeline Runner is a command line tool for running entire MEDS-transform pipelines in a single
 command.
 
-Runs the entire pipeline, end-to-end, based on the configuration provided.
-
-This script will launch many subsidiary commands via `subprocess`, one for each stage of the specified
-pipeline.
-
 **MEDS-transforms Pipeline description:**
 
 No description provided.
@@ -944,11 +907,6 @@ WITH_CONFIG_HELP_STR = """
 == MEDS-Transforms Pipeline Runner ==
 MEDS-Transforms Pipeline Runner is a command line tool for running entire MEDS-transform pipelines in a single
 command.
-
-Runs the entire pipeline, end-to-end, based on the configuration provided.
-
-This script will launch many subsidiary commands via `subprocess`, one for each stage of the specified
-pipeline.
 
 **MEDS-transforms Pipeline description:**
 

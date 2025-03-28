@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """This script is a helper utility to run entire pipelines from a single script.
 
 To do this effectively, this runner functionally takes a "meta configuration" file that contains:
@@ -7,7 +6,6 @@ To do this effectively, this runner functionally takes a "meta configuration" fi
      stage scripts and Hydra launcher configurations for each stage to control parallelism, resources, etc.
 """
 
-import importlib
 import subprocess
 from pathlib import Path
 
@@ -22,52 +20,14 @@ except ImportError:  # pragma: no cover
 
 import logging
 
-from MEDS_transforms import RESERVED_CONFIG_NAMES, RUNNER_CONFIG_YAML
-
 # This is to ensure that the custom resolvers are added.
 from MEDS_transforms.utils import *  # noqa: F401, F403
 
+from .configs import PREPROCESS_CONFIG_YAML, RUNNER_CONFIG_YAML
+
 logger = logging.getLogger(__name__)
 
-
-def get_script_from_name(stage_name: str) -> str | None:
-    """Returns the script name for the given stage name.
-
-    Args:
-        stage_name: The name of the stage.
-
-    Returns:
-        The script name for the given stage name.
-
-    Examples:
-        >>> get_script_from_name("shard_events")
-        'MEDS_extract-shard_events'
-        >>> get_script_from_name("fit_vocabulary_indices")
-        'MEDS_transform-fit_vocabulary_indices'
-        >>> get_script_from_name("filter_subjects")
-        'MEDS_transform-filter_subjects'
-        >>> get_script_from_name("reorder_measurements")
-        'MEDS_transform-reorder_measurements'
-        >>> get_script_from_name("nonexistent_stage")
-        Traceback (most recent call last):
-            ...
-        ValueError: Could not find a script for stage nonexistent_stage.
-    """
-
-    try:
-        _ = importlib.import_module(f"MEDS_transforms.extract.{stage_name}")
-        return f"MEDS_extract-{stage_name}"
-    except ImportError:
-        pass
-
-    for pfx in ("MEDS_transforms.transforms", "MEDS_transforms.filters", "MEDS_transforms"):
-        try:
-            _ = importlib.import_module(f"{pfx}.{stage_name}")
-            return f"MEDS_transform-{stage_name}"
-        except ImportError:
-            pass
-
-    raise ValueError(f"Could not find a script for stage {stage_name}.")
+RESERVED_CONFIG_NAMES = {c.stem for c in (PREPROCESS_CONFIG_YAML, RUNNER_CONFIG_YAML)}
 
 
 def get_parallelization_args(
@@ -184,19 +144,22 @@ def run_stage(
         ...     "do_profile": False,
         ...     "_local_pipeline_config": {
         ...         "stage_configs": {
-        ...             "shard_events": {},
+        ...             "reshard_to_split": {},
         ...             "fit_vocabulary_indices": {"_script": "foobar"},
         ...         },
         ...     },
         ...     "_stage_runners": {
-        ...         "shard_events": {"_script": "not used"},
+        ...         "reshard_to_split": {"_script": "not used"},
         ...         "fit_vocabulary_indices": {},
         ...         "baz": {"script": "baz_script"},
         ...     },
         ... })
-        >>> run_stage(cfg, "shard_events", runner_fn=fake_shell_succeed)
-        MEDS_extract-shard_events --config-dir=... --config-name=pipeline_config
-            'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=shard_events
+        >>> run_stage(cfg, "reshard_to_split", runner_fn=fake_shell_succeed)
+        MEDS_transform-stage pipeline_config.yaml reshard_to_split
+            --config-dir=...
+            --config-name=pipeline_config
+            'hydra.searchpath=[pkg://MEDS_transforms.configs]'
+            stage=reshard_to_split
         >>> run_stage(
         ...     cfg, "fit_vocabulary_indices", runner_fn=fake_shell_succeed
         ... )
@@ -235,7 +198,7 @@ def run_stage(
     elif "_script" in stage_config:
         script = stage_config._script
     else:
-        script = get_script_from_name(stage_name)
+        script = f"MEDS_transform-stage {str(pipeline_config_fp)} {stage_name}"
 
     command_parts = [
         script,
@@ -379,6 +342,3 @@ def load_yaml_file(path: str | None) -> dict | DictConfig:
 
 
 OmegaConf.register_new_resolver("load_yaml_file", load_yaml_file, replace=True)
-
-if __name__ == "__main__":  # pragma: no cover
-    main()

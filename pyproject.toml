@@ -8,7 +8,7 @@ dynamic = ["version"]
 authors = [
   { name="Matthew McDermott", email="mattmcdermott8@gmail.com" },
 ]
-description = "MEDS ETL and transformation functions leveraging a sharding-based parallelism model & polars."
+description = "A framework for compiling simple, mapreduce style pipelines over MEDS datasets."
 readme = "README.md"
 requires-python = ">=3.11"
 classifiers = [
@@ -34,32 +34,23 @@ docs = [
 ]
 
 [project.scripts]
-# MEDS_extract
-MEDS_extract-split_and_shard_subjects = "MEDS_transforms.extract.split_and_shard_subjects:main"
-MEDS_extract-shard_events = "MEDS_transforms.extract.shard_events:main"
-MEDS_extract-convert_to_sharded_events = "MEDS_transforms.extract.convert_to_sharded_events:main"
-MEDS_extract-merge_to_MEDS_cohort = "MEDS_transforms.extract.merge_to_MEDS_cohort:main"
-MEDS_extract-extract_code_metadata = "MEDS_transforms.extract.extract_code_metadata:main"
-MEDS_extract-finalize_MEDS_metadata = "MEDS_transforms.extract.finalize_MEDS_metadata:main"
-MEDS_extract-finalize_MEDS_data = "MEDS_transforms.extract.finalize_MEDS_data:main"
-
-# MEDS_transform
-## General
-MEDS_transform-aggregate_code_metadata = "MEDS_transforms.aggregate_code_metadata:main"
-MEDS_transform-fit_vocabulary_indices = "MEDS_transforms.fit_vocabulary_indices:main"
-MEDS_transform-reshard_to_split = "MEDS_transforms.reshard_to_split:main"
-## Filters
-MEDS_transform-filter_measurements = "MEDS_transforms.filters.filter_measurements:main"
-MEDS_transform-filter_subjects = "MEDS_transforms.filters.filter_subjects:main"
-## Transforms
-MEDS_transform-reorder_measurements = "MEDS_transforms.transforms.reorder_measurements:main"
-MEDS_transform-add_time_derived_measurements = "MEDS_transforms.transforms.add_time_derived_measurements:main"
-MEDS_transform-extract_values = "MEDS_transforms.transforms.extract_values:main"
-MEDS_transform-normalization = "MEDS_transforms.transforms.normalization:main"
-MEDS_transform-occlude_outliers = "MEDS_transforms.transforms.occlude_outliers:main"
+# Stages
+MEDS_transform-stage = "MEDS_transforms.__main__:run_stage"
 
 # Runner
-MEDS_transform-runner = "MEDS_transforms.runner:main"
+MEDS_transform-pipeline = "MEDS_transforms.runner:main"
+
+[project.entry-points."MEDS_transforms.stages"]
+aggregate_code_metadata = "MEDS_transforms.stages.aggregate_code_metadata:main"
+fit_vocabulary_indices = "MEDS_transforms.stages.fit_vocabulary_indices:main"
+reshard_to_split = "MEDS_transforms.stages.reshard_to_split:main"
+filter_measurements = "MEDS_transforms.stages.filter_measurements:filter_measurements.main"
+filter_subjects = "MEDS_transforms.stages.filter_subjects:filter_subjects.main"
+reorder_measurements = "MEDS_transforms.stages.reorder_measurements:reorder_measurements.main"
+add_time_derived_measurements = "MEDS_transforms.stages.add_time_derived_measurements:add_time_derived_measurements.main"
+extract_values = "MEDS_transforms.stages.extract_values:extract_values.main"
+normalization = "MEDS_transforms.stages.normalization:normalize.main"
+occlude_outliers = "MEDS_transforms.stages.occlude_outliers:occlude_outliers.main"
 
 [project.urls]
 Homepage = "https://github.com/mmcdermott/MEDS_transforms"
