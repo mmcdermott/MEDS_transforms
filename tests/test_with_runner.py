@@ -916,7 +916,6 @@ A test pipeline for the MEDS-transforms pipeline runner.
 
 def test_pipeline():
     shared_kwargs = {
-        "config_name": "runner",
         "stage_name": None,
         "stage_kwargs": None,
         "do_pass_stage_name": False,

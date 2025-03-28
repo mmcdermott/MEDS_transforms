@@ -12,6 +12,7 @@ from .stages import get_all_registered_stages
 HELP_STRS = {"--help", "-h", "help", "h"}
 PKG_PFX = "pkg://"
 YAML_EXTENSIONS = {"yaml", "yml"}
+SINGLETON_STR = "__null__"
 
 
 def print_help_stage():
@@ -31,6 +32,9 @@ def print_help_stage():
 
 def resolve_pipeline_yaml(pipeline_yaml: str):
     """Resolve the pipeline YAML file path."""
+    if pipeline_yaml == SINGLETON_STR:
+        return None
+
     if pipeline_yaml.startswith(PKG_PFX):
         pipeline_yaml = pipeline_yaml[len(PKG_PFX) :]
         pipeline_parts = pipeline_yaml.split(".")

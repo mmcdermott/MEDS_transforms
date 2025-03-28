@@ -130,7 +130,6 @@ def run_command(
     script: Path | str,
     hydra_kwargs: dict[str, str],
     test_name: str,
-    config_name: str | None = None,
     should_error: bool = False,
     do_use_config_yaml: bool = False,
     stage_name: str | None = None,
@@ -141,16 +140,9 @@ def run_command(
 
     err_cmd_lines = []
 
-    if config_name is not None and not config_name.startswith("_"):
-        config_name = f"_{config_name}"
-
     if do_use_config_yaml:
-        if config_name is None:
-            raise ValueError("config_name must be provided if do_use_config_yaml is True.")
-
         conf = OmegaConf.create(
             {
-                "defaults": [config_name],
                 **hydra_kwargs,
             }
         )
@@ -168,8 +160,6 @@ def run_command(
         )
         err_cmd_lines.append(f"Using config yaml:\n{OmegaConf.to_yaml(conf)}")
     else:
-        if config_name is not None:
-            command_parts.append(f"--config-name={config_name}")
         command_parts.append(" ".join(dict_to_hydra_kwargs(hydra_kwargs)))
 
     if do_pass_stage_name:
@@ -340,7 +330,6 @@ def single_stage_tester(
     want_outputs: dict[str, pl.DataFrame] | None = None,
     assert_no_other_outputs: bool = True,
     should_error: bool = False,
-    config_name: str = "preprocess",
     input_files: dict[str, FILE_T] | None = None,
     df_check_kwargs: dict | None = None,
     test_name: str | None = None,
@@ -376,16 +365,15 @@ def single_stage_tester(
             pipeline_config_kwargs["cohort_dir"] = str(cohort_dir.resolve())
 
         if stage_name is not None:
-            pipeline_config_kwargs["stages"] = [stage_name]
+            pipeline_config_kwargs["pipeline.stages"] = [stage_name]
         if stage_kwargs:
-            pipeline_config_kwargs["stage_configs"] = {stage_name: stage_kwargs}
+            pipeline_config_kwargs[f"stage.{stage_name}"] = stage_kwargs
 
         run_command_kwargs = {
             "script": script,
             "hydra_kwargs": pipeline_config_kwargs,
             "test_name": test_name,
             "should_error": should_error,
-            "config_name": config_name,
             "do_use_config_yaml": do_use_config_yaml,
         }
 
@@ -426,7 +414,6 @@ def multi_stage_tester(
     do_pass_stage_name: bool | dict[str, bool] = True,
     want_outputs: dict[str, pl.DataFrame] | None = None,
     assert_no_other_outputs: bool = False,
-    config_name: str = "preprocess",
     input_files: dict[str, FILE_T] | None = None,
     **pipeline_kwargs,
 ):
@@ -467,7 +454,6 @@ def multi_stage_tester(
                 script=script,
                 hydra_kwargs=pipeline_config_kwargs,
                 do_use_config_yaml=True,
-                config_name=config_name,
                 test_name=f"Multi stage transform {i}/{n_stages}: {stage}",
                 stage_name=stage,
                 do_pass_stage_name=do_pass_stage_name[stage],

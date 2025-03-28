@@ -298,16 +298,12 @@ def populate_stage(
     return out
 
 
-def register_structured_config(pipeline_config_path: Path, stage_name: str):
-    if pipeline_config_path.is_dir():
-        raise ValueError(f"Pipeline config path '{pipeline_config_path}' is a directory, not a file.")
+def register_structured_config(pipeline_config_path: Path | None, stage_name: str):
 
     all_stages = get_all_registered_stages()
 
-    if not pipeline_config_path.exists():
-        logger.warning(
-            f"Pipeline config file '{pipeline_config_path}' does not exist. Creating a single-stage pipeline"
-        )
+    if pipeline_config_path is None:
+        logger.warning(f"Null pipeline specified. Creating a single-stage pipeline for {stage_name}")
 
         if stage_name not in all_stages:
             raise ValueError(f"Stage '{stage_name}' not registered...")
@@ -351,7 +347,7 @@ def register_structured_config(pipeline_config_path: Path, stage_name: str):
         has_base_stage = BASE_STAGE_KEY in stage_cfg
         has_script = SCRIPT_KEY in stage_cfg
 
-        base_stage = stage_cfg.get(BASE_STAGE_KEY, None)
+        base_stage = stage_options.get(BASE_STAGE_KEY, None)
 
         if has_base_stage and not (base_stage in all_stages):
             raise ValueError(f"Base stage '{base_stage}' not registered...")

@@ -219,7 +219,6 @@ def single_stage_transform_tester(
         "do_use_config_yaml": do_use_config_yaml,
         "assert_no_other_outputs": assert_no_other_outputs,
         "should_error": should_error,
-        "config_name": "preprocess",
         "input_files": remap_inputs_for_transform(**input_data_kwargs),
         "df_check_kwargs": df_check_kwargs,
     }
@@ -251,7 +250,6 @@ def multi_stage_transform_tester(
         "stage_configs": stage_configs,
         "do_pass_stage_name": do_pass_stage_name,
         "assert_no_other_outputs": False,  # TODO(mmd): eventually fix
-        "config_name": "preprocess",
         "input_files": remap_inputs_for_transform(**input_data_kwargs),
         "want_outputs": {**want_data, **want_metadata},
     }

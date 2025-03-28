@@ -12,8 +12,7 @@ logger = logging.getLogger(__name__)
 
 class StageInfo(TypedDict, total=True):
     entry_point: EntryPoint
-    package: str
-    module: str
+    package_name: str
     package_version: str
     default_config: DictConfig
 
@@ -34,11 +33,9 @@ def get_all_registered_stages() -> dict[str, StageInfo]:
         logger.debug(f"Found stage {ep.name}: ")
 
         ep_package = ep.dist.metadata["Name"]
-        ep_module = ep.module
         ep_package_version = ep.dist.version
 
         logger.debug(f"  - package: {ep_package}")
-        logger.debug(f"  - module: {ep_module}")
         logger.debug(f"  - package version: {ep_package_version}")
 
         # Get the default stage configuration file, if present:
@@ -56,8 +53,7 @@ def get_all_registered_stages() -> dict[str, StageInfo]:
 
         out[ep.name] = {
             "entry_point": ep,
-            "package": ep_package,
-            "module": ep_module,
+            "package_name": ep_package,
             "package_version": ep_package_version,
             "default_config": default_config,
         }
