@@ -1,5 +1,0 @@
-count_code_occurrences:
-  aggregations:
-    - "code/n_occurrences"
-    - "code/n_subjects"
-  do_summarize_over_all_codes: true # This indicates we should include overall, code-independent counts

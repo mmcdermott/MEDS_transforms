@@ -36,4 +36,6 @@ INFERRED_STAGE_KEYS = {
     "output_dir",
     "reducer_output_dir",
     "_script",
+    "_base_stage",
+    "_name",
 }
