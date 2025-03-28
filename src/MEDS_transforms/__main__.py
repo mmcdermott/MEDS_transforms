@@ -69,10 +69,12 @@ def run_stage():
 
     all_stages = get_all_stages()
 
-    if sys.argv[1] in HELP_STRS:
+    if len(sys.argv) < 2:
+        print_help_stage()
+        sys.exit(1)
+    elif sys.argv[1] in HELP_STRS:
         print_help_stage()
         sys.exit(0)
-
     elif len(sys.argv) < 3:
         print_help_stage()
         sys.exit(1)
@@ -85,9 +87,6 @@ def run_stage():
         raise ValueError(f"Stage '{stage_name}' not found.")
 
     main_fn = all_stages[stage_name].load()
-
-    print(f"Using config path: {pipeline_yaml.parent}")
-    print(f"Using config name: {pipeline_yaml.stem}")
 
     hydra_wrapper = hydra.main(
         version_base=None,
