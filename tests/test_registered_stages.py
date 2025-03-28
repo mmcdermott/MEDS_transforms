@@ -3,6 +3,7 @@ from importlib.resources import files
 from pathlib import Path
 
 import pytest
+from meds import code_metadata_filepath
 from meds_testing_helpers.dataset import MEDSDataset
 from omegaconf import OmegaConf
 
@@ -37,6 +38,11 @@ def test_registered_stages(simple_static_MEDS: Path, stage: str):
         tempdir = tempfile.TemporaryDirectory()
         input_dir = Path(tempdir.name)
         in_data.write(input_dir)
+
+        # Currently, the MEDS testing helper only writes out columns that are in the code metadata schema. If
+        # there are more, we need to write them out manually.
+
+        in_data._pl_code_metadata.write_parquet(input_dir / code_metadata_filepath)
     else:
         input_dir = simple_static_MEDS
 
