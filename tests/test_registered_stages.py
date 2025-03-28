@@ -2,6 +2,7 @@ import tempfile
 from importlib.resources import files
 from pathlib import Path
 
+import polars as pl
 import pytest
 from meds import code_metadata_filepath
 from meds_testing_helpers.dataset import MEDSDataset
@@ -46,9 +47,15 @@ def test_registered_stages(simple_static_MEDS: Path, stage: str):
     else:
         input_dir = simple_static_MEDS
 
-    want_data = MEDSDataset.from_yaml(want_fp)
+    if stage == "normalization":
+        want_data = MEDSDataset.from_yaml(want_fp, code=pl.Int64, numeric_value=pl.Float64)
+    else:
+        want_data = MEDSDataset.from_yaml(want_fp)
 
-    stage_kwargs = OmegaConf.to_container(OmegaConf.load(stage_cfg_fp))
+    if stage_cfg_fp.is_file():
+        stage_kwargs = OmegaConf.to_container(OmegaConf.load(stage_cfg_fp))
+    else:
+        stage_kwargs = {}
 
     try:
         MEDS_transforms_pipeline_tester(

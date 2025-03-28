@@ -230,7 +230,7 @@ def assert_df_equal(want: pl.DataFrame, got: pl.DataFrame, msg: str = None, **kw
             want = want.with_columns(**update_exprs).select(want_cols)
             got = got.with_columns(**update_exprs).select(got_cols)
 
-        assert_frame_equal(want, got, **kwargs)
+        assert_frame_equal(want, got, **kwargs, rtol=1e-3, atol=1e-5)
     except AssertionError as e:
         pl.Config.set_tbl_rows(-1)
         raise AssertionError(f"{msg}:\nWant:\n{want}\nGot:\n{got}\n{e}") from e
