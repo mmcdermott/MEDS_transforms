@@ -18,6 +18,8 @@ from ..stages import get_all_registered_stages
 MAIN_YAML = files(__package_name__).joinpath("configs/_main.yaml")
 RUNNER_CONFIG_YAML = files(__package_name__).joinpath("configs/_runner.yaml")
 
+RESERVED_CONFIG_NAMES = {c.stem for c in (MAIN_YAML, RUNNER_CONFIG_YAML)}
+
 logger = logging.getLogger(__name__)
 
 NAME_KEY = "_name"
@@ -328,7 +330,7 @@ def register_structured_config(pipeline_config_path: Path, stage_name: str):
         match stage_cfg:
             case str():
                 stage = stage_cfg
-                stage_options = DictConfig()
+                stage_options = DictConfig({})
             case dict() | DictConfig():
                 if NAME_KEY in stage_cfg:
                     if any(k not in {NAME_KEY, BASE_STAGE_KEY, SCRIPT_KEY} for k in stage_cfg):

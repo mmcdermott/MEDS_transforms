@@ -1,5 +1,5 @@
 import logging
-from importlib.metadata import entry_points
+from importlib.metadata import EntryPoint, entry_points
 from importlib.resources import files
 from typing import TypedDict
 
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class StageInfo(TypedDict, total=True):
-    entry_point: entry_points.EntryPoint
+    entry_point: EntryPoint
     package: str
     module: str
     package_version: str
@@ -33,13 +33,13 @@ def get_all_registered_stages() -> dict[str, StageInfo]:
 
         logger.debug(f"Found stage {ep.name}: ")
 
-        ep_package = ep.dist.project_name
-        ep_module = ep.module_name.split(".")[0]
+        ep_package = ep.dist.metadata["Name"]
+        ep_module = ep.module
         ep_package_version = ep.dist.version
 
-        logger.debug(f"  - package: {ep.dist.project_name}")
-        logger.debug(f"  - module: {ep.module_name}")
-        logger.debug(f"  - package version: {ep.dist.version}")
+        logger.debug(f"  - package: {ep_package}")
+        logger.debug(f"  - module: {ep_module}")
+        logger.debug(f"  - package version: {ep_package_version}")
 
         # Get the default stage configuration file, if present:
         config_filepath = files(ep_package).joinpath(f"configs/stages/{ep.name}.yaml")
@@ -52,7 +52,7 @@ def get_all_registered_stages() -> dict[str, StageInfo]:
             logger.debug("    defaults loaded!")
         else:
             logger.debug("  - config file not found, using empty config")
-            default_config = DictConfig()
+            default_config = DictConfig({})
 
         out[ep.name] = {
             "entry_point": ep,
