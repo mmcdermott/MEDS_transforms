@@ -194,13 +194,13 @@ def test_registered_stages(simple_static_MEDS: Path, stage: str):
         try:
             MEDS_transforms_pipeline_tester(
                 script=CMD_PATTERN.format(stage_name=stage),
-                stage_name=stage,
-                stage_kwargs=example.stage_cfg,
                 want_outputs=want_outputs,
                 input_dir=input_dir,
                 do_use_config_yaml=example.do_use_yaml,
                 test_name=name,
                 assert_no_other_outputs=assert_no_other_outputs,
+                stages=[stage],
+                stage_configs={stage: example.stage_cfg},
             )
         finally:
             if input_dir != simple_static_MEDS:

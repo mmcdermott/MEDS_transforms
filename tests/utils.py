@@ -131,16 +131,14 @@ def dict_to_hydra_kwargs(d: dict[str, str]) -> str:
 
 
 def run_command(
-    script: Path | str,
+    script: str,
     hydra_kwargs: dict[str, str],
     test_name: str,
     config_name: str | None = None,
     should_error: bool = False,
     do_use_config_yaml: bool = False,
-    stage_name: str | None = None,
 ):
-    script = ["python", str(script.resolve())] if isinstance(script, Path) else [script]
-    command_parts = script
+    command_parts = [script]
 
     err_cmd_lines = []
 
@@ -310,9 +308,9 @@ def check_outputs(
 
 
 def MEDS_transforms_pipeline_tester(
-    script: str | Path,
-    stage_name: str | None,
-    stage_kwargs: dict[str, str] | None,
+    *,
+    script: str,
+    test_name: str,
     do_use_config_yaml: bool = False,
     want_outputs: dict[str, pl.DataFrame] | None = None,
     assert_no_other_outputs: bool = True,
@@ -321,54 +319,33 @@ def MEDS_transforms_pipeline_tester(
     input_files: dict[str, FILE_T] | None = None,
     input_dir: Path | None = None,
     df_check_kwargs: dict | None = None,
-    test_name: str | None = None,
     do_include_dirs: bool = True,
-    hydra_verbose: bool = True,
     stdout_regex: str | None = None,
     **pipeline_kwargs,
 ):
-    if test_name is None:
-        test_name = f"Single stage transform: {stage_name}"
-
     if df_check_kwargs is None:
         df_check_kwargs = {}
-
-    if stage_kwargs is None:
-        stage_kwargs = {}
 
     with input_dataset(input_dir, input_files) as (input_dir, cohort_dir):
         for k, v in pipeline_kwargs.items():
             if type(v) is str and "{input_dir}" in v:
                 pipeline_kwargs[k] = v.format(input_dir=str(input_dir.resolve()))
-        for k, v in stage_kwargs.items():
-            if type(v) is str and "{input_dir}" in v:
-                stage_kwargs[k] = v.format(input_dir=str(input_dir.resolve()))
 
-        pipeline_config_kwargs = {
-            "hydra.verbose": hydra_verbose,
-            **pipeline_kwargs,
-        }
+        pipeline_config_kwargs = {**pipeline_kwargs}
 
         if do_include_dirs:
             pipeline_config_kwargs["input_dir"] = str(input_dir.resolve())
             pipeline_config_kwargs["cohort_dir"] = str(cohort_dir.resolve())
 
-        if stage_name is not None:
-            pipeline_config_kwargs["stages"] = [stage_name]
-        if stage_kwargs:
-            pipeline_config_kwargs["stage_configs"] = {stage_name: stage_kwargs}
-
-        run_command_kwargs = {
-            "script": script,
-            "hydra_kwargs": pipeline_config_kwargs,
-            "test_name": test_name,
-            "should_error": should_error,
-            "config_name": config_name,
-            "do_use_config_yaml": do_use_config_yaml,
-        }
-
         # Run the transform
-        stderr, stdout = run_command(**run_command_kwargs)
+        stderr, stdout = run_command(
+            script=script,
+            hydra_kwargs=pipeline_config_kwargs,
+            test_name=test_name,
+            config_name=config_name,
+            should_error=should_error,
+            do_use_config_yaml=do_use_config_yaml,
+        )
         if should_error:
             return
 
@@ -387,7 +364,5 @@ def MEDS_transforms_pipeline_tester(
             )
         except Exception as e:
             raise AssertionError(
-                f"Single stage transform {stage_name} failed -- {e}:\n"
-                f"Script stdout:\n{stdout}\n"
-                f"Script stderr:\n{stderr}\n"
+                f"{test_name} failed -- {e}:\n" f"Script stdout:\n{stdout}\n" f"Script stderr:\n{stderr}\n"
             ) from e
