@@ -15,6 +15,7 @@ from .utils import MEDS_transforms_pipeline_tester
 # Get all registered stages
 REGISTERED_STAGES = get_all_stages()
 CMD_PATTERN = "MEDS_transform-stage pkg://MEDS_transforms.configs._preprocess.yaml {stage_name}"
+DO_USE_YAML_KEY = "__do_use_yaml"
 
 
 def test_registered_stages(simple_static_MEDS: Path, stage: str):
@@ -43,6 +44,12 @@ def test_registered_stages(simple_static_MEDS: Path, stage: str):
         # there are more, we need to write them out manually.
 
         in_data._pl_code_metadata.write_parquet(input_dir / code_metadata_filepath)
+
+        # Same for data
+        for k, v in in_data._pl_shards.items():
+            fp = input_dir / "data" / f"{k}.parquet"
+            fp.parent.mkdir(parents=True, exist_ok=True)
+            v.write_parquet(fp)
     else:
         input_dir = simple_static_MEDS
 
@@ -56,6 +63,8 @@ def test_registered_stages(simple_static_MEDS: Path, stage: str):
     else:
         stage_kwargs = {}
 
+    do_use_yaml = stage_kwargs.pop(DO_USE_YAML_KEY, False)
+
     try:
         MEDS_transforms_pipeline_tester(
             script=CMD_PATTERN.format(stage_name=stage),
@@ -63,6 +72,7 @@ def test_registered_stages(simple_static_MEDS: Path, stage: str):
             stage_kwargs=stage_kwargs,
             want_outputs={f"data/{k}": v for k, v in want_data._pl_shards.items()},
             input_dir=input_dir,
+            do_use_config_yaml=do_use_yaml,
         )
     finally:
         if input_dir != simple_static_MEDS:

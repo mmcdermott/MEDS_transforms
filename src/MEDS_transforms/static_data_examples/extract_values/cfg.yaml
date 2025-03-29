@@ -1,0 +1,44 @@
+__do_use_yaml: true
+
+_match_revise_mode: multi_match_and_revise
+_match_revise:
+  - _matcher:
+      code: BP
+    numeric_value:
+      extract:
+        from: text_value
+        regex: (\d+)/.* # systolic
+    code: "{code}//SYSTOLIC"
+    text_value:
+      literal: null
+  - _matcher:
+      code: BP
+    numeric_value:
+      extract:
+        from: text_value
+        regex: .*/(\d+) # diastolic
+    code: "{code}//DIASTOLIC"
+    text_value:
+      literal: null
+  - _matcher:
+      code: TEMP
+      text_value:
+        regex: ^[\d\.]+C$
+    numeric_value:
+      extract:
+        from: text_value
+        regex: ^([\d\.]+)C$
+    code: "{code}//C"
+    text_value:
+      literal: null
+  - _matcher:
+      code: TEMP
+      text_value:
+        regex: ^[\d\.]+F$
+    numeric_value:
+      extract:
+        from: text_value
+        regex: ^([\d\.]+)F$
+    code: "{code}//F"
+    text_value:
+      literal: null
