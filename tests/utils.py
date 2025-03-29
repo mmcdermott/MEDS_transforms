@@ -3,12 +3,11 @@ import re
 import subprocess
 import tempfile
 from contextlib import contextmanager
-from io import StringIO
 from pathlib import Path
 from typing import Any
 
 import polars as pl
-from meds import parent_codes_field, time_field
+from meds_testing_helpers.dataset import MEDSDataset
 from omegaconf import OmegaConf
 from polars.testing import assert_frame_equal
 from yaml import load as load_yaml
@@ -18,51 +17,13 @@ try:
 except ImportError:
     from yaml import Loader
 
-DEFAULT_CSV_TS_FORMAT = "%m/%d/%Y, %H:%M:%S"
-
-# TODO: Make use meds library
-MEDS_PL_SCHEMA = {
-    "subject_id": pl.Int64,
-    "time": pl.Datetime("us"),
-    "code": pl.String,
-    "numeric_value": pl.Float32,
-    "numeric_value/is_inlier": pl.Boolean,
-    "text_value": pl.String,
-}
-
-
-def parse_meds_csvs(
-    csvs: str | dict[str, str], schema: dict[str, pl.DataType] = MEDS_PL_SCHEMA
-) -> pl.DataFrame | dict[str, pl.DataFrame]:
-    """Converts a string or dict of named strings to a MEDS DataFrame by interpreting them as CSVs."""
-
-    default_read_schema = {**schema}
-    default_read_schema["time"] = pl.Utf8
-
-    def reader(csv_str: str) -> pl.DataFrame:
-        cols = csv_str.strip().split("\n")[0].split(",")
-        read_schema = {k: v for k, v in default_read_schema.items() if k in cols}
-
-        df = pl.read_csv(StringIO(csv_str), schema=read_schema)
-
-        if time_field in cols:
-            df = df.with_columns(
-                pl.col(time_field).str.strptime(MEDS_PL_SCHEMA[time_field], DEFAULT_CSV_TS_FORMAT)
-            )
-        if parent_codes_field in cols:
-            df = df.with_columns(pl.col(parent_codes_field).str.split(", "))
-
-        return df.select(cols)
-
-    if isinstance(csvs, str):
-        return reader(csvs)
-    else:
-        return {k: reader(v) for k, v in csvs.items()}
-
 
 def parse_shards_yaml(yaml_str: str, **schema_updates) -> pl.DataFrame:
-    schema = {**MEDS_PL_SCHEMA, **schema_updates}
-    return parse_meds_csvs(load_yaml(yaml_str.strip(), Loader=Loader), schema=schema)
+    data = load_yaml(yaml_str.strip(), Loader=Loader)
+
+    schema_updates = {"numeric_value/is_inlier": pl.Boolean, **schema_updates}
+
+    return {k: MEDSDataset.parse_csv(v, **schema_updates) for k, v in data.items()}
 
 
 def dict_to_hydra_kwargs(d: dict[str, str]) -> str:
