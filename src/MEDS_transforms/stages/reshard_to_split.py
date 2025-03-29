@@ -290,9 +290,6 @@ def main(cfg: DictConfig):
 
     new_sharded_splits = json.loads(shards_fp.read_text())
 
-    if cfg.stage_cfg.get("train_only", False):
-        raise ValueError("This stage does not support train_only=True")
-
     orig_shards_iter, _ = shard_iterator(cfg, out_suffix="")
 
     orig_shards_iter = [(in_fp, out_fp.relative_to(output_dir)) for in_fp, out_fp in orig_shards_iter]
