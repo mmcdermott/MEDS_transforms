@@ -12,12 +12,22 @@ In this test, the following stages are run:
 The stage configuration arguments will be as given in the yaml block below:
 """
 
+import re
 from functools import partial
 
 import polars as pl
 from meds import code_metadata_filepath, subject_id_field, subject_splits_filepath
 
-from tests.utils import MEDS_transforms_pipeline_tester, add_params, exact_str_regex, parse_shards_yaml
+from tests.utils import MEDS_transforms_pipeline_tester, parse_shards_yaml
+
+
+def add_params(templ_str: str, **kwargs):
+    return templ_str.format(**kwargs)
+
+
+def exact_str_regex(s: str) -> str:
+    return f"^{re.escape(s)}$"
+
 
 RUNNER_SCRIPT = "MEDS_transform-pipeline"
 AGGREGATE_CODE_METADATA_SCRIPT = (

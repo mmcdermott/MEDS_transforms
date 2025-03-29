@@ -32,10 +32,6 @@ MEDS_PL_SCHEMA = {
 }
 
 
-def exact_str_regex(s: str) -> str:
-    return f"^{re.escape(s)}$"
-
-
 def parse_meds_csvs(
     csvs: str | dict[str, str], schema: dict[str, pl.DataType] = MEDS_PL_SCHEMA
 ) -> pl.DataFrame | dict[str, pl.DataFrame]:
@@ -250,10 +246,6 @@ def check_json(want: dict | Callable, got: dict, msg: str):
 
 
 FILE_T = pl.DataFrame | dict[str, Any] | str
-
-
-def add_params(templ_str: str, **kwargs):
-    return templ_str.format(**kwargs)
 
 
 @contextmanager
