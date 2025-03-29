@@ -17,7 +17,6 @@ REGISTERED_STAGES = get_all_stages()
 CMD_PATTERN = "MEDS_transform-stage pkg://MEDS_transforms.configs._preprocess.yaml {stage_name}"
 
 
-@pytest.mark.parametrize("stage", sorted(list(REGISTERED_STAGES.keys())))
 def test_registered_stages(simple_static_MEDS: Path, stage: str):
     """Tests that all registered stages are present in the MEDS transforms pipeline."""
 
