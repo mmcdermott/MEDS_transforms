@@ -157,6 +157,8 @@ def test_registered_stages(simple_static_MEDS: Path, stage: str):
                 "values/max": pl.Float32,
             }
             assert_no_other_outputs = False
+        case "fit_vocabulary_indices":
+            schema_updates = {"code/vocab_index": pl.UInt8}
         case _:
             schema_updates = {}
 

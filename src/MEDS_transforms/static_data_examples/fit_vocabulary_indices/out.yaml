@@ -1,0 +1,7 @@
+metadata/codes.parquet: |2-
+  code,description,parent_codes,code/vocab_index
+  EYE_COLOR//BLUE,"Blue Eyes. Less common than brown.",,1
+  EYE_COLOR//BROWN,"Brown Eyes. The most common eye color.",,2
+  EYE_COLOR//HAZEL,"Hazel eyes. These are uncommon",,3
+  HR,"Heart Rate",LOINC/8867-4,4
+  TEMP,"Body Temperature",LOINC/8310-5,5
