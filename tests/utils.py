@@ -34,10 +34,7 @@ MEDS_PL_SCHEMA = {
 def parse_meds_csvs(
     csvs: str | dict[str, str], schema: dict[str, pl.DataType] = MEDS_PL_SCHEMA
 ) -> pl.DataFrame | dict[str, pl.DataFrame]:
-    """Converts a string or dict of named strings to a MEDS DataFrame by interpreting them as CSVs.
-
-    TODO: doctests.
-    """
+    """Converts a string or dict of named strings to a MEDS DataFrame by interpreting them as CSVs."""
 
     default_read_schema = {**schema}
     default_read_schema["time"] = pl.Utf8
