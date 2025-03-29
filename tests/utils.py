@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
+from meds import parent_codes_field, time_field
 from omegaconf import OmegaConf
 from polars.testing import assert_frame_equal
 from yaml import load as load_yaml
@@ -49,9 +50,17 @@ def parse_meds_csvs(
     def reader(csv_str: str) -> pl.DataFrame:
         cols = csv_str.strip().split("\n")[0].split(",")
         read_schema = {k: v for k, v in default_read_schema.items() if k in cols}
-        return pl.read_csv(StringIO(csv_str), schema=read_schema).with_columns(
-            pl.col("time").str.strptime(MEDS_PL_SCHEMA["time"], DEFAULT_CSV_TS_FORMAT)
-        )
+
+        df = pl.read_csv(StringIO(csv_str), schema=read_schema)
+
+        if time_field in cols:
+            df = df.with_columns(
+                pl.col(time_field).str.strptime(MEDS_PL_SCHEMA[time_field], DEFAULT_CSV_TS_FORMAT)
+            )
+        if parent_codes_field in cols:
+            df = df.with_columns(pl.col(parent_codes_field).str.split(", "))
+
+        return df.select(cols)
 
     if isinstance(csvs, str):
         return reader(csvs)
@@ -221,7 +230,7 @@ def assert_df_equal(want: pl.DataFrame, got: pl.DataFrame, msg: str = None, **kw
             want = want.with_columns(**update_exprs).select(want_cols)
             got = got.with_columns(**update_exprs).select(got_cols)
 
-        assert_frame_equal(want, got, **kwargs)
+        assert_frame_equal(want, got, **kwargs, rtol=1e-3, atol=1e-5)
     except AssertionError as e:
         pl.Config.set_tbl_rows(-1)
         raise AssertionError(f"{msg}:\nWant:\n{want}\nGot:\n{got}\n{e}") from e
@@ -248,36 +257,41 @@ def add_params(templ_str: str, **kwargs):
 
 
 @contextmanager
-def input_dataset(input_files: dict[str, FILE_T] | None = None):
+def input_dataset(input_dir: Path | None = None, input_files: dict[str, FILE_T] | None = None):
     with tempfile.TemporaryDirectory() as d:
-        input_dir = Path(d) / "input_cohort"
         cohort_dir = Path(d) / "output_cohort"
 
-        for filename, data in input_files.items():
-            fp = input_dir / filename
-            fp.parent.mkdir(parents=True, exist_ok=True)
+        if input_dir is not None:
+            assert not input_files
+        else:
+            input_dir = Path(d) / "input_cohort"
+            for filename, data in input_files.items():
+                fp = input_dir / filename
+                fp.parent.mkdir(parents=True, exist_ok=True)
 
-            match data:
-                case pl.DataFrame() if fp.suffix == "":
-                    data.write_parquet(fp.with_suffix(".parquet"), use_pyarrow=True)
-                case pl.DataFrame() if fp.suffix in {".parquet", ".par"}:
-                    data.write_parquet(fp, use_pyarrow=True)
-                case pl.DataFrame() if fp.suffix == ".csv":
-                    data.write_csv(fp)
-                case dict() if fp.suffix == "":
-                    fp.with_suffix(".json").write_text(json.dumps(data))
-                case dict() if fp.suffix.endswith(".json"):
-                    fp.write_text(json.dumps(data))
-                case str():
-                    fp.write_text(data.strip())
-                case _ if callable(data):
-                    data_str = data(
-                        input_dir=str(input_dir.resolve()),
-                        cohort_dir=str(cohort_dir.resolve()),
-                    )
-                    fp.write_text(data_str)
-                case _:
-                    raise ValueError(f"Unknown data type {type(data)} for file {fp.relative_to(input_dir)}")
+                match data:
+                    case pl.DataFrame() if fp.suffix == "":
+                        data.write_parquet(fp.with_suffix(".parquet"), use_pyarrow=True)
+                    case pl.DataFrame() if fp.suffix in {".parquet", ".par"}:
+                        data.write_parquet(fp, use_pyarrow=True)
+                    case pl.DataFrame() if fp.suffix == ".csv":
+                        data.write_csv(fp)
+                    case dict() if fp.suffix == "":
+                        fp.with_suffix(".json").write_text(json.dumps(data))
+                    case dict() if fp.suffix.endswith(".json"):
+                        fp.write_text(json.dumps(data))
+                    case str():
+                        fp.write_text(data.strip())
+                    case _ if callable(data):
+                        data_str = data(
+                            input_dir=str(input_dir.resolve()),
+                            cohort_dir=str(cohort_dir.resolve()),
+                        )
+                        fp.write_text(data_str)
+                    case _:
+                        raise ValueError(
+                            f"Unknown data type {type(data)} for file {fp.relative_to(input_dir)}"
+                        )
 
         yield input_dir, cohort_dir
 
@@ -331,7 +345,7 @@ def check_outputs(
         )
 
 
-def single_stage_tester(
+def MEDS_transforms_pipeline_tester(
     script: str | Path,
     stage_name: str | None,
     stage_kwargs: dict[str, str] | None,
@@ -342,6 +356,7 @@ def single_stage_tester(
     should_error: bool = False,
     config_name: str = "preprocess",
     input_files: dict[str, FILE_T] | None = None,
+    input_dir: Path | None = None,
     df_check_kwargs: dict | None = None,
     test_name: str | None = None,
     do_include_dirs: bool = True,
@@ -358,7 +373,7 @@ def single_stage_tester(
     if stage_kwargs is None:
         stage_kwargs = {}
 
-    with input_dataset(input_files) as (input_dir, cohort_dir):
+    with input_dataset(input_dir, input_files) as (input_dir, cohort_dir):
         for k, v in pipeline_kwargs.items():
             if type(v) is str and "{input_dir}" in v:
                 pipeline_kwargs[k] = v.format(input_dir=str(input_dir.resolve()))

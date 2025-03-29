@@ -7,7 +7,7 @@ from pathlib import Path
 import polars as pl
 from meds import subject_id_field, subject_splits_filepath
 
-from tests.utils import FILE_T, parse_shards_yaml, single_stage_tester
+from tests.utils import FILE_T, MEDS_transforms_pipeline_tester, parse_shards_yaml
 
 # Test MEDS data (inputs)
 
@@ -233,4 +233,4 @@ def single_stage_transform_tester(
 
     base_kwargs["want_outputs"] = want_outputs
 
-    single_stage_tester(**base_kwargs)
+    MEDS_transforms_pipeline_tester(**base_kwargs)
