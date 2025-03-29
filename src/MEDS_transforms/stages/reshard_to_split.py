@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 from meds import subject_id_field, subject_splits_filepath, time_field
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 
 from ..mapreduce import rwlock_wrap, shard_iterator, shuffle_shards
 from ..stage import MEDS_transforms_stage
@@ -290,9 +290,6 @@ def main(cfg: DictConfig):
 
     new_sharded_splits = json.loads(shards_fp.read_text())
 
-    if cfg.stage_cfg.get("train_only", False):
-        raise ValueError("This stage does not support train_only=True")
-
     orig_shards_iter, _ = shard_iterator(cfg, out_suffix="")
 
     orig_shards_iter = [(in_fp, out_fp.relative_to(output_dir)) for in_fp, out_fp in orig_shards_iter]
@@ -335,7 +332,3 @@ def main(cfg: DictConfig):
         )
 
     logger.info(f"Done with {cfg.stage}")
-
-
-OmegaConf.register_new_resolver("current_script_name", lambda: main.__module__.split(".")[-1], replace=True)
-OmegaConf.register_new_resolver("get_script_docstring", lambda: main.__doc__, replace=True)
