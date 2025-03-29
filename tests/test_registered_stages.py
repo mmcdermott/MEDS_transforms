@@ -1,4 +1,3 @@
-import copy
 import tempfile
 from dataclasses import dataclass
 from importlib.resources import files
@@ -49,7 +48,15 @@ def read_metadata_only(fp: Path, **schema_updates) -> pl.DataFrame:
     key = list(data.keys())[0]
     assert key == code_metadata_filepath
 
-    return MEDSDataset.parse_csv(data[key], **copy.deepcopy(schema_updates))
+    val = data[key]
+    if isinstance(val, str):
+        return MEDSDataset.parse_csv(data[key], **schema_updates)
+    elif isinstance(val, dict):
+        return pl.from_dict(val, schema_overrides=schema_updates)
+    elif isinstance(val, list):
+        return pl.from_dicts(val, schema_overrides=schema_updates)
+    else:
+        raise ValueError(f"Unsupported data type for metadata: {type(val)}")
 
 
 def parse_example_dir(example_dir: Path, **schema_updates) -> StageExample:
@@ -63,14 +70,12 @@ def parse_example_dir(example_dir: Path, **schema_updates) -> StageExample:
         raise FileNotFoundError(f"Output file not found: {want_fp}")
 
     try:
-        want_data = MEDSDataset.from_yaml(want_fp, **copy.deepcopy(schema_updates))
+        want_data = MEDSDataset.from_yaml(want_fp, **schema_updates)
         want_metadata = None
     except ValueError as e:
-        if "No data shards found in YAML" not in str(e):
-            raise e
         want_data = None
         try:
-            want_metadata = read_metadata_only(want_fp, **copy.deepcopy(schema_updates))
+            want_metadata = read_metadata_only(want_fp, **schema_updates)
         except Exception as e2:
             raise e2 from e
 
@@ -108,13 +113,13 @@ def get_nested_test_cases(
         return test_cases
 
     if is_example_dir(example_dir):
-        test_cases[prefix] = parse_example_dir(example_dir, **copy.deepcopy(schema_updates))
+        test_cases[prefix] = parse_example_dir(example_dir, **schema_updates)
         return test_cases
 
     for path in example_dir.iterdir():
         if path.is_dir():
             nested_prefix = f"{prefix}/{path.name}"
-            get_nested_test_cases(path, nested_prefix, test_cases, **copy.deepcopy(schema_updates))
+            get_nested_test_cases(path, nested_prefix, test_cases, **schema_updates)
 
     return test_cases
 
@@ -128,6 +133,7 @@ def test_registered_stages(simple_static_MEDS: Path, stage: str):
 
     examples_dir = files(ep_package).joinpath("static_data_examples") / stage
 
+    assert_no_other_outputs = True
     match stage:
         case "normalization":
             schema_updates = {"code": pl.Int64, "numeric_value": pl.Float64}
@@ -139,8 +145,18 @@ def test_registered_stages(simple_static_MEDS: Path, stage: str):
                         "values/quantile/0.5": pl.Float32,
                         "values/quantile/0.75": pl.Float32,
                     }
-                )
+                ),
+                "code/n_occurrences": pl.UInt8,
+                "code/n_subjects": pl.UInt8,
+                "values/n_occurrences": pl.UInt8,
+                "values/n_subjects": pl.UInt8,
+                "values/sum": pl.Float32,
+                "values/sum_sqd": pl.Float32,
+                "values/n_ints": pl.UInt8,
+                "values/min": pl.Float32,
+                "values/max": pl.Float32,
             }
+            assert_no_other_outputs = False
         case _:
             schema_updates = {}
 
@@ -182,6 +198,7 @@ def test_registered_stages(simple_static_MEDS: Path, stage: str):
                 input_dir=input_dir,
                 do_use_config_yaml=example.do_use_yaml,
                 test_name=name,
+                assert_no_other_outputs=assert_no_other_outputs,
             )
         finally:
             if input_dir != simple_static_MEDS:
