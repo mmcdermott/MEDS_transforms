@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 from meds import subject_id_field, subject_splits_filepath, time_field
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 
 from ..mapreduce import rwlock_wrap, shard_iterator, shuffle_shards
 from ..stage import MEDS_transforms_stage
@@ -335,7 +335,3 @@ def main(cfg: DictConfig):
         )
 
     logger.info(f"Done with {cfg.stage}")
-
-
-OmegaConf.register_new_resolver("current_script_name", lambda: main.__module__.split(".")[-1], replace=True)
-OmegaConf.register_new_resolver("get_script_docstring", lambda: main.__doc__, replace=True)
