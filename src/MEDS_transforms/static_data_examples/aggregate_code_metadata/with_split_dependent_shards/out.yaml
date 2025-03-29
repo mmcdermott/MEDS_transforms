@@ -1,0 +1,180 @@
+metadata/codes.parquet:
+  - code: null
+    code/n_occurrences: 44
+    code/n_subjects: 4
+    values/n_occurrences: 28
+    values/n_subjects: 4
+    values/sum: 3198.8389005974336
+    values/sum_sqd: 382968.28937288234
+    values/n_ints: 6
+    values/min: 86.0
+    values/max: 175.271118
+    values/quantiles:
+      values/quantile/0.25: 99.9
+      values/quantile/0.5: 105.1
+      values/quantile/0.75: 113.4
+    description: null
+    parent_codes: null
+
+  - code: "ADMISSION//CARDIAC"
+    code/n_occurrences: 2
+    code/n_subjects: 2
+    values/n_occurrences: 0
+    values/n_subjects: 0
+    values/sum: 0
+    values/sum_sqd: 0
+    values/n_ints: 0
+    values/min: null
+    values/max: null
+    values/quantiles: null
+    description: null
+    parent_codes: null
+
+  - code: "ADMISSION//ORTHOPEDIC"
+    code/n_occurrences: 1
+    code/n_subjects: 1
+    values/n_occurrences: 0
+    values/n_subjects: 0
+    values/sum: 0
+    values/sum_sqd: 0
+    values/n_ints: 0
+    values/min: null
+    values/max: null
+    values/quantiles: null
+    description: null
+    parent_codes: null
+
+  - code: "ADMISSION//PULMONARY"
+    code/n_occurrences: 1
+    code/n_subjects: 1
+    values/n_occurrences: 0
+    values/n_subjects: 0
+    values/sum: 0
+    values/sum_sqd: 0
+    values/n_ints: 0
+    values/min: null
+    values/max: null
+    values/quantiles: null
+    description: null
+    parent_codes: null
+
+  - code: "DISCHARGE"
+    code/n_occurrences: 4
+    code/n_subjects: 4
+    values/n_occurrences: 0
+    values/n_subjects: 0
+    values/sum: 0
+    values/sum_sqd: 0
+    values/n_ints: 0
+    values/min: null
+    values/max: null
+    values/quantiles: null
+    description: null
+    parent_codes: null
+
+  - code: "DOB"
+    code/n_occurrences: 4
+    code/n_subjects: 4
+    values/n_occurrences: 0
+    values/n_subjects: 0
+    values/sum: 0
+    values/sum_sqd: 0
+    values/n_ints: 0
+    values/min: null
+    values/max: null
+    values/quantiles: null
+    description: null
+    parent_codes: null
+
+  - code: "EYE_COLOR//BLUE"
+    code/n_occurrences: 1
+    code/n_subjects: 1
+    values/n_occurrences: 0
+    values/n_subjects: 0
+    values/sum: 0
+    values/sum_sqd: 0
+    values/n_ints: 0
+    values/min: null
+    values/max: null
+    values/quantiles: null
+    description: "Blue Eyes. Less common than brown."
+    parent_codes: null
+
+  - code: "EYE_COLOR//BROWN"
+    code/n_occurrences: 1
+    code/n_subjects: 1
+    values/n_occurrences: 0
+    values/n_subjects: 0
+    values/sum: 0
+    values/sum_sqd: 0
+    values/n_ints: 0
+    values/min: null
+    values/max: null
+    values/quantiles: null
+    description: "Brown Eyes. The most common eye color."
+    parent_codes: null
+
+  - code: "EYE_COLOR//HAZEL"
+    code/n_occurrences: 2
+    code/n_subjects: 2
+    values/n_occurrences: 0
+    values/n_subjects: 0
+    values/sum: 0
+    values/sum_sqd: 0
+    values/n_ints: 0
+    values/min: null
+    values/max: null
+    values/quantiles: null
+    description: "Hazel eyes. These are uncommon"
+    parent_codes: null
+
+  - code: "HEIGHT"
+    code/n_occurrences: 4
+    code/n_subjects: 4
+    values/n_occurrences: 4
+    values/n_subjects: 4
+    values/sum: 656.8389005974336
+    values/sum_sqd: 108056.12937288235
+    values/n_ints: 0
+    values/min: 156.485596
+    values/max: 175.271118
+    values/quantiles:
+      values/quantile/0.25: 160.395311
+      values/quantile/0.5: 164.686884
+      values/quantile/0.75: 164.686884
+    description: null
+    parent_codes: null
+
+  - code: "HR"
+    code/n_occurrences: 12
+    code/n_subjects: 4
+    values/n_occurrences: 12
+    values/n_subjects: 4
+    values/sum: 1360.5000000000002
+    values/sum_sqd: 158538.77
+    values/n_ints: 2
+    values/min: 86.0
+    values/max: 170.199997
+    values/quantiles:
+      values/quantile/0.25: 107.5
+      values/quantile/0.5: 112.5
+      values/quantile/0.75: 113.4
+    description: "Heart Rate"
+    parent_codes: ["LOINC/8867-4"]
+
+  - code: "TEMP"
+    code/n_occurrences: 12
+    code/n_subjects: 4
+    values/n_occurrences: 12
+    values/n_subjects: 4
+    values/sum: 1181.4999999999998
+    values/sum_sqd: 116373.38999999998
+    values/n_ints: 4
+    values/min: 95.5
+    values/max: 100.400002
+    values/quantiles:
+      values/quantile/0.25: 96.2
+      values/quantile/0.5: 99.9
+      values/quantile/0.75: 100.0
+    description: "Body Temperature"
+    parent_codes: ["LOINC/8310-5"]
