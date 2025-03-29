@@ -136,9 +136,9 @@ MEDS_CODE_METADATA = pl.DataFrame(
 
 # After filtering out subjects with fewer than 5 events:
 WANT_FILTER = parse_shards_yaml(
-    f"""
+    """
 "filter_subjects/train/0": |-2
-  {subject_id_field},time,code,numeric_value
+  subject_id,time,code,numeric_value
   239684,,EYE_COLOR//BROWN,
   239684,,HEIGHT,175.271115221764
   239684,"12/28/1980, 00:00:00",DOB,
@@ -171,13 +171,13 @@ WANT_FILTER = parse_shards_yaml(
   1195293,"06/20/2010, 20:50:04",DISCHARGE,
 
 "filter_subjects/train/1": |-2
-  {subject_id_field},time,code,numeric_value
+  subject_id,time,code,numeric_value
 
 "filter_subjects/tuning/0": |-2
-  {subject_id_field},time,code,numeric_value
+  subject_id,time,code,numeric_value
 
 "filter_subjects/held_out/0": |-2
-  {subject_id_field},time,code,numeric_value
+  subject_id,time,code,numeric_value
   1500733,,EYE_COLOR//BROWN,
   1500733,,HEIGHT,158.60131573580904
   1500733,"07/20/1986, 00:00:00",DOB,
@@ -193,9 +193,9 @@ WANT_FILTER = parse_shards_yaml(
 )
 
 WANT_TIME_DERIVED = parse_shards_yaml(
-    f"""
+    """
 "add_time_derived_measurements/train/0": |-2
-  {subject_id_field},time,code,numeric_value
+  subject_id,time,code,numeric_value
   239684,,EYE_COLOR//BROWN,
   239684,,HEIGHT,175.271115221764
   239684,"12/28/1980, 00:00:00","TIME_OF_DAY//[00,06)",
@@ -254,13 +254,13 @@ WANT_TIME_DERIVED = parse_shards_yaml(
   1195293,"06/20/2010, 20:50:04",DISCHARGE,
 
 "add_time_derived_measurements/train/1": |-2
-  {subject_id_field},time,code,numeric_value
+  subject_id,time,code,numeric_value
 
 "add_time_derived_measurements/tuning/0": |-2
-  {subject_id_field},time,code,numeric_value
+  subject_id,time,code,numeric_value
 
 "add_time_derived_measurements/held_out/0": |-2
-  {subject_id_field},time,code,numeric_value
+  subject_id,time,code,numeric_value
   1500733,,EYE_COLOR//BROWN,
   1500733,,HEIGHT,158.60131573580904
   1500733,"07/20/1986, 00:00:00","TIME_OF_DAY//[00,06)",
@@ -444,9 +444,9 @@ shape: (4, 3)
 """
 
 WANT_OCCLUDE_OUTLIERS = parse_shards_yaml(
-    f"""
+    """
 "occlude_outliers/train/0": |-2
-  {subject_id_field},time,code,numeric_value,numeric_value/is_inlier
+  subject_id,time,code,numeric_value,numeric_value/is_inlier
   239684,,EYE_COLOR//BROWN,,
   239684,,HEIGHT,,false
   239684,"12/28/1980, 00:00:00","TIME_OF_DAY//[00,06)",,
@@ -505,13 +505,13 @@ WANT_OCCLUDE_OUTLIERS = parse_shards_yaml(
   1195293,"06/20/2010, 20:50:04",DISCHARGE,,
 
 "occlude_outliers/train/1": |-2
-  {subject_id_field},time,code,numeric_value,numeric_value/is_inlier
+  subject_id,time,code,numeric_value,numeric_value/is_inlier
 
 "occlude_outliers/tuning/0": |-2
-  {subject_id_field},time,code,numeric_value,numeric_value/is_inlier
+  subject_id,time,code,numeric_value,numeric_value/is_inlier
 
 "occlude_outliers/held_out/0": |-2
-  {subject_id_field},time,code,numeric_value,numeric_value/is_inlier
+  subject_id,time,code,numeric_value,numeric_value/is_inlier
   1500733,,EYE_COLOR//BROWN,,
   1500733,,HEIGHT,,false
   1500733,"07/20/1986, 00:00:00","TIME_OF_DAY//[00,06)",,
@@ -829,9 +829,9 @@ held_out/0
 
 # Note we have dropped the row in the held out shard that doesn't have a code in the vocabulary!
 WANT_NORMALIZATION = parse_shards_yaml(
-    f"""
+    """
 "data/train/0": |-2
-  {subject_id_field},time,code,numeric_value
+  subject_id,time,code,numeric_value
   239684,,6,
   239684,,7,
   239684,"12/28/1980, 00:00:00",10,
@@ -890,13 +890,13 @@ WANT_NORMALIZATION = parse_shards_yaml(
   1195293,"06/20/2010, 20:50:04",3,
 
 "data/train/1": |-2
-  {subject_id_field},time,code,numeric_value
+  subject_id,time,code,numeric_value
 
 "data/tuning/0": |-2
-  {subject_id_field},time,code,numeric_value
+  subject_id,time,code,numeric_value
 
 "data/held_out/0": |-2
-  {subject_id_field},time,code,numeric_value
+  subject_id,time,code,numeric_value
   1500733,,6,
   1500733,,7,
   1500733,"07/20/1986, 00:00:00",10,
