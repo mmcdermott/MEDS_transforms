@@ -2,7 +2,6 @@ import json
 import re
 import subprocess
 import tempfile
-from collections.abc import Callable
 from contextlib import contextmanager
 from io import StringIO
 from pathlib import Path
@@ -232,19 +231,6 @@ def assert_df_equal(want: pl.DataFrame, got: pl.DataFrame, msg: str = None, **kw
         raise AssertionError(f"{msg}:\nWant:\n{want}\nGot:\n{got}\n{e}") from e
 
 
-def check_json(want: dict | Callable, got: dict, msg: str):
-    try:
-        match want:
-            case dict():
-                assert got == want, f"Want:\n{want}\nGot:\n{got}"
-            case _ if callable(want):
-                want(got)
-            case _:
-                raise ValueError(f"Unknown want type: {type(want)}")
-    except AssertionError as e:
-        raise AssertionError(f"{msg}: {e}") from e
-
-
 FILE_T = pl.DataFrame | dict[str, Any] | str
 
 
@@ -321,9 +307,6 @@ def check_outputs(
             case ".parquet":
                 got_df = pl.read_parquet(output_fp, glob=False)
                 assert_df_equal(want, got_df, msg=msg, **df_check_kwargs)
-            case ".json":
-                got = json.loads(output_fp.read_text())
-                check_json(want, got, msg=msg)
             case _:
                 raise ValueError(f"Unknown file suffix: {file_suffix}")
 
