@@ -1014,10 +1014,9 @@ A test pipeline for the MEDS-transforms pipeline runner.
 
 def test_pipeline():
     shared_kwargs = {
-        "config_name": "runner",
+        "config_name": "_runner",
         "stage_name": None,
         "stage_kwargs": None,
-        "do_pass_stage_name": False,
         "do_use_config_yaml": False,
         "do_include_dirs": False,
         "hydra_verbose": False,

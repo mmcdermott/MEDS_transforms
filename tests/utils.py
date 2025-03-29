@@ -138,15 +138,11 @@ def run_command(
     should_error: bool = False,
     do_use_config_yaml: bool = False,
     stage_name: str | None = None,
-    do_pass_stage_name: bool = False,
 ):
     script = ["python", str(script.resolve())] if isinstance(script, Path) else [script]
     command_parts = script
 
     err_cmd_lines = []
-
-    if config_name is not None and not config_name.startswith("_"):
-        config_name = f"_{config_name}"
 
     if do_use_config_yaml:
         if config_name is None:
@@ -172,14 +168,7 @@ def run_command(
         )
         err_cmd_lines.append(f"Using config yaml:\n{OmegaConf.to_yaml(conf)}")
     else:
-        if config_name is not None:
-            command_parts.append(f"--config-name={config_name}")
         command_parts.append(" ".join(dict_to_hydra_kwargs(hydra_kwargs)))
-
-    if do_pass_stage_name:
-        if stage_name is None:
-            raise ValueError("stage_name must be provided if do_pass_stage_name is True.")
-        command_parts.append(f"stage={stage_name}")
 
     full_cmd = " ".join(command_parts)
     err_cmd_lines.append(f"Running command: {full_cmd}")
@@ -324,12 +313,11 @@ def MEDS_transforms_pipeline_tester(
     script: str | Path,
     stage_name: str | None,
     stage_kwargs: dict[str, str] | None,
-    do_pass_stage_name: bool = False,
     do_use_config_yaml: bool = False,
     want_outputs: dict[str, pl.DataFrame] | None = None,
     assert_no_other_outputs: bool = True,
     should_error: bool = False,
-    config_name: str = "preprocess",
+    config_name: str = "_preprocess",
     input_files: dict[str, FILE_T] | None = None,
     input_dir: Path | None = None,
     df_check_kwargs: dict | None = None,
@@ -378,10 +366,6 @@ def MEDS_transforms_pipeline_tester(
             "config_name": config_name,
             "do_use_config_yaml": do_use_config_yaml,
         }
-
-        if do_pass_stage_name:
-            run_command_kwargs["stage"] = stage_name
-            run_command_kwargs["do_pass_stage_name"] = True
 
         # Run the transform
         stderr, stdout = run_command(**run_command_kwargs)
