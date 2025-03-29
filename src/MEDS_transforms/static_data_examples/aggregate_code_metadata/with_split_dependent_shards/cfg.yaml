@@ -1,4 +1,3 @@
-__do_use_yaml: true
 aggregations:
   - code/n_occurrences
   - code/n_subjects

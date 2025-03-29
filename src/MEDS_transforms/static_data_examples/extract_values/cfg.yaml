@@ -1,5 +1,3 @@
-__do_use_yaml: true
-
 _match_revise_mode: multi_match_and_revise
 _match_revise:
   - _matcher:

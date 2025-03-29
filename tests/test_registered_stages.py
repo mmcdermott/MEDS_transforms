@@ -3,36 +3,34 @@ from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
 
+import polars as pl
+import pytest
+from meds import code_metadata_filepath
+from meds_testing_helpers.dataset import MEDSDataset
+from omegaconf import OmegaConf
 from yaml import load as load_yaml
+
+from MEDS_transforms.__main__ import get_all_stages
+
+from .utils import MEDS_transforms_pipeline_tester
 
 try:
     from yaml import CLoader as Loader
 except ImportError:  # pragma: no cover
     from yaml import Loader
 
-import polars as pl
-import pytest
-from meds import code_metadata_filepath
-from meds_testing_helpers.dataset import MEDSDataset
-from omegaconf import OmegaConf
-
-from MEDS_transforms.__main__ import get_all_stages
-
-from .utils import MEDS_transforms_pipeline_tester
-
 # Get all registered stages
 REGISTERED_STAGES = get_all_stages()
 CMD_PATTERN = "MEDS_transform-stage pkg://MEDS_transforms.configs._preprocess.yaml {stage_name}"
-DO_USE_YAML_KEY = "__do_use_yaml"
 
 
 @dataclass
 class StageExample:
     stage_cfg: dict
-    want_data: MEDSDataset | None = None
-    want_metadata: pl.DataFrame | None = None
-    in_data: MEDSDataset | None = None
-    do_use_yaml: bool = False
+    want_data: MEDSDataset | None
+    want_metadata: pl.DataFrame | None
+    in_data: MEDSDataset | None
+    test_kwargs: dict
 
     def __post_init__(self):
         if self.want_data is None and self.want_metadata is None:
@@ -65,6 +63,7 @@ def parse_example_dir(example_dir: Path, **schema_updates) -> StageExample:
     stage_cfg_fp = example_dir / "cfg.yaml"
     in_fp = example_dir / "in.yaml"
     want_fp = example_dir / "out.yaml"
+    test_cfg_fp = example_dir / "_test_cfg.yaml"
 
     if not want_fp.is_file():
         raise FileNotFoundError(f"Output file not found: {want_fp}")
@@ -81,14 +80,14 @@ def parse_example_dir(example_dir: Path, **schema_updates) -> StageExample:
 
     in_data = MEDSDataset.from_yaml(in_fp) if in_fp.is_file() else None
     stage_cfg = OmegaConf.to_container(OmegaConf.load(stage_cfg_fp)) if stage_cfg_fp.is_file() else {}
-    do_use_yaml = stage_cfg.pop(DO_USE_YAML_KEY, False)
+    test_kwargs = OmegaConf.to_container(OmegaConf.load(test_cfg_fp)) if test_cfg_fp.is_file() else {}
 
     return StageExample(
         want_data=want_data,
         want_metadata=want_metadata,
         stage_cfg=stage_cfg,
         in_data=in_data,
-        do_use_yaml=do_use_yaml,
+        test_kwargs=test_kwargs,
     )
 
 
@@ -133,7 +132,6 @@ def test_registered_stages(simple_static_MEDS: Path, stage: str):
 
     examples_dir = files(ep_package).joinpath("static_data_examples") / stage
 
-    assert_no_other_outputs = True
     match stage:
         case "normalization":
             schema_updates = {"code": pl.Int64, "numeric_value": pl.Float64}
@@ -156,7 +154,6 @@ def test_registered_stages(simple_static_MEDS: Path, stage: str):
                 "values/min": pl.Float32,
                 "values/max": pl.Float32,
             }
-            assert_no_other_outputs = False
         case "fit_vocabulary_indices":
             schema_updates = {"code/vocab_index": pl.UInt8}
         case _:
@@ -196,11 +193,10 @@ def test_registered_stages(simple_static_MEDS: Path, stage: str):
                 script=CMD_PATTERN.format(stage_name=stage),
                 want_outputs=want_outputs,
                 input_dir=input_dir,
-                do_use_config_yaml=example.do_use_yaml,
                 test_name=name,
-                assert_no_other_outputs=assert_no_other_outputs,
                 stages=[stage],
                 stage_configs={stage: example.stage_cfg},
+                **example.test_kwargs,
             )
         finally:
             if input_dir != simple_static_MEDS:
