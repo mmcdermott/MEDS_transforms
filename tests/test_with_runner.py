@@ -17,8 +17,12 @@ from functools import partial
 import polars as pl
 from meds import code_metadata_filepath, subject_id_field, subject_splits_filepath
 
-from tests import AGGREGATE_CODE_METADATA_SCRIPT, RUNNER_SCRIPT
 from tests.utils import MEDS_transforms_pipeline_tester, add_params, exact_str_regex, parse_shards_yaml
+
+RUNNER_SCRIPT = "MEDS_transform-pipeline"
+AGGREGATE_CODE_METADATA_SCRIPT = (
+    "MEDS_transform-stage pkg://MEDS_transforms.configs._preprocess.yaml aggregate_code_metadata"
+)
 
 SPLITS_DF = pl.DataFrame(
     {
