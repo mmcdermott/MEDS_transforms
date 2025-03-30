@@ -2,7 +2,7 @@
 
 import polars as pl
 
-from . import MEDS_transforms_stage
+from .. import MEDS_transforms_stage
 
 
 @MEDS_transforms_stage

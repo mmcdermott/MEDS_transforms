@@ -130,7 +130,7 @@ def test_registered_stages(simple_static_MEDS: Path, stage: str):
 
     ep_package = ep.dist.metadata["Name"]
 
-    examples_dir = files(ep_package).joinpath("static_data_examples") / stage
+    examples_dir = files(ep_package).joinpath("stages") / stage
 
     match stage:
         case "normalization":

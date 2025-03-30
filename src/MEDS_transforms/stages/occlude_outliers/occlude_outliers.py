@@ -5,7 +5,7 @@ from collections.abc import Callable
 import polars as pl
 from omegaconf import DictConfig
 
-from . import MEDS_transforms_stage
+from .. import MEDS_transforms_stage
 
 
 @MEDS_transforms_stage
