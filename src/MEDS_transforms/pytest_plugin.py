@@ -54,7 +54,7 @@ def get_examples_for_stage(stage: str) -> dict[str, StageExample]:
     return get_nested_test_cases(examples_dir, stage, **schema_updates)
 
 
-def pytest_addoption(parser):
+def pytest_addoption(parser):  # pragma: no cover
     stgaes_for_package_help_str = (
         "Specify the package name(s) to search within when looking for registered stages to test. "
         "If not specified, all registered stages, _except for the core MEDS-Transforms stages_ will be "
@@ -108,7 +108,7 @@ def _auto_detect_package(config: pytest.Config) -> str | None:
             with open(pyproject_file, "rb") as f:
                 pyproject = tomllib.load(f)
                 return pyproject.get("project", {}).get("name")
-        except Exception:
+        except Exception:  # pragma: no cover
             pass
     if setup_file.exists():
         spec = importlib.util.spec_from_file_location("setup", setup_file)
@@ -116,7 +116,7 @@ def _auto_detect_package(config: pytest.Config) -> str | None:
         try:
             spec.loader.exec_module(setup_module)
             return getattr(setup_module, "__name__", None)
-        except Exception:
+        except Exception:  # pragma: no cover
             pass
     return None
 
@@ -160,7 +160,7 @@ def stage_example(stage: str, stage_scenario: str) -> StageExample:
     """Fixture to provide the example for the given stage and scenario."""
 
     stage_scenarios = get_examples_for_stage(stage)
-    if stage_scenario not in stage_scenarios:
+    if stage_scenario not in stage_scenarios:  # pragma: no cover
         raise ValueError(f"Stage scenario '{stage_scenario}' not found for stage '{stage}'.")
 
     yield stage_scenarios[stage_scenario]
