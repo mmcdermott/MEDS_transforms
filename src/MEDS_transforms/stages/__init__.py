@@ -2,6 +2,7 @@ from importlib.metadata import entry_points
 
 from .. import __package_name__
 from .base import MEDS_transforms_stage  # noqa: F401
+from .examples import StageExample, get_nested_test_cases  # noqa: F401
 
 # Here are all the stages that are registered in the entry points, imported here so they can be imported at a
 # module level.
