@@ -15,8 +15,8 @@ from meds import subject_id_field, subject_splits_filepath, time_field
 from omegaconf import DictConfig
 
 from ..mapreduce import rwlock_wrap, shard_iterator, shuffle_shards
-from ..stage import MEDS_transforms_stage
 from ..utils import stage_init, write_lazyframe
+from . import MEDS_transforms_stage
 
 logger = logging.getLogger(__name__)
 

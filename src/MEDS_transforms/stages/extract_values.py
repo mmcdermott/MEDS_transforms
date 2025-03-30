@@ -9,7 +9,7 @@ from omegaconf import DictConfig
 
 from .. import DEPRECATED_NAMES, INFERRED_STAGE_KEYS, MANDATORY_TYPES
 from ..parser import cfg_to_expr
-from ..stage import MEDS_transforms_stage
+from . import MEDS_transforms_stage
 
 logger = logging.getLogger(__name__)
 
