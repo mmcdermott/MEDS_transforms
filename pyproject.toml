@@ -17,14 +17,14 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-  "polars~=1.26", "pyarrow", "hydra-core", "numpy", "meds==0.3.3", "filelock",
+  "polars~=1.26", "pyarrow", "hydra-core", "numpy", "meds==0.3.3", "filelock", "pytest", "meds_testing_helpers~=0.2.6"
 ]
 
 [tool.setuptools_scm]
 
 [project.optional-dependencies]
 dev = ["pre-commit<4"]
-tests = ["pytest", "pytest-cov", "rootutils", "hydra-joblib-launcher", "meds_testing_helpers~=0.2.6"]
+tests = ["pytest-cov", "hydra-joblib-launcher"]
 local_parallelism = ["hydra-joblib-launcher"]
 slurm_parallelism = ["hydra-submitit-launcher"]
 docs = [
@@ -64,3 +64,6 @@ addopts = [
   "--doctest-glob=*.md",
 ]
 doctest_optionflags = ["NORMALIZE_WHITESPACE", "ELLIPSIS"]
+
+[project.entry-points.pytest11]
+MEDS_transforms = "MEDS_transforms.pytest_plugin"
