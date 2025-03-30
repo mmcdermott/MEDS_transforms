@@ -6,7 +6,7 @@ from .. import MEDS_transforms_stage
 
 
 @MEDS_transforms_stage
-def normalize(
+def normalization(
     df: pl.LazyFrame, code_metadata: pl.DataFrame, code_modifiers: list[str] | None = None
 ) -> pl.LazyFrame:
     """Normalize a MEDS dataset across both categorical and continuous dimensions.
@@ -93,7 +93,7 @@ def normalize(
         ...         "values/std": pl.Float64,
         ...     },
         ... )
-        >>> normalize(MEDS_df.lazy(), code_metadata).collect()
+        >>> normalization(MEDS_df.lazy(), code_metadata).collect()
         shape: (6, 4)
         ┌────────────┬─────────────────────┬──────┬───────────────┐
         │ subject_id ┆ time                ┆ code ┆ numeric_value │
@@ -147,7 +147,7 @@ def normalize(
         ...         "values/std": pl.Float64,
         ...     },
         ... )
-        >>> normalize(MEDS_df.lazy(), code_metadata, ["unit"]).collect()
+        >>> normalization(MEDS_df.lazy(), code_metadata, ["unit"]).collect()
         shape: (6, 4)
         ┌────────────┬─────────────────────┬──────┬───────────────┐
         │ subject_id ┆ time                ┆ code ┆ numeric_value │
@@ -166,7 +166,7 @@ def normalize(
         doesn't retain any extra columns after the operation. If you want to retain the row index, you should
         file a GitHub issue with this request and we can add it in a future release.
         >>> MEDS_df = MEDS_df.with_columns(pl.lit(1).alias("_row_idx"), pl.lit(2).alias("foobar"))
-        >>> normalize(MEDS_df.head(1).lazy(), code_metadata, ["unit"]).collect()
+        >>> normalization(MEDS_df.head(1).lazy(), code_metadata, ["unit"]).collect()
         shape: (1, 4)
         ┌────────────┬─────────────────────┬──────┬───────────────┐
         │ subject_id ┆ time                ┆ code ┆ numeric_value │
