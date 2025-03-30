@@ -1,6 +1,11 @@
 from importlib.metadata import entry_points
 
 from .. import __package_name__
+from .base import MEDS_transforms_stage  # noqa: F401
+
+# Here are all the stages that are registered in the entry points, imported here so they can be imported at a
+# module level.
+# isort: split
 from .add_time_derived_measurements import main as add_time_derived_measurements  # noqa: F401
 from .aggregate_code_metadata import main as aggregate_code_metadata  # noqa: F401
 from .extract_values import main as extract_values  # noqa: F401
