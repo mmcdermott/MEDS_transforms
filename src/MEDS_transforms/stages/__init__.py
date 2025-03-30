@@ -1,9 +1,6 @@
-# Import the stage registration helper
-from .base import MEDS_transforms_stage
+from importlib.metadata import entry_points
 
-__all__ = ["MEDS_transforms_stage"]
-
-# Import individual stages. These aren't exposed via __all__, but are importable individually
+from .. import __package_name__
 from .add_time_derived_measurements import main as add_time_derived_measurements  # noqa: F401
 from .aggregate_code_metadata import main as aggregate_code_metadata  # noqa: F401
 from .extract_values import main as extract_values  # noqa: F401
@@ -14,3 +11,9 @@ from .normalization import main as normalization  # noqa: F401
 from .occlude_outliers import main as occlude_outliers  # noqa: F401
 from .reorder_measurements import main as reorder_measurements  # noqa: F401
 from .reshard_to_split import main as reshard_to_split  # noqa: F401
+
+
+def get_all_stages():
+    """Get all available stages."""
+    eps = entry_points(group=f"{__package_name__}.stages")
+    return {name: eps[name] for name in eps.names}

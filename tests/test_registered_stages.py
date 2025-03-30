@@ -10,7 +10,7 @@ from meds_testing_helpers.dataset import MEDSDataset
 from omegaconf import OmegaConf
 from yaml import load as load_yaml
 
-from MEDS_transforms.__main__ import get_all_stages
+from MEDS_transforms.stages import get_all_stages
 
 from .utils import MEDS_transforms_pipeline_tester
 
