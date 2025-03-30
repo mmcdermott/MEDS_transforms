@@ -209,14 +209,14 @@ def MEDS_transforms_stage(*args, **kwargs):
         >>> hasattr(fn, "main")
         False
         >>> fn.__name__ # Inferred from the source module name
-        'stages'
+        'base'
         >>> fn.__doc__ # Inferred from the map function docstring
         'base map docstring'
         >>> fn = MEDS_transforms_stage(map_fn=map_fn, reduce_fn=reduce_fn)
         >>> hasattr(fn, "main")
         False
         >>> fn.__name__ # Inferred from the source module name
-        'stages'
+        'base'
         >>> print(fn.__doc__) # Inferred from the map function docstring
         Map Stage:
         base map docstring
@@ -259,7 +259,7 @@ def MEDS_transforms_stage(*args, **kwargs):
         >>> fn.__doc__
         'base map docstring'
         >>> fn.main.__name__ # Inferred from the source module name
-        'stages'
+        'base'
         >>> fn.main.__doc__ # Inferred from the map function docstring
         'base map docstring'
         >>> fn = MEDS_transforms_stage(map_fn, reduce_fn=reduce_fn)
@@ -268,7 +268,7 @@ def MEDS_transforms_stage(*args, **kwargs):
         >>> hasattr(fn, "main")
         True
         >>> fn.main.__name__ # Inferred from the source module name
-        'stages'
+        'base'
         >>> print(fn.main.__doc__) # Inferred from the map function docstring
         Map Stage:
         base map docstring
