@@ -6,6 +6,7 @@ To do this effectively, this runner functionally takes a "meta configuration" fi
      stage scripts and Hydra launcher configurations for each stage to control parallelism, resources, etc.
 """
 
+import copy
 import subprocess
 from pathlib import Path
 
@@ -187,7 +188,35 @@ def run_stage(
 
     do_profile = cfg.get("do_profile", False)
     pipeline_config_fp = Path(cfg.pipeline_config_fp)
-    stage_config = cfg._local_pipeline_config.get("stage_configs", {}).get(stage_name, {})
+
+    all_stages = cfg._local_pipeline_config.get("stages", [])
+
+    stage_config = None
+
+    for s in all_stages:
+        copy.deepcopy(s)
+        if isinstance(s, str):
+            s_name = s
+            s_config = {}
+        elif isinstance(s, (dict, DictConfig)):
+            if "_name" in s:
+                s_name = s["_name"]
+                s_config = s.pop("_name")
+            elif len(s) == 1:
+                s_name = list(s.keys())[0]
+                s_config = s[s_name]
+            else:
+                raise ValueError(f"Stage config must have _name or be of length 1. Got {s}.")
+        else:
+            raise ValueError(f"Stage config must be a string or a dict. Got {s}.")
+
+        if s_name == stage_name:
+            stage_config = s_config
+            break
+
+    if stage_config is None:
+        raise ValueError(f"Stage {stage_name} not found in pipeline config.")
+
     stage_runner_config = cfg._stage_runners.get(stage_name, {})
 
     script = None
@@ -198,12 +227,14 @@ def run_stage(
     else:
         script = f"MEDS_transform-stage {str(pipeline_config_fp)} {stage_name}"
 
+    input_dir = cfg._local_pipeline_config.input_dir
+    cohort_dir = cfg._local_pipeline_config.cohort_dir
+
     command_parts = [
         script,
-        f"--config-dir={str(pipeline_config_fp.parent.resolve())}",
-        f"--config-name={pipeline_config_fp.stem}",
         "'hydra.searchpath=[pkg://MEDS_transforms.configs]'",
-        f"stage={stage_name}",
+        f"input_dir={input_dir}",
+        f"cohort_dir={cohort_dir}",
     ]
 
     parallelization_args = get_parallelization_args(
@@ -212,7 +243,7 @@ def run_stage(
 
     if parallelization_args:
         multirun = parallelization_args.pop(0)
-        command_parts = command_parts[:3] + [multirun] + command_parts[3:] + parallelization_args
+        command_parts = command_parts[:1] + [multirun] + command_parts[1:] + parallelization_args
 
     if do_profile:
         command_parts.append("++hydra.callbacks.profiler._target_=hydra_profiler.profiler.ProfilerCallback")
@@ -281,13 +312,26 @@ def main(cfg: DictConfig):
         default_parallelization_cfg = None
 
     for stage in stages:
-        done_file = log_dir / f"{stage}.done"
+
+        if isinstance(stage, str):
+            stage_name = stage
+        elif isinstance(stage, (dict, DictConfig)):
+            if "_name" in stage:
+                stage_name = stage["_name"]
+            elif len(stage) == 1:
+                stage_name = list(stage.keys())[0]
+            else:
+                raise ValueError(f"Stage config must have _name or be of length 1. Got {stage}.")
+        else:
+            raise ValueError(f"Stage config must be a string or a dict. Got {stage}.")
+
+        done_file = log_dir / f"{stage_name}.done"
 
         if done_file.exists():
-            logger.info(f"Skipping stage {stage} as it is already complete.")
+            logger.info(f"Skipping stage {stage_name} as it is already complete.")
         else:
-            logger.info(f"Running stage: {stage}")
-            run_stage(cfg, stage, default_parallelization_cfg=default_parallelization_cfg)
+            logger.info(f"Running stage: {stage_name}")
+            run_stage(cfg, stage_name, default_parallelization_cfg=default_parallelization_cfg)
             done_file.touch()
 
     global_done_file.touch()

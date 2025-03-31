@@ -30,9 +30,6 @@ def exact_str_regex(s: str) -> str:
 
 
 RUNNER_SCRIPT = "MEDS_transform-pipeline"
-AGGREGATE_CODE_METADATA_SCRIPT = (
-    "MEDS_transform-stage pkg://MEDS_transforms.configs._preprocess.yaml aggregate_code_metadata"
-)
 
 SPLITS_DF = pl.DataFrame(
     {
@@ -922,9 +919,7 @@ WANT_NORMALIZATION = parse_shards_yaml(
 
 # Normally, you wouldn't need to specify all of these scripts, but in testing with local scripts we need to
 # specify them all as they need to point to their python paths.
-STAGE_RUNNER_YAML = f"""
-fit_normalization:
-  script: {AGGREGATE_CODE_METADATA_SCRIPT}
+STAGE_RUNNER_YAML = """
 """
 
 PARALLEL_STAGE_RUNNER_YAML = f"""
@@ -936,59 +931,46 @@ parallelize:
 """
 
 PIPELINE_NO_STAGES_YAML = """
-defaults:
-  - _preprocess
-  - _self_
-
 input_dir: {input_dir}
 cohort_dir: {cohort_dir}
 """
 
-PIPELINE_YAML = f"""
-defaults:
-  - _preprocess
-  - _self_
+PIPELINE_YAML = """
+input_dir: {input_dir}
+cohort_dir: {cohort_dir}
 
-input_dir: {{input_dir}}
-cohort_dir: {{cohort_dir}}
-
+name: "Test"
 description: "A test pipeline for the MEDS-transforms pipeline runner."
 
 stages:
-  - filter_subjects
-  - add_time_derived_measurements
-  - fit_outlier_detection
-  - occlude_outliers
-  - fit_normalization
+  - filter_subjects:
+      min_events_per_subject: 5
+  - add_time_derived_measurements:
+      age:
+        DOB_code: "DOB" # This is the MEDS official code for BIRTH
+        age_code: "AGE"
+        age_unit: "years"
+      time_of_day:
+        time_of_day_code: "TIME_OF_DAY"
+        endpoints: [6, 12, 18, 24]
+  - fit_outlier_detection:
+      _base_stage: aggregate_code_metadata
+      aggregations:
+        - "values/n_occurrences"
+        - "values/sum"
+        - "values/sum_sqd"
+  - occlude_outliers:
+      stddev_cutoff: 1
+  - fit_normalization:
+      _base_stage: aggregate_code_metadata
+      aggregations:
+        - "code/n_occurrences"
+        - "code/n_subjects"
+        - "values/n_occurrences"
+        - "values/sum"
+        - "values/sum_sqd"
   - fit_vocabulary_indices
   - normalization
-
-stage_configs:
-  filter_subjects:
-    min_events_per_subject: 5
-  add_time_derived_measurements:
-    age:
-      DOB_code: "DOB" # This is the MEDS official code for BIRTH
-      age_code: "AGE"
-      age_unit: "years"
-    time_of_day:
-      time_of_day_code: "TIME_OF_DAY"
-      endpoints: [6, 12, 18, 24]
-  fit_outlier_detection:
-    _script: {str(AGGREGATE_CODE_METADATA_SCRIPT)}
-    aggregations:
-      - "values/n_occurrences"
-      - "values/sum"
-      - "values/sum_sqd"
-  occlude_outliers:
-    stddev_cutoff: 1
-  fit_normalization:
-    aggregations:
-      - "code/n_occurrences"
-      - "code/n_subjects"
-      - "values/n_occurrences"
-      - "values/sum"
-      - "values/sum_sqd"
 """
 
 NO_ARGS_HELP_STR = """
@@ -1014,7 +996,6 @@ A test pipeline for the MEDS-transforms pipeline runner.
 
 def test_pipeline():
     shared_kwargs = {
-        "config_name": "_runner",
         "do_use_config_yaml": False,
         "do_include_dirs": False,
     }
@@ -1101,10 +1082,10 @@ def test_pipeline():
             **{f"data/{k}": v for k, v in MEDS_SHARDS.items()},
             code_metadata_filepath: MEDS_CODE_METADATA,
             subject_splits_filepath: SPLITS_DF,
-            "_preprocess.yaml": partial(add_params, PIPELINE_YAML),
+            "_runner.yaml": partial(add_params, PIPELINE_YAML),
         },
         should_error=True,
-        pipeline_config_fp="{input_dir}/_preprocess.yaml",
+        pipeline_config_fp="{input_dir}/_runner.yaml",
         test_name="Runner should fail if the pipeline config has an invalid name",
         **shared_kwargs,
     )

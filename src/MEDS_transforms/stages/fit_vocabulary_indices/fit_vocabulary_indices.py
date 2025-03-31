@@ -208,7 +208,6 @@ def main(cfg: DictConfig):
 
     logger.info(
         f"Running with config:\n{OmegaConf.to_yaml(cfg)}\n"
-        f"Stage: {cfg.stage}\n\n"
         f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
     )
 
@@ -239,5 +238,3 @@ def main(cfg: DictConfig):
     logger.info(f"Indices assigned. Writing to {output_fp}")
 
     code_metadata.write_parquet(output_fp, use_pyarrow=True)
-
-    logger.info(f"Done with {cfg.stage}")

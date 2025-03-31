@@ -81,15 +81,15 @@ def run_stage():
     stage_name = sys.argv[2]
     sys.argv = sys.argv[2:]  # remove dispatcher arguments
 
-    if stage_name not in all_stages:
-        raise ValueError(f"Stage '{stage_name}' not found.")
+    executable_stage_name = register_structured_config(pipeline_yaml, stage_name)
 
-    main_fn = all_stages[stage_name]["entry_point"].load()
+    if executable_stage_name not in all_stages:
+        raise ValueError(f"Stage '{executable_stage_name}' not found.")
+
+    main_fn = all_stages[executable_stage_name]["entry_point"].load()
 
     OmegaConf.register_new_resolver("stage_name", lambda: stage_name)
     OmegaConf.register_new_resolver("stage_docstring", lambda: main_fn.__doc__.replace("$", "$$"))
-
-    register_structured_config(pipeline_yaml, stage_name)
 
     hydra_wrapper = hydra.main(
         version_base=None,

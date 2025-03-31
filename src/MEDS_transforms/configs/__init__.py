@@ -10,7 +10,7 @@ from typing import Any
 
 from hydra.core.config_store import ConfigStore
 from meds import dataset_metadata_filepath
-from omegaconf import MISSING, DictConfig, ListConfig, OmegaConf
+from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from .. import __package_name__
 from ..stages import get_all_registered_stages
@@ -25,17 +25,6 @@ logger = logging.getLogger(__name__)
 NAME_KEY = "_name"
 BASE_STAGE_KEY = "_base_stage"
 SCRIPT_KEY = "_script"
-
-
-@dataclass
-class BasePipelineConfig:
-    """Structured configuration object for a MEDS-Transforms pipeline."""
-
-    name: str = MISSING
-    version: str = MISSING
-    description: str = MISSING
-
-    stages: list[dict[str, dict]] = None
 
 
 def get_dataset_metadata_from_root(root: str) -> dict[str, str]:
@@ -303,7 +292,7 @@ def populate_stage(
     return out
 
 
-def register_structured_config(pipeline_config_path: Path | None, stage_name: str):
+def register_structured_config(pipeline_config_path: Path | None, stage_name: str) -> str:
 
     all_stages = get_all_registered_stages()
 
@@ -326,6 +315,7 @@ def register_structured_config(pipeline_config_path: Path | None, stage_name: st
         pipeline = OmegaConf.load(pipeline_config_path)
 
     new_stages = []
+    executable_stage_names = {}
     for i, stage_cfg in enumerate(pipeline.stages):
         stage_cfg = copy.deepcopy(stage_cfg)
         match stage_cfg:
@@ -349,8 +339,8 @@ def register_structured_config(pipeline_config_path: Path | None, stage_name: st
 
         logger.debug(f"Stage '{stage}' found in pipeline '{pipeline.name}'")
 
-        has_base_stage = BASE_STAGE_KEY in stage_cfg
-        has_script = SCRIPT_KEY in stage_cfg
+        has_base_stage = BASE_STAGE_KEY in stage_options
+        has_script = SCRIPT_KEY in stage_options
 
         base_stage = stage_options.get(BASE_STAGE_KEY, None)
 
@@ -370,11 +360,13 @@ def register_structured_config(pipeline_config_path: Path | None, stage_name: st
         if has_registered_name:
             defaults.update(all_stages[stage]["default_config"])
         elif has_base_stage:
-            defaults.update(all_stages[stage_cfg[BASE_STAGE_KEY]]["default_config"])
+            defaults.update(all_stages[stage_options[BASE_STAGE_KEY]]["default_config"])
 
         stage_opts = DictConfig({**defaults, **stage_options})
         stage_opts[NAME_KEY] = stage
         new_stages.append(stage_opts)
+
+        executable_stage_names[stage] = base_stage if has_base_stage else stage
 
     pipeline.stages = ListConfig(new_stages)
 
@@ -395,3 +387,5 @@ def register_structured_config(pipeline_config_path: Path | None, stage_name: st
     cs.store(group="dataset", name="_base_dataset", node=DatasetConfig)
     cs.store(group="pipeline", name="pipeline", node=pipeline)
     cs.store(group="stage_cfg", name="stage_cfg", node=stage_cfg)
+
+    return executable_stage_names[stage_name]
