@@ -84,47 +84,59 @@ class StageType(StrEnum):
             raise ValueError("Either main_fn or map_fn/reduce_fn must be provided.")
 
 
-def get_stage_main(
-    *,
-    main_fn: MAIN_FN_T | None = None,
-    map_fn: ANY_COMPUTE_FN_T | None = None,
-    reduce_fn: ANY_COMPUTE_FN_T | None = None,
-    stage_name: str | None = None,
-    stage_docstring: str | None = None,
-) -> MAIN_FN_T:
-    """Wraps or returns a function that can serve as the main function for a stage."""
+class Stage:
+    """An object that wraps the stage information."""
 
-    mode = StageType.from_fns(main_fn, map_fn, reduce_fn)
+    def __init__(
+        self,
+        *,
+        main_fn: MAIN_FN_T | None = None,
+        map_fn: ANY_COMPUTE_FN_T | None = None,
+        reduce_fn: ANY_COMPUTE_FN_T | None = None,
+        stage_name: str | None = None,
+        stage_docstring: str | None = None,
+    ) -> MAIN_FN_T:
+        """Wraps or returns a function that can serve as the main function for a stage."""
 
-    if stage_name is None:
-        stage_name = (main_fn or map_fn).__module__.split(".")[-1]
+        mode = StageType.from_fns(main_fn, map_fn, reduce_fn)
 
-    match mode:
-        case StageType.MAIN:
-            stage_docstring = stage_docstring or inspect.getdoc(main_fn) or ""
-        case StageType.MAP:
-            stage_docstring = stage_docstring or inspect.getdoc(map_fn) or ""
+        if stage_name is None:
+            stage_name = (main_fn or map_fn).__module__.split(".")[-1]
 
-            @functools.wraps(map_fn)
-            def main_fn(cfg: DictConfig):
-                return map_stage(cfg, map_fn)
+        match mode:
+            case StageType.MAIN:
+                stage_docstring = stage_docstring or inspect.getdoc(main_fn) or ""
+                self.__call_fn = main_fn
+            case StageType.MAP:
+                stage_docstring = stage_docstring or inspect.getdoc(map_fn) or ""
 
-            main_fn.__name__ = stage_name
+                @functools.wraps(map_fn)
+                def main_fn(cfg: DictConfig):
+                    return map_stage(cfg, map_fn)
 
-        case StageType.MAPREDUCE:
-            stage_docstring = stage_docstring or (
-                f"Map Stage:\n{inspect.getdoc(map_fn) or ''}\n\n"
-                f"Reduce stage:\n{inspect.getdoc(reduce_fn) or ''}"
-            )
+                main_fn.__name__ = stage_name
+                self.__call_fn = map_fn
 
-            def main_fn(cfg: DictConfig):
-                return mapreduce_stage(cfg, map_fn, reduce_fn)
+            case StageType.MAPREDUCE:
+                stage_docstring = stage_docstring or (
+                    f"Map Stage:\n{inspect.getdoc(map_fn) or ''}\n\n"
+                    f"Reduce stage:\n{inspect.getdoc(reduce_fn) or ''}"
+                )
 
-            main_fn.__name__ = stage_name
+                def main_fn(cfg: DictConfig):
+                    return mapreduce_stage(cfg, map_fn, reduce_fn)
 
-    main_fn.__doc__ = stage_docstring
+                main_fn.__name__ = stage_name
+                self.__call_fn = map_fn
 
-    return main_fn
+        main_fn.__doc__ = stage_docstring
+
+        self.main = main_fn
+        self.__name__ = self.__call_fn.__name__
+        self.__doc__ = self.__call_fn.__doc__
+
+    def __call__(self, *args, **kwargs):
+        self.__call_fn(*args, **kwargs)
 
 
 def MEDS_transforms_stage(*args, **kwargs):
@@ -194,7 +206,7 @@ def MEDS_transforms_stage(*args, **kwargs):
 
         >>> fn = MEDS_transforms_stage(main_fn=main)
         >>> hasattr(fn, "main")
-        False
+        True
         >>> hasattr(main, "main")
         False
         >>> fn.__name__
@@ -207,22 +219,18 @@ def MEDS_transforms_stage(*args, **kwargs):
 
         >>> fn = MEDS_transforms_stage(map_fn=map_fn)
         >>> hasattr(fn, "main")
-        False
-        >>> fn.__name__ # Inferred from the source module name
-        'base'
+        True
+        >>> fn.__name__
+        'map_fn'
         >>> fn.__doc__ # Inferred from the map function docstring
         'base map docstring'
         >>> fn = MEDS_transforms_stage(map_fn=map_fn, reduce_fn=reduce_fn)
         >>> hasattr(fn, "main")
-        False
-        >>> fn.__name__ # Inferred from the source module name
-        'base'
+        True
+        >>> fn.__name__
+        'map_fn'
         >>> print(fn.__doc__) # Inferred from the map function docstring
-        Map Stage:
         base map docstring
-        <BLANKLINE>
-        Reduce stage:
-        base reduce docstring
         >>> map_fn.__name__
         'map_fn'
         >>> map_fn.__doc__
@@ -237,7 +245,7 @@ def MEDS_transforms_stage(*args, **kwargs):
 
         >>> fn = MEDS_transforms_stage(main)
         >>> hasattr(fn, "main")
-        False
+        True
         >>> fn.__name__
         'main'
         >>> fn.__doc__
@@ -259,7 +267,7 @@ def MEDS_transforms_stage(*args, **kwargs):
         >>> fn.__doc__
         'base map docstring'
         >>> fn.main.__name__ # Inferred from the source module name
-        'base'
+        'map_fn'
         >>> fn.main.__doc__ # Inferred from the map function docstring
         'base map docstring'
         >>> fn = MEDS_transforms_stage(map_fn, reduce_fn=reduce_fn)
@@ -268,7 +276,7 @@ def MEDS_transforms_stage(*args, **kwargs):
         >>> hasattr(fn, "main")
         True
         >>> fn.main.__name__ # Inferred from the source module name
-        'base'
+        'map_fn'
         >>> print(fn.main.__doc__) # Inferred from the map function docstring
         Map Stage:
         base map docstring
@@ -290,10 +298,11 @@ def MEDS_transforms_stage(*args, **kwargs):
 
         If specified with no positional arguments and only non-determining keyword arguments (meaning no main
         or map function), then a decorator is returned that itself takes a function:
+
         >>> fntr = MEDS_transforms_stage(stage_name="bar", stage_docstring="baz")
         >>> fn = fntr(main)
         >>> hasattr(fn, "main")
-        False
+        True
         >>> fn = fntr(map_fn)
         >>> fn(cfg={}, stage_cfg={})
         'map'
@@ -329,9 +338,9 @@ def MEDS_transforms_stage(*args, **kwargs):
             raise ValueError("Cannot provide main_fn or map_fn kwargs when using as a decorator.")
 
         if (fn.__name__ == "main") and ("reduce_fn" not in kwargs):
-            return get_stage_main(main_fn=fn, **kwargs)
+            return Stage(main_fn=fn, **kwargs)
 
-        main_fn = get_stage_main(main_fn=None, map_fn=fn, **kwargs)
+        main_fn = Stage(main_fn=None, map_fn=fn, **kwargs)
         fn.main = main_fn
         return fn
 
@@ -341,7 +350,7 @@ def MEDS_transforms_stage(*args, **kwargs):
         )
     if len(args) == 0:
         if "main_fn" in kwargs or "map_fn" in kwargs:
-            return get_stage_main(**kwargs)
+            return Stage(**kwargs)
         return functools.partial(decorator, **kwargs)
     else:
         return decorator(args[0], **kwargs)
