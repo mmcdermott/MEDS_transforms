@@ -14,7 +14,6 @@ from .stages import StageExample, get_all_registered_stages, get_nested_test_cas
 
 # Get all registered stages
 REGISTERED_STAGES = get_all_registered_stages()
-CMD_PATTERN = "MEDS_transform-stage __null__ {stage_name}"
 
 
 def get_examples_for_stage(stage: str) -> dict[str, StageExample]:
