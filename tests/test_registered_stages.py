@@ -7,7 +7,7 @@ from MEDS_transforms.stages import StageExample
 from .utils import MEDS_transforms_pipeline_tester
 
 # Get all registered stages
-CMD_PATTERN = "MEDS_transform-stage pkg://MEDS_transforms.configs._preprocess.yaml {stage_name}"
+CMD_PATTERN = "MEDS_transform-stage __null__ {stage_name}"
 
 
 def test_stage_scenario(

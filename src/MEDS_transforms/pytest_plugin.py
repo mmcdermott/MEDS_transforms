@@ -14,13 +14,13 @@ from .stages import StageExample, get_all_registered_stages, get_nested_test_cas
 
 # Get all registered stages
 REGISTERED_STAGES = get_all_registered_stages()
-CMD_PATTERN = "MEDS_transform-stage pkg://MEDS_transforms.configs._preprocess.yaml {stage_name}"
+CMD_PATTERN = "MEDS_transform-stage __null__ {stage_name}"
 
 
 def get_examples_for_stage(stage: str) -> dict[str, StageExample]:
     ep = REGISTERED_STAGES[stage]
 
-    ep_package = ep.dist.metadata["Name"]
+    ep_package = ep["package_name"]
 
     examples_dir = files(ep_package).joinpath("stages") / stage
 
@@ -125,9 +125,9 @@ def get_stages_under_test(config: pytest.Config) -> dict[str, EntryPoint]:
     packages = config.packages_to_test
 
     if packages is None:
-        out = {n: ep for n, ep in REGISTERED_STAGES.items() if ep.dist.metadata["Name"] != __package_name__}
+        out = {n: s for n, s in REGISTERED_STAGES.items() if s["package_name"] != __package_name__}
     else:
-        out = {n: ep for n, ep in REGISTERED_STAGES.items() if ep.dist.metadata["Name"] in packages}
+        out = {n: s for n, s in REGISTERED_STAGES.items() if s["package_name"] in packages}
 
     stages = config.getoption("test_stage")
     if stages:
