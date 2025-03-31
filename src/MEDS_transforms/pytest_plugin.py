@@ -14,7 +14,6 @@ from .stages import StageExample, get_all_stages, get_nested_test_cases
 
 # Get all registered stages
 REGISTERED_STAGES = get_all_stages()
-CMD_PATTERN = "MEDS_transform-stage pkg://MEDS_transforms.configs._preprocess.yaml {stage_name}"
 
 
 def get_examples_for_stage(stage: str) -> dict[str, StageExample]:
