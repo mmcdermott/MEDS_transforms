@@ -111,6 +111,10 @@ def is_metadata_stage(stage: dict[str, Any] | DictConfig) -> bool:
                 f"If specified manually, is_metadata must be a boolean. Got {stage['is_metadata']}"
             )
         return bool(stage["is_metadata"])
+    elif stage.get(NAME_KEY, "") == "aggregate_code_metadata":
+        return True
+    elif stage.get(BASE_STAGE_KEY, "") == "aggregate_code_metadata":
+        return True
     else:
         return "aggregations" in stage
 
@@ -249,6 +253,7 @@ def populate_stage(
     # specific output directory, or, for the last data or metadata stages, respectively, will be the global
     # pipeline output data shard or metadata directories, as appropriate.
     is_metadata = is_metadata_stage(stage)
+    print(stage, is_metadata)
 
     stage_index = stages.index(stage_name)
 
