@@ -24,7 +24,7 @@ def test_stage_entry_point_help():
 def test_stage_entry_point_errors():
     for pipeline, stage, want_err in [
         ("not_real.yaml", "occlude_outliers", "Pipeline YAML file 'not_real.yaml' does not exist."),
-        (PKG_BASE.format(config="_preprocess.yaml"), "not_real_stage", "Stage 'not_real_stage' not found."),
+        ("__null__", "not_real_stage", "Stage 'not_real_stage' not found."),
         (
             "pkg://pkg.bad_suffix.json",
             "occlude_outliers",
