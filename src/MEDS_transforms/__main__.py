@@ -1,23 +1,16 @@
 import os
 import sys
-from importlib.metadata import entry_points
 from importlib.resources import files
 from pathlib import Path
 
 import hydra
 from omegaconf import OmegaConf
 
-from . import __package_name__
+from .stages import get_all_stages
 
 HELP_STRS = {"--help", "-h", "help", "h"}
 PKG_PFX = "pkg://"
 YAML_EXTENSIONS = {"yaml", "yml"}
-
-
-def get_all_stages():
-    """Get all available stages."""
-    eps = entry_points(group=f"{__package_name__}.stages")
-    return {name: eps[name] for name in eps.names}
 
 
 def print_help_stage():
