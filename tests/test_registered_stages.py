@@ -23,7 +23,6 @@ def test_stage_scenario(
         want_outputs=want_outputs,
         input_dir=input_dir,
         test_name=f"{stage}/{stage_scenario}",
-        stages=[stage],
-        stage_configs={stage: stage_example.stage_cfg},
+        stage_cfg=stage_example.stage_cfg,
         **stage_example.test_kwargs,
     )
