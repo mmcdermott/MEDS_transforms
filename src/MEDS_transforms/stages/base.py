@@ -106,6 +106,9 @@ class Stage:
     This class is usually created through the `Stage.register` method -- either as a decorator, or as a
     function directly called. See the examples below for more details.
 
+    Calling `print` on a `Stage` object will display a simple method indicating the name of the stage, the
+    global stage docstring, and the names of the main, map, reduce, and mimic functions, if set.
+
     Attributes:
         stage_type: The type of stage this is. This is set automatically based on the provided functions. See
             `StageType` for more details.
@@ -138,7 +141,6 @@ class Stage:
         reduce_fn: ANY_COMPUTE_FN_T | None = None,
         stage_name: str | None = None,
         stage_docstring: str | None = None,
-        mimic_fn: Callable | None = None,
     ) -> MAIN_FN_T:
         """Wraps or returns a function that can serve as the main function for a stage."""
 
@@ -153,8 +155,6 @@ class Stage:
         self.main_fn = main_fn
         self.map_fn = map_fn
         self.reduce_fn = reduce_fn
-        if mimic_fn is not None:
-            self.mimic_fn = mimic_fn
 
     @property
     def stage_docstring(self) -> str:
@@ -217,9 +217,31 @@ class Stage:
     def mimic_fn(self) -> Callable | None:
         """The function that this stage object should "mimic" when treated like a plain function.
 
-        When used as a decorator, we want this stage to mimic the decorated function upon normal usage. This
-        practice enables doctests and imports of the stage function to work as expected. This property gets
-        the function being mimicked.
+        This is useful when a stage is constructed via decorator mode of `Stage.register`. In that case, we
+        want this stage to mimic the decorated function upon normal usage. This practice enables doctests and
+        imports of the stage function to work as expected. This property gets the function being mimicked.
+
+        Examples:
+            >>> def main(cfg: DictConfig):
+            ...     '''base main docstring'''
+            ...     return "main"
+            >>> def baz_fn(foo: str, bar: int):
+            ...     '''base baz docstring'''
+            ...     return f"baz {foo} {bar}"
+            >>> stage = Stage.register(main_fn=main)
+            >>> print(stage.mimic_fn)
+            None
+            >>> stage.mimic_fn = baz_fn
+            >>> stage.__name__
+            'baz_fn'
+            >>> stage.__doc__
+            'base baz docstring'
+            >>> stage('foo', 42)
+            'baz foo 42'
+            >>> stage.mimic_fn = "main"
+            Traceback (most recent call last):
+                ...
+            TypeError: Cannot set mimic_fn to non-function. Got <class 'str'>
         """
         return self.__mimic_fn
 
@@ -228,7 +250,14 @@ class Stage:
         """Sets the function that this stage object should "mimic" when treated like a plain function.
 
         In addition to the function itself, this also overwrites variables like `__name__` and `__doc__` to
-        match the decorated function.
+        match the decorated function. This should really only be used to mimic one of the main or map
+        functions, but this is not checked currently.
+
+        Args:
+            fn: The function to mimic.
+
+        Raises:
+            TypeError: If the provided argument is not a function.
         """
 
         if not inspect.isfunction(fn):
@@ -346,6 +375,7 @@ class Stage:
 
             As it has no mimic function, if you try to call it directly, it will raise an error, and not act
             like the main function.
+
             >>> main({})
             'main'
             >>> stage({})
@@ -489,6 +519,34 @@ class Stage:
             Traceback (most recent call last):
                 ...
             ValueError: Stage.register can only be used with at most a single positional arg. Got 2
+
+            Though not recommended, you could theoretically use decorator mode directly to create a function
+            that would return a stage. This exposes some further error surfaces which are checked explicitly:
+
+            >>> def main(cfg: DictConfig):
+            ...     '''base main docstring'''
+            ...     return "main"
+            >>> def map_fn(cfg: DictConfig, stage_cfg: DictConfig):
+            ...     '''base map docstring'''
+            ...     return "map"
+            >>> manual_decorator = Stage.register(stage_name="foo", stage_docstring="bar")
+            >>> print(manual_decorator(map_fn))
+            Stage foo:
+              Type: map
+              Docstring:
+                | bar
+              Map function: map_fn
+              Reduce function: None
+              Main function: None
+              Mimic function: map_fn
+            >>> manual_decorator(main, map_fn=map_fn)
+            Traceback (most recent call last):
+                ...
+            ValueError: Cannot provide main_fn or map_fn kwargs when using as a decorator.
+            >>> manual_decorator("foo")
+            Traceback (most recent call last):
+                ...
+            TypeError: First argument must be a function. Got <class 'str'>
         """
 
         def decorator(fn: Callable, **kwargs):
