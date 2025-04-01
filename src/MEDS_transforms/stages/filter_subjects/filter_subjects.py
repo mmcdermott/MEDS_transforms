@@ -7,7 +7,7 @@ from functools import partial
 import polars as pl
 from omegaconf import DictConfig
 
-from .. import MEDS_transforms_stage
+from .. import Stage
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +197,7 @@ def filter_subjects_by_num_events(df: pl.LazyFrame, min_events_per_subject: int)
     return df.filter(pl.col("time").n_unique().over("subject_id") >= min_events_per_subject)
 
 
-@MEDS_transforms_stage
+@Stage.register
 def filter_subjects(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Returns a function that filters subjects by the number of measurements and events they have.
 

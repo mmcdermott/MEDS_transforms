@@ -5,10 +5,10 @@ from collections.abc import Callable
 import polars as pl
 from omegaconf import DictConfig
 
-from .. import MEDS_transforms_stage
+from .. import Stage
 
 
-@MEDS_transforms_stage
+@Stage.register
 def occlude_outliers(
     stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
