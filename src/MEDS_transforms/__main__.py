@@ -86,7 +86,7 @@ def run_stage():
     if executable_stage_name not in all_stages:
         raise ValueError(f"Stage '{executable_stage_name}' not found.")
 
-    main_fn = all_stages[executable_stage_name]["entry_point"].load()
+    main_fn = all_stages[executable_stage_name]["entry_point"].load().main
 
     OmegaConf.register_new_resolver("stage_name", lambda: stage_name)
     OmegaConf.register_new_resolver("stage_docstring", lambda: main_fn.__doc__.replace("$", "$$"))

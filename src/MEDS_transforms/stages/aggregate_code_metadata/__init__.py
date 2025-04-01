@@ -1,3 +1,1 @@
-from .aggregate_code_metadata import main  # noqa: F401
-
-__all__ = ["main"]
+from .aggregate_code_metadata import stage  # noqa: F401

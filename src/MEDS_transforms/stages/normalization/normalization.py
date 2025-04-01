@@ -2,10 +2,10 @@
 
 import polars as pl
 
-from .. import MEDS_transforms_stage
+from .. import Stage
 
 
-@MEDS_transforms_stage
+@Stage.register
 def normalization(
     df: pl.LazyFrame, code_metadata: pl.DataFrame, code_modifiers: list[str] | None = None
 ) -> pl.LazyFrame:

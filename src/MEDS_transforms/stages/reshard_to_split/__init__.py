@@ -1,3 +1,1 @@
-from .reshard_to_split import main  # noqa: F401
-
-__all__ = ["main"]
+from .reshard_to_split import main as stage  # noqa: F401

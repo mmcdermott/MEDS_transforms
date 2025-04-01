@@ -7,7 +7,7 @@ import polars as pl
 from omegaconf import DictConfig, OmegaConf
 
 from ... import INFERRED_STAGE_KEYS
-from .. import MEDS_transforms_stage
+from .. import Stage
 
 logger = logging.getLogger(__name__)
 
@@ -387,7 +387,7 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
     return fn
 
 
-@MEDS_transforms_stage
+@Stage.register
 def add_time_derived_measurements(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Adds all requested time-derived measurements to a DataFrame.
 
