@@ -132,6 +132,7 @@ class Stage:
 
     __mimic_fn: Callable | None = None
     __stage_docstring: str | None = None
+    __stage_name: str | None = None
 
     def __init__(
         self,
@@ -145,16 +146,23 @@ class Stage:
         """Wraps or returns a function that can serve as the main function for a stage."""
 
         self.stage_type = StageType.from_fns(main_fn, map_fn, reduce_fn)
-
-        if stage_name is None:
-            stage_name = (main_fn or map_fn).__module__.split(".")[-1]
-
         self.stage_name = stage_name
         self.stage_docstring = stage_docstring
 
         self.main_fn = main_fn
         self.map_fn = map_fn
         self.reduce_fn = reduce_fn
+
+    @property
+    def stage_name(self) -> str:
+        if self.__stage_name is not None:
+            return self.__stage_name
+
+        return (self.main_fn or self.map_fn).__module__.split(".")[-1]
+
+    @stage_name.setter
+    def stage_name(self, name: str):
+        self.__stage_name = name
 
     @property
     def stage_docstring(self) -> str:
