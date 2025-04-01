@@ -9,12 +9,12 @@ from omegaconf import DictConfig
 
 from ... import DEPRECATED_NAMES, INFERRED_STAGE_KEYS, MANDATORY_TYPES
 from ...parser import cfg_to_expr
-from .. import MEDS_transforms_stage
+from .. import Stage
 
 logger = logging.getLogger(__name__)
 
 
-@MEDS_transforms_stage
+@Stage.register
 def extract_values(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Create a function that extracts values from a MEDS cohort.
 

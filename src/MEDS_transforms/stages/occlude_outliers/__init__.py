@@ -1,5 +1,1 @@
-from .occlude_outliers import occlude_outliers as _stage
-
-__all__ = ["main"]
-
-main = _stage.main
+from .occlude_outliers import occlude_outliers as stage  # noqa: F401

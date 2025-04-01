@@ -1,3 +1,1 @@
-from .fit_vocabulary_indices import main  # noqa: F401
-
-__all__ = ["main"]
+from .fit_vocabulary_indices import main as stage  # noqa: F401

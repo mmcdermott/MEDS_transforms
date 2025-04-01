@@ -8,12 +8,12 @@ from omegaconf import DictConfig, ListConfig
 
 from MEDS_transforms.utils import get_smallest_valid_uint_type
 
-from .. import MEDS_transforms_stage
+from .. import Stage
 
 logger = logging.getLogger(__name__)
 
 
-@MEDS_transforms_stage
+@Stage.register
 def reorder_measurements(
     stage_cfg: DictConfig, code_metadata: pl.DataFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:

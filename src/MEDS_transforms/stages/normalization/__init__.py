@@ -1,5 +1,1 @@
-from .normalization import normalization as _stage
-
-__all__ = ["main"]
-
-main = _stage.main
+from .normalization import normalization as stage  # noqa: F401
