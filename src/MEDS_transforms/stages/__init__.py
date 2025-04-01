@@ -1,4 +1,4 @@
-from importlib.metadata import entry_points
+from importlib.metadata import EntryPoint, entry_points
 
 from .. import __package_name__
 from .base import Stage  # noqa: F401
@@ -19,7 +19,7 @@ from .reorder_measurements import stage as reorder_measurements  # noqa: F401
 from .reshard_to_split import stage as reshard_to_split  # noqa: F401
 
 
-def get_all_stages():
+def get_all_stages() -> dict[str, EntryPoint]:
     """Get all available stages."""
     eps = entry_points(group=f"{__package_name__}.stages")
     return {name: eps[name] for name in eps.names}
