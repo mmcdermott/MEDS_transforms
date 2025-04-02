@@ -94,30 +94,3 @@ class StageExample:
             in_data=in_data,
             test_kwargs=test_kwargs,
         )
-
-
-def get_nested_test_cases(
-    example_dir: Path,
-    prefix: str | None = None,
-    test_cases: dict[str, StageExample] | None = None,
-    **schema_updates,
-) -> dict[str, StageExample]:
-    """Recursively get all test cases from the example directory."""
-    if test_cases is None:
-        test_cases = {}
-    if prefix is None:
-        prefix = ""
-
-    if not example_dir.is_dir():
-        return test_cases
-
-    if StageExample.is_example_dir(example_dir):
-        test_cases[prefix] = StageExample.from_dir(example_dir, **schema_updates)
-        return test_cases
-
-    for path in example_dir.iterdir():
-        if path.is_dir():
-            nested_prefix = f"{prefix}/{path.name}"
-            get_nested_test_cases(path, nested_prefix, test_cases, **schema_updates)
-
-    return test_cases
