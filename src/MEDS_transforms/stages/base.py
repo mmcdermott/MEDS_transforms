@@ -196,6 +196,7 @@ class Stage:
         ...     stage = Stage(main_fn=main, examples_dir=example_dir)
         ...     stage.test_cases
         {'.': StageExample(stage_name='base',
+                    `      scenario_name='.',
                            stage_cfg={},
                            want_data=MEDSDataset(data_shards={'0': {'code': [],
                                                                     'time': [],
@@ -226,6 +227,7 @@ class Stage:
         ...     stage = Stage(main_fn=main, examples_dir=example_dir)
         ...     stage.test_cases
         {'example_2_foo': StageExample(stage_name='base',
+                                       scenario_name='example_2_foo',
                                        stage_cfg={},
                                        want_data=None,
                                        want_metadata=shape: (0, 3)
@@ -238,6 +240,7 @@ class Stage:
                                        in_data=None,
                                        test_kwargs={}),
          'example_1': StageExample(stage_name='base',
+                                   scenario_name='example_1',
                                    stage_cfg={},
                                    want_data=MEDSDataset(data_shards={'0': {'code': [],
                                                                             'time': [],
@@ -437,7 +440,10 @@ class Stage:
             if StageExample.is_example_dir(example_dir):
                 scenario_name = example_dir.relative_to(self.examples_dir).as_posix()
                 test_cases[scenario_name] = StageExample.from_dir(
-                    stage_name=self.stage_name, example_dir=example_dir, **self.output_schema_updates
+                    stage_name=self.stage_name,
+                    scenario_name=scenario_name,
+                    example_dir=example_dir,
+                    **self.output_schema_updates,
                 )
             else:
                 examples_to_check.extend(example_dir.iterdir())
