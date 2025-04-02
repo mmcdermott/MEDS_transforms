@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import inspect
 import logging
 import os
@@ -14,6 +15,7 @@ from importlib.metadata import EntryPoint
 from pathlib import Path
 from typing import ClassVar
 
+import polars as pl
 from omegaconf import DictConfig
 
 from ..mapreduce import ANY_COMPUTE_FN_T, map_stage, mapreduce_stage
@@ -149,6 +151,8 @@ class Stage:
         examples_dir: A directory containing nested test cases for the stage.
             If not set, this is automatically inferred in the case that the stage name and registering file
             conform to the pattern mentioned above.
+        output_schema_updates: A dictionary mapping column name to a Polars type for the output of the stage,
+            with the base MEDS schema options as defaults for unspecified columns.
     """
 
     stage_type: StageType
@@ -159,6 +163,8 @@ class Stage:
     main_fn: MAIN_FN_T | None = None
 
     examples_dir: Path | None = None
+
+    output_schema_updates: dict[str, pl.DataType] | None = None
 
     __mimic_fn: Callable | None = None
     __stage_docstring: str | None = None
@@ -194,6 +200,7 @@ class Stage:
         reduce_fn: ANY_COMPUTE_FN_T | None = None,
         stage_name: str | None = None,
         stage_docstring: str | None = None,
+        output_schema_updates: dict[str, pl.DataType] | None = None,
         examples_dir: Path | None = None,
         _calling_file: Path | None = None,
     ) -> MAIN_FN_T:
@@ -223,6 +230,11 @@ class Stage:
             self.__infer_examples_dir(_calling_file)
         else:
             self.examples_dir = examples_dir
+
+        if output_schema_updates is None:
+            self.output_schema_updates = {}
+        else:
+            self.output_schema_updates = copy.deepcopy(output_schema_updates)
 
     def __infer_examples_dir(self, stage_definition_file: Path | None):
         """Infers the examples directory from the calling file.

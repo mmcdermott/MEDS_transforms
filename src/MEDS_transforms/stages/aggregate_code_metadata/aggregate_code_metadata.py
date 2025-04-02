@@ -740,4 +740,26 @@ def reducer_fntr(
     return reducer
 
 
-stage = Stage.register(map_fn=mapper_fntr, reduce_fn=reducer_fntr)
+AGGREGATION_SCHEMA_UPDATES = {
+    "values/quantiles": pl.Struct(
+        {
+            "values/quantile/0.25": pl.Float32,
+            "values/quantile/0.5": pl.Float32,
+            "values/quantile/0.75": pl.Float32,
+        }
+    ),
+    "code/n_occurrences": pl.UInt8,
+    "code/n_subjects": pl.UInt8,
+    "values/n_occurrences": pl.UInt8,
+    "values/n_subjects": pl.UInt8,
+    "values/sum": pl.Float32,
+    "values/sum_sqd": pl.Float32,
+    "values/n_ints": pl.UInt8,
+    "values/min": pl.Float32,
+    "values/max": pl.Float32,
+}
+
+
+stage = Stage.register(
+    map_fn=mapper_fntr, reduce_fn=reducer_fntr, output_schema_updates=AGGREGATION_SCHEMA_UPDATES
+)

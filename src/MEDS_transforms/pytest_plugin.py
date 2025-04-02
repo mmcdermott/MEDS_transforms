@@ -15,41 +15,13 @@ from .stages import StageExample, get_all_registered_stages, get_nested_test_cas
 REGISTERED_STAGES = get_all_registered_stages()
 
 
-def get_examples_for_stage(stage: str) -> dict[str, StageExample]:
-    ep = REGISTERED_STAGES[stage]
+def get_examples_for_stage(stage_name: str) -> dict[str, StageExample]:
+    stage = REGISTERED_STAGES[stage_name].load()
 
-    examples_dir = ep.load().examples_dir
-    if examples_dir is None:
+    if not stage.examples_dir:
         return {}
 
-    match stage:
-        case "normalization":
-            schema_updates = {"code": pl.Int64, "numeric_value": pl.Float64}
-        case "aggregate_code_metadata":
-            schema_updates = {
-                "values/quantiles": pl.Struct(
-                    {
-                        "values/quantile/0.25": pl.Float32,
-                        "values/quantile/0.5": pl.Float32,
-                        "values/quantile/0.75": pl.Float32,
-                    }
-                ),
-                "code/n_occurrences": pl.UInt8,
-                "code/n_subjects": pl.UInt8,
-                "values/n_occurrences": pl.UInt8,
-                "values/n_subjects": pl.UInt8,
-                "values/sum": pl.Float32,
-                "values/sum_sqd": pl.Float32,
-                "values/n_ints": pl.UInt8,
-                "values/min": pl.Float32,
-                "values/max": pl.Float32,
-            }
-        case "fit_vocabulary_indices":
-            schema_updates = {"code/vocab_index": pl.UInt8}
-        case _:
-            schema_updates = {}
-
-    return get_nested_test_cases(examples_dir, stage, **schema_updates)
+    return get_nested_test_cases(stage.examples_dir, stage_name, **stage.output_schema_updates)
 
 
 def pytest_addoption(parser):  # pragma: no cover
