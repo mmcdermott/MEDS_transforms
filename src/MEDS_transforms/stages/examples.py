@@ -32,14 +32,40 @@ _LAST = "└── "
 
 
 def pretty_list_directory(path: Path, prefix: str | None = None) -> list[str]:
+    """Pretty prints the contents of a directory.
+
+    Args:
+        path: The path to the directory to list.
+        prefix: Used for the recursive prefixing of subdirectories. Defaults to None.
+
+    Returns:
+        A list of strings representing the contents of the directory. To be printed with newlines separating
+        them.
+
+    Raises:
+        ValueError: If the path is not a directory.
+
+    Examples:
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     path = Path(tmpdir)
+        ...     (path / "file1.txt").touch()
+        ...     (path / "foo").mkdir()
+        ...     (path / "bar").mkdir()
+        ...     (path / "bar" / "baz.csv").touch()
+        ...     for l in pretty_list_directory(path): print(l) # This is just used as newlines break doctests
+        ├── bar
+        │   └── baz.csv
+        ├── foo
+        └── file1.txt
+    """
+
+    if not path.is_dir():
+        raise ValueError(f"Path {path} is not a directory.")
 
     if prefix is None:
         prefix = ""
 
     lines = []
-
-    if not path.is_dir():
-        return lines
 
     children = list(path.iterdir())
 
