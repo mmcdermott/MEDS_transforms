@@ -278,10 +278,13 @@ class Stage:
             return False
 
         old_warn_val = Stage.WARN_ON_ENTRY_POINT_DISCREPANCY
+        old_env_val = os.environ.get("DISABLE_STAGE_VALIDATION", "0")
 
         try:
             # Temporarily disable warnings to avoid circular imports.
             Stage.WARN_ON_ENTRY_POINT_DISCREPANCY = False
+            os.environ["DISABLE_STAGE_VALIDATION"] = "1"
+
             entry_point = registered_stages[stage_name].load()
             if self != entry_point:
                 raise ValueError(
@@ -302,6 +305,11 @@ class Stage:
             # In this case, we can't validate this stage because python won't directly let us import it. We
             # run a secondary process to validate the entry point:
 
+            logger.warning(
+                f"Stage {stage_name} is registered in the entry points, but cannot be imported within "
+                "the python process for validation. Using a subprocess based ID retrieval."
+            )
+
             import subprocess
 
             out = subprocess.run(
@@ -320,6 +328,7 @@ class Stage:
                 )
 
         finally:
+            os.environ["DISABLE_STAGE_VALIDATION"] = old_env_val
             Stage.WARN_ON_ENTRY_POINT_DISCREPANCY = old_warn_val
 
         return True
