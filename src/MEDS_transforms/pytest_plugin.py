@@ -15,7 +15,7 @@ REGISTERED_STAGES = get_all_registered_stages()
 
 
 def pytest_addoption(parser):  # pragma: no cover
-    stgaes_for_package_help_str = (
+    stages_for_package_help_str = (
         "Specify the package name(s) to search within when looking for registered stages to test. "
         "If not specified, all registered stages, _except for the core MEDS-Transforms stages_ will be "
         "tested. This option will attempt to automatically apply an intelligent default to just the current "
@@ -26,7 +26,7 @@ def pytest_addoption(parser):  # pragma: no cover
         "skipped without error."
     )
     parser.addoption(
-        "--test_stages_for_package", action="append", type=str, default=[], help=stgaes_for_package_help_str
+        "--test_stages_for_package", action="append", type=str, default=[], help=stages_for_package_help_str
     )
 
     stage_help_str = (
