@@ -80,6 +80,12 @@ def run_stage():
         raise ValueError(f"Stage '{stage_name}' not found.")
 
     stage = all_stages[stage_name].load()
+
+    if stage.stage_name != stage_name:
+        raise ValueError(
+            f"Loaded stage name '{stage.stage_name}' does not match the provided name '{stage_name}'!"
+        )
+
     main_fn = stage.main
 
     hydra_wrapper = hydra.main(

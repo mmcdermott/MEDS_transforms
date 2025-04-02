@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import ast
-import hashlib
 import inspect
 import logging
 import os
@@ -98,6 +96,10 @@ class StageRegistrationWarning(Warning):
     pass
 
 
+class StageRegistrationError(Exception):
+    pass
+
+
 class Stage:
     """The representation of a MEDS-Transforms stage, in object form.
 
@@ -145,70 +147,27 @@ class Stage:
     __stage_docstring: str | None = None
     __stage_name: str | None = None
 
-    WARN_ON_ENTRY_POINT_DISCREPANCY: ClassVar[bool] = True
+    WARN_IF_NO_ENTRY_POINT_AT_NAME: ClassVar[bool] = os.environ.get("DISABLE_STAGE_VALIDATION", "0") != "1"
+    ERR_IF_ENTRY_POINT_IMPORTABLE: ClassVar[bool] = os.environ.get("DISABLE_STAGE_VALIDATION", "0") != "1"
 
-    @staticmethod
-    def hash_fn_src(fn: Callable) -> str:
-        """This function hashes the abstract syntax tree of the function source code.
-
-        This will return a reasonable proxy for a "semantic hash" of the function, which is useful for
-        checking equality between two functions that are semantically identical but have different
-        representations (e.g., different whitespace, different variable names, defined in different modules,
-        etc.).
-
-        Args:
-            fn: The function to hash.
-
-        Returns:
-            str: The hash of the function's source code.
-
-        Raises:
-            TypeError: If the provided argument is not a function.
-
-        Examples:
-            >>> def foo(x):
-            ...     return x + 1
-            >>> Stage.hash_fn_src(foo)
-            'e62971895b5015aa4939bbf5c996e1f82225bd46f0002483e647c9320c0495f4'
-            >>> def foo_2(x):
-            ...     '''I have a docstring!'''
-            ...     # And a comment
-            ...     return x + 1
-            >>> Stage.hash_fn_src(foo_2)
-            'e62971895b5015aa4939bbf5c996e1f82225bd46f0002483e647c9320c0495f4'
-            >>> def bar(x):
-            ...     return x + 2
-            >>> Stage.hash_fn_src(bar)
-            'ee0da7f2d21a4458cc21ab8d82d06d20f843636533e71e3ce1c0e9044d72ea1b'
-
-            Note that this is currently not a true semantic hash, as it does not account for the variable
-            names being relative placeholders, not absolute strings. E.g.
-
-            >>> def foo_3(y):
-            ...     '''I'm semantically equivalent to foo and foo_2, but have a different variable name!'''
-            ...     return y + 1
-            >>> Stage.hash_fn_src(foo_3)
-            '6cde60950f074d34921a12b01c5ffd3c6e9695fbe6081c30ca1f1e421e7cb82a'
-        """
-
-        if not inspect.isfunction(fn):
-            raise TypeError(f"Cannot hash non-function. Got {type(fn)}")
-
-        src = inspect.getsource(fn)
-        tree = ast.parse(src)
-        # Strip function definition name to avoid name-based differences
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if (
-                    node.body
-                    and isinstance(node.body[0], ast.Expr)
-                    and isinstance(node.body[0].value, ast.Constant)
-                    and isinstance(node.body[0].value.value, str)
-                ):
-                    node.body = node.body[1:]  # Remove the docstring
-                node.name = "func_def"
-        ast_dump = ast.dump(tree, annotate_fields=False)
-        return hashlib.sha256(ast_dump.encode("utf-8")).hexdigest()
+    ENTRY_POINT_SETUP_STRING: ClassVar[str] = (
+        "This may be due to a missing or incorrectly configured entry point in your setup.py or "
+        "pyproject.toml file. If this is during development, you may need to run "
+        "`pip install -e .` to install your package properly in editable mode and ensure your "
+        "stage registration is detected. "
+    )
+    DISABLE_WARNING_STRING: ClassVar[str] = (
+        "You can disable this warning by setting the class variable `WARN_IF_NO_ENTRY_POINT_AT_NAME` to "
+        "`False`, or filtering out `StageRegistrationWarning` warnings. "
+    )
+    DISABLE_ERROR_STRING: ClassVar[str] = (
+        "You can disable reload-should-cause-error checking by setting the class variable "
+        "`ERR_IF_ENTRY_POINT_IMPORTABLE` to `False`."
+    )
+    DISABLE_ALL_STAGE_VALIDATION_STRING: ClassVar[str] = (
+        "You can disable all validation by setting the environment variable "
+        "`DISABLE_STAGE_VALIDATION` to `1`."
+    )
 
     def __init__(
         self,
@@ -235,32 +194,18 @@ class Stage:
             logger.info(
                 "Skipping stage validation due to DISABLE_STAGE_VALIDATION environment variable being set."
             )
-        elif self.WARN_ON_ENTRY_POINT_DISCREPANCY:
-            self.validate_stage_entry_point_registration()
+        else:
+            self.__validate_stage_entry_point_registration()
 
-    @property
-    def _ID(self) -> str:
-        match self.stage_type:
-            case StageType.MAIN:
-                return f"Main-'{Stage.hash_fn_src(self.main_fn)}'"
-            case StageType.MAP:
-                return f"Map-'{Stage.hash_fn_src(self.map_fn)}'"
-            case StageType.MAPREDUCE:
-                return f"MapReduce-'{Stage.hash_fn_src(self.map_fn)}'-'{Stage.hash_fn_src(self.reduce_fn)}'"
-            case _:
-                raise ValueError(f"Unknown stage type {self.stage_type}")
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Stage):
-            raise TypeError(f"Cannot compare Stage to {type(other)}")
-        return self._ID == other._ID
-
-    def validate_stage_entry_point_registration(
+    def __validate_stage_entry_point_registration(
         self,
         stage_name: str | None = None,  # For stage name inference.
         registered_stages: dict[str, EntryPoint] | None = None,  # For dependency injection.
     ):
         """Validates that the stage is registered in the entry points."""
+
+        if not (self.WARN_IF_NO_ENTRY_POINT_AT_NAME or self.ERR_IF_ENTRY_POINT_IMPORTABLE):
+            return
 
         if registered_stages is None:
             registered_stages = get_all_registered_stages()
@@ -268,93 +213,43 @@ class Stage:
             stage_name = self.stage_name
 
         if stage_name not in registered_stages:
-            warnings.warn(
-                f"Stage '{stage_name}' is not registered in the entry points. This may be due to a missing "
-                "or incorrectly configured entry point in the setup.py file. If this is during development, "
-                "you may need to run `pip install -e .` to install your package and properly register the "
-                "stage in the entry points, or simply ignore this warning.",
-                category=StageRegistrationWarning,
-            )
-            return False
+            if self.WARN_IF_NO_ENTRY_POINT_AT_NAME:
+                # If the stage is not registered, we warn.
+                warnings.warn(
+                    f"Stage '{stage_name}' is not registered in the entry points.\n"
+                    f"{self.ENTRY_POINT_SETUP_STRING}\n{self.DISABLE_WARNING_STRING}\n"
+                    f"{self.DISABLE_ALL_STAGE_VALIDATION_STRING}",
+                    category=StageRegistrationWarning,
+                )
+            return
 
-        old_warn_val = Stage.WARN_ON_ENTRY_POINT_DISCREPANCY
+        if not self.ERR_IF_ENTRY_POINT_IMPORTABLE:
+            return
+
         old_env_val = os.environ.get("DISABLE_STAGE_VALIDATION", "0")
-
         try:
             # Temporarily disable warnings to avoid circular imports.
-            Stage.WARN_ON_ENTRY_POINT_DISCREPANCY = False
             os.environ["DISABLE_STAGE_VALIDATION"] = "1"
 
-            entry_point = registered_stages[stage_name].load()
-            if self != entry_point:
-                raise ValueError(
-                    f"Stage {stage_name} is registered in the entry points, but the hash does not match.\n"
-                    f"Self ID: {self._ID}\n"
-                    f"Registered ID: {entry_point._ID}\n"
-                    "This may be due to a missing or incorrectly configured entry point. "
-                    "If this is during development, you may need to run `pip install -e .` to install your "
-                    "package and properly register the stage in the entry points."
-                )
+            # Attempt to reload, which should cause an error if the stage being constructed is the same stage
+            # as the one being registered.
+            registered_stages[stage_name].load()
+            raise StageRegistrationError(
+                f"Stage {stage_name} is registered in the entry points, but an attempted reload causes "
+                "no issues. If this were the stage you are constructing, a reload would cause a circular "
+                "import error, so this means you are overwriting an external, different stage, which is a "
+                "problem!\n"
+                f"{self.ENTRY_POINT_SETUP_STRING}\n{self.DISABLE_ERROR_STRING}\n"
+                f"{self.DISABLE_ALL_STAGE_VALIDATION_STRING}"
+            )
         except AttributeError as e:
             if "circular import" not in str(e):
                 raise ValueError(
                     f"Failed to validate stage {stage_name} for an unexpected reason; it is possible that "
                     "an upstream stage defined with the same name is invalid."
                 ) from e
-
-            # In this case, we can't validate this stage because python won't directly let us import it. We
-            # run a secondary process to validate the entry point:
-
-            logger.warning(
-                f"Stage {stage_name} is registered in the entry points, but cannot be imported within "
-                "the python process for validation. Using a subprocess based ID retrieval."
-            )
-
-            import subprocess
-
-            out = subprocess.run(
-                ["__get_MEDS_transform_stage_id", stage_name], check=True, capture_output=True
-            )
-            registered_id = out.stdout.decode("utf-8").strip()
-
-            if self._ID != registered_id:
-                raise ValueError(
-                    f"Stage {stage_name} is registered in the entry points, but the hash does not match.\n"
-                    f"Self ID: {self._ID}\n"
-                    f"Registered ID: {registered_id}\n"
-                    "This may be due to a missing or incorrectly configured entry point. "
-                    "If this is during development, you may need to run `pip install -e .` to install your "
-                    "package and properly register the stage in the entry points."
-                )
-
         finally:
             os.environ["DISABLE_STAGE_VALIDATION"] = old_env_val
-            Stage.WARN_ON_ENTRY_POINT_DISCREPANCY = old_warn_val
-
-        return True
-
-    @property
-    def __fn_module(self) -> str:
-        """The module name of the stage.
-
-        This is set automatically based on the provided functions.
-        """
-
-        match self.stage_type:
-            case StageType.MAIN:
-                return self.main_fn.__module__
-            case StageType.MAP:
-                return self.map_fn.__module__
-            case StageType.MAPREDUCE:
-                if self.map_fn.__module__ != self.reduce_fn.__module__:
-                    logger.warning(
-                        f"Stage {self.stage_name} has map and reduce functions in different modules. This "
-                        "may cause warnings in stage registration validation checks."
-                    )
-
-                return self.map_fn.__module__
-
-        return (self.main_fn or self.map_fn).__module__
 
     @property
     def stage_name(self) -> str:
@@ -564,10 +459,11 @@ class Stage:
         Examples:
 
             Firstly, note that in normal usage, the Stage class raises a warning if the stage is not
-            registered properly in an entry point. We'll disable that for most of the doctests here, then show
-            it again at the end.
+            registered properly in an entry point. We'll disable that and other error checking for most of the
+            doctests here, then show it again at the end.
 
-            >>> Stage.WARN_ON_ENTRY_POINT_DISCREPANCY = False
+            >>> Stage.WARN_IF_NO_ENTRY_POINT_AT_NAME = False
+            >>> Stage.ERR_IF_ENTRY_POINT_IMPORTABLE = False
 
             When used with only keyword arguments that fully define a function a stage set to mimic nothing is
             returned directly, with the parameters set as defined by what kind of stage is being created.
@@ -769,7 +665,7 @@ class Stage:
 
             What about those warnings?
 
-            >>> Stage.WARN_ON_ENTRY_POINT_DISCREPANCY = True
+            >>> Stage.WARN_IF_NO_ENTRY_POINT_AT_NAME = True
 
             To see the warnings in this test, we'll explicitly tell the warnings module to raise errors if a
             warning is thrown, then re-run something successful before:
@@ -783,9 +679,13 @@ class Stage:
             Traceback (most recent call last):
                 ...
             MEDS_transforms.stages.base.StageRegistrationWarning: Stage 'base' is not registered in the entry
-            points. This may be due to a missing or incorrectly configured entry point in the setup.py file.
-            If this is during development, you may need to run `pip install -e .` to install your package and
-            properly register the stage in the entry points, or simply ignore this warning.
+            points. This may be due to a missing or incorrectly configured entry point in your setup.py or
+            pyproject.toml file. If this is during development, you may need to run `pip install -e .` to
+            install your package properly in editable mode and ensure your stage registration is detected.
+            You can disable this warning by setting the class variable `WARN_IF_NO_ENTRY_POINT_AT_NAME` to
+            `False`, or filtering out `StageRegistrationWarning` warnings.
+            You can disable all validation by setting the environment variable `DISABLE_STAGE_VALIDATION` to
+            `1`.
         """
 
         def decorator(fn: Callable, **kwargs):
