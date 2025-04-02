@@ -4,8 +4,10 @@ import polars as pl
 
 from .. import Stage
 
+NORMALIZATION_OUTPUT_SCHEMA = {"code": pl.Int64, "numeric_value": pl.Float64}
 
-@Stage.register
+
+@Stage.register(output_schema_updates=NORMALIZATION_OUTPUT_SCHEMA)
 def normalization(
     df: pl.LazyFrame, code_metadata: pl.DataFrame, code_modifiers: list[str] | None = None
 ) -> pl.LazyFrame:

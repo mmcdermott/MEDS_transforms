@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 
 import polars as pl
@@ -8,6 +9,14 @@ from .utils import MEDS_transforms_pipeline_tester
 
 # Get all registered stages
 CMD_PATTERN = "MEDS_transform-stage __null__ {stage_name}"
+
+
+def test_stage_help(stage: str):
+    """Test the help command for a stage."""
+
+    script = CMD_PATTERN.format(stage_name=stage) + " --help"
+
+    subprocess.run(script, shell=True, check=True)
 
 
 def test_stage_scenario(

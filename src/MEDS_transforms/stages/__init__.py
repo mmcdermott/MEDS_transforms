@@ -1,6 +1,6 @@
 from .base import Stage  # noqa: F401
 from .discovery import get_all_registered_stages  # noqa: F401
-from .examples import StageExample, get_nested_test_cases  # noqa: F401
+from .examples import StageExample  # noqa: F401
 
 # Here are all the stages that are registered in the entry points, imported here so they can be imported at a
 # module level.
