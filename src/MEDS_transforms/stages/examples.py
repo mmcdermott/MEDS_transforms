@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import subprocess
 import tempfile
+import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,12 +25,13 @@ try:
 except ImportError:  # pragma: no cover
     from yaml import Loader
 
+_SPACE = "    "
+_BRANCH = "│   "
+_TEE = "├── "
+_LAST = "└── "
+
 
 def pretty_list_directory(path: Path, prefix: str | None = None) -> list[str]:
-    space = "    "
-    branch = "│   "
-    tee = "├── "
-    last = "└── "
 
     if prefix is None:
         prefix = ""
@@ -44,8 +46,8 @@ def pretty_list_directory(path: Path, prefix: str | None = None) -> list[str]:
     for i, child in enumerate(children):
         is_last = i == len(children) - 1
 
-        node_prefix = last if is_last else tee
-        subdir_prefix = space if is_last else branch
+        node_prefix = _LAST if is_last else _TEE
+        subdir_prefix = _SPACE if is_last else _BRANCH
 
         if child.is_file():
             lines.append(f"{prefix}{node_prefix}{child.name}")
@@ -152,6 +154,9 @@ class StageExample:
         if self.want_data is None and self.want_metadata is None:
             raise ValueError("Either want_data or want_metadata must be provided.")
 
+        if self.scenario_name == ".":
+            self.scenario_name = None
+
     @classmethod
     def is_example_dir(cls, path: Path) -> bool:
         """Check if the given path is a valid example directory."""
@@ -198,6 +203,28 @@ class StageExample:
             in_data=in_data,
             test_kwargs=test_kwargs,
         )
+
+    @property
+    def full_name(self) -> str:
+        if self.scenario_name:
+            return f"{self.stage_name}/{self.scenario_name}"
+        return self.stage_name
+
+    def __str__(self) -> str:
+        lines = [
+            f"StageExample [{self.full_name}]",
+            f"  stage_cfg: {self.stage_cfg}",
+            f"  test_kwargs: {self.test_kwargs}",
+        ]
+
+        if self.in_data is not None:
+            lines.append(f"  input:\n{self.in_data}")
+
+        if self.want_data is not None:
+            lines.append(f"  want_data:\n{self.want_data}")
+        if self.want_metadata is not None:
+            lines.append(f"  want_metadata:\n{self.want_metadata}")
+        return "\n".join(lines)
 
     def write_for_test(self, input_dir: Path) -> None:
         if self.in_data is None:
@@ -343,3 +370,21 @@ class StageExample:
             except AssertionError as e:
                 err_lines.append(str(e))
                 raise AssertionError("\n".join(err_lines))
+
+
+class StageExampleDict(dict):
+    def __str__(self) -> str:
+        if not self:
+            return "{}"
+
+        if len(self) == 1 and list(self.keys())[0] == ".":
+            return str(list(self.values())[0])
+
+        lines = []
+        for k, v in self.items():
+            lines.append(f"{k}:")
+            v_str = textwrap.indent(str(v), _BRANCH)
+
+            lines.append(v_str)
+
+        return "\n".join(lines)

@@ -20,7 +20,7 @@ from omegaconf import DictConfig
 
 from ..mapreduce import ANY_COMPUTE_FN_T, map_stage, mapreduce_stage
 from .discovery import get_all_registered_stages
-from .examples import StageExample
+from .examples import StageExample, StageExampleDict
 
 logger = logging.getLogger(__name__)
 
@@ -194,21 +194,36 @@ class Stage:
         ...     example_data = example_dir / "out_data.yaml"
         ...     _ = example_data.write_text("data/0.parquet: 'code,time,subject_id,numeric_value'")
         ...     stage = Stage(main_fn=main, examples_dir=example_dir)
-        ...     stage.test_cases
-        {'.': StageExample(stage_name='base',
-                    `      scenario_name='.',
-                           stage_cfg={},
-                           want_data=MEDSDataset(data_shards={'0': {'code': [],
-                                                                    'time': [],
-                                                                    'subject_id': [],
-                                                                    'numeric_value': []}},
-                                                 dataset_metadata={},
-                                                 code_metadata={'code': [],
-                                                                'description': [],
-                                                                'parent_codes': []}),
-                           want_metadata=None,
-                           in_data=None,
-                           test_kwargs={})}
+        ...     print(stage.test_cases)
+        StageExample [base]
+          stage_cfg: {}
+          test_kwargs: {}
+          want_data:
+        MEDSDataset:
+        dataset_metadata:
+        data_shards:
+          - 0:
+            pyarrow.Table
+            subject_id: int64
+            time: timestamp[us]
+            code: string
+            numeric_value: float
+            ----
+            subject_id: [[]]
+            time: [[]]
+            code: []
+            numeric_value: [[]]
+        code_metadata:
+          pyarrow.Table
+          code: string
+          description: string
+          parent_codes: list<item: string>
+            child 0, item: string
+          ----
+          code: []
+          description: []
+          parent_codes: []
+        subject_splits: None
 
     We can also have nested test cases:
 
@@ -225,34 +240,49 @@ class Stage:
         ...     ex_2_metadata_fp = (ex_2 / "out_metadata.yaml")
         ...     _ = ex_2_metadata_fp.write_text("metadata/codes.parquet: 'code,description,parent_codes'")
         ...     stage = Stage(main_fn=main, examples_dir=example_dir)
-        ...     stage.test_cases
-        {'example_2_foo': StageExample(stage_name='base',
-                                       scenario_name='example_2_foo',
-                                       stage_cfg={},
-                                       want_data=None,
-                                       want_metadata=shape: (0, 3)
-                                       ┌──────┬─────────────┬──────────────┐
-                                       │ code ┆ description ┆ parent_codes │
-                                       │ ---  ┆ ---         ┆ ---          │
-                                       │ str  ┆ str         ┆ list[str]    │
-                                       ╞══════╪═════════════╪══════════════╡
-                                       └──────┴─────────────┴──────────────┘,
-                                       in_data=None,
-                                       test_kwargs={}),
-         'example_1': StageExample(stage_name='base',
-                                   scenario_name='example_1',
-                                   stage_cfg={},
-                                   want_data=MEDSDataset(data_shards={'0': {'code': [],
-                                                                            'time': [],
-                                                                            'subject_id': [],
-                                                                            'numeric_value': []}},
-                                                         dataset_metadata={},
-                                                         code_metadata={'code': [],
-                                                                        'description': [],
-                                                                        'parent_codes': []}),
-                                   want_metadata=None,
-                                   in_data=None,
-                                   test_kwargs={})}
+        ...     print(stage.test_cases)
+        example_2_foo:
+        │   StageExample [base/example_2_foo]
+        │     stage_cfg: {}
+        │     test_kwargs: {}
+        │     want_metadata:
+        │   shape: (0, 3)
+        │   ┌──────┬─────────────┬──────────────┐
+        │   │ code ┆ description ┆ parent_codes │
+        │   │ ---  ┆ ---         ┆ ---          │
+        │   │ str  ┆ str         ┆ list[str]    │
+        │   ╞══════╪═════════════╪══════════════╡
+        │   └──────┴─────────────┴──────────────┘
+        example_1:
+        │   StageExample [base/example_1]
+        │     stage_cfg: {}
+        │     test_kwargs: {}
+        │     want_data:
+        │   MEDSDataset:
+        │   dataset_metadata:
+        │   data_shards:
+        │     - 0:
+        │       pyarrow.Table
+        │       subject_id: int64
+        │       time: timestamp[us]
+        │      code: string
+        │      numeric_value: float
+        │      ----
+        │      subject_id: [[]]
+        │      time: [[]]
+        │      code: []
+        │      numeric_value: [[]]
+        │  code_metadata:
+        │    pyarrow.Table
+        │    code: string
+        │    description: string
+        │    parent_codes: list<item: string>
+        │      child 0, item: string
+        │    ----
+        │    code: []
+        │    description: []
+        │    parent_codes: []
+        │  subject_splits: None
 
     The examples directory can also be inferred via a passed `_calling_file` argument, which is intended to be
     the file in which the `Stage.register` function was called. This looks to see if (1) the calling file
@@ -448,7 +478,7 @@ class Stage:
             else:
                 examples_to_check.extend(example_dir.iterdir())
 
-        return test_cases
+        return StageExampleDict(**test_cases)
 
     def __validate_stage_entry_point_registration(
         self,
