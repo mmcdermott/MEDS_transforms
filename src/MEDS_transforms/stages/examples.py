@@ -57,7 +57,20 @@ def pretty_list_directory(path: Path, prefix: str | None = None) -> list[str]:
         │   └── baz.csv
         ├── foo
         └── file1.txt
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     path = Path(tmpdir)
+        ...     pretty_list_directory(path / "foo")
+        Traceback (most recent call last):
+            ...
+        ValueError: Path /tmp/tmp.../foo is not a directory.
+        >>> pretty_list_directory("foo")
+        Traceback (most recent call last):
+            ...
+        ValueError: Expected a Path object, got <class 'str'>: foo
     """
+
+    if not isinstance(path, Path):
+        raise ValueError(f"Expected a Path object, got {type(path)}: {path}")
 
     if not path.is_dir():
         raise ValueError(f"Path {path} is not a directory.")
