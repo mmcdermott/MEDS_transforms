@@ -11,6 +11,7 @@ from collections.abc import Callable
 from enum import StrEnum
 from functools import partial, wraps
 from importlib.metadata import EntryPoint
+from pathlib import Path
 from typing import ClassVar
 
 from omegaconf import DictConfig
@@ -120,7 +121,18 @@ class Stage:
     function directly called. See the examples below for more details.
 
     Calling `print` on a `Stage` object will display a simple method indicating the name of the stage, the
-    global stage docstring, and the names of the main, map, reduce, and mimic functions, if set.
+    global stage docstring, and the names of the main, map, reduce, and mimic functions, if set. This is
+    largely for testing and debugging purposes, and is not intended to be used in production code.
+
+    Static data examples can also be attached to the stage object, to enable automated testing and
+    documentation of the stage. This is managed through the `examples_dir` attribute, which can be passed in
+    upon construction. When constructed through the `Stage.register` function, which is the typical usage, if
+    unspecified this will automatically be set in accordance with the following rules:
+      1. If the location in which `Stage.register` is called lives in a directory of the same name as the
+         stage being defined _and_ has a subdirectory called `examples`, then that directory will be used.
+      2. Otherwise, it will remain unset and no examples will be attached.
+    If you would like additional modes of default inference to be added (such as on the basis of the locations
+    in which the passed functions are defined) please file a GitHub Issue.
 
     Attributes:
         stage_type: The type of stage this is. This is set automatically based on the provided functions. See
@@ -134,6 +146,9 @@ class Stage:
         reduce_fn: The reducing function for the stage. This is set automatically based on the provided
             functions. May be None for a `StageType.MAP` or `StageType.MAIN` stage.
         main_fn: The main function for the stage. This is set automatically based on the provided functions.
+        examples_dir: A directory containing nested test cases for the stage.
+            If not set, this is automatically inferred in the case that the stage name and registering file
+            conform to the pattern mentioned above.
     """
 
     stage_type: StageType
@@ -142,6 +157,8 @@ class Stage:
     map_fn: ANY_COMPUTE_FN_T | None = None
     reduce_fn: ANY_COMPUTE_FN_T | None = None
     main_fn: MAIN_FN_T | None = None
+
+    examples_dir: Path | None = None
 
     __mimic_fn: Callable | None = None
     __stage_docstring: str | None = None
@@ -177,6 +194,8 @@ class Stage:
         reduce_fn: ANY_COMPUTE_FN_T | None = None,
         stage_name: str | None = None,
         stage_docstring: str | None = None,
+        examples_dir: Path | None = None,
+        _calling_file: Path | None = None,
     ) -> MAIN_FN_T:
         """Wraps or returns a function that can serve as the main function for a stage."""
 
@@ -199,6 +218,47 @@ class Stage:
             )
         else:
             self.__validate_stage_entry_point_registration()
+
+        if examples_dir is None:
+            self.__infer_examples_dir(_calling_file)
+        else:
+            self.examples_dir = examples_dir
+
+    def __infer_examples_dir(self, stage_definition_file: Path | None):
+        """Infers the examples directory from the calling file.
+
+        This is done by looking for a directory with the same name as the stage being defined, and checking
+        for a subdirectory called "examples". If this is not found, the examples_dir will remain unset.
+        """
+        if stage_definition_file is None:
+            return
+
+        if not stage_definition_file.is_file():
+            logger.warning(
+                f"Stage definition file {stage_definition_file} is not a file. "
+                "Cannot infer examples directory."
+            )
+            return
+
+        # Get the directory of the calling file
+        possible_stage_dir = stage_definition_file.parent
+
+        if possible_stage_dir.name != self.stage_name:
+            logger.debug(
+                f"Stage definition file {stage_definition_file} is not in a directory with the same name as "
+                "the stage {self.stage_name}. Cannot infer examples directory."
+            )
+
+        possible_examples_dir = possible_stage_dir / "examples"
+
+        if possible_examples_dir.is_dir():
+            self.examples_dir = possible_examples_dir
+        else:
+            logger.debug(
+                f"Stage definition file {stage_definition_file} lacks an examples subdirectory. Can't infer "
+                "examples directory."
+            )
+            self.examples_dir = None
 
     def __validate_stage_entry_point_registration(
         self,
@@ -418,6 +478,8 @@ class Stage:
     def register(cls, *args, **kwargs) -> Callable[[Callable], Stage] | Stage:
         """This method used to define and register a MEDS-Transforms stage of any variety.
 
+        ## Function usage modes:
+
         It can be used either as a decorator, a parametrized decorator, or a direct method, depending on the
         arguments provided and manner of invocation.
 
@@ -450,6 +512,10 @@ class Stage:
             **kwargs: Keyword arguments. These can include `main_fn`, `map_fn`, `reduce_fn`,
                 `stage_name`, and `stage_docstring`. Other keyword arguments will cause an error. Not all
                 keyword arguments are required for all usages of the decorator.
+
+        ## Inference of static data examples:
+
+        When this function is called, it will attempt to locate the module in which it is called.
 
         Returns:
             Either a `Stage` object or a decorator function, depending on the arguments provided.
@@ -691,6 +757,19 @@ class Stage:
             `1`.
         """
 
+        # Get the frame of the caller
+        caller_frame = inspect.currentframe().f_back
+        # Get the filename from the frame
+        calling_file = Path(caller_frame.f_code.co_filename)
+
+        inferred_kwargs = {"_calling_file": calling_file}
+
+        if set(inferred_kwargs.keys()).intersection(kwargs.keys()):
+            raise ValueError(
+                "Cannot provide keyword arguments that are also automatically inferred. "
+                f"Got {set(inferred_kwargs).intersection(kwargs.keys())}"
+            )
+
         def decorator(fn: Callable, **kwargs):
             if not inspect.isfunction(fn):
                 raise TypeError(f"First argument must be a function. Got {type(fn)}")
@@ -711,12 +790,12 @@ class Stage:
 
         if len(args) == 0:
             if "main_fn" in kwargs or "map_fn" in kwargs:
-                return Stage(**kwargs)
-            return partial(decorator, **kwargs)
+                return Stage(**kwargs, **inferred_kwargs)
+            return partial(decorator, **kwargs, **inferred_kwargs)
         elif len(args) == 1:
             if kwargs:
                 raise ValueError("Cannot provide keyword arguments when using as a decorator.")
-            return decorator(args[0])
+            return decorator(args[0], **inferred_kwargs)
         else:
             raise ValueError(
                 f"Stage.register can only be used with at most a single positional arg. Got {len(args)}"

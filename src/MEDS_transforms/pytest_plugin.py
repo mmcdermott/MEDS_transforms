@@ -2,7 +2,6 @@ import importlib
 import tempfile
 import tomllib
 from importlib.metadata import EntryPoint
-from importlib.resources import files
 from pathlib import Path
 
 import polars as pl
@@ -19,9 +18,9 @@ REGISTERED_STAGES = get_all_registered_stages()
 def get_examples_for_stage(stage: str) -> dict[str, StageExample]:
     ep = REGISTERED_STAGES[stage]
 
-    ep_package = ep.dist.metadata["Name"]
-
-    examples_dir = files(ep_package).joinpath("stages") / stage
+    examples_dir = ep.load().examples_dir
+    if examples_dir is None:
+        return {}
 
     match stage:
         case "normalization":
