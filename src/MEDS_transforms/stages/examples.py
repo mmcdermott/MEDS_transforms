@@ -357,7 +357,7 @@ class StageExample:
 
             command_out = subprocess.run(script, shell=True, capture_output=True)
 
-            err_lines = [self._err_prefix, f"Script: {' '.join(script)}"]
+            err_lines = [self._err_prefix, f"Script: {script}"]
             err_lines.append(f"Stdout:\n{command_out.stdout.decode()}")
             err_lines.append(f"Stderr:\n{command_out.stderr.decode()}")
 
