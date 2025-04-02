@@ -98,7 +98,7 @@ def get_stages_under_test(config: pytest.Config) -> dict[str, dict[str, StageExa
             )
         out = {stage: ep for stage, ep in out.items() if stage in stages}
 
-    out = {n: ep.load().test_cases for n, ep in out.items()}
+    out = {n: ep["entry_point"].load().test_cases for n, ep in out.items()}
     return out
 
 

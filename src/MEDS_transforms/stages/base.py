@@ -475,7 +475,7 @@ class Stage:
 
             # Attempt to reload, which should cause an error if the stage being constructed is the same stage
             # as the one being registered.
-            registered_stages[stage_name].load()
+            registered_stages[stage_name]["entry_point"].load()
             raise StageRegistrationError(
                 f"Stage {stage_name} is registered in the entry points, but an attempted reload causes "
                 "no issues. If this were the stage you are constructing, a reload would cause a circular "
