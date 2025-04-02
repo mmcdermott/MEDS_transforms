@@ -20,6 +20,7 @@ from omegaconf import DictConfig
 
 from ..mapreduce import ANY_COMPUTE_FN_T, map_stage, mapreduce_stage
 from .discovery import get_all_registered_stages
+from .examples import StageExample
 
 logger = logging.getLogger(__name__)
 
@@ -271,6 +272,28 @@ class Stage:
                 "examples directory."
             )
             self.examples_dir = None
+
+    @property
+    def test_cases(self) -> dict[str, StageExample]:
+        if self.examples_dir is None:
+            return {}
+
+        examples_to_check = [self.examples_dir]
+        test_cases = {}
+
+        while examples_to_check:
+            example_dir = examples_to_check.pop()
+
+            if not example_dir.is_dir():
+                continue
+
+            if StageExample.is_example_dir(example_dir):
+                scenario_name = example_dir.relative_to(self.examples_dir).as_posix()
+                test_cases[scenario_name] = StageExample.from_dir(example_dir, **self.output_schema_updates)
+            else:
+                examples_to_check.extend(example_dir.iterdir())
+
+        return test_cases
 
     def __validate_stage_entry_point_registration(
         self,

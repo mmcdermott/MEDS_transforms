@@ -1,7 +1,6 @@
 import importlib
 import tempfile
 import tomllib
-from importlib.metadata import EntryPoint
 from pathlib import Path
 
 import polars as pl
@@ -9,19 +8,10 @@ import pytest
 from meds import code_metadata_filepath
 
 from . import __package_name__
-from .stages import StageExample, get_all_registered_stages, get_nested_test_cases
+from .stages import StageExample, get_all_registered_stages
 
 # Get all registered stages
 REGISTERED_STAGES = get_all_registered_stages()
-
-
-def get_examples_for_stage(stage_name: str) -> dict[str, StageExample]:
-    stage = REGISTERED_STAGES[stage_name].load()
-
-    if not stage.examples_dir:
-        return {}
-
-    return get_nested_test_cases(stage.examples_dir, stage_name, **stage.output_schema_updates)
 
 
 def pytest_addoption(parser):  # pragma: no cover
@@ -91,7 +81,7 @@ def _auto_detect_package(config: pytest.Config) -> str | None:
     return None
 
 
-def get_stages_under_test(config: pytest.Config) -> dict[str, EntryPoint]:
+def get_stages_under_test(config: pytest.Config) -> dict[str, dict[str, StageExample]]:
     packages = config.packages_to_test
 
     if packages is None:
@@ -107,33 +97,34 @@ def get_stages_under_test(config: pytest.Config) -> dict[str, EntryPoint]:
                 f"Available stages given specified package ({packages}) are: {', '.join(out.keys())}."
             )
         out = {stage: ep for stage, ep in out.items() if stage in stages}
+
+    out = {n: ep.load().test_cases for n, ep in out.items()}
     return out
 
 
 def pytest_generate_tests(metafunc):
     """Generate tests for registered stages based on the command line options."""
-    allowed_stages = get_stages_under_test(metafunc.config)
+    config = metafunc.config
 
-    stage_scenarios = {stage: get_examples_for_stage(stage) for stage in allowed_stages.keys()}
+    config.allowed_stage_scenarios = get_stages_under_test(config)
 
     if "stage_scenario" in metafunc.fixturenames:
         arg_names = ["stage", "stage_scenario"]
-        arg_values = [(s, sc) for s in allowed_stages.keys() for sc in stage_scenarios[s].keys()]
+        arg_values = [(s, sc) for s, scenarios in config.allowed_stage_scenarios.items() for sc in scenarios]
         metafunc.parametrize(arg_names, arg_values, scope="session")
 
     elif "stage" in metafunc.fixturenames:
-        metafunc.parametrize("stage", list(allowed_stages.keys()), scope="session")
+        metafunc.parametrize("stage", list(config.allowed_stage_scenarios.keys()), scope="session")
 
 
 @pytest.fixture(scope="session")
-def stage_example(stage: str, stage_scenario: str) -> StageExample:
+def stage_example(request: pytest.FixtureRequest, stage: str, stage_scenario: str) -> StageExample:
     """Fixture to provide the example for the given stage and scenario."""
 
-    stage_scenarios = get_examples_for_stage(stage)
-    if stage_scenario not in stage_scenarios:  # pragma: no cover
+    if stage_scenario not in request.config.allowed_stage_scenarios[stage]:  # pragma: no cover
         raise ValueError(f"Stage scenario '{stage_scenario}' not found for stage '{stage}'.")
 
-    yield stage_scenarios[stage_scenario]
+    yield request.config.allowed_stage_scenarios[stage][stage_scenario]
 
 
 @pytest.fixture(scope="session")
