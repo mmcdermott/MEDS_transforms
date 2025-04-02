@@ -2,16 +2,22 @@
 
 from __future__ import annotations
 
+import ast
+import hashlib
 import inspect
 import logging
 import textwrap
+import warnings
 from collections.abc import Callable
 from enum import StrEnum
 from functools import partial, wraps
+from importlib.metadata import EntryPoint
+from typing import ClassVar
 
 from omegaconf import DictConfig
 
 from ..mapreduce import ANY_COMPUTE_FN_T, map_stage, mapreduce_stage
+from .discovery import get_all_registered_stages
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +93,10 @@ class StageType(StrEnum):
             raise ValueError("Either main_fn or map_fn/reduce_fn must be provided.")
 
 
+class StageRegistrationWarning(Warning):
+    pass
+
+
 class Stage:
     """The representation of a MEDS-Transforms stage, in object form.
 
@@ -134,6 +144,71 @@ class Stage:
     __stage_docstring: str | None = None
     __stage_name: str | None = None
 
+    WARN_ON_ENTRY_POINT_DISCREPANCY: ClassVar[bool] = True
+
+    @staticmethod
+    def hash_fn_src(fn: Callable) -> str:
+        """This function hashes the abstract syntax tree of the function source code.
+
+        This will return a reasonable proxy for a "semantic hash" of the function, which is useful for
+        checking equality between two functions that are semantically identical but have different
+        representations (e.g., different whitespace, different variable names, defined in different modules,
+        etc.).
+
+        Args:
+            fn: The function to hash.
+
+        Returns:
+            str: The hash of the function's source code.
+
+        Raises:
+            TypeError: If the provided argument is not a function.
+
+        Examples:
+            >>> def foo(x):
+            ...     return x + 1
+            >>> Stage.hash_fn_src(foo)
+            'e62971895b5015aa4939bbf5c996e1f82225bd46f0002483e647c9320c0495f4'
+            >>> def foo_2(x):
+            ...     '''I have a docstring!'''
+            ...     # And a comment
+            ...     return x + 1
+            >>> Stage.hash_fn_src(foo_2)
+            'e62971895b5015aa4939bbf5c996e1f82225bd46f0002483e647c9320c0495f4'
+            >>> def bar(x):
+            ...     return x + 2
+            >>> Stage.hash_fn_src(bar)
+            'ee0da7f2d21a4458cc21ab8d82d06d20f843636533e71e3ce1c0e9044d72ea1b'
+
+            Note that this is currently not a true semantic hash, as it does not account for the variable
+            names being relative placeholders, not absolute strings. E.g.
+
+            >>> def foo_3(y):
+            ...     '''I'm semantically equivalent to foo and foo_2, but have a different variable name!'''
+            ...     return y + 1
+            >>> Stage.hash_fn_src(foo_3)
+            '6cde60950f074d34921a12b01c5ffd3c6e9695fbe6081c30ca1f1e421e7cb82a'
+        """
+
+        if not inspect.isfunction(fn):
+            raise TypeError(f"Cannot hash non-function. Got {type(fn)}")
+
+        src = inspect.getsource(fn)
+        tree = ast.parse(src)
+        # Strip function definition name to avoid name-based differences
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if (
+                    node.body
+                    and isinstance(node.body[0], ast.Expr)
+                    and isinstance(node.body[0].value, ast.Constant)
+                    and isinstance(node.body[0].value.value, str)
+                ):
+                    node.body = node.body[1:]  # Remove the docstring
+                node.name = "func_def"
+        ast_dump = ast.dump(tree, annotate_fields=False)
+        return hashlib.sha256(ast_dump.encode("utf-8")).hexdigest()
+
     def __init__(
         self,
         *,
@@ -152,6 +227,75 @@ class Stage:
         self.main_fn = main_fn
         self.map_fn = map_fn
         self.reduce_fn = reduce_fn
+
+        if self.WARN_ON_ENTRY_POINT_DISCREPANCY:
+            self.validate_stage_entry_point_registration()
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Stage):
+            raise TypeError(f"Cannot compare Stage to {type(other)}")
+
+        if self.stage_type != other.stage_type:
+            return False
+
+        match self.stage_type:
+            case StageType.MAIN:
+                return Stage.hash_fn_src(self.main_fn) == Stage.hash_fn_src(other.main_fn)
+            case StageType.MAP:
+                return Stage.hash_fn_src(self.map_fn) == Stage.hash_fn_src(other.map_fn)
+            case StageType.MAPREDUCE:
+                return (Stage.hash_fn_src(self.map_fn) == Stage.hash_fn_src(other.map_fn)) and (
+                    Stage.hash_fn_src(self.reduce_fn) == Stage.hash_fn_src(other.reduce_fn)
+                )
+            case _:
+                raise ValueError(f"Unknown stage type {self.stage_type}")
+
+    def validate_stage_entry_point_registration(
+        self,
+        stage_name: str | None = None,  # For stage name inference.
+        registered_stages: dict[str, EntryPoint] | None = None,  # For dependency injection.
+    ):
+        """Validates that the stage is registered in the entry points."""
+
+        if registered_stages is None:
+            registered_stages = get_all_registered_stages()
+        if stage_name is None:
+            stage_name = self.stage_name
+
+        if stage_name not in registered_stages:
+            warnings.warn(
+                f"Stage '{stage_name}' is not registered in the entry points. This may be due to a missing "
+                "or incorrectly configured entry point in the setup.py file. If this is during development, "
+                "you may need to run `pip install -e .` to install your package and properly register the "
+                "stage in the entry points, or simply ignore this warning.",
+                category=StageRegistrationWarning,
+            )
+            return False
+
+        return True
+
+    @property
+    def __fn_module(self) -> str:
+        """The module name of the stage.
+
+        This is set automatically based on the provided functions.
+        """
+
+        match self.stage_type:
+            case StageType.MAIN:
+                return self.main_fn.__module__
+            case StageType.MAP:
+                return self.map_fn.__module__
+            case StageType.MAPREDUCE:
+                if self.map_fn.__module__ != self.reduce_fn.__module__:
+                    logger.warning(
+                        f"Stage {self.stage_name} has map and reduce functions in different modules. This "
+                        "may cause warnings in stage registration validation checks."
+                    )
+
+                return self.map_fn.__module__
+
+        return (self.main_fn or self.map_fn).__module__
 
     @property
     def stage_name(self) -> str:
@@ -236,7 +380,9 @@ class Stage:
             >>> def baz_fn(foo: str, bar: int):
             ...     '''base baz docstring'''
             ...     return f"baz {foo} {bar}"
-            >>> stage = Stage.register(main_fn=main)
+            >>> with warnings.catch_warnings(): # We catch a warning to avoid issues with stage registration
+            ...     warnings.simplefilter("ignore")
+            ...     stage = Stage.register(main_fn=main)
             >>> print(stage.mimic_fn)
             None
             >>> stage.mimic_fn = baz_fn
@@ -357,6 +503,12 @@ class Stage:
             ValueError: If both `main_fn` and `map_fn` or `reduce_fn` are provided.
 
         Examples:
+
+            Firstly, note that in normal usage, the Stage class raises a warning if the stage is not
+            registered properly in an entry point. We'll disable that for most of the doctests here, then show
+            it again at the end.
+
+            >>> Stage.WARN_ON_ENTRY_POINT_DISCREPANCY = False
 
             When used with only keyword arguments that fully define a function a stage set to mimic nothing is
             returned directly, with the parameters set as defined by what kind of stage is being created.
@@ -555,6 +707,26 @@ class Stage:
             Traceback (most recent call last):
                 ...
             TypeError: First argument must be a function. Got <class 'str'>
+
+            What about those warnings?
+
+            >>> Stage.WARN_ON_ENTRY_POINT_DISCREPANCY = True
+
+            To see the warnings in this test, we'll explicitly tell the warnings module to raise errors if a
+            warning is thrown, then re-run something successful before:
+
+            >>> with warnings.catch_warnings():
+            ...     warnings.simplefilter("error")
+            ...     @Stage.register
+            ...     def main(cfg: DictConfig):
+            ...         '''base main docstring'''
+            ...         return "main"
+            Traceback (most recent call last):
+                ...
+            MEDS_transforms.stages.base.StageRegistrationWarning: Stage 'base' is not registered in the entry
+            points. This may be due to a missing or incorrectly configured entry point in the setup.py file.
+            If this is during development, you may need to run `pip install -e .` to install your package and
+            properly register the stage in the entry points, or simply ignore this warning.
         """
 
         def decorator(fn: Callable, **kwargs):

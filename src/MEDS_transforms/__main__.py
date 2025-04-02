@@ -6,7 +6,7 @@ from pathlib import Path
 import hydra
 from omegaconf import OmegaConf
 
-from .stages import get_all_stages
+from .stages import get_all_registered_stages
 
 HELP_STRS = {"--help", "-h", "help", "h"}
 PKG_PFX = "pkg://"
@@ -23,7 +23,7 @@ def print_help_stage():
     print("  * stage_name: Name of the stage to run.")
     print()
     print("Available stages:")
-    all_stages = get_all_stages()
+    all_stages = get_all_registered_stages()
     for name in sorted(all_stages):
         print(f"  - {name}")
 
@@ -60,7 +60,7 @@ def resolve_pipeline_yaml(pipeline_yaml: str):
 def run_stage():
     """Run a stage based on command line arguments."""
 
-    all_stages = get_all_stages()
+    all_stages = get_all_registered_stages()
 
     if len(sys.argv) < 2:
         print_help_stage()
