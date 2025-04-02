@@ -191,8 +191,11 @@ class Stage:
         do_skip_validation = os.environ.get("DISABLE_STAGE_VALIDATION", "0") == "1"
 
         if do_skip_validation:
-            logger.info(
-                "Skipping stage validation due to DISABLE_STAGE_VALIDATION environment variable being set."
+            logger.debug(
+                "Skipping stage validation at constructor time due to DISABLE_STAGE_VALIDATION environment "
+                "variable being set. This is normal during execution of a stage via the MEDS-Transforms CLI, "
+                "as validation happens manually in the main function in that context, but is typically not "
+                "normal during testing, for example."
             )
         else:
             self.__validate_stage_entry_point_registration()

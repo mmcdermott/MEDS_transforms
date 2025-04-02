@@ -6,6 +6,11 @@ from pathlib import Path
 import hydra
 from omegaconf import OmegaConf
 
+# We disable stage validation here as it is not needed on the CLI; instead, we manually validate that the
+# stage name matches after loading, and that plus the checks for duplicate stage entry points covers all
+# validation failure scenarios.
+os.environ["DISABLE_STAGE_VALIDATION"] = "1"
+
 from .stages import get_all_registered_stages
 
 HELP_STRS = {"--help", "-h", "help", "h"}
