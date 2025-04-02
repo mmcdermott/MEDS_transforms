@@ -154,6 +154,149 @@ class Stage:
             conform to the pattern mentioned above.
         output_schema_updates: A dictionary mapping column name to a Polars type for the output of the stage,
             with the base MEDS schema options as defaults for unspecified columns.
+
+    Examples:
+
+    Most of the examples shown here are focused on more internal aspects of how stages work; for documentation
+    on how you will most likely use stages, see the documentation for the `Stage.register` function.
+
+    Stages come with tracked test cases. If no special parameters are set on the command line, they won't be
+    tracked:
+
+        >>> Stage.WARN_IF_NO_ENTRY_POINT_AT_NAME = False
+        >>> Stage.ERR_IF_ENTRY_POINT_IMPORTABLE = False
+        >>> def main(cfg: DictConfig):
+        ...     '''base main docstring'''
+        ...     return "main"
+        >>> stage = Stage(main_fn=main)
+        >>> print(stage.examples_dir)
+        None
+        >>> stage.test_cases
+        {}
+
+    The test cases are inferred through the `examples_dir` attribute. This can be set manually:
+
+        >>> stage = Stage(main_fn=main, examples_dir=Path("foo"))
+        >>> print(stage.examples_dir)
+        foo
+
+    But the test cases will only exist if the directory is properly set up:
+
+        >>> stage.test_cases
+        {}
+
+    Proper set-up means the directory is or has any children that satisfy the `StageExample.is_example_dir`
+    method.
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     example_dir = Path(tmpdir) / "examples"
+        ...     example_dir.mkdir()
+        ...     example_data = example_dir / "out_data.yaml"
+        ...     _ = example_data.write_text("data/0.parquet: 'code,time,subject_id,numeric_value'")
+        ...     stage = Stage(main_fn=main, examples_dir=example_dir)
+        ...     stage.test_cases
+        {'.': StageExample(stage_cfg={},
+                           want_data=MEDSDataset(data_shards={'0': {'code': [],
+                                                                    'time': [],
+                                                                    'subject_id': [],
+                                                                    'numeric_value': []}},
+                                                 dataset_metadata={},
+                                                 code_metadata={'code': [],
+                                                                'description': [],
+                                                                'parent_codes': []}),
+                           want_metadata=None,
+                           in_data=None,
+                           test_kwargs={})}
+
+    We can also have nested test cases:
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     example_dir = Path(tmpdir) / "examples"
+        ...     # Example # 1
+        ...     ex_1 = example_dir / "example_1"
+        ...     ex_1.mkdir(parents=True)
+        ...     ex_1_data_fp = (ex_1 / "out_data.yaml")
+        ...     _ = ex_1_data_fp.write_text("data/0.parquet: 'code,time,subject_id,numeric_value'")
+        ...     # Example # 2
+        ...     ex_2 = example_dir / "example_2_foo"
+        ...     ex_2.mkdir()
+        ...     ex_2_metadata_fp = (ex_2 / "out_metadata.yaml")
+        ...     _ = ex_2_metadata_fp.write_text("metadata/codes.parquet: 'code,description,parent_codes'")
+        ...     stage = Stage(main_fn=main, examples_dir=example_dir)
+        ...     stage.test_cases
+        {'example_2_foo': StageExample(stage_cfg={},
+                                       want_data=None,
+                                       want_metadata=shape: (0, 3)
+                                       ┌──────┬─────────────┬──────────────┐
+                                       │ code ┆ description ┆ parent_codes │
+                                       │ ---  ┆ ---         ┆ ---          │
+                                       │ str  ┆ str         ┆ list[str]    │
+                                       ╞══════╪═════════════╪══════════════╡
+                                       └──────┴─────────────┴──────────────┘,
+                                       in_data=None,
+                                       test_kwargs={}),
+         'example_1': StageExample(stage_cfg={},
+                                   want_data=MEDSDataset(data_shards={'0': {'code': [],
+                                                                            'time': [],
+                                                                            'subject_id': [],
+                                                                            'numeric_value': []}},
+                                                         dataset_metadata={},
+                                                         code_metadata={'code': [],
+                                                                        'description': [],
+                                                                        'parent_codes': []}),
+                                   want_metadata=None,
+                                   in_data=None,
+                                   test_kwargs={})}
+
+    The examples directory can also be inferred via a passed `_calling_file` argument, which is intended to be
+    the file in which the `Stage.register` function was called. This looks to see if (1) the calling file
+    lives in a parent directory of the same name as the defining stage and (2) if that directory has an
+    `examples` subdirectory. If so, this subdirectory is et to the examples directory. Otherwise, nothing is
+    set.
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     stage_dir = Path(tmpdir) / "stage_foo"
+        ...     calling_file = stage_dir / "stage_foo.py"
+        ...     examples_dir = stage_dir / "examples"
+        ...     examples_dir.mkdir(parents=True)
+        ...     calling_file.touch()
+        ...     stage = Stage(main_fn=main, stage_name="stage_foo", _calling_file=calling_file)
+        ...     print(stage.examples_dir.relative_to(tmpdir))
+        stage_foo/examples
+
+    If the stage name doesn't match the directory name, we won't infer `self.examples_dir`:
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     stage_dir = Path(tmpdir) / "stage_foo"
+        ...     calling_file = stage_dir / "stage_foo.py"
+        ...     examples_dir = stage_dir / "examples"
+        ...     examples_dir.mkdir(parents=True)
+        ...     calling_file.touch()
+        ...     stage = Stage(main_fn=main, stage_name="not_stage_foo", _calling_file=calling_file)
+        ...     print(stage.examples_dir)
+        None
+
+    If the examples directory doesn't exist, we won't infer `self.examples_dir`:
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     stage_dir = Path(tmpdir) / "stage_foo"
+        ...     stage_dir.mkdir()
+        ...     calling_file = stage_dir / "stage_foo.py"
+        ...     calling_file.touch()
+        ...     stage = Stage(main_fn=main, stage_name="stage_foo", _calling_file=calling_file)
+        ...     print(stage.examples_dir)
+        None
+
+    If the calling file doesn't exist, we won't infer `self.examples_dir`:
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     stage_dir = Path(tmpdir) / "stage_foo"
+        ...     calling_file = stage_dir / "stage_foo.py"
+        ...     examples_dir = stage_dir / "examples"
+        ...     examples_dir.mkdir(parents=True)
+        ...     stage = Stage(main_fn=main, stage_name="stage_foo", _calling_file=calling_file)
+        ...     print(stage.examples_dir)
+        None
     """
 
     stage_type: StageType
@@ -261,6 +404,7 @@ class Stage:
                 f"Stage definition file {stage_definition_file} is not in a directory with the same name as "
                 "the stage {self.stage_name}. Cannot infer examples directory."
             )
+            return
 
         possible_examples_dir = possible_stage_dir / "examples"
 
@@ -550,7 +694,12 @@ class Stage:
 
         ## Inference of static data examples:
 
-        When this function is called, it will attempt to locate the module in which it is called.
+        When this function is called, it will attempt to locate the filepath of the file in which it was
+        called, and pass that as the `_calling_file` argument to the `Stage` constructor. This is used to
+        infer the examples directory if it is not manually set. Note that this means that the parameter
+        `_calling_file` can not be used as a keyword argument to this function. You should never need this
+        parameter anyways, as if you are setting something manually you can directly set the example
+        directory.
 
         Returns:
             Either a `Stage` object or a decorator function, depending on the arguments provided.
@@ -766,6 +915,15 @@ class Stage:
             Traceback (most recent call last):
                 ...
             TypeError: First argument must be a function. Got <class 'str'>
+
+            The parameter `_calling_file` is used to infer the examples directory, and can't be set manually
+            in the function.
+
+            >>> Stage.register(_calling_file="foo")
+            Traceback (most recent call last):
+                ...
+            ValueError: Cannot provide keyword arguments that are also automatically inferred. Got
+            {'_calling_file'}
 
             What about those warnings?
 
