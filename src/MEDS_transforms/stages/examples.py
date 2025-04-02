@@ -93,8 +93,6 @@ def pretty_list_directory(path: Path, prefix: str | None = None) -> list[str]:
         elif child.is_dir():
             lines.append(f"{prefix}{node_prefix}{child.name}")
             lines.extend(pretty_list_directory(child, prefix=prefix + subdir_prefix))
-        else:
-            raise ValueError(f"Unsupported file type: {child}")
     return lines
 
 
