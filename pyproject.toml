@@ -40,6 +40,9 @@ MEDS_transform-stage = "MEDS_transforms.__main__:run_stage"
 # Runner
 MEDS_transform-pipeline = "MEDS_transforms.runner:main"
 
+# Helpers, internal only
+__get_MEDS_transform_stage_id = "MEDS_transforms.get_stage_id:main"
+
 [project.entry-points."MEDS_transforms.stages"]
 aggregate_code_metadata = "MEDS_transforms.stages:aggregate_code_metadata"
 fit_vocabulary_indices = "MEDS_transforms.stages:fit_vocabulary_indices"

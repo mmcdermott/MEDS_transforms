@@ -6,6 +6,7 @@ import ast
 import hashlib
 import inspect
 import logging
+import os
 import textwrap
 import warnings
 from collections.abc import Callable
@@ -228,27 +229,31 @@ class Stage:
         self.map_fn = map_fn
         self.reduce_fn = reduce_fn
 
-        if self.WARN_ON_ENTRY_POINT_DISCREPANCY:
+        do_skip_validation = os.environ.get("DISABLE_STAGE_VALIDATION", "0") == "1"
+
+        if do_skip_validation:
+            logger.info(
+                "Skipping stage validation due to DISABLE_STAGE_VALIDATION environment variable being set."
+            )
+        elif self.WARN_ON_ENTRY_POINT_DISCREPANCY:
             self.validate_stage_entry_point_registration()
+
+    @property
+    def _ID(self) -> str:
+        match self.stage_type:
+            case StageType.MAIN:
+                return f"Main-'{Stage.hash_fn_src(self.main_fn)}'"
+            case StageType.MAP:
+                return f"Map-'{Stage.hash_fn_src(self.map_fn)}'"
+            case StageType.MAPREDUCE:
+                return f"MapReduce-'{Stage.hash_fn_src(self.map_fn)}'-'{Stage.hash_fn_src(self.reduce_fn)}'"
+            case _:
+                raise ValueError(f"Unknown stage type {self.stage_type}")
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Stage):
             raise TypeError(f"Cannot compare Stage to {type(other)}")
-
-        if self.stage_type != other.stage_type:
-            return False
-
-        match self.stage_type:
-            case StageType.MAIN:
-                return Stage.hash_fn_src(self.main_fn) == Stage.hash_fn_src(other.main_fn)
-            case StageType.MAP:
-                return Stage.hash_fn_src(self.map_fn) == Stage.hash_fn_src(other.map_fn)
-            case StageType.MAPREDUCE:
-                return (Stage.hash_fn_src(self.map_fn) == Stage.hash_fn_src(other.map_fn)) and (
-                    Stage.hash_fn_src(self.reduce_fn) == Stage.hash_fn_src(other.reduce_fn)
-                )
-            case _:
-                raise ValueError(f"Unknown stage type {self.stage_type}")
+        return self._ID == other._ID
 
     def validate_stage_entry_point_registration(
         self,
@@ -271,6 +276,51 @@ class Stage:
                 category=StageRegistrationWarning,
             )
             return False
+
+        old_warn_val = Stage.WARN_ON_ENTRY_POINT_DISCREPANCY
+
+        try:
+            # Temporarily disable warnings to avoid circular imports.
+            Stage.WARN_ON_ENTRY_POINT_DISCREPANCY = False
+            entry_point = registered_stages[stage_name].load()
+            if self != entry_point:
+                raise ValueError(
+                    f"Stage {stage_name} is registered in the entry points, but the hash does not match.\n"
+                    f"Self ID: {self._ID}\n"
+                    f"Registered ID: {entry_point._ID}\n"
+                    "This may be due to a missing or incorrectly configured entry point. "
+                    "If this is during development, you may need to run `pip install -e .` to install your "
+                    "package and properly register the stage in the entry points."
+                )
+        except AttributeError as e:
+            if "circular import" not in str(e):
+                raise ValueError(
+                    f"Failed to validate stage {stage_name} for an unexpected reason; it is possible that "
+                    "an upstream stage defined with the same name is invalid."
+                ) from e
+
+            # In this case, we can't validate this stage because python won't directly let us import it. We
+            # run a secondary process to validate the entry point:
+
+            import subprocess
+
+            out = subprocess.run(
+                ["__get_MEDS_transform_stage_id", stage_name], check=True, capture_output=True
+            )
+            registered_id = out.stdout.decode("utf-8").strip()
+
+            if self._ID != registered_id:
+                raise ValueError(
+                    f"Stage {stage_name} is registered in the entry points, but the hash does not match.\n"
+                    f"Self ID: {self._ID}\n"
+                    f"Registered ID: {registered_id}\n"
+                    "This may be due to a missing or incorrectly configured entry point. "
+                    "If this is during development, you may need to run `pip install -e .` to install your "
+                    "package and properly register the stage in the entry points."
+                )
+
+        finally:
+            Stage.WARN_ON_ENTRY_POINT_DISCREPANCY = old_warn_val
 
         return True
 
