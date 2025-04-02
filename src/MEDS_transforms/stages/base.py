@@ -195,7 +195,8 @@ class Stage:
         ...     _ = example_data.write_text("data/0.parquet: 'code,time,subject_id,numeric_value'")
         ...     stage = Stage(main_fn=main, examples_dir=example_dir)
         ...     stage.test_cases
-        {'.': StageExample(stage_cfg={},
+        {'.': StageExample(stage_name='base',
+                           stage_cfg={},
                            want_data=MEDSDataset(data_shards={'0': {'code': [],
                                                                     'time': [],
                                                                     'subject_id': [],
@@ -224,7 +225,8 @@ class Stage:
         ...     _ = ex_2_metadata_fp.write_text("metadata/codes.parquet: 'code,description,parent_codes'")
         ...     stage = Stage(main_fn=main, examples_dir=example_dir)
         ...     stage.test_cases
-        {'example_2_foo': StageExample(stage_cfg={},
+        {'example_2_foo': StageExample(stage_name='base',
+                                       stage_cfg={},
                                        want_data=None,
                                        want_metadata=shape: (0, 3)
                                        ┌──────┬─────────────┬──────────────┐
@@ -235,7 +237,8 @@ class Stage:
                                        └──────┴─────────────┴──────────────┘,
                                        in_data=None,
                                        test_kwargs={}),
-         'example_1': StageExample(stage_cfg={},
+         'example_1': StageExample(stage_name='base',
+                                   stage_cfg={},
                                    want_data=MEDSDataset(data_shards={'0': {'code': [],
                                                                             'time': [],
                                                                             'subject_id': [],
@@ -433,7 +436,9 @@ class Stage:
 
             if StageExample.is_example_dir(example_dir):
                 scenario_name = example_dir.relative_to(self.examples_dir).as_posix()
-                test_cases[scenario_name] = StageExample.from_dir(example_dir, **self.output_schema_updates)
+                test_cases[scenario_name] = StageExample.from_dir(
+                    stage_name=self.stage_name, example_dir=example_dir, **self.output_schema_updates
+                )
             else:
                 examples_to_check.extend(example_dir.iterdir())
 

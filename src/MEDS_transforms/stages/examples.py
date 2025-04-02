@@ -42,6 +42,7 @@ def read_metadata_only(fp: Path, **schema_updates) -> pl.DataFrame:
 class StageExample:
     """A dataclass to encapsulate an example of a stage being used."""
 
+    stage_name: str
     stage_cfg: dict
     want_data: MEDSDataset | None
     want_metadata: pl.DataFrame | None
@@ -60,7 +61,7 @@ class StageExample:
         return want_data_fp.is_file() or want_metadata_fp.is_file()
 
     @classmethod
-    def from_dir(cls, example_dir: Path, **schema_updates) -> StageExample:
+    def from_dir(cls, stage_name: str, example_dir: Path, **schema_updates) -> StageExample:
         """Parse the example directory and return a StageExample object, or raise an error if invalid."""
 
         stage_cfg_fp = example_dir / "cfg.yaml"
@@ -88,6 +89,7 @@ class StageExample:
         test_kwargs = OmegaConf.to_container(OmegaConf.load(test_cfg_fp)) if test_cfg_fp.is_file() else {}
 
         return cls(
+            stage_name=stage_name,
             want_data=want_data,
             want_metadata=want_metadata,
             stage_cfg=stage_cfg,
