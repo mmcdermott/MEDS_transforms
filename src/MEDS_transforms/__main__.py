@@ -6,7 +6,12 @@ from pathlib import Path
 import hydra
 from omegaconf import OmegaConf
 
-from .stages import get_all_stages
+# We disable stage validation here as it is not needed on the CLI; instead, we manually validate that the
+# stage name matches after loading, and that plus the checks for duplicate stage entry points covers all
+# validation failure scenarios.
+os.environ["DISABLE_STAGE_VALIDATION"] = "1"
+
+from .stages import get_all_registered_stages
 
 HELP_STRS = {"--help", "-h", "help", "h"}
 PKG_PFX = "pkg://"
@@ -23,7 +28,7 @@ def print_help_stage():
     print("  * stage_name: Name of the stage to run.")
     print()
     print("Available stages:")
-    all_stages = get_all_stages()
+    all_stages = get_all_registered_stages()
     for name in sorted(all_stages):
         print(f"  - {name}")
 
@@ -60,7 +65,7 @@ def resolve_pipeline_yaml(pipeline_yaml: str):
 def run_stage():
     """Run a stage based on command line arguments."""
 
-    all_stages = get_all_stages()
+    all_stages = get_all_registered_stages()
 
     if len(sys.argv) < 2:
         print_help_stage()
@@ -80,6 +85,12 @@ def run_stage():
         raise ValueError(f"Stage '{stage_name}' not found.")
 
     stage = all_stages[stage_name].load()
+
+    if stage.stage_name != stage_name:
+        raise ValueError(
+            f"Loaded stage name '{stage.stage_name}' does not match the provided name '{stage_name}'!"
+        )
+
     main_fn = stage.main
 
     hydra_wrapper = hydra.main(

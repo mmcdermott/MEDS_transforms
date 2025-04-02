@@ -1,7 +1,5 @@
-from importlib.metadata import EntryPoint, entry_points
-
-from .. import __package_name__
 from .base import Stage  # noqa: F401
+from .discovery import get_all_registered_stages  # noqa: F401
 from .examples import StageExample, get_nested_test_cases  # noqa: F401
 
 # Here are all the stages that are registered in the entry points, imported here so they can be imported at a
@@ -17,9 +15,3 @@ from .normalization import stage as normalization  # noqa: F401
 from .occlude_outliers import stage as occlude_outliers  # noqa: F401
 from .reorder_measurements import stage as reorder_measurements  # noqa: F401
 from .reshard_to_split import stage as reshard_to_split  # noqa: F401
-
-
-def get_all_stages() -> dict[str, EntryPoint]:
-    """Get all available stages."""
-    eps = entry_points(group=f"{__package_name__}.stages")
-    return {name: eps[name] for name in eps.names}

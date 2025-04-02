@@ -4,14 +4,19 @@ from __future__ import annotations
 
 import inspect
 import logging
+import os
 import textwrap
+import warnings
 from collections.abc import Callable
 from enum import StrEnum
 from functools import partial, wraps
+from importlib.metadata import EntryPoint
+from typing import ClassVar
 
 from omegaconf import DictConfig
 
 from ..mapreduce import ANY_COMPUTE_FN_T, map_stage, mapreduce_stage
+from .discovery import get_all_registered_stages
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +92,14 @@ class StageType(StrEnum):
             raise ValueError("Either main_fn or map_fn/reduce_fn must be provided.")
 
 
+class StageRegistrationWarning(Warning):
+    pass
+
+
+class StageRegistrationError(Exception):
+    pass
+
+
 class Stage:
     """The representation of a MEDS-Transforms stage, in object form.
 
@@ -132,6 +145,29 @@ class Stage:
 
     __mimic_fn: Callable | None = None
     __stage_docstring: str | None = None
+    __stage_name: str | None = None
+
+    WARN_IF_NO_ENTRY_POINT_AT_NAME: ClassVar[bool] = os.environ.get("DISABLE_STAGE_VALIDATION", "0") != "1"
+    ERR_IF_ENTRY_POINT_IMPORTABLE: ClassVar[bool] = os.environ.get("DISABLE_STAGE_VALIDATION", "0") != "1"
+
+    ENTRY_POINT_SETUP_STRING: ClassVar[str] = (
+        "This may be due to a missing or incorrectly configured entry point in your setup.py or "
+        "pyproject.toml file. If this is during development, you may need to run "
+        "`pip install -e .` to install your package properly in editable mode and ensure your "
+        "stage registration is detected. "
+    )
+    DISABLE_WARNING_STRING: ClassVar[str] = (
+        "You can disable this warning by setting the class variable `WARN_IF_NO_ENTRY_POINT_AT_NAME` to "
+        "`False`, or filtering out `StageRegistrationWarning` warnings. "
+    )
+    DISABLE_ERROR_STRING: ClassVar[str] = (
+        "You can disable reload-should-cause-error checking by setting the class variable "
+        "`ERR_IF_ENTRY_POINT_IMPORTABLE` to `False`."
+    )
+    DISABLE_ALL_STAGE_VALIDATION_STRING: ClassVar[str] = (
+        "You can disable all validation by setting the environment variable "
+        "`DISABLE_STAGE_VALIDATION` to `1`."
+    )
 
     def __init__(
         self,
@@ -145,16 +181,89 @@ class Stage:
         """Wraps or returns a function that can serve as the main function for a stage."""
 
         self.stage_type = StageType.from_fns(main_fn, map_fn, reduce_fn)
-
-        if stage_name is None:
-            stage_name = (main_fn or map_fn).__module__.split(".")[-1]
-
         self.stage_name = stage_name
         self.stage_docstring = stage_docstring
 
         self.main_fn = main_fn
         self.map_fn = map_fn
         self.reduce_fn = reduce_fn
+
+        do_skip_validation = os.environ.get("DISABLE_STAGE_VALIDATION", "0") == "1"
+
+        if do_skip_validation:
+            logger.debug(
+                "Skipping stage validation at constructor time due to DISABLE_STAGE_VALIDATION environment "
+                "variable being set. This is normal during execution of a stage via the MEDS-Transforms CLI, "
+                "as validation happens manually in the main function in that context, but is typically not "
+                "normal during testing, for example."
+            )
+        else:
+            self.__validate_stage_entry_point_registration()
+
+    def __validate_stage_entry_point_registration(
+        self,
+        stage_name: str | None = None,  # For stage name inference.
+        registered_stages: dict[str, EntryPoint] | None = None,  # For dependency injection.
+    ):
+        """Validates that the stage is registered in the entry points."""
+
+        if not (self.WARN_IF_NO_ENTRY_POINT_AT_NAME or self.ERR_IF_ENTRY_POINT_IMPORTABLE):
+            return
+
+        if registered_stages is None:
+            registered_stages = get_all_registered_stages()
+        if stage_name is None:
+            stage_name = self.stage_name
+
+        if stage_name not in registered_stages:
+            if self.WARN_IF_NO_ENTRY_POINT_AT_NAME:
+                # If the stage is not registered, we warn.
+                warnings.warn(
+                    f"Stage '{stage_name}' is not registered in the entry points.\n"
+                    f"{self.ENTRY_POINT_SETUP_STRING}\n{self.DISABLE_WARNING_STRING}\n"
+                    f"{self.DISABLE_ALL_STAGE_VALIDATION_STRING}",
+                    category=StageRegistrationWarning,
+                )
+            return
+
+        if not self.ERR_IF_ENTRY_POINT_IMPORTABLE:
+            return
+
+        old_env_val = os.environ.get("DISABLE_STAGE_VALIDATION", "0")
+        try:
+            # Temporarily disable warnings to avoid circular imports.
+            os.environ["DISABLE_STAGE_VALIDATION"] = "1"
+
+            # Attempt to reload, which should cause an error if the stage being constructed is the same stage
+            # as the one being registered.
+            registered_stages[stage_name].load()
+            raise StageRegistrationError(
+                f"Stage {stage_name} is registered in the entry points, but an attempted reload causes "
+                "no issues. If this were the stage you are constructing, a reload would cause a circular "
+                "import error, so this means you are overwriting an external, different stage, which is a "
+                "problem!\n"
+                f"{self.ENTRY_POINT_SETUP_STRING}\n{self.DISABLE_ERROR_STRING}\n"
+                f"{self.DISABLE_ALL_STAGE_VALIDATION_STRING}"
+            )
+        except AttributeError as e:
+            if "circular import" not in str(e):
+                raise ValueError(
+                    f"Failed to validate stage {stage_name} for an unexpected reason; it is possible that "
+                    "an upstream stage defined with the same name is invalid."
+                ) from e
+        finally:
+            os.environ["DISABLE_STAGE_VALIDATION"] = old_env_val
+
+    @property
+    def stage_name(self) -> str:
+        if self.__stage_name is not None:
+            return self.__stage_name
+
+        return (self.main_fn or self.map_fn).__module__.split(".")[-1]
+
+    @stage_name.setter
+    def stage_name(self, name: str):
+        self.__stage_name = name
 
     @property
     def stage_docstring(self) -> str:
@@ -228,7 +337,9 @@ class Stage:
             >>> def baz_fn(foo: str, bar: int):
             ...     '''base baz docstring'''
             ...     return f"baz {foo} {bar}"
-            >>> stage = Stage.register(main_fn=main)
+            >>> with warnings.catch_warnings(): # We catch a warning to avoid issues with stage registration
+            ...     warnings.simplefilter("ignore")
+            ...     stage = Stage.register(main_fn=main)
             >>> print(stage.mimic_fn)
             None
             >>> stage.mimic_fn = baz_fn
@@ -349,6 +460,13 @@ class Stage:
             ValueError: If both `main_fn` and `map_fn` or `reduce_fn` are provided.
 
         Examples:
+
+            Firstly, note that in normal usage, the Stage class raises a warning if the stage is not
+            registered properly in an entry point. We'll disable that and other error checking for most of the
+            doctests here, then show it again at the end.
+
+            >>> Stage.WARN_IF_NO_ENTRY_POINT_AT_NAME = False
+            >>> Stage.ERR_IF_ENTRY_POINT_IMPORTABLE = False
 
             When used with only keyword arguments that fully define a function a stage set to mimic nothing is
             returned directly, with the parameters set as defined by what kind of stage is being created.
@@ -547,6 +665,30 @@ class Stage:
             Traceback (most recent call last):
                 ...
             TypeError: First argument must be a function. Got <class 'str'>
+
+            What about those warnings?
+
+            >>> Stage.WARN_IF_NO_ENTRY_POINT_AT_NAME = True
+
+            To see the warnings in this test, we'll explicitly tell the warnings module to raise errors if a
+            warning is thrown, then re-run something successful before:
+
+            >>> with warnings.catch_warnings():
+            ...     warnings.simplefilter("error")
+            ...     @Stage.register
+            ...     def main(cfg: DictConfig):
+            ...         '''base main docstring'''
+            ...         return "main"
+            Traceback (most recent call last):
+                ...
+            MEDS_transforms.stages.base.StageRegistrationWarning: Stage 'base' is not registered in the entry
+            points. This may be due to a missing or incorrectly configured entry point in your setup.py or
+            pyproject.toml file. If this is during development, you may need to run `pip install -e .` to
+            install your package properly in editable mode and ensure your stage registration is detected.
+            You can disable this warning by setting the class variable `WARN_IF_NO_ENTRY_POINT_AT_NAME` to
+            `False`, or filtering out `StageRegistrationWarning` warnings.
+            You can disable all validation by setting the environment variable `DISABLE_STAGE_VALIDATION` to
+            `1`.
         """
 
         def decorator(fn: Callable, **kwargs):

@@ -10,10 +10,10 @@ import pytest
 from meds import code_metadata_filepath
 
 from . import __package_name__
-from .stages import StageExample, get_all_stages, get_nested_test_cases
+from .stages import StageExample, get_all_registered_stages, get_nested_test_cases
 
 # Get all registered stages
-REGISTERED_STAGES = get_all_stages()
+REGISTERED_STAGES = get_all_registered_stages()
 
 
 def get_examples_for_stage(stage: str) -> dict[str, StageExample]:
