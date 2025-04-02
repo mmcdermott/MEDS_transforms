@@ -1,11 +1,8 @@
 import importlib
-import tempfile
 import tomllib
 from pathlib import Path
 
-import polars as pl
 import pytest
-from meds import code_metadata_filepath
 
 from . import __package_name__
 from .stages import StageExample, get_all_registered_stages
@@ -125,40 +122,3 @@ def stage_example(request: pytest.FixtureRequest, stage: str, stage_scenario: st
         raise ValueError(f"Stage scenario '{stage_scenario}' not found for stage '{stage}'.")
 
     yield request.config.allowed_stage_scenarios[stage][stage_scenario]
-
-
-@pytest.fixture(scope="session")
-def stage_example_on_disk(stage_example: StageExample, simple_static_MEDS: Path) -> Path:
-    if stage_example.in_data is None:
-        yield simple_static_MEDS
-        return
-
-    with tempfile.TemporaryDirectory() as tempdir:
-        input_dir = Path(tempdir)
-        stage_example.in_data.write(input_dir)
-
-        # Currently, the MEDS testing helper only writes out columns that are in the code metadata schema.
-        # If there are more, we need to write them out manually.
-
-        stage_example.in_data._pl_code_metadata.write_parquet(input_dir / code_metadata_filepath)
-
-        # Same for data
-        for k, v in stage_example.in_data._pl_shards.items():
-            fp = input_dir / "data" / f"{k}.parquet"
-            fp.parent.mkdir(parents=True, exist_ok=True)
-            v.write_parquet(fp)
-
-        yield input_dir
-
-
-@pytest.fixture(scope="session")
-def stage_example_IO(
-    stage_example: StageExample, stage_example_on_disk: Path
-) -> tuple[Path, dict[str, pl.DataFrame]]:
-    """Fixture to provide the input and expected output for the given stage and scenario."""
-    if stage_example.want_data is not None:
-        want_outputs = {f"data/{k}": v for k, v in stage_example.want_data._pl_shards.items()}
-    else:
-        want_outputs = {code_metadata_filepath: stage_example.want_metadata}
-
-    yield stage_example_on_disk, want_outputs
