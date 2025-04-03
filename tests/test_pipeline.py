@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from MEDS_transforms.pytest_plugin import test_pipeline
+from MEDS_transforms.pytest_plugin import pipeline_tester
 
 RUNNER_SCRIPT = "MEDS_transform-pipeline"
 
@@ -68,6 +68,9 @@ stage_configs:
       - "values/n_occurrences"
       - "values/sum"
       - "values/sum_sqd"
+
+hydra:
+  searchpath: ["pkg://MEDS_transforms.configs"]
 """
 
 STAGE_SCENARIO_SEQUENCE = [
@@ -98,12 +101,12 @@ parallelize:
 
 
 def test_example_pipeline():
-    test_pipeline(PIPELINE_YAML, STAGE_RUNNER_YAML, STAGE_SCENARIO_SEQUENCE)
+    pipeline_tester(PIPELINE_YAML, STAGE_RUNNER_YAML, STAGE_SCENARIO_SEQUENCE)
 
 
 @pytest.mark.parallelized
 def test_example_pipeline_parallel():
-    test_pipeline(PIPELINE_YAML, PARALLEL_STAGE_RUNNER_YAML, STAGE_SCENARIO_SEQUENCE)
+    pipeline_tester(PIPELINE_YAML, PARALLEL_STAGE_RUNNER_YAML, STAGE_SCENARIO_SEQUENCE)
 
 
 NO_ARGS_HELP_STR = """

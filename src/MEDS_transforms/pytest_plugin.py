@@ -122,3 +122,72 @@ def stage_example(request: pytest.FixtureRequest, stage: str, stage_scenario: st
         raise ValueError(f"Stage scenario '{stage_scenario}' not found for stage '{stage}'.")
 
     yield request.config.allowed_stage_scenarios[stage][stage_scenario]
+
+
+import subprocess
+import tempfile
+
+
+def pipeline_tester(pipeline_yaml: str, stage_runner_yaml: str, stage_scenario_sequence: list[str]):
+    """Test the pipeline with the given YAML configuration and stage scenario sequence."""
+
+    stage_examples = []
+    for stage_scenario in stage_scenario_sequence:
+        parts = stage_scenario.split("/")
+        if len(parts) > 1:
+            stage_name, scenario_name = parts[0], "/".join(parts[1:])
+        else:
+            stage_name = stage_scenario
+            scenario_name = "."
+
+        try:
+            stage_examples.append(REGISTERED_STAGES[stage_name].load().test_cases[scenario_name])
+        except Exception as e:
+            raise ValueError(f"Error loading stage example for {stage_name}/{scenario_name}") from e
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # 1. Set-up
+        test_root = Path(tmpdir)
+
+        input_dir = test_root / "input"
+        input_dir.mkdir(parents=True, exist_ok=True)
+
+        stage_examples[0].write_for_test(input_dir)
+
+        cohort_dir = test_root / "cohort"
+
+        pipeline_yaml = pipeline_yaml.format(input_dir=input_dir, cohort_dir=cohort_dir)
+
+        pipeline_config_fp = test_root / "pipeline.yaml"
+        pipeline_config_fp.write_text(pipeline_yaml)
+
+        stage_runner_fp = test_root / "stage_runner.yaml"
+        stage_runner_fp.write_text(stage_runner_yaml)
+
+        command = [
+            "MEDS_transform-pipeline",
+            f"pipeline_config_fp={pipeline_config_fp}",
+            f"stage_runner_fp={stage_runner_fp}",
+        ]
+
+        # 2. Run the pipeline
+        out = subprocess.run(
+            command,
+            shell=False,
+            check=False,
+            capture_output=True,
+        )
+
+        def err_msg(m: str) -> str:
+            lines = [
+                f"Pipeline failed with error: {m}",
+                "Stdout:",
+                out.stdout.decode("utf-8"),
+                "Stderr:",
+                out.stderr.decode("utf-8"),
+            ]
+            return "\n".join(lines)
+
+        assert out.returncode == 0, err_msg(f"Pipeline returned code {out.returncode}.")
+
+        # 3. Check the output
