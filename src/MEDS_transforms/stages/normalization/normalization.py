@@ -4,7 +4,7 @@ import polars as pl
 
 from .. import Stage
 
-NORMALIZATION_OUTPUT_SCHEMA = {"code": pl.Int64, "numeric_value": pl.Float64}
+NORMALIZATION_OUTPUT_SCHEMA = {"code": pl.Int64, "numeric_value": pl.Float32}
 
 
 @Stage.register(output_schema_updates=NORMALIZATION_OUTPUT_SCHEMA)
@@ -77,7 +77,7 @@ def normalization(
         ...         "subject_id": pl.UInt32,
         ...         "time": pl.Datetime,
         ...         "code": pl.Utf8,
-        ...         "numeric_value": pl.Float64,
+        ...         "numeric_value": pl.Float32,
         ...         "unit": pl.Utf8,
         ...    },
         ... )
@@ -91,8 +91,8 @@ def normalization(
         ...     schema = {
         ...         "code": pl.Utf8,
         ...         "code/vocab_index": pl.UInt32,
-        ...         "values/mean": pl.Float64,
-        ...         "values/std": pl.Float64,
+        ...         "values/mean": pl.Float32,
+        ...         "values/std": pl.Float32,
         ...     },
         ... )
         >>> normalization(MEDS_df.lazy(), code_metadata).collect()
@@ -100,7 +100,7 @@ def normalization(
         ┌────────────┬─────────────────────┬──────┬───────────────┐
         │ subject_id ┆ time                ┆ code ┆ numeric_value │
         │ ---        ┆ ---                 ┆ ---  ┆ ---           │
-        │ u32        ┆ datetime[μs]        ┆ u32  ┆ f64           │
+        │ u32        ┆ datetime[μs]        ┆ u32  ┆ f32           │
         ╞════════════╪═════════════════════╪══════╪═══════════════╡
         │ 1          ┆ 2021-01-01 00:00:00 ┆ 0    ┆ -2.0          │
         │ 1          ┆ 2021-01-01 00:00:00 ┆ 0    ┆ 2.0           │
@@ -129,7 +129,7 @@ def normalization(
         ...         "subject_id": pl.UInt32,
         ...         "time": pl.Datetime,
         ...         "code": pl.Utf8,
-        ...         "numeric_value": pl.Float64,
+        ...         "numeric_value": pl.Float32,
         ...         "unit": pl.Utf8,
         ...    },
         ... )
@@ -145,8 +145,8 @@ def normalization(
         ...         "code": pl.Utf8,
         ...         "unit": pl.Utf8,
         ...         "code/vocab_index": pl.UInt32,
-        ...         "values/mean": pl.Float64,
-        ...         "values/std": pl.Float64,
+        ...         "values/mean": pl.Float32,
+        ...         "values/std": pl.Float32,
         ...     },
         ... )
         >>> normalization(MEDS_df.lazy(), code_metadata, ["unit"]).collect()
@@ -154,7 +154,7 @@ def normalization(
         ┌────────────┬─────────────────────┬──────┬───────────────┐
         │ subject_id ┆ time                ┆ code ┆ numeric_value │
         │ ---        ┆ ---                 ┆ ---  ┆ ---           │
-        │ u32        ┆ datetime[μs]        ┆ u32  ┆ f64           │
+        │ u32        ┆ datetime[μs]        ┆ u32  ┆ f32           │
         ╞════════════╪═════════════════════╪══════╪═══════════════╡
         │ 1          ┆ 2021-01-01 00:00:00 ┆ 0    ┆ -2.0          │
         │ 1          ┆ 2021-01-01 00:00:00 ┆ 1    ┆ 0.0           │
@@ -173,7 +173,7 @@ def normalization(
         ┌────────────┬─────────────────────┬──────┬───────────────┐
         │ subject_id ┆ time                ┆ code ┆ numeric_value │
         │ ---        ┆ ---                 ┆ ---  ┆ ---           │
-        │ u32        ┆ datetime[μs]        ┆ u32  ┆ f64           │
+        │ u32        ┆ datetime[μs]        ┆ u32  ┆ f32           │
         ╞════════════╪═════════════════════╪══════╪═══════════════╡
         │ 1          ┆ 2021-01-01 00:00:00 ┆ 0    ┆ -2.0          │
         └────────────┴─────────────────────┴──────┴───────────────┘
@@ -203,6 +203,8 @@ def normalization(
     while idx_col in df_cols:
         idx_col = f"_{idx_col}"
 
+    normalized_val_col = (pl.col("numeric_value") - pl.col("values/mean")) / pl.col("values/std")
+
     return (
         df.with_row_index(idx_col)
         .join(
@@ -216,7 +218,7 @@ def normalization(
             "subject_id",
             "time",
             pl.col("code/vocab_index").alias("code"),
-            ((pl.col("numeric_value") - pl.col("values/mean")) / pl.col("values/std")).alias("numeric_value"),
+            normalized_val_col.cast(pl.Float32).alias("numeric_value"),
         )
         .sort(idx_col)
         .drop(idx_col)
