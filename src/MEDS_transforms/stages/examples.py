@@ -544,6 +544,38 @@ class StageExample:
 
 
 class StageExampleDict(dict):
+    """A dictionary subclass to hold stage examples.
+
+    The only purpose to this is to display the examples in a more readable format when printed. It does not
+    validate that the values are `StageExample` objects,
+
+    Examples:
+        >>> print(StageExampleDict())
+        {}
+
+    Singleton example dictionaries with an empty scenario name just prints the stage:
+
+        >>> print(StageExampleDict(**{".": "foo"}))
+        foo
+
+    With a scenario name or multiple scenarios, it prints the stage and scenario, nesting with a "│" indicator
+
+        >>> print(StageExampleDict(**{"foo": "bar"}))
+        foo:
+        │   bar
+
+    Note that if the empty scenario name (".") is included in a multi-scenario dict, it is printed, unlike in
+    the singleton case.
+
+        >>> print(StageExampleDict(**{"foo": "bar", "baz": "qux", ".": "quux"}))
+        foo:
+        │   bar
+        baz:
+        │   qux
+        .:
+        │   quux
+    """
+
     def __str__(self) -> str:
         if not self:
             return "{}"
