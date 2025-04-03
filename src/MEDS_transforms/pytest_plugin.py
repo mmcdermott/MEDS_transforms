@@ -1,4 +1,6 @@
 import importlib
+import subprocess
+import tempfile
 import tomllib
 from pathlib import Path
 
@@ -123,10 +125,6 @@ def stage_example(request: pytest.FixtureRequest, stage: str, stage_scenario: st
         raise ValueError(f"Stage scenario '{stage_scenario}' not found for stage '{stage}'.")
 
     yield request.config.allowed_stage_scenarios[stage][stage_scenario]
-
-
-import subprocess
-import tempfile
 
 
 def pipeline_tester(pipeline_yaml: str, stage_runner_yaml: str, stage_scenario_sequence: list[str]):
