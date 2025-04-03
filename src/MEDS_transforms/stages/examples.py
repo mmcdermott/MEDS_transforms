@@ -748,8 +748,30 @@ class StageExample:
             └── data
                 └── foo.json
 
+    We also have an option to tell the system that we've already resolved the cohort dir into the appropriate
+    data or metadata subdirectories; this is useful in pipeline tests. To do that, the `is_resolved_dir`
+    parameter can be passed to `check_outputs` (it isn't passable to `test` as that is only used for
+    single-stage tests which don't need this capability).
+
+        >>> example = StageExample(stage_name="with_scenario", want_data=data)
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     cohort_dir = Path(tmpdir)
+        ...     _ = example.want_data.write(cohort_dir)
+        ...     example.check_outputs(cohort_dir / "data", is_resolved_dir=True)
+        ...     print("No error was raised!")
+        No error was raised!
+        >>> example = StageExample(stage_name="example_stage", want_metadata=metadata_df)
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     cohort_dir = Path(tmpdir)
+        ...     (cohort_dir / 'metadata').mkdir()
+        ...     example.want_metadata.write_parquet(cohort_dir / code_metadata_filepath)
+        ...     example.check_outputs(cohort_dir / "metadata", is_resolved_dir=True)
+        ...     print("No error was raised!")
+        No error was raised!
+
     Different errors are raised if the shards differ...
 
+        >>> example = StageExample(stage_name="with_scenario", want_data=data)
         >>> wrong_data = MEDSDataset(data_shards={"1": data_df}, dataset_metadata={})
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     cohort_dir = Path(tmpdir)
@@ -887,6 +909,7 @@ class StageExample:
     want_metadata: pl.DataFrame | None = None
     in_data: MEDSDataset | None = None
     do_use_config_yaml: bool = False
+    df_check_kwargs: dict | None = None
 
     BASE_PACKAGE: ClassVar[str] = "pkg://MEDS_transforms.configs._preprocess.yaml"
 
@@ -896,6 +919,9 @@ class StageExample:
 
         if self.scenario_name == ".":
             self.scenario_name = None
+
+        if self.df_check_kwargs is None:
+            self.df_check_kwargs = dict(rtol=1e-3, atol=1e-5)
 
     @classmethod
     def is_example_dir(cls, path: Path) -> bool:
@@ -984,42 +1010,45 @@ class StageExample:
                 fp.parent.mkdir(parents=True, exist_ok=True)
                 v.write_parquet(fp)
 
-    def __data_files(self, cohort_dir: Path) -> list[Path]:
-        return list((cohort_dir / "data").rglob("*.parquet"))
+    def __data_files(self, data_dir: Path) -> list[Path]:
+        return list((data_dir).rglob("*.parquet"))
 
-    def __data_shards(self, cohort_dir: Path) -> dict[str, pl.DataFrame]:
+    def __data_shards(self, data_dir: Path) -> dict[str, pl.DataFrame]:
         shards = {}
-        for fp in self.__data_files(cohort_dir):
-            shard_name = fp.relative_to(cohort_dir / "data").with_suffix("").as_posix()
+        for fp in self.__data_files(data_dir):
+            shard_name = fp.relative_to(data_dir).with_suffix("").as_posix()
             shards[shard_name] = pl.read_parquet(fp)
         return shards
 
-    def __check_files(self, cohort_dir: Path):
+    def __check_files(self, cohort_dir: Path, is_resolved_dir: bool = False) -> None:
         if not cohort_dir.exists():
             raise AssertionError(f"Expected cohort directory {cohort_dir} to exist, but it does not.")
 
         all_files_str = f"{cohort_dir.name}\n" + "\n".join(pretty_list_directory(cohort_dir))
 
         if self.want_data is not None:
-            if not self.__data_files(cohort_dir):
+            data_dir = cohort_dir if is_resolved_dir else cohort_dir / "data"
+            if not self.__data_files(data_dir):
                 raise AssertionError(
                     f"Expected data files in {cohort_dir}/data/**.parquet, but none were found. Got:\n"
                     f"{all_files_str}"
                 )
 
         if self.want_metadata is not None:
-            metadata_fp = cohort_dir / code_metadata_filepath
+            metadata_dir = cohort_dir if is_resolved_dir else cohort_dir / "metadata"
+            metadata_fp = metadata_dir / "codes.parquet"
             if not metadata_fp.is_file():
                 raise AssertionError(
                     f"Expected metadata file {code_metadata_filepath} in {cohort_dir}. Got:\n"
                     f"{all_files_str}"
                 )
 
-    def check_outputs(self, cohort_dir: Path):
-        self.__check_files(cohort_dir)
+    def check_outputs(self, cohort_dir: Path, is_resolved_dir: bool = False) -> None:
+        self.__check_files(cohort_dir, is_resolved_dir)
 
         if self.want_data is not None:
-            got_data = MEDSDataset(data_shards=self.__data_shards(cohort_dir), dataset_metadata={})
+            data_dir = cohort_dir if is_resolved_dir else cohort_dir / "data"
+            got_data = MEDSDataset(data_shards=self.__data_shards(data_dir), dataset_metadata={})
 
             try:
                 assert (
@@ -1028,7 +1057,7 @@ class StageExample:
                 for shard_name, got_df in got_data._pl_shards.items():
                     want_df = self.want_data._pl_shards[shard_name]
                     try:
-                        assert_frame_equal(got_df, want_df, rtol=1e-3, atol=1e-5)
+                        assert_frame_equal(got_df, want_df, **self.df_check_kwargs)
                     except AssertionError as e:
                         raise AssertionError(f"Data differs in (at least) shard {shard_name}: {e}")
             except AssertionError as e:
@@ -1036,9 +1065,11 @@ class StageExample:
                 raise AssertionError(f"Want data:\n{self.want_data}\nGot data:\n{got_data}\n{e}")
 
         if self.want_metadata is not None:
-            got_metadata = pl.read_parquet(cohort_dir / code_metadata_filepath)
+            metadata_dir = cohort_dir if is_resolved_dir else cohort_dir / "metadata"
+            metadata_fp = metadata_dir / "codes.parquet"
+            got_metadata = pl.read_parquet(metadata_fp)
             try:
-                assert_frame_equal(self.want_metadata, got_metadata, rtol=1e-3, atol=1e-5)
+                assert_frame_equal(self.want_metadata, got_metadata, **self.df_check_kwargs)
             except AssertionError as e:
                 pl.Config.set_tbl_rows(-1)
                 raise AssertionError(

@@ -3,6 +3,7 @@ import tomllib
 from pathlib import Path
 
 import pytest
+from omegaconf import OmegaConf
 
 from . import __package_name__
 from .stages import StageExample, get_all_registered_stages
@@ -131,6 +132,15 @@ import tempfile
 def pipeline_tester(pipeline_yaml: str, stage_runner_yaml: str, stage_scenario_sequence: list[str]):
     """Test the pipeline with the given YAML configuration and stage scenario sequence."""
 
+    pipeline_stages = list(OmegaConf.create(pipeline_yaml).stages)
+
+    if len(pipeline_stages) != len(stage_scenario_sequence):
+        raise ValueError(
+            "Incorrect pipeline test specification! "
+            f"Pipeline YAML has {len(pipeline_stages)} stages, but {len(stage_scenario_sequence)} "
+            "stage scenarios were provided."
+        )
+
     stage_examples = []
     for stage_scenario in stage_scenario_sequence:
         parts = stage_scenario.split("/")
@@ -191,3 +201,34 @@ def pipeline_tester(pipeline_yaml: str, stage_runner_yaml: str, stage_scenario_s
         assert out.returncode == 0, err_msg(f"Pipeline returned code {out.returncode}.")
 
         # 3. Check the output
+        last_data_stage = (None, None)
+        last_metadata_stage = (None, None)
+
+        for name, stage in zip(pipeline_stages, stage_examples):
+            if stage.want_data is not None:
+                last_data_stage = (name, stage)
+            if stage.want_metadata is not None:
+                last_metadata_stage = (name, stage)
+
+        for name, stage in zip(pipeline_stages, stage_examples):
+            is_last_data_stage = last_data_stage[0] == name
+            is_last_metadata_stage = last_metadata_stage[0] == name
+
+            stage_output_dir = cohort_dir / name
+
+            stage.df_check_kwargs = {"rtol": 5e-2, "atol": 1e-2, "check_dtypes": False}
+
+            try:
+                if stage.want_data is not None:
+                    if is_last_data_stage:
+                        stage.check_outputs(cohort_dir)
+                    else:
+                        stage.check_outputs(stage_output_dir, is_resolved_dir=True)
+
+                if stage.want_metadata is not None:
+                    if is_last_metadata_stage:
+                        stage.check_outputs(cohort_dir)
+                    else:
+                        stage.check_outputs(stage_output_dir, is_resolved_dir=True)
+            except AssertionError as e:
+                raise AssertionError(f"Pipeline failed to produce expected output for stage '{name}'") from e
