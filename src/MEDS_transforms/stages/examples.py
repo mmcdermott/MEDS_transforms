@@ -824,60 +824,60 @@ class StageExample:
         Traceback (most recent call last):
             ...
         AssertionError: Want data:
-            MEDSDataset:
-            dataset_metadata:
-            data_shards:
-              - 0:
-                pyarrow.Table
-                subject_id: int64
-                time: timestamp[us]
-                code: string
-                numeric_value: float
-                ----
-                subject_id: [[1]]
-                time: [[2012-12-01 00:00:00.000000]]
-                code: [["A"]]
-                numeric_value: [[null]]
-            code_metadata:
-              pyarrow.Table
-              code: string
-              description: string
-              parent_codes: list<item: string>
-                child 0, item: string
-              ----
-              code: []
-              description: []
-              parent_codes: []
-            subject_splits: None
-            Got data:
-            MEDSDataset:
-            dataset_metadata:
-            data_shards:
-              - 1:
-                pyarrow.Table
-                subject_id: int64
-                time: timestamp[us]
-                code: string
-                numeric_value: float
-                ----
-                subject_id: [[1]]
-                time: [[2012-12-01 00:00:00.000000]]
-                code: [["A"]]
-                numeric_value: [[null]]
-            code_metadata:
-              pyarrow.Table
-              code: string
-              description: string
-              parent_codes: list<item: string>
-                child 0, item: string
-              ----
-              code: []
-              description: []
-              parent_codes: []
-            subject_splits: None
-            Data differs in (at least) shard 0: DataFrames are different (value mismatch for column 'time')
-            [left]:  [datetime.datetime(2015, 12, 1, 0, 0)]
-            [right]: [datetime.datetime(2012, 12, 1, 0, 0)]
+        MEDSDataset:
+        dataset_metadata:
+        data_shards:
+          - 0:
+            pyarrow.Table
+            subject_id: int64
+            time: timestamp[us]
+            code: string
+            numeric_value: float
+            ----
+            subject_id: [[1]]
+            time: [[2012-12-01 00:00:00.000000]]
+            code: [["A"]]
+            numeric_value: [[null]]
+        code_metadata:
+          pyarrow.Table
+          code: string
+          description: string
+          parent_codes: list<item: string>
+            child 0, item: string
+          ----
+          code: []
+          description: []
+          parent_codes: []
+        subject_splits: None
+        Got data:
+        MEDSDataset:
+        dataset_metadata:
+        data_shards:
+          - 0:
+            pyarrow.Table
+            subject_id: int64
+            time: timestamp[us]
+            code: string
+            numeric_value: float
+            ----
+            subject_id: [[1]]
+            time: [[2015-12-01 00:00:00.000000]]
+            code: [["A"]]
+            numeric_value: [[null]]
+        code_metadata:
+          pyarrow.Table
+          code: string
+          description: string
+          parent_codes: list<item: string>
+            child 0, item: string
+          ----
+          code: []
+          description: []
+          parent_codes: []
+        subject_splits: None
+        Data differs in (at least) shard 0: DataFrames are different (value mismatch for column 'time')
+        [left]:  [datetime.datetime(2015, 12, 1, 0, 0)]
+        [right]: [datetime.datetime(2012, 12, 1, 0, 0)]
     """
 
     stage_name: str
