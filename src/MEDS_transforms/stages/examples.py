@@ -64,7 +64,13 @@ def pretty_list_directory(path: Path, prefix: str | None = None) -> list[str]:
         ...     pretty_list_directory(path / "foo")
         Traceback (most recent call last):
             ...
-        ValueError: Path /tmp/tmp.../foo is not a directory.
+        ValueError: Path /tmp/tmp.../foo does not exist.
+        >>> with tempfile.NamedTemporaryFile(suffix=".txt") as tmp:
+        ...     path = Path(tmp.name)
+        ...     pretty_list_directory(path)
+        Traceback (most recent call last):
+            ...
+        ValueError: Path /tmp/tmp....txt is not a directory.
         >>> pretty_list_directory("foo")
         Traceback (most recent call last):
             ...
@@ -73,6 +79,9 @@ def pretty_list_directory(path: Path, prefix: str | None = None) -> list[str]:
 
     if not isinstance(path, Path):
         raise ValueError(f"Expected a Path object, got {type(path)}: {path}")
+
+    if not path.exists():
+        raise ValueError(f"Path {path} does not exist.")
 
     if not path.is_dir():
         raise ValueError(f"Path {path} is not a directory.")
@@ -312,6 +321,33 @@ def read_metadata_only(fp: Path, **schema_updates) -> pl.DataFrame:
 
 
 @dataclass
+class TestEnv:
+    """A dataclass to encapsulate the test environment for a stage.
+
+    This is largely just useful for type safety and for pretty printing during debugging and testing.
+    """
+
+    script: str
+    cohort_dir: Path
+    test_dir: Path
+    input_dir: Path
+    config_yaml_fp: Path | None = None
+
+    def __str__(self) -> str:
+        lines = [f"Test Environment in {self.test_dir}", "  - Files:"]
+        lines.extend(pretty_list_directory(self.test_dir, prefix=_SPACE))
+        lines.append(f"  - Input sub-directory: {self.input_dir.relative_to(self.test_dir)}")
+        lines.append(f"  - Cohort sub-directory: {self.cohort_dir.relative_to(self.test_dir)}")
+
+        if self.config_yaml_fp:
+            lines.append(f"  - Config yaml file: {self.config_yaml_fp.relative_to(self.test_dir)}")
+            cfg_yaml_contents = self.config_yaml_fp.read_text().strip()
+            lines.extend(textwrap.indent(cfg_yaml_contents, _SPACE + _BRANCH).splitlines())
+        lines.append(f"  - Script: {self.script}")
+        return "\n".join(lines)
+
+
+@dataclass
 class StageExample:
     """A dataclass to encapsulate an example of a stage being used.
 
@@ -385,7 +421,7 @@ class StageExample:
     You can also create an example with a scenario name, stage configuration arguments, test kwargs, and
     output (want) data instead of metadata:
 
-        >>> data_df = pl.DataFrame({"subject_id": [1], "code": ["A"], "time": [1], "numeric_value": [None]})
+        >>> data_df = pl.DataFrame({"subject_id": [1], "time": [1], "code": ["A"], "numeric_value": [None]})
         >>> data = MEDSDataset(data_shards={"0": data_df}, dataset_metadata={})
         >>> example_data = StageExample(
         ...     stage_name="with_scenario",
@@ -476,6 +512,372 @@ class StageExample:
             │ foo  ┆ Foo         │
             │ bar  ┆ Bar         │
             └──────┴─────────────┘
+
+    On the testing front, there are a number of methods to help with testing the stage example. At the highest
+    level of abstraction, you can call the `test` method to construct a test environment, run the stage
+    through the MEDS-Transform CLI, and assert that the outputs are as expected. This, combined with the
+    `stage_example` pytest fixtures in `../pytest_plugin.py`, gives an easy, accessible API to test stages
+    that are registered with examples. If you need more flexibility in your usage, please file a GitHub Issue.
+
+    To see the test code in action, though, we'll look at some lower layers of abstraction. First, we can set
+    up and inspect the test environment with the `test_env` `contextmanager` property. This yields a `TestEnv`
+    object, which has a nice readable `__str__` method, so we can print it to inspect it. Note that, upon
+    creation, the `cohort_dir` part of the test environment is non-existent, but input data and config yaml
+    files (if `do_use_config_yaml` is set to `True`) are created. The test environment is cleaned up when the
+    context manager exits.
+
+        >>> example = StageExample(stage_name="example_stage", want_metadata=metadata_df)
+        >>> with example.test_env as test_env:
+        ...     print(test_env)
+        Test Environment in /tmp/tmp...
+          - Files:
+            └── input
+                ├── data
+                │   ├── held_out
+                │   │   └── 0.parquet
+                │   ├── train
+                │   │   ├── 0.parquet
+                │   │   └── 1.parquet
+                │   └── tuning
+                │       └── 0.parquet
+                └── metadata
+                    ├── codes.parquet
+                    ├── dataset.json
+                    └── subject_splits.parquet
+          - Input sub-directory: input
+          - Cohort sub-directory: cohort
+          - Script: MEDS_transform-stage pkg://MEDS_transforms.configs._preprocess.yaml example_stage
+                    'stages=["example_stage"]' input_dir=/tmp/tmp.../input cohort_dir=/tmp/tmp.../cohort
+        >>> test_env.test_dir.is_dir()
+        False
+        >>> example = StageExample(
+        ...     stage_name="example_stage", want_metadata=metadata_df,
+        ...     stage_cfg={"arg1": "value1", "arg2": {"arg3": ["value3A", "value3B"]}},
+        ...     in_data=data,
+        ...     do_use_config_yaml=True,
+        ... )
+        >>> with example.test_env as test_env:
+        ...     print(test_env)
+        Test Environment in /tmp/tmp...
+          - Files:
+            ├── config.yaml
+            └── input
+                ├── data
+                │   └── 0.parquet
+                └── metadata
+                    ├── codes.parquet
+                    └── dataset.json
+          - Input sub-directory: input
+          - Cohort sub-directory: cohort
+          - Config yaml file: config.yaml
+            │   defaults:
+            │   - _preprocess
+            │   stages:
+            │   - example_stage
+            │   stage_configs:
+            │     example_stage:
+            │       arg1: value1
+            │       arg2:
+            │         arg3:
+            │         - value3A
+            │         - value3B
+            │   hydra:
+            │     searchpath:
+            │     - pkg://MEDS_transforms.configs
+          - Script: MEDS_transform-stage /tmp/tmp.../config.yaml example_stage
+                    input_dir=/tmp/tmp.../input cohort_dir=/tmp/tmp.../cohort
+
+    This test environment is used when we call the `test` method, which runs the stage, then checks to ensure
+    that the stage ran successfully and the outputs in the `cohort_dir` are as expected. If the test fails, an
+    error message including the string representation of the test environment and the command output is
+    printed. To explore this, we'll make a fake run function that just returns a controllable return code and
+    output.
+
+        >>> def fake_run_success(script, shell, capture_output):
+        ...     return subprocess.CompletedProcess([], returncode=0, stdout=b"Success", stderr=b"")
+        >>> def fake_run_failure(script, shell, capture_output):
+        ...     return subprocess.CompletedProcess([], returncode=1, stdout=b"", stderr=b"Failure")
+
+    If we run and return a failing status code, the example will error as it is not expecting the command to
+    fail:
+
+        >>> example = StageExample(stage_name="example_stage", want_metadata=metadata_df)
+        >>> example.test(run_fn=fake_run_failure)
+        Traceback (most recent call last):
+            ...
+        AssertionError: Stage example example_stage Failed:
+        Test Environment in /tmp/tmp...
+          - Files:
+            └── input
+                ├── data
+                │   ├── held_out
+                │   │   └── 0.parquet
+                │   ├── train
+                │   │   ├── 0.parquet
+                │   │   └── 1.parquet
+                │   └── tuning
+                │       └── 0.parquet
+                └── metadata
+                    ├── codes.parquet
+                    ├── dataset.json
+                    └── subject_splits.parquet
+          - Input sub-directory: input
+          - Cohort sub-directory: cohort
+          - Script: MEDS_transform-stage pkg://MEDS_transforms.configs._preprocess.yaml example_stage
+                    'stages=["example_stage"]' input_dir=/tmp/tmp.../input cohort_dir=/tmp/tmp.../cohort
+        Stdout:
+        <BLANKLINE>
+        Stderr:
+        Failure
+        Command errored with return code 1
+
+    If we have it succeed, it will still fail, as it won't find any of the output files it is expecting in the
+    (non-existent) cohort directory:
+
+        >>> example = StageExample(stage_name="example_stage", want_metadata=metadata_df)
+        >>> example.test(run_fn=fake_run_success)
+        Traceback (most recent call last):
+            ...
+        AssertionError: Stage example example_stage Failed:
+        Test Environment in /tmp/tmp...
+          - Files:
+            └── input
+                ├── data
+                │   ├── held_out
+                │   │   └── 0.parquet
+                │   ├── train
+                │   │   ├── 0.parquet
+                │   │   └── 1.parquet
+                │   └── tuning
+                │       └── 0.parquet
+                └── metadata
+                    ├── codes.parquet
+                    ├── dataset.json
+                    └── subject_splits.parquet
+          - Input sub-directory: input
+          - Cohort sub-directory: cohort
+          - Script: MEDS_transform-stage pkg://MEDS_transforms.configs._preprocess.yaml example_stage
+                    'stages=["example_stage"]' input_dir=/tmp/tmp.../input cohort_dir=/tmp/tmp.../cohort
+        Stdout:
+        Success
+        Stderr:
+        <BLANKLINE>
+        Expected cohort directory /tmp/tmp.../cohort to exist, but it does not.
+
+    To explore test failures in more detail, we can use the `check_outputs` helper, which checks the output of
+    the passed cohort directory is as expected. For example, if we add the expected metadata to a directory
+    and validate that, we won't see any errors:
+
+        >>> example = StageExample(stage_name="example_stage", want_metadata=metadata_df)
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     cohort_dir = Path(tmpdir)
+        ...     (cohort_dir / 'metadata').mkdir()
+        ...     example.want_metadata.write_parquet(cohort_dir / code_metadata_filepath)
+        ...     example.check_outputs(cohort_dir)
+        ...     print("No error was raised!")
+        No error was raised!
+
+    This function will error if we don't have the expected metadata file in the cohort directory or if its
+    contents are wrong. Note this function also returns a more minimal error, though the broader `test` helper
+    wraps it in additional context.
+
+        >>> example = StageExample(stage_name="example_stage", want_metadata=metadata_df)
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     cohort_dir = Path(tmpdir)
+        ...     (cohort_dir / 'metadata').mkdir()
+        ...     example.check_outputs(cohort_dir)
+        Traceback (most recent call last):
+            ...
+        AssertionError: Expected metadata file metadata/codes.parquet in /tmp/tmp.... Got:
+        tmp...
+        └── metadata
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     cohort_dir = Path(tmpdir)
+        ...     (cohort_dir / 'metadata').mkdir()
+        ...     wrong_metadata = pl.DataFrame({"code": ["f"], "description": [None]})
+        ...     wrong_metadata.write_parquet(cohort_dir / code_metadata_filepath)
+        ...     example.check_outputs(cohort_dir)
+        Traceback (most recent call last):
+            ...
+        AssertionError: Want metadata:
+        shape: (2, 2)
+        ┌──────┬─────────────┐
+        │ code ┆ description │
+        │ ---  ┆ ---         │
+        │ str  ┆ str         │
+        ╞══════╪═════════════╡
+        │ foo  ┆ Foo         │
+        │ bar  ┆ Bar         │
+        └──────┴─────────────┘
+        Got metadata:
+        shape: (1, 2)
+        ┌──────┬─────────────┐
+        │ code ┆ description │
+        │ ---  ┆ ---         │
+        │ str  ┆ null        │
+        ╞══════╪═════════════╡
+        │ f    ┆ null        │
+        └──────┴─────────────┘
+        DataFrames are different (dtypes do not match)
+        [left]:  {'code': String, 'description': String}
+        [right]: {'code': String, 'description': Null}
+
+    Similar assertion cases are used for data comparisons
+
+        >>> data_df = pl.DataFrame(
+        ...     {"subject_id": [1], "time": [datetime(2012, 12, 1)], "code": ["A"], "numeric_value": [None]},
+        ...     schema_overrides={"numeric_value": pl.Float32},
+        ... )
+        >>> data = MEDSDataset(data_shards={"0": data_df}, dataset_metadata={})
+        >>> example = StageExample(stage_name="with_scenario", want_data=data)
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     cohort_dir = Path(tmpdir)
+        ...     _ = example.want_data.write(cohort_dir)
+        ...     example.check_outputs(cohort_dir)
+        ...     print("No error was raised!")
+        No error was raised!
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     cohort_dir = Path(tmpdir)
+        ...     (cohort_dir / 'data').mkdir()
+        ...     (cohort_dir / 'data' / 'foo.json').write_text('{"foo": "bar"}')
+        ...     example.check_outputs(cohort_dir)
+        Traceback (most recent call last):
+            ...
+        AssertionError: Expected data files in /tmp/tmp.../data/**.parquet, but none were found. Got:
+            tmp...
+            └── data
+                └── foo.json
+
+    Different errors are raised if the shards differ...
+
+        >>> wrong_data = MEDSDataset(data_shards={"1": data_df}, dataset_metadata={})
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     cohort_dir = Path(tmpdir)
+        ...     _ = wrong_data.write(cohort_dir)
+        ...     example.check_outputs(cohort_dir)
+        Traceback (most recent call last):
+            ...
+        AssertionError: Want data:
+            MEDSDataset:
+            dataset_metadata:
+            data_shards:
+              - 0:
+                pyarrow.Table
+                subject_id: int64
+                time: timestamp[us]
+                code: string
+                numeric_value: float
+                ----
+                subject_id: [[1]]
+                time: [[2012-12-01 00:00:00.000000]]
+                code: [["A"]]
+                numeric_value: [[null]]
+            code_metadata:
+              pyarrow.Table
+              code: string
+              description: string
+              parent_codes: list<item: string>
+                child 0, item: string
+              ----
+              code: []
+              description: []
+              parent_codes: []
+            subject_splits: None
+            Got data:
+            MEDSDataset:
+            dataset_metadata:
+            data_shards:
+              - 1:
+                pyarrow.Table
+                subject_id: int64
+                time: timestamp[us]
+                code: string
+                numeric_value: float
+                ----
+                subject_id: [[1]]
+                time: [[2012-12-01 00:00:00.000000]]
+                code: [["A"]]
+                numeric_value: [[null]]
+            code_metadata:
+              pyarrow.Table
+              code: string
+              description: string
+              parent_codes: list<item: string>
+                child 0, item: string
+              ----
+              code: []
+              description: []
+              parent_codes: []
+            subject_splits: None
+            Shards differ: dict_keys(['1']) vs dict_keys(['0'])
+
+    ...or if the contents of the data are different:
+
+        >>> wrong_data_df = pl.DataFrame(
+        ...     {"subject_id": [1], "time": [datetime(2015, 12, 1)], "code": ["A"], "numeric_value": [None]},
+        ... )
+        >>> wrong_data = MEDSDataset(data_shards={"0": wrong_data_df}, dataset_metadata={})
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     cohort_dir = Path(tmpdir)
+        ...     _ = wrong_data.write(cohort_dir)
+        ...     example.check_outputs(cohort_dir)
+        Traceback (most recent call last):
+            ...
+        AssertionError: Want data:
+            MEDSDataset:
+            dataset_metadata:
+            data_shards:
+              - 0:
+                pyarrow.Table
+                subject_id: int64
+                time: timestamp[us]
+                code: string
+                numeric_value: float
+                ----
+                subject_id: [[1]]
+                time: [[2012-12-01 00:00:00.000000]]
+                code: [["A"]]
+                numeric_value: [[null]]
+            code_metadata:
+              pyarrow.Table
+              code: string
+              description: string
+              parent_codes: list<item: string>
+                child 0, item: string
+              ----
+              code: []
+              description: []
+              parent_codes: []
+            subject_splits: None
+            Got data:
+            MEDSDataset:
+            dataset_metadata:
+            data_shards:
+              - 1:
+                pyarrow.Table
+                subject_id: int64
+                time: timestamp[us]
+                code: string
+                numeric_value: float
+                ----
+                subject_id: [[1]]
+                time: [[2012-12-01 00:00:00.000000]]
+                code: [["A"]]
+                numeric_value: [[null]]
+            code_metadata:
+              pyarrow.Table
+              code: string
+              description: string
+              parent_codes: list<item: string>
+                child 0, item: string
+              ----
+              code: []
+              description: []
+              parent_codes: []
+            subject_splits: None
+            Data differs in (at least) shard 0: DataFrames are different (value mismatch for column 'time')
+            [left]:  [datetime.datetime(2015, 12, 1, 0, 0)]
+            [right]: [datetime.datetime(2012, 12, 1, 0, 0)]
     """
 
     stage_name: str
@@ -592,7 +994,10 @@ class StageExample:
             shards[shard_name] = pl.read_parquet(fp)
         return shards
 
-    def check_files(self, cohort_dir: Path):
+    def __check_files(self, cohort_dir: Path):
+        if not cohort_dir.exists():
+            raise AssertionError(f"Expected cohort directory {cohort_dir} to exist, but it does not.")
+
         all_files_str = f"{cohort_dir.name}\n" + "\n".join(pretty_list_directory(cohort_dir))
 
         if self.want_data is not None:
@@ -611,16 +1016,21 @@ class StageExample:
                 )
 
     def check_outputs(self, cohort_dir: Path):
-        self.check_files(cohort_dir)
+        self.__check_files(cohort_dir)
 
         if self.want_data is not None:
             got_data = MEDSDataset(data_shards=self.__data_shards(cohort_dir), dataset_metadata={})
 
             try:
-                assert got_data._pl_shards.keys() == self.want_data._pl_shards.keys()
+                assert (
+                    got_data._pl_shards.keys() == self.want_data._pl_shards.keys()
+                ), f"Shards differ: {got_data._pl_shards.keys()} vs {self.want_data._pl_shards.keys()}"
                 for shard_name, got_df in got_data._pl_shards.items():
                     want_df = self.want_data._pl_shards[shard_name]
-                    assert_frame_equal(got_df, want_df, rtol=1e-3, atol=1e-5)
+                    try:
+                        assert_frame_equal(got_df, want_df, rtol=1e-3, atol=1e-5)
+                    except AssertionError as e:
+                        raise AssertionError(f"Data differs in (at least) shard {shard_name}: {e}")
             except AssertionError as e:
                 pl.Config.set_tbl_rows(-1)
                 raise AssertionError(f"Want data:\n{self.want_data}\nGot data:\n{got_data}\n{e}")
@@ -658,7 +1068,7 @@ class StageExample:
 
     @property
     @contextmanager
-    def test_env(self) -> tuple[str, Path]:
+    def test_env(self) -> TestEnv:
         """Context manager to set up the test environment.
 
         This sets up the test directory and cleans it up after use. It yields the script to run this stage and
@@ -677,7 +1087,7 @@ class StageExample:
             if self.do_use_config_yaml:
                 cfg_yaml_fp = test_dir / "config.yaml"
                 OmegaConf.save(self.cmd_pipeline_cfg, cfg_yaml_fp)
-                pipeline_cfg_yaml = str(cfg_yaml_fp.resolve())
+                pipeline_cfg_yaml = cfg_yaml_fp.resolve()
             else:
                 pipeline_cfg_yaml = self.BASE_PACKAGE
 
@@ -686,7 +1096,13 @@ class StageExample:
                 f"{' '.join(self.cmd_args)} input_dir={input_dir} cohort_dir={cohort_dir}"
             )
 
-            yield script, cohort_dir
+            yield TestEnv(
+                script=script,
+                cohort_dir=cohort_dir,
+                test_dir=test_dir,
+                input_dir=input_dir,
+                config_yaml_fp=pipeline_cfg_yaml if self.do_use_config_yaml else None,
+            )
 
     @property
     def _err_prefix(self) -> str:
@@ -706,19 +1122,19 @@ class StageExample:
             AssertionError: If the test fails.
         """
 
-        with self.test_env as (script, cohort_dir):
-            command_out = run_fn(script, shell=True, capture_output=True)
+        with self.test_env as test_env:
+            command_out = run_fn(test_env.script, shell=True, capture_output=True)
+            err_lines = [self._err_prefix, *str(test_env).splitlines()]
 
-            err_lines = [self._err_prefix, f"Script: {script}"]
             err_lines.append(f"Stdout:\n{command_out.stdout.decode()}")
             err_lines.append(f"Stderr:\n{command_out.stderr.decode()}")
 
             if command_out.returncode != 0:
-                err_lines.append(f"Command errored with {command_out.returncode}")
+                err_lines.append(f"Command errored with return code {command_out.returncode}")
                 raise AssertionError("\n".join(err_lines))
 
             try:
-                self.check_outputs(cohort_dir)
+                self.check_outputs(test_env.cohort_dir)
             except AssertionError as e:
                 err_lines.append(str(e))
                 raise AssertionError("\n".join(err_lines))
