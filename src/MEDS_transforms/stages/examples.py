@@ -311,7 +311,27 @@ def read_metadata_only(fp: Path, **schema_updates) -> pl.DataFrame:
 
 @dataclass
 class StageExample:
-    """A dataclass to encapsulate an example of a stage being used."""
+    """A dataclass to encapsulate an example of a stage being used.
+
+    This is used in the automated stage testing infrastructure both for testing the built-in MEDS transforms
+    stages and for downstream package stages.
+
+    Eventually, it may be used for documenting stages as well -- if this would be useful to you, please file a
+    GitHub issue to request it so we can track interest.
+
+    Attributes:
+        stage_name: The name of the stage.
+        scenario_name: The name of the scenario. If the string "." is used, it is replaced with `None`.
+        stage_cfg: The configuration options for this example -- e.g., if the stage is run, with these
+            options, on the specified in_data, the output should match the want_data or want_metadata.
+        want_data: The expected output data for the stage. If `None`, then want_metadata must be provided and
+            the stage is a metadata stage.
+        want_metadata: The expected output metadata for the stage. If `None`, then want_data must be provided
+            and the stage is a data stage.
+        in_data: The input data for the stage. If `None`, then the default static data
+            (`meds_testing_helpers.static_sample_data.SIMPLE_STATIC_SHARDED_BY_SPLIT`) is used.
+        test_kwargs: Additional keyword arguments to control test behavior.
+    """
 
     stage_name: str
     scenario_name: str | None
@@ -520,13 +540,21 @@ class StageExample:
             lines.append(f"Config:\n{self.cmd_pipeline_cfg}")
         return "\n".join(lines)
 
-    def test(self) -> None:
-        """Run a test for this example and assert correctness."""
+    def test(self, run_fn: callable | None = subprocess.run) -> None:
+        """Run a test for this example and assert correctness.
+
+        Args:
+            run_fn: The function to use to run the command. Defaults to subprocess.run. This is useful for
+                dependency injection or customizing the test set-up.
+
+        Raises:
+            AssertionError: If the test fails.
+        """
 
         with tempfile.TemporaryDirectory() as test_dir:
             script, cohort_dir = self.get_test_run_command(Path(test_dir))
 
-            command_out = subprocess.run(script, shell=True, capture_output=True)
+            command_out = run_fn(script, shell=True, capture_output=True)
 
             err_lines = [self._err_prefix, f"Script: {script}"]
             err_lines.append(f"Stdout:\n{command_out.stdout.decode()}")
