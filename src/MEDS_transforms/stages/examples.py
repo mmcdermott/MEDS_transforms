@@ -96,7 +96,7 @@ def pretty_list_directory(path: Path, prefix: str | None = None) -> list[str]:
     return lines
 
 
-def dict_to_hydra_kwargs(d: dict[str, str]) -> str:
+def dict_to_hydra_kwargs(d: dict[str, str]) -> list[str]:
     """Converts a dictionary to a hydra kwargs string for testing purposes.
 
     Args:
@@ -109,8 +109,17 @@ def dict_to_hydra_kwargs(d: dict[str, str]) -> str:
         ValueError: If a key in the dictionary is not dot-list compatible.
 
     Examples:
-        >>> print(" ".join(dict_to_hydra_kwargs({"a": 1, "b": "foo", "c": {"d": 2, "f": ["foo", "bar"]}})))
-        a=1 b=foo c.d=2 'c.f=["foo", "bar"]'
+        >>> args = dict_to_hydra_kwargs({
+        ...     "a": 1, "b": "foo", "c": {"d": True, "e": False, "f": ["foo", "bar"], "g": None}
+        ... })
+        >>> for arg in args:
+        ...     print(arg)
+        a=1
+        b=foo
+        c.d=true
+        c.e=false
+        'c.f=["foo", "bar"]'
+        ~c.g
         >>> from datetime import datetime
         >>> dict_to_hydra_kwargs({"a": 1, 2: "foo"})
         Traceback (most recent call last):
@@ -159,20 +168,145 @@ def dict_to_hydra_kwargs(d: dict[str, str]) -> str:
 
 
 def read_metadata_only(fp: Path, **schema_updates) -> pl.DataFrame:
+    """Reads a code metadata file from a yaml representation.
+
+    Eventually, this should be replaced by functionality in `meds_testing_helpers`. TODO(mmd): File an issue
+    there to track.
+
+    Args:
+        fp: The path to the yaml file.
+        schema_updates: Optional schema updates to apply.
+
+    Returns:
+        A Polars DataFrame containing the metadata.
+
+    Raises:
+        ValueError: If the yaml file does not contain the expected structure or the metadata encoding type is
+            not supported.
+
+    Examples:
+        >>> metadata_df = pl.DataFrame({
+        ...     "code": ["foo", "bar"],
+        ...     "description": ["Foo", "Bar"],
+        ...     "fake_number": [1, 2],
+        ... })
+        >>> csv_rep = {"metadata/codes.parquet": metadata_df.write_csv()}
+        >>> rows_rep = {"metadata/codes.parquet": metadata_df.to_dicts()}
+        >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as tmp:
+        ...     yaml_fp = Path(tmp.name)
+        ...     OmegaConf.save(csv_rep, yaml_fp)
+        ...     read_metadata_only(Path(tmp.name))
+        shape: (2, 3)
+        ┌──────┬─────────────┬─────────────┐
+        │ code ┆ description ┆ fake_number │
+        │ ---  ┆ ---         ┆ ---         │
+        │ str  ┆ str         ┆ i64         │
+        ╞══════╪═════════════╪═════════════╡
+        │ foo  ┆ Foo         ┆ 1           │
+        │ bar  ┆ Bar         ┆ 2           │
+        └──────┴─────────────┴─────────────┘
+        >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as tmp:
+        ...     yaml_fp = Path(tmp.name)
+        ...     OmegaConf.save(csv_rep, yaml_fp)
+        ...     read_metadata_only(Path(tmp.name), fake_number=pl.Int32)
+        shape: (2, 3)
+        ┌──────┬─────────────┬─────────────┐
+        │ code ┆ description ┆ fake_number │
+        │ ---  ┆ ---         ┆ ---         │
+        │ str  ┆ str         ┆ i32         │
+        ╞══════╪═════════════╪═════════════╡
+        │ foo  ┆ Foo         ┆ 1           │
+        │ bar  ┆ Bar         ┆ 2           │
+        └──────┴─────────────┴─────────────┘
+        >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as tmp:
+        ...     yaml_fp = Path(tmp.name)
+        ...     OmegaConf.save(rows_rep, yaml_fp)
+        ...     read_metadata_only(Path(tmp.name))
+        shape: (2, 3)
+        ┌──────┬─────────────┬─────────────┐
+        │ code ┆ description ┆ fake_number │
+        │ ---  ┆ ---         ┆ ---         │
+        │ str  ┆ str         ┆ i64         │
+        ╞══════╪═════════════╪═════════════╡
+        │ foo  ┆ Foo         ┆ 1           │
+        │ bar  ┆ Bar         ┆ 2           │
+        └──────┴─────────────┴─────────────┘
+        >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as tmp:
+        ...     yaml_fp = Path(tmp.name)
+        ...     OmegaConf.save(rows_rep, yaml_fp)
+        ...     read_metadata_only(Path(tmp.name), fake_number=pl.String)
+        shape: (2, 3)
+        ┌──────┬─────────────┬─────────────┐
+        │ code ┆ description ┆ fake_number │
+        │ ---  ┆ ---         ┆ ---         │
+        │ str  ┆ str         ┆ str         │
+        ╞══════╪═════════════╪═════════════╡
+        │ foo  ┆ Foo         ┆ 1           │
+        │ bar  ┆ Bar         ┆ 2           │
+        └──────┴─────────────┴─────────────┘
+
+        Errors are raised if the yaml file is not a filepath:
+
+        >>> read_metadata_only("foo")
+        Traceback (most recent call last):
+            ...
+        TypeError: Expected a Path object, got <class 'str'>: foo
+
+        Or if the file does not exist:
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     read_metadata_only(Path(tmpdir) / "not_real.yaml")
+        Traceback (most recent call last):
+            ...
+        FileNotFoundError: File /tmp/tmp.../not_real.yaml does not exist.
+
+        Or if the yaml file isn't in the right structure
+
+        >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as tmp:
+        ...     yaml_fp = Path(tmp.name)
+        ...     OmegaConf.save(["foo", "bar", "baz"], yaml_fp)
+        ...     read_metadata_only(Path(tmp.name))
+        Traceback (most recent call last):
+            ...
+        ValueError: Expected YAML file to contain 'metadata/codes.parquet: ' pointing to contents, but got:
+            ['foo', 'bar', 'baz']
+
+        Or the data in the metadata key isn't in the right format
+
+        >>> cols_rep = {"metadata/codes.parquet": metadata_df.to_dict(as_series=False)}
+        >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as tmp:
+        ...     yaml_fp = Path(tmp.name)
+        ...     OmegaConf.save(cols_rep, yaml_fp)
+        ...     read_metadata_only(Path(tmp.name))
+        Traceback (most recent call last):
+            ...
+        ValueError: Unsupported data type for metadata: <class 'dict'>
+    """
+
+    if not isinstance(fp, Path):
+        raise TypeError(f"Expected a Path object, got {type(fp)}: {fp}")
+    if not fp.is_file():
+        raise FileNotFoundError(f"File {fp} does not exist.")
+
     data = load_yaml(fp.read_text(), Loader=Loader)
-    assert len(data) == 1
+
+    if not isinstance(data, dict) or len(data) != 1 or list(data.keys())[0] != code_metadata_filepath:
+        raise ValueError(
+            f"Expected YAML file to contain '{code_metadata_filepath}: ' pointing to contents, "
+            f"but got:\n{data}"
+        )
+
     key = list(data.keys())[0]
-    assert key == code_metadata_filepath
 
     val = data[key]
-    if isinstance(val, str):
-        return MEDSDataset.parse_csv(data[key], **schema_updates)
-    elif isinstance(val, dict):
-        return pl.from_dict(val, schema_overrides=schema_updates)
-    elif isinstance(val, list):
-        return pl.from_dicts(val, schema_overrides=schema_updates)
-    else:
-        raise ValueError(f"Unsupported data type for metadata: {type(val)}")
+
+    match data[key]:
+        case str() as csv:
+            return MEDSDataset.parse_csv(csv, **schema_updates)
+        case list() as rows:
+            return pl.from_dicts(rows, schema_overrides=schema_updates)
+        case _:
+            raise ValueError(f"Unsupported data type for metadata: {type(val)}")
 
 
 @dataclass
