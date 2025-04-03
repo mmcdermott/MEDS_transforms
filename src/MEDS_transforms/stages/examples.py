@@ -9,7 +9,7 @@ from __future__ import annotations
 import subprocess
 import tempfile
 import textwrap
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import polars as pl
@@ -330,16 +330,159 @@ class StageExample:
             and the stage is a data stage.
         in_data: The input data for the stage. If `None`, then the default static data
             (`meds_testing_helpers.static_sample_data.SIMPLE_STATIC_SHARDED_BY_SPLIT`) is used.
-        test_kwargs: Additional keyword arguments to control test behavior.
+        do_use_config_yaml: Whether to use a config.yaml file for the stage. If `True`, then the stage is run
+            only with the parameters set via a file, not the command line. Defaults to `False`.
+
+    Raises:
+        ValueError: If neither want_data nor want_metadata is provided, or if both are provided.
+
+    Examples:
+
+    At its simplest, a stage example can be created with just the stage name and the expected output data:
+
+        >>> metadata_df = pl.DataFrame({"code": ["foo", "bar"], "description": ["Foo", "Bar"]})
+        >>> example = StageExample(stage_name="example_stage", want_metadata=metadata_df)
+        >>> print(example)
+        StageExample [example_stage]
+          stage_cfg: {}
+          want_metadata:
+            shape: (2, 2)
+            ┌──────┬─────────────┐
+            │ code ┆ description │
+            │ ---  ┆ ---         │
+            │ str  ┆ str         │
+            ╞══════╪═════════════╡
+            │ foo  ┆ Foo         │
+            │ bar  ┆ Bar         │
+            └──────┴─────────────┘
+
+    It has some helpful properties that you can access too, for its name, test kwargs, and testing usage:
+
+        >>> print(example.full_name)
+        example_stage
+        >>> print(example.do_use_config_yaml)
+        False
+        >>> print(example._pipeline_kwargs)
+        {'stages': ['example_stage'], 'stage_configs': {'example_stage': {}}}
+        >>> print(example.cmd_pipeline_cfg)
+        None
+        >>> for arg in example.cmd_args:
+        ...     print(arg)
+        'stages=["example_stage"]'
+        >>> print(example._err_prefix)
+        Stage example example_stage Failed:
+
+    Note that the scenario name is ignored if it is set to "." as well as if it is not set at all. This is to
+    reflect the fact that a singleton example directory will have a relative path to root of "." and should be
+    inferred to have a null scenario name.
+
+    >>> example = StageExample(stage_name="example_stage", scenario_name=".", want_metadata=metadata_df)
+    >>> print(example.scenario_name)
+    None
+
+    You can also create an example with a scenario name, stage configuration arguments, test kwargs, and
+    output (want) data instead of metadata:
+
+        >>> data_df = pl.DataFrame({"subject_id": [1], "code": ["A"], "time": [1], "numeric_value": [None]})
+        >>> data = MEDSDataset(data_shards={"0": data_df}, dataset_metadata={})
+        >>> example_data = StageExample(
+        ...     stage_name="with_scenario",
+        ...     scenario_name="example_scenario",
+        ...     stage_cfg={"arg1": "value1", "arg2": "value2"},
+        ...     want_data=data,
+        ...     do_use_config_yaml=True,
+        ... )
+        >>> print(example_data)
+        StageExample [with_scenario/example_scenario]
+          stage_cfg: {'arg1': 'value1', 'arg2': 'value2'}
+          do_use_config_yaml: True
+          want_data:
+            MEDSDataset:
+            dataset_metadata:
+            data_shards:
+              - 0:
+                pyarrow.Table
+                subject_id: int64
+                time: timestamp[us]
+                code: string
+                numeric_value: float
+                ----
+                subject_id: [[1]]
+                time: [[1970-01-01 00:00:00.000001]]
+                code: [["A"]]
+                numeric_value: [[null]]
+            code_metadata:
+              pyarrow.Table
+              code: string
+              description: string
+              parent_codes: list<item: string>
+                child 0, item: string
+              ----
+              code: []
+              description: []
+              parent_codes: []
+            subject_splits: None
+
+    You can also set an input dataset for the stage example manually as well; if it is unset (as above), it
+    defaults to `meds_testing_helpers.static_sample_data.SIMPLE_STATIC_SHARDED_BY_SPLIT` in automated tests:
+
+        >>> example_with_in_data = StageExample(
+        ...     stage_name="with_scenario",
+        ...     scenario_name="example_scenario",
+        ...     stage_cfg={"arg1": "value1", "arg2": "value2"},
+        ...     want_metadata=metadata_df,
+        ...     in_data=data,
+        ...     do_use_config_yaml=True,
+        ... )
+        >>> print(example_with_in_data)
+        StageExample [with_scenario/example_scenario]
+          stage_cfg: {'arg1': 'value1', 'arg2': 'value2'}
+          do_use_config_yaml: True
+          in_data:
+            MEDSDataset:
+            dataset_metadata:
+            data_shards:
+              - 0:
+                pyarrow.Table
+                subject_id: int64
+                time: timestamp[us]
+                code: string
+                numeric_value: float
+                ----
+                subject_id: [[1]]
+                time: [[1970-01-01 00:00:00.000001]]
+                code: [["A"]]
+                numeric_value: [[null]]
+            code_metadata:
+              pyarrow.Table
+              code: string
+              description: string
+              parent_codes: list<item: string>
+                child 0, item: string
+              ----
+              code: []
+              description: []
+              parent_codes: []
+            subject_splits: None
+          want_metadata:
+            shape: (2, 2)
+            ┌──────┬─────────────┐
+            │ code ┆ description │
+            │ ---  ┆ ---         │
+            │ str  ┆ str         │
+            ╞══════╪═════════════╡
+            │ foo  ┆ Foo         │
+            │ bar  ┆ Bar         │
+            └──────┴─────────────┘
     """
 
     stage_name: str
-    scenario_name: str | None
-    stage_cfg: dict
-    want_data: MEDSDataset | None
-    want_metadata: pl.DataFrame | None
-    in_data: MEDSDataset | None
-    test_kwargs: dict
+    scenario_name: str | None = None
+    stage_cfg: dict = field(default_factory=dict)
+    want_data: MEDSDataset | None = None
+    want_metadata: pl.DataFrame | None = None
+    in_data: MEDSDataset | None = None
+    do_use_config_yaml: bool = False
 
     def __post_init__(self):
         if self.want_data is None and self.want_metadata is None:
@@ -392,7 +535,7 @@ class StageExample:
             want_metadata=want_metadata,
             stage_cfg=stage_cfg,
             in_data=in_data,
-            test_kwargs=test_kwargs,
+            **test_kwargs,
         )
 
     @property
@@ -405,16 +548,21 @@ class StageExample:
         lines = [
             f"StageExample [{self.full_name}]",
             f"  stage_cfg: {self.stage_cfg}",
-            f"  test_kwargs: {self.test_kwargs}",
         ]
 
-        if self.in_data is not None:
-            lines.append(f"  input:\n{self.in_data}")
+        if self.do_use_config_yaml:
+            lines.append(f"  do_use_config_yaml: {self.do_use_config_yaml}")
 
-        if self.want_data is not None:
-            lines.append(f"  want_data:\n{self.want_data}")
-        if self.want_metadata is not None:
-            lines.append(f"  want_metadata:\n{self.want_metadata}")
+        def add_nested_line(k: str):
+            val = getattr(self, k)
+            if val is not None:
+                lines.append(f"  {k}:")
+                lines.append(textwrap.indent(str(val), _SPACE))
+
+        add_nested_line("in_data")
+        add_nested_line("want_data")
+        add_nested_line("want_metadata")
+
         return "\n".join(lines)
 
     def write_for_test(self, input_dir: Path) -> None:
@@ -484,11 +632,6 @@ class StageExample:
                 )
 
     @property
-    def do_use_config_yaml(self) -> bool:
-        """Check if the test should use a config YAML file."""
-        return self.test_kwargs.get("do_use_config_yaml", False)
-
-    @property
     def _pipeline_kwargs(self) -> dict:
         return {"stages": [self.stage_name], "stage_configs": {self.stage_name: self.stage_cfg}}
 
@@ -535,7 +678,7 @@ class StageExample:
 
     @property
     def _err_prefix(self) -> str:
-        lines = [f"Stage example {self.stage_name}/{self.scenario_name} Failed:"]
+        lines = [f"Stage example {self.full_name} Failed:"]
         if self.do_use_config_yaml:
             lines.append(f"Config:\n{self.cmd_pipeline_cfg}")
         return "\n".join(lines)

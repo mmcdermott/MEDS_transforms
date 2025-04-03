@@ -197,33 +197,32 @@ class Stage:
         ...     print(stage.test_cases)
         StageExample [base]
           stage_cfg: {}
-          test_kwargs: {}
           want_data:
-        MEDSDataset:
-        dataset_metadata:
-        data_shards:
-          - 0:
-            pyarrow.Table
-            subject_id: int64
-            time: timestamp[us]
-            code: string
-            numeric_value: float
-            ----
-            subject_id: [[]]
-            time: [[]]
-            code: []
-            numeric_value: [[]]
-        code_metadata:
-          pyarrow.Table
-          code: string
-          description: string
-          parent_codes: list<item: string>
-            child 0, item: string
-          ----
-          code: []
-          description: []
-          parent_codes: []
-        subject_splits: None
+            MEDSDataset:
+            dataset_metadata:
+            data_shards:
+              - 0:
+                pyarrow.Table
+                subject_id: int64
+                time: timestamp[us]
+                code: string
+                numeric_value: float
+                ----
+                subject_id: [[]]
+                time: [[]]
+                code: []
+                numeric_value: [[]]
+            code_metadata:
+              pyarrow.Table
+              code: string
+              description: string
+              parent_codes: list<item: string>
+                child 0, item: string
+              ----
+              code: []
+              description: []
+              parent_codes: []
+            subject_splits: None
 
     We can also have nested test cases:
 
@@ -244,45 +243,43 @@ class Stage:
         example_2_foo:
         │   StageExample [base/example_2_foo]
         │     stage_cfg: {}
-        │     test_kwargs: {}
         │     want_metadata:
-        │   shape: (0, 3)
-        │   ┌──────┬─────────────┬──────────────┐
-        │   │ code ┆ description ┆ parent_codes │
-        │   │ ---  ┆ ---         ┆ ---          │
-        │   │ str  ┆ str         ┆ list[str]    │
-        │   ╞══════╪═════════════╪══════════════╡
-        │   └──────┴─────────────┴──────────────┘
+        │       shape: (0, 3)
+        │       ┌──────┬─────────────┬──────────────┐
+        │       │ code ┆ description ┆ parent_codes │
+        │       │ ---  ┆ ---         ┆ ---          │
+        │       │ str  ┆ str         ┆ list[str]    │
+        │       ╞══════╪═════════════╪══════════════╡
+        │       └──────┴─────────────┴──────────────┘
         example_1:
         │   StageExample [base/example_1]
         │     stage_cfg: {}
-        │     test_kwargs: {}
         │     want_data:
-        │   MEDSDataset:
-        │   dataset_metadata:
-        │   data_shards:
-        │     - 0:
-        │       pyarrow.Table
-        │       subject_id: int64
-        │       time: timestamp[us]
-        │      code: string
-        │      numeric_value: float
-        │      ----
-        │      subject_id: [[]]
-        │      time: [[]]
-        │      code: []
-        │      numeric_value: [[]]
-        │  code_metadata:
-        │    pyarrow.Table
-        │    code: string
-        │    description: string
-        │    parent_codes: list<item: string>
-        │      child 0, item: string
-        │    ----
-        │    code: []
-        │    description: []
-        │    parent_codes: []
-        │  subject_splits: None
+        │       MEDSDataset:
+        │       dataset_metadata:
+        │       data_shards:
+        │         - 0:
+        │           pyarrow.Table
+        │           subject_id: int64
+        │           time: timestamp[us]
+        │          code: string
+        │          numeric_value: float
+        │          ----
+        │          subject_id: [[]]
+        │          time: [[]]
+        │          code: []
+        │          numeric_value: [[]]
+        │       code_metadata:
+        │         pyarrow.Table
+        │         code: string
+        │         description: string
+        │         parent_codes: list<item: string>
+        │           child 0, item: string
+        │         ----
+        │         code: []
+        │         description: []
+        │         parent_codes: []
+        │       subject_splits: None
 
     The examples directory can also be inferred via a passed `_calling_file` argument, which is intended to be
     the file in which the `Stage.register` function was called. This looks to see if (1) the calling file
