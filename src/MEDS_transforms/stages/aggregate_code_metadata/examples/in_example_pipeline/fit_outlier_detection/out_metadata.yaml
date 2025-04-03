@@ -1,86 +1,14 @@
-metadata/codes.parquet:
-  - code: "ADMISSION//CARDIAC"
-    values/n_occurrences: 0
-    values/sum: 0.0
-    values/sum_sqd: 0.0
-    description: null
-    parent_codes: null
-
-  - code: "AGE"
-    values/n_occurrences: 12
-    values/sum: 370.8654479980469
-    values/sum_sqd: 11482.001953125
-    description: null
-    parent_codes: null
-
-  - code: "DISCHARGE"
-    values/n_occurrences: 0
-    values/sum: 0.0
-    values/sum_sqd: 0.0
-    description: null
-    parent_codes: null
-
-  - code: "DOB"
-    values/n_occurrences: 0
-    values/sum: 0.0
-    values/sum_sqd: 0.0
-    description: null
-    parent_codes: null
-
-  - code: "EYE_COLOR//BLUE"
-    values/n_occurrences: 0
-    values/sum: 0.0
-    values/sum_sqd: 0.0
-    description: "Blue Eyes. Less common than brown."
-    parent_codes: null
-
-  - code: "EYE_COLOR//BROWN"
-    values/n_occurrences: 0
-    values/sum: 0.0
-    values/sum_sqd: 0.0
-    description: "Brown Eyes. The most common eye color."
-    parent_codes: null
-
-  - code: "HEIGHT"
-    values/n_occurrences: 2
-    values/sum: 339.9580078125
-    values/sum_sqd: 57841.734375
-    description: null
-    parent_codes: null
-
-  - code: "HR"
-    values/n_occurrences: 10
-    values/sum: 1104.300048828125
-    values/sum_sqd: 122174.7265625
-    description: "Heart Rate"
-    parent_codes:
-      - "LOINC/8867-4"
-
-  - code: "TEMP"
-    values/n_occurrences: 10
-    values/sum: 983.6000366210938
-    values/sum_sqd: 96788.53125
-    description: "Body Temperature"
-    parent_codes:
-      - "LOINC/8310-5"
-
-  - code: "TIME_OF_DAY//[00,06)"
-    values/n_occurrences: 0
-    values/sum: 0.0
-    values/sum_sqd: 0.0
-    description: null
-    parent_codes: null
-
-  - code: "TIME_OF_DAY//[12,18)"
-    values/n_occurrences: 0
-    values/sum: 0.0
-    values/sum_sqd: 0.0
-    description: null
-    parent_codes: null
-
-  - code: "TIME_OF_DAY//[18,24)"
-    values/n_occurrences: 0
-    values/sum: 0.0
-    values/sum_sqd: 0.0
-    description: null
-    parent_codes: null
+metadata/codes.parquet: |2-
+  code,values/n_occurrences,values/sum,values/sum_sqd,description,parent_codes
+  ADMISSION//CARDIAC,0,0.0,0.0,,
+  AGE,12,370.8654479980469,11482.001953125,,
+  DISCHARGE,0,0.0,0.0,,
+  DOB,0,0.0,0.0,,
+  EYE_COLOR//BLUE,0,0.0,0.0,"Blue Eyes. Less common than brown.",
+  EYE_COLOR//BROWN,0,0.0,0.0,"Brown Eyes. The most common eye color.",
+  HEIGHT,2,339.9580078125,57841.734375,,
+  HR,10,1104.300048828125,122174.7265625,"Heart Rate","LOINC/8867-4"
+  TEMP,10,983.6000366210938,96788.53125,"Body Temperature","LOINC/8310-5"
+  "TIME_OF_DAY//[00,06)",0,0.0,0.0,,
+  "TIME_OF_DAY//[12,18)",0,0.0,0.0,,
+  "TIME_OF_DAY//[18,24)",0,0.0,0.0,,
