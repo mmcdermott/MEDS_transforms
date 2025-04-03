@@ -55,8 +55,8 @@ def pretty_list_directory(path: Path, prefix: str | None = None) -> list[str]:
         ...     for l in pretty_list_directory(path): print(l) # This is just used as newlines break doctests
         ├── bar
         │   └── baz.csv
-        ├── foo
-        └── file1.txt
+        ├── file1.txt
+        └── foo
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     path = Path(tmpdir)
         ...     pretty_list_directory(path / "foo")
@@ -80,7 +80,7 @@ def pretty_list_directory(path: Path, prefix: str | None = None) -> list[str]:
 
     lines = []
 
-    children = list(path.iterdir())
+    children = sorted(list(path.iterdir()))
 
     for i, child in enumerate(children):
         is_last = i == len(children) - 1
