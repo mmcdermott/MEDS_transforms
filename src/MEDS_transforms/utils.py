@@ -51,7 +51,7 @@ def get_smallest_valid_uint_type(num: int | float | pl.Expr) -> pl.DataType:
 def write_lazyframe(df: pl.LazyFrame, out_fp: Path) -> None:
     if isinstance(df, pl.LazyFrame):
         df = df.collect()
-
+    out_fp.parent.mkdir(parents=True, exist_ok=True)
     df.write_parquet(out_fp, use_pyarrow=True)
 
 
