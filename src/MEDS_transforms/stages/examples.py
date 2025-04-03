@@ -9,8 +9,10 @@ from __future__ import annotations
 import subprocess
 import tempfile
 import textwrap
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import ClassVar
 
 import polars as pl
 from meds import code_metadata_filepath
@@ -484,6 +486,8 @@ class StageExample:
     in_data: MEDSDataset | None = None
     do_use_config_yaml: bool = False
 
+    BASE_PACKAGE: ClassVar[str] = "pkg://MEDS_transforms.configs._preprocess.yaml"
+
     def __post_init__(self):
         if self.want_data is None and self.want_metadata is None:
             raise ValueError("Either want_data or want_metadata must be provided.")
@@ -652,29 +656,37 @@ class StageExample:
     def cmd_args(self) -> list[str]:
         return [] if self.do_use_config_yaml else dict_to_hydra_kwargs(self._pipeline_kwargs)
 
-    def get_test_run_command(self, test_dir: Path) -> tuple[str, Path]:
-        if not test_dir.is_dir():
-            raise FileNotFoundError(f"Test directory {test_dir} does not exist.")
+    @property
+    @contextmanager
+    def test_env(self) -> tuple[str, Path]:
+        """Context manager to set up the test environment.
 
-        input_dir = test_dir / "input"
-        input_dir.mkdir()
-        self.write_for_test(input_dir)
+        This sets up the test directory and cleans it up after use. It yields the script to run this stage and
+        the cohort directory to check the outputs.
+        """
+        with tempfile.TemporaryDirectory() as test_dir:
+            test_dir = Path(test_dir)
 
-        cohort_dir = test_dir / "cohort"
+            input_dir = test_dir / "input"
+            input_dir.mkdir()
 
-        if self.do_use_config_yaml:
-            cfg_yaml_fp = test_dir / "config.yaml"
-            OmegaConf.save(self.cmd_pipeline_cfg, cfg_yaml_fp)
-            pipeline_cfg_yaml = str(cfg_yaml_fp.resolve())
-        else:
-            pipeline_cfg_yaml = "pkg://MEDS_transforms.configs._preprocess.yaml"
+            self.write_for_test(input_dir)
 
-        script = (
-            f"MEDS_transform-stage {pipeline_cfg_yaml} {self.stage_name} "
-            f"{' '.join(self.cmd_args)} input_dir={input_dir} cohort_dir={cohort_dir}"
-        )
+            cohort_dir = test_dir / "cohort"
 
-        return script, cohort_dir
+            if self.do_use_config_yaml:
+                cfg_yaml_fp = test_dir / "config.yaml"
+                OmegaConf.save(self.cmd_pipeline_cfg, cfg_yaml_fp)
+                pipeline_cfg_yaml = str(cfg_yaml_fp.resolve())
+            else:
+                pipeline_cfg_yaml = self.BASE_PACKAGE
+
+            script = (
+                f"MEDS_transform-stage {pipeline_cfg_yaml} {self.stage_name} "
+                f"{' '.join(self.cmd_args)} input_dir={input_dir} cohort_dir={cohort_dir}"
+            )
+
+            yield script, cohort_dir
 
     @property
     def _err_prefix(self) -> str:
@@ -694,9 +706,7 @@ class StageExample:
             AssertionError: If the test fails.
         """
 
-        with tempfile.TemporaryDirectory() as test_dir:
-            script, cohort_dir = self.get_test_run_command(Path(test_dir))
-
+        with self.test_env as (script, cohort_dir):
             command_out = run_fn(script, shell=True, capture_output=True)
 
             err_lines = [self._err_prefix, f"Script: {script}"]
