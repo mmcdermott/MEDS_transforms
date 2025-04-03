@@ -9,6 +9,7 @@ from __future__ import annotations
 import subprocess
 import tempfile
 import textwrap
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -1142,7 +1143,7 @@ class StageExample:
             lines.append(f"Config:\n{self.cmd_pipeline_cfg}")
         return "\n".join(lines)
 
-    def test(self, run_fn: callable | None = subprocess.run) -> None:
+    def test(self, run_fn: Callable | None = subprocess.run) -> None:
         """Run a test for this example and assert correctness.
 
         Args:

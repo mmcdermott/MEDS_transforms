@@ -2,6 +2,7 @@ import importlib
 import subprocess
 import tempfile
 import tomllib
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -127,8 +128,78 @@ def stage_example(request: pytest.FixtureRequest, stage: str, stage_scenario: st
     yield request.config.allowed_stage_scenarios[stage][stage_scenario]
 
 
-def pipeline_tester(pipeline_yaml: str, stage_runner_yaml: str, stage_scenario_sequence: list[str]):
-    """Test the pipeline with the given YAML configuration and stage scenario sequence."""
+def pipeline_tester(
+    pipeline_yaml: str,
+    stage_runner_yaml: str,
+    stage_scenario_sequence: list[str],
+    run_fn: Callable | None = subprocess.run,
+):
+    """Test the pipeline with the given YAML configuration and stage scenario sequence.
+
+    Args:
+        pipeline_yaml: A string with the yaml for the pipeline configuration to be tested. If you would like
+            to support a file or pkg file syntax here, file a GitHub issue.
+        stage_runner_yaml: A string with the yaml for the stage runner configuration to be tested. If you
+            would like to support a file or pkg file syntax here, file a GitHub issue.
+        stage_scenario_sequence: A list of strings of the form `"{stage_name}/{scenario}"` where `"scenario"`
+            may be "/" separated or non-existent (so just "{stage_name}") that define the input/output
+            relationships expected for the pipeline for each stage -- e.g., the input to the first listed
+            scenario is the test input to the pipeline, its output is expected to be the output that the
+            pipeline produces when it runs the first stage, which is then fed into the second stage, etc.
+            These are used to test the pipeline conforms to expectations across all stages.
+        run_fn: A callable to run the pipeline. Defaults to `subprocess.run`. This is useful for dependency
+            injection during testing.
+
+    Raises:
+        ValueError: If the pipeline YAML and stage scenario sequence do not match in length.
+        AssertionError: If the pipeline fails to produce expected output for any stage.
+
+    Examples:
+
+        We just show error cases here for now, but check out the `tests/test_pipeline.py` file to see this in
+        action with the default stages.
+
+        >>> pipeline_yaml = "stages: ['foo', 'bar']"
+        >>> pipeline_tester(pipeline_yaml, "", ["just_one"])
+        Traceback (most recent call last):
+            ...
+        ValueError: Incorrect pipeline test specification! Pipeline YAML has 2 stages, but 1 stage scenarios
+        were provided.
+        >>> pipeline_tester(pipeline_yaml, "", ["foo/just_one", "bar/just_one"])
+        Traceback (most recent call last):
+            ...
+        ValueError: Error loading stage example for ...
+
+        To see it in action, we'll use fake run functions.
+
+        >>> def fake_run_success(script, shell, capture_output):
+        ...     return subprocess.CompletedProcess([], returncode=0, stdout=b"Success", stderr=b"")
+        >>> def fake_run_failure(script, shell, capture_output):
+        ...     return subprocess.CompletedProcess([], returncode=1, stdout=b"", stderr=b"Failure")
+
+        We'll use the real, default example for the `filter_subjects` stage here.
+
+        >>> pipeline_yaml = "stages: [filter_subjects]" # This wouldn't work in real life
+
+        If we run and throw an error from the fake shell runner, it will raise an AssertionError.
+
+        >>> pipeline_tester(pipeline_yaml, "", ["filter_subjects"], run_fn=fake_run_failure)
+        Traceback (most recent call last):
+            ...
+        AssertionError: Pipeline failed with error: Pipeline returned code 1.
+        Stdout:
+        <BLANKLINE>
+        Stderr:
+        Failure
+
+        If we run and succeed, it will still throw an error as the stage will fail to validate its expected
+        files.
+
+        >>> pipeline_tester(pipeline_yaml, "", ["filter_subjects"], run_fn=fake_run_success)
+        Traceback (most recent call last):
+            ...
+        AssertionError: Pipeline failed to produce expected output for stage 'filter_subjects'
+    """
 
     pipeline_stages = list(OmegaConf.create(pipeline_yaml).stages)
 
@@ -179,10 +250,9 @@ def pipeline_tester(pipeline_yaml: str, stage_runner_yaml: str, stage_scenario_s
         ]
 
         # 2. Run the pipeline
-        out = subprocess.run(
+        out = run_fn(
             command,
             shell=False,
-            check=False,
             capture_output=True,
         )
 
