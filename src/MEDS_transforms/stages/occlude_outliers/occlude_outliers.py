@@ -8,7 +8,7 @@ from omegaconf import DictConfig
 from .. import Stage
 
 
-@Stage.register
+@Stage.register(output_schema_updates={"numeric_value/is_inlier": pl.Boolean})
 def occlude_outliers(
     stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
