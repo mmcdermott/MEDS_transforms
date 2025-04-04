@@ -6,16 +6,19 @@ from pathlib import Path
 import hydra
 from omegaconf import OmegaConf
 
+from .configs import MAIN_YAML, register_structured_config
+from .stages import get_all_registered_stages
+
 # We disable stage validation here as it is not needed on the CLI; instead, we manually validate that the
 # stage name matches after loading, and that plus the checks for duplicate stage entry points covers all
 # validation failure scenarios.
 os.environ["DISABLE_STAGE_VALIDATION"] = "1"
 
-from .stages import get_all_registered_stages
 
 HELP_STRS = {"--help", "-h", "help", "h"}
 PKG_PFX = "pkg://"
 YAML_EXTENSIONS = {"yaml", "yml"}
+SINGLETON_STR = "__null__"
 
 
 def print_help_stage():
@@ -35,6 +38,9 @@ def print_help_stage():
 
 def resolve_pipeline_yaml(pipeline_yaml: str):
     """Resolve the pipeline YAML file path."""
+    if pipeline_yaml == SINGLETON_STR:
+        return None
+
     if pipeline_yaml.startswith(PKG_PFX):
         pipeline_yaml = pipeline_yaml[len(PKG_PFX) :]
         pipeline_parts = pipeline_yaml.split(".")
@@ -81,25 +87,28 @@ def run_stage():
     stage_name = sys.argv[2]
     sys.argv = sys.argv[2:]  # remove dispatcher arguments
 
-    if stage_name not in all_stages:
-        raise ValueError(f"Stage '{stage_name}' not found.")
+    executable_stage_name = register_structured_config(pipeline_yaml, stage_name)
 
-    stage = all_stages[stage_name].load()
+    if executable_stage_name not in all_stages:
+        raise ValueError(f"Stage '{executable_stage_name}' not found.")
 
-    if stage.stage_name != stage_name:
+    executable_stage = all_stages[executable_stage_name].load()
+
+    if executable_stage.stage_name != executable_stage_name:
         raise ValueError(
-            f"Loaded stage name '{stage.stage_name}' does not match the provided name '{stage_name}'!"
+            f"Loaded stage name '{executable_stage.stage_name}' does not match the provided name "
+            f"'{executable_stage_name}'!"
         )
 
-    main_fn = stage.main
-
-    hydra_wrapper = hydra.main(
-        version_base=None,
-        config_path=str(pipeline_yaml.parent),
-        config_name=pipeline_yaml.stem,
-    )
+    main_fn = executable_stage.main
 
     OmegaConf.register_new_resolver("stage_name", lambda: stage_name)
     OmegaConf.register_new_resolver("stage_docstring", lambda: main_fn.__doc__.replace("$", "$$"))
+
+    hydra_wrapper = hydra.main(
+        version_base=None,
+        config_path=str(MAIN_YAML.parent),
+        config_name=MAIN_YAML.stem,
+    )
 
     hydra_wrapper(main_fn)()

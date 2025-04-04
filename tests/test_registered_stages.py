@@ -6,7 +6,7 @@ from MEDS_transforms.stages import StageExample
 def test_stage_help(stage: str):
     """Test the help command for a stage."""
 
-    script = f"MEDS_transform-stage pkg://MEDS_transforms.configs._preprocess.yaml {stage} --help"
+    script = f"MEDS_transform-stage __null__ {stage} --help"
 
     subprocess.run(script, shell=True, check=True)
 

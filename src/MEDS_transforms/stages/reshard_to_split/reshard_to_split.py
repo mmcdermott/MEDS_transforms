@@ -331,4 +331,4 @@ def main(cfg: DictConfig):
             do_overwrite=cfg.do_overwrite,
         )
 
-    logger.info(f"Done with {cfg.stage}")
+    logger.info("Done")

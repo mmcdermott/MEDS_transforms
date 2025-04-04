@@ -86,9 +86,9 @@ def get_stages_under_test(config: pytest.Config) -> dict[str, dict[str, StageExa
     packages = config.packages_to_test
 
     if packages is None:
-        out = {n: ep for n, ep in REGISTERED_STAGES.items() if ep.dist.metadata["Name"] != __package_name__}
+        out = {n: s for n, s in REGISTERED_STAGES.items() if s["package_name"] != __package_name__}
     else:
-        out = {n: ep for n, ep in REGISTERED_STAGES.items() if ep.dist.metadata["Name"] in packages}
+        out = {n: s for n, s in REGISTERED_STAGES.items() if s["package_name"] in packages}
 
     stages = config.getoption("test_stage")
     if stages:
@@ -99,7 +99,7 @@ def get_stages_under_test(config: pytest.Config) -> dict[str, dict[str, StageExa
             )
         out = {stage: ep for stage, ep in out.items() if stage in stages}
 
-    out = {n: ep.load().test_cases for n, ep in out.items()}
+    out = {n: ep["entry_point"].load().test_cases for n, ep in out.items()}
     return out
 
 

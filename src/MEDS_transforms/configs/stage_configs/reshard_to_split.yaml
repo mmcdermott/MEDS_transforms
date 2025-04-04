@@ -1,2 +1,0 @@
-reshard_to_split:
-  n_subjects_per_shard: 50000
