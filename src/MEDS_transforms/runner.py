@@ -224,6 +224,12 @@ def run_stage(
         script = stage_runner_config.script
     elif "_script" in stage_config:
         script = stage_config._script
+    elif "_base_stage" in stage_runner_config:
+        base_stage_name = stage_runner_config["_base_stage"]
+        script = f"MEDS_transform-stage {str(pipeline_config_fp)} {base_stage_name}"
+    elif "_base_stage" in stage_config:
+        base_stage_name = stage_config["_base_stage"]
+        script = f"MEDS_transform-stage {str(pipeline_config_fp)} {base_stage_name}"
     else:
         script = f"MEDS_transform-stage {str(pipeline_config_fp)} {stage_name}"
 

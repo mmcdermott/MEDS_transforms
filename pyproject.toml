@@ -24,7 +24,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pre-commit<4"]
-tests = ["pytest-cov", "hydra-joblib-launcher"]
+tests = ["pytest-cov"]
 local_parallelism = ["hydra-joblib-launcher"]
 slurm_parallelism = ["hydra-submitit-launcher"]
 docs = [
@@ -64,6 +64,9 @@ addopts = [
   "--doctest-glob=*.md",
 ]
 doctest_optionflags = ["NORMALIZE_WHITESPACE", "ELLIPSIS"]
+markers = [
+  "parallelized: mark test as parallelized, requiring hydra-joblib-launcher",
+]
 
 [project.entry-points.pytest11]
 MEDS_transforms = "MEDS_transforms.pytest_plugin"
