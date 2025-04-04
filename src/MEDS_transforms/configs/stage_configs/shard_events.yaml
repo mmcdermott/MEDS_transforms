@@ -1,3 +1,0 @@
-shard_events:
-  row_chunksize: 200000000
-  infer_schema_length: 10000

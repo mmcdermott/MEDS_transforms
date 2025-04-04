@@ -1,9 +1,0 @@
-split_and_shard_subjects:
-  is_metadata: True
-  output_dir: ${cohort_dir}/metadata
-  n_subjects_per_shard: 50000
-  external_splits_json_fp: null
-  split_fracs:
-    train: 0.8
-    tuning: 0.1
-    held_out: 0.1

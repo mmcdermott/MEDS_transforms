@@ -1,2 +1,0 @@
-convert_to_sharded_events:
-  do_dedup_text_and_numeric: True

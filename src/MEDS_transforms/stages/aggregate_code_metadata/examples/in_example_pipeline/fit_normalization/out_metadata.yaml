@@ -1,0 +1,14 @@
+metadata/codes.parquet: |2-
+  code,code/n_occurrences,code/n_subjects,values/n_occurrences,values/sum,values/sum_sqd,description,parent_codes
+  ADMISSION//CARDIAC,2,2,0,0.0,0.0,,
+  AGE,12,2,7,224.0208376784967,7169.33349609375,,
+  DISCHARGE,2,2,0,0.0,0.0,,
+  DOB,2,2,0,0.0,0.0,,
+  EYE_COLOR//BLUE,1,1,0,0.0,0.0,"Blue Eyes. Less common than brown.",
+  EYE_COLOR//BROWN,1,1,0,0.0,0.0,"Brown Eyes. The most common eye color.",
+  HEIGHT,2,2,0,0,0.0,,
+  HR,10,2,7,776.7999877929688,86249.921875,"Heart Rate","LOINC/8867-4"
+  TEMP,10,2,6,600.1000366210938,60020.21484375,"Body Temperature","LOINC/8310-5"
+  "TIME_OF_DAY//[00,06)",2,2,0,0.0,0.0,,
+  "TIME_OF_DAY//[12,18)",2,1,0,0.0,0.0,,
+  "TIME_OF_DAY//[18,24)",10,2,0,0.0,0.0,,
