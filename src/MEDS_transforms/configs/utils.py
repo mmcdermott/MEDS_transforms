@@ -5,14 +5,11 @@
 """
 
 import dataclasses
-import logging
 from collections.abc import Callable
 from functools import partial
 
 from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
-
-logger = logging.getLogger(__name__)
 
 
 def OmegaConfResolver(*args, **kwargs) -> Callable:
