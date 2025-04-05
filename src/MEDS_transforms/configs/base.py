@@ -1,7 +1,7 @@
 """This file defines the structured base classes for the various configs used in MEDS-Transforms."""
 
 import json
-import warnings
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -9,9 +9,7 @@ from hydra.core.config_store import ConfigStore
 from meds import DatasetMetadata, dataset_metadata_filepath
 from omegaconf import OmegaConf
 
-
-class DatasetMetadataNotFoundWarning(Warning):
-    pass
+logger = logging.getLogger(__name__)
 
 
 def get_dataset_metadata_from_root(root: str) -> DatasetMetadata:
@@ -78,37 +76,31 @@ def get_dataset_name_from_root(root: str, default: str = "Unknown") -> str:
         'example_dataset'
 
         If the dataset metadata file is not found or can't be parsed, the default is returned and a warning is
-        raised; we'll filter out the warning here to keep test output clean:
+        logged, which we can catch and print with the `print_warnings` context manager (defined in our
+        `conftest.py`):
 
         >>> metadata = DatasetMetadata(
         ...     dataset_name="example_dataset",
         ...     dataset_version="1.0.0",
         ... )
-        >>> with warnings.catch_warnings(category=DatasetMetadataNotFoundWarning):
-        ...     warnings.simplefilter("ignore")
-        ...     with tempfile.TemporaryDirectory() as MEDS_root:
-        ...         get_dataset_name_from_root(MEDS_root, default="Foo")
+        >>> with print_warnings(), tempfile.TemporaryDirectory() as MEDS_root:
+        ...     get_dataset_name_from_root(MEDS_root, default="Foo")
         'Foo'
-
-        If we turn on warnings and make them be treated as exceptions, we can see a warning is also thrown in
-        this setting:
-
-        >>> with warnings.catch_warnings(category=DatasetMetadataNotFoundWarning):
-        ...     warnings.simplefilter("error")
-        ...     with tempfile.TemporaryDirectory() as MEDS_root:
-        ...         metadata_fp = Path(MEDS_root) / dataset_metadata_filepath
-        ...         metadata_fp.parent.mkdir(parents=True, exist_ok=False)
-        ...         _ = metadata_fp.write_text("def foo(): return 42") # Invalid JSON
-        ...         get_dataset_name_from_root(MEDS_root, default="Foo")
-        Traceback (most recent call last):
-            ...
-        MEDS_transforms.configs.base.DatasetMetadataNotFoundWarning: Valid dataset metadata file not found in
-        /tmp/tmp...: Expecting value: line 1 column 1 (char 0)
+        Warning: Valid dataset metadata file not found in /tmp/tmp...:
+                 Dataset metadata file not found at /tmp/tmp.../metadata/dataset.json
+        >>> with print_warnings(), tempfile.TemporaryDirectory() as MEDS_root:
+        ...     metadata_fp = Path(MEDS_root) / dataset_metadata_filepath
+        ...     metadata_fp.parent.mkdir(parents=True, exist_ok=False)
+        ...     _ = metadata_fp.write_text("def foo(): return 42") # Invalid JSON
+        ...     get_dataset_name_from_root(MEDS_root, default="Foo")
+        'Foo'
+        Warning: Valid dataset metadata file not found in /tmp/tmp...:
+                 Expecting value: line 1 column 1 (char 0)
     """
     try:
         return get_dataset_metadata_from_root(root).get("dataset_name", default)
     except Exception as e:
-        warnings.warn(f"Valid dataset metadata file not found in {root}: {e}", DatasetMetadataNotFoundWarning)
+        logger.warning(f"Valid dataset metadata file not found in {root}: {e}")
         return default
 
 
@@ -138,37 +130,31 @@ def get_dataset_version_from_root(root: str, default: str = "Unknown") -> str:
         '1.0.0'
 
         If the dataset metadata file is not found or can't be parsed, the default is returned and a warning is
-        raised; we'll filter out the warning here to keep test output clean:
+        logged, which we can catch and print with the `print_warnings` context manager (defined in our
+        `conftest.py`):
 
         >>> metadata = DatasetMetadata(
         ...     dataset_name="example_dataset",
         ...     dataset_version="1.0.0",
         ... )
-        >>> with warnings.catch_warnings(category=DatasetMetadataNotFoundWarning):
-        ...     warnings.simplefilter("ignore")
-        ...     with tempfile.TemporaryDirectory() as MEDS_root:
-        ...         metadata_fp = Path(MEDS_root) / dataset_metadata_filepath
-        ...         metadata_fp.parent.mkdir(parents=True, exist_ok=False)
-        ...         _ = metadata_fp.write_text("Hello world!") # Invalid JSON
-        ...         get_dataset_version_from_root(MEDS_root, default="Bar")
+        >>> with print_warnings(), tempfile.TemporaryDirectory() as MEDS_root:
+        ...     metadata_fp = Path(MEDS_root) / dataset_metadata_filepath
+        ...     metadata_fp.parent.mkdir(parents=True, exist_ok=False)
+        ...     _ = metadata_fp.write_text("Hello world!") # Invalid JSON
+        ...     get_dataset_version_from_root(MEDS_root, default="Bar")
         'Bar'
-
-        If we turn on warnings and make them be treated as exceptions, we can see a warning is also thrown in
-        this setting:
-
-        >>> with warnings.catch_warnings(category=DatasetMetadataNotFoundWarning):
-        ...     warnings.simplefilter("error")
-        ...     with tempfile.TemporaryDirectory() as MEDS_root:
-        ...         get_dataset_version_from_root(MEDS_root, default="Foo")
-        Traceback (most recent call last):
-            ...
-        MEDS_transforms.configs.base.DatasetMetadataNotFoundWarning: Valid dataset metadata file not found in
-        /tmp/tmp...: Dataset metadata file not found at /tmp/tmp.../metadata/dataset.json
+        Warning: Valid dataset metadata file not found in /tmp/tmp...:
+                 Expecting value: line 1 column 1 (char 0)
+        >>> with print_warnings(), tempfile.TemporaryDirectory() as MEDS_root:
+        ...     get_dataset_version_from_root(MEDS_root, default="Bar")
+        'Bar'
+        Warning: Valid dataset metadata file not found in /tmp/tmp...:
+                 Dataset metadata file not found at /tmp/tmp.../metadata/dataset.json
     """
     try:
         return get_dataset_metadata_from_root(root).get("dataset_version", default)
     except Exception as e:
-        warnings.warn(f"Valid dataset metadata file not found in {root}: {e}", DatasetMetadataNotFoundWarning)
+        logger.warning(f"Valid dataset metadata file not found in {root}: {e}")
         return default
 
 
