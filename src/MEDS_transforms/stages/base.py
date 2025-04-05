@@ -7,7 +7,6 @@ import inspect
 import logging
 import os
 import textwrap
-import warnings
 from collections.abc import Callable
 from enum import StrEnum
 from functools import partial, wraps
@@ -96,10 +95,6 @@ class StageType(StrEnum):
             raise ValueError("Either main_fn or map_fn/reduce_fn must be provided.")
 
 
-class StageRegistrationWarning(Warning):
-    pass
-
-
 class StageRegistrationError(Exception):
     pass
 
@@ -163,7 +158,6 @@ class Stage:
     Stages come with tracked test cases. If no special parameters are set on the command line, they won't be
     tracked:
 
-        >>> Stage.WARN_IF_NO_ENTRY_POINT_AT_NAME = False
         >>> Stage.ERR_IF_ENTRY_POINT_IMPORTABLE = False
         >>> def main(cfg: DictConfig):
         ...     '''base main docstring'''
@@ -422,7 +416,7 @@ class Stage:
         if stage_definition_file is None:
             return
 
-        if not stage_definition_file.is_file():
+        if not stage_definition_file.is_file():  # pragma: no cover
             logger.warning(
                 f"Stage definition file {stage_definition_file} is not a file. "
                 "Cannot infer examples directory."
@@ -495,11 +489,10 @@ class Stage:
         if stage_name not in registered_stages:
             if self.WARN_IF_NO_ENTRY_POINT_AT_NAME:
                 # If the stage is not registered, we warn.
-                warnings.warn(
+                logger.warning(
                     f"Stage '{stage_name}' is not registered in the entry points.\n"
                     f"{self.ENTRY_POINT_SETUP_STRING}\n{self.DISABLE_WARNING_STRING}\n"
                     f"{self.DISABLE_ALL_STAGE_VALIDATION_STRING}",
-                    category=StageRegistrationWarning,
                 )
             return
 
@@ -614,9 +607,7 @@ class Stage:
             >>> def baz_fn(foo: str, bar: int):
             ...     '''base baz docstring'''
             ...     return f"baz {foo} {bar}"
-            >>> with warnings.catch_warnings(): # We catch a warning to avoid issues with stage registration
-            ...     warnings.simplefilter("ignore")
-            ...     stage = Stage.register(main_fn=main)
+            >>> stage = Stage.register(main_fn=main)
             >>> print(stage.mimic_fn)
             None
             >>> stage.mimic_fn = baz_fn
@@ -749,11 +740,10 @@ class Stage:
 
         Examples:
 
-            Firstly, note that in normal usage, the Stage class raises a warning if the stage is not
-            registered properly in an entry point. We'll disable that and other error checking for most of the
-            doctests here, then show it again at the end.
+            Firstly, note that in normal usage, the Stage class raises a warning and/or errors if the stage is
+            not registered properly in an entry point. We'll disable that and other error checking for most of
+            the doctests here, then show it again at the end.
 
-            >>> Stage.WARN_IF_NO_ENTRY_POINT_AT_NAME = False
             >>> Stage.ERR_IF_ENTRY_POINT_IMPORTABLE = False
 
             When used with only keyword arguments that fully define a function a stage set to mimic nothing is
@@ -963,35 +953,32 @@ class Stage:
             ValueError: Cannot provide keyword arguments that are also automatically inferred. Got
             {'_calling_file'}
 
-            What about those warnings?
+            What about those warnings? To see the warnings in this test, we'll explicitly capture and print
+            logged warnings. These will normally only be visible in the logger output, but we'll capture and
+            print them here using the `print_warnings` context manager, defined in our `conftest.py` file.
 
-            >>> Stage.WARN_IF_NO_ENTRY_POINT_AT_NAME = True
-
-            To see the warnings in this test, we'll explicitly tell the warnings module to raise errors if a
-            warning is thrown, then re-run something successful before:
-
-            >>> with warnings.catch_warnings():
-            ...     warnings.simplefilter("error")
+            >>> with print_warnings():
             ...     @Stage.register
             ...     def main(cfg: DictConfig):
             ...         '''base main docstring'''
             ...         return "main"
-            Traceback (most recent call last):
-                ...
-            MEDS_transforms.stages.base.StageRegistrationWarning: Stage 'base' is not registered in the entry
-            points. This may be due to a missing or incorrectly configured entry point in your setup.py or
-            pyproject.toml file. If this is during development, you may need to run `pip install -e .` to
-            install your package properly in editable mode and ensure your stage registration is detected.
-            You can disable this warning by setting the class variable `WARN_IF_NO_ENTRY_POINT_AT_NAME` to
-            `False`, or filtering out `StageRegistrationWarning` warnings.
-            You can disable all validation by setting the environment variable `DISABLE_STAGE_VALIDATION` to
-            `1`.
+            Warning: Stage 'base' is not registered in the entry points. This may be due to a missing or
+            incorrectly configured entry point in your setup.py or pyproject.toml file. If this is during
+            development, you may need to run `pip install -e .` to install your package properly in editable
+            mode and ensure your stage registration is detected. You can disable this warning by setting the
+            class variable `WARN_IF_NO_ENTRY_POINT_AT_NAME` to `False`, or filtering out
+            `StageRegistrationWarning` warnings. You can disable all validation by setting the environment
+            variable `DISABLE_STAGE_VALIDATION` to `1`.
         """
 
         # Get the frame of the caller
         caller_frame = inspect.currentframe().f_back
         # Get the filename from the frame
         calling_file = Path(caller_frame.f_code.co_filename)
+        if not calling_file.is_file():  # pragma: no cover
+            # In this case, something is wrong and we can't infer what the file is, so we omit it. This mostly
+            # comes up in test cases, not real usage.
+            calling_file = None
 
         inferred_kwargs = {"_calling_file": calling_file}
 
