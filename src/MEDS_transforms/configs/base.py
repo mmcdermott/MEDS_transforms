@@ -3,13 +3,11 @@
 import dataclasses
 import json
 import logging
-from collections.abc import Callable
-from functools import partial
 from pathlib import Path
 
-from hydra.core.config_store import ConfigStore
 from meds import DatasetMetadata, dataset_metadata_filepath
-from omegaconf import OmegaConf
+
+from .utils import OmegaConfResolver, hydra_registered_dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +50,7 @@ def get_dataset_metadata_from_root(root: str) -> DatasetMetadata:
     return DatasetMetadata(**json.loads(fp.read_text()))
 
 
+@OmegaConfResolver
 def get_dataset_name_from_root(root: str, default: str = "Unknown") -> str:
     """Get the dataset name from the root directory.
 
@@ -106,6 +105,7 @@ def get_dataset_name_from_root(root: str, default: str = "Unknown") -> str:
         return default
 
 
+@OmegaConfResolver
 def get_dataset_version_from_root(root: str, default: str = "Unknown") -> str:
     """Get the dataset version from the root directory.
 
@@ -160,47 +160,6 @@ def get_dataset_version_from_root(root: str, default: str = "Unknown") -> str:
         return default
 
 
-def hydra_registered_dataclass(*, group: str | None, name: str | None = None) -> Callable[[type], type]:
-    """A simple decorator to define a class as a dataclass and register it with Hydra.
-
-    This is a parametrized decorator that takes in the hydra config-store group (mandatory, must be specified
-    by keyword) and name (optional, can be inferred from the decorated class). The flagged class will be
-    registered in the hydra config store with the given name and made a dataclass.
-
-    Args:
-        group: The hydra config-store group to register the class with.
-        name: The name to register the class with. If None, the class name will be used.
-
-    Returns:
-        A decorator that takes a class, makes it a dataclass, and registers it with Hydra.
-
-    Examples:
-        >>> @hydra_registered_dataclass(group="foo")
-        ... class Bar:
-        ...     baz: str = 'baz'
-        >>> dataclasses.is_dataclass(Bar)
-        True
-        >>> cs = ConfigStore.instance()
-        >>> cs.repo['foo']
-        {'Bar.yaml': ConfigNode(name='Bar.yaml', node={'baz': 'baz'}, group='foo', ...)}
-        >>> @hydra_registered_dataclass(group="foo", name="Bar2")
-        ... class Bar:
-        ...     qux: str = 'quux'
-        >>> cs.repo['foo']
-        {'Bar.yaml': ..., 'Bar2.yaml': ConfigNode(name='Bar2.yaml', node={'qux': 'quux'}, ...)}
-    """
-
-    def decorator(cls: type, name: str | None = None) -> type:
-        if name is None:
-            name = cls.__name__
-        cls = dataclasses.dataclass(cls)
-        cs = ConfigStore.instance()
-        cs.store(group=group, name=name, node=cls)
-        return cls
-
-    return partial(decorator, name=name)
-
-
 @hydra_registered_dataclass(group="dataset", name="_base_dataset")
 class DatasetConfig:
     """A base configuration class for MEDS dataset inputs.
@@ -221,7 +180,3 @@ class DatasetConfig:
     name: str
     version: str
     code_modifiers: list[str] = dataclasses.field(default_factory=list)
-
-
-OmegaConf.register_new_resolver("get_dataset_name_from_root", get_dataset_name_from_root)
-OmegaConf.register_new_resolver("get_dataset_version_from_root", get_dataset_version_from_root)
