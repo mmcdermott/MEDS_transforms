@@ -155,7 +155,7 @@ class Stage:
         output_schema_updates: A dictionary mapping column name to a Polars type for the output of the stage,
             with the base MEDS schema options as defaults for unspecified columns.
         default_config: A dictionary containing the default configuration options for the stage. This can be
-            passed manulaly during registration or is set automatically based on the calling file location in
+            passed manually during registration or is set automatically based on the calling file location in
             a manner similar to the examples directory.
 
     Examples:
