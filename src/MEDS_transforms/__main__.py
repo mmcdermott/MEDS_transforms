@@ -4,6 +4,7 @@ from importlib.resources import files
 from pathlib import Path
 
 import hydra
+from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
 
 # We disable stage validation here as it is not needed on the CLI; instead, we manually validate that the
@@ -90,6 +91,13 @@ def run_stage():
         raise ValueError(
             f"Loaded stage name '{stage.stage_name}' does not match the provided name '{stage_name}'!"
         )
+
+    _stage_configs = {}
+    for n, ep in all_stages.items():
+        _stage_configs.update(ep.load().default_config)
+
+    cs = ConfigStore.instance()
+    cs.store(group="stage_configs", name="_stage_configs", node=_stage_configs)
 
     main_fn = stage.main
 

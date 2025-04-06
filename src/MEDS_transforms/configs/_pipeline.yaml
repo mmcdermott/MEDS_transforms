@@ -1,3 +1,6 @@
+defaults:
+  - stage_configs: _stage_configs
+
 # Global IO
 input_dir: ???
 cohort_dir: ???
@@ -12,7 +15,6 @@ log_dir: "${stage_cfg.output_dir}/.logs"
 do_overwrite: False
 seed: 1
 stages: ??? # The list of stages to this overall pipeline (in order)
-stage_configs: ??? # The configurations for each stage, keyed by stage name
 
 # Mapreduce information
 worker: 0
