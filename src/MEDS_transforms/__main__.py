@@ -94,9 +94,8 @@ def run_stage():
 
     main_fn = stage.main
 
-    if stage.default_config:
-        cs = ConfigStore.instance()
-        cs.store(group="stage_configs", name="_stage_configs", node=stage.default_config)
+    cs = ConfigStore.instance()
+    cs.store(group="stage_configs", name="_stage_configs", node=stage.default_config)
 
     hydra_wrapper = hydra.main(
         version_base=None,
