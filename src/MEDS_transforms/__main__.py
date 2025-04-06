@@ -92,10 +92,14 @@ def run_stage():
             f"Loaded stage name '{stage.stage_name}' does not match the provided name '{stage_name}'!"
         )
 
-    main_fn = stage.main
+    _stage_configs = {}
+    for n, ep in all_stages.items():
+        _stage_configs.update(ep.load().default_config)
 
     cs = ConfigStore.instance()
-    cs.store(group="stage_configs", name="_stage_configs", node=stage.default_config)
+    cs.store(group="stage_configs", name="_stage_configs", node=_stage_configs)
+
+    main_fn = stage.main
 
     hydra_wrapper = hydra.main(
         version_base=None,
