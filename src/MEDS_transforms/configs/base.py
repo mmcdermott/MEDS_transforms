@@ -4,8 +4,10 @@ import dataclasses
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from meds import DatasetMetadata, dataset_metadata_filepath
+from omegaconf import DictConfig
 
 from .utils import OmegaConfResolver, hydra_registered_dataclass
 
@@ -164,10 +166,10 @@ def get_dataset_version_from_root(root: str, default: str = "Unknown") -> str:
 class DatasetConfig:
     """A base configuration class for MEDS dataset inputs.
 
-    This class is used to define the base configuration for a dataset. It includes the root directory of the
-    dataset, and the name and version of the dataset. This is merely a base class used for type safety in the
-    Hydra configs. In hydra configuration usage, the resolvers defined below populate the name and version
-    parameters given the root dir automatically, if possible.
+    This class is used to define the base configuration for a dataset (largely for type safety purposes). It
+    includes the root directory of the dataset, and the name and version of the dataset. This is merely a base
+    class used for type safety in the Hydra configs. In hydra configuration usage, the resolvers defined below
+    populate the name and version parameters given the root dir automatically, if possible.
 
     Attributes:
         root_dir: The root directory of the dataset.
@@ -180,3 +182,45 @@ class DatasetConfig:
     name: str
     version: str
     code_modifiers: list[str] = dataclasses.field(default_factory=list)
+
+
+StageConfig_T = dict[str, Any] | DictConfig
+
+
+@hydra_registered_dataclass(group="pipeline", name="_base_pipeline")
+class PipelineConfig:
+    """A base configuration class for MEDS-transforms pipelines.
+
+    This class is used to define the base configuration class for a pipeline (largely for type safety
+    purposes). It contains a name, a version, a description, and a list of stages (alongside their
+    configuration objects). This is intended to be used largely in the context of the MEDS-Transforms
+    configuration stack, not as a standalone Hydra configuration object (as in that context, it will lack
+    sufficient information to infer stage-specific default arguments.
+
+    The primary information in this configuration is contained in the `stages` key, which contains the list of
+    all stages in this pipeline. It is a list, such that each element in the list has one of the following
+    forms:
+      1. A plain string that is the name of the (registered) target stage. This indicates that the stage
+         should be run with no changes to the default arguments (unless further changes are added on the
+         command line).
+      2. A dictionary with only one non-meta key that is the name of the target stage. The value of this
+         non-meta key points to a dictionary of configuration options to pass to the stage. Meta-keys
+         correspond to additional information aobut how the stage should be run, and currently consist solely
+         of the `_base_stage` option, which points to the string name of the registered stage that should be
+         run when the stage of the target name is called, if it is not the target name. This is useful for
+         stages that can be used repeatedly in the same pipeline with different arguments, such as aggregation
+         of code metadata.
+
+    See examples below for more information.
+
+    Attributes:
+        name: The name of the pipeline.
+        version: The version of the pipeline.
+        description: A description of the pipeline.
+        stages: The list of stages. See above for a description of their organization.
+    """
+
+    name: str
+    version: str
+    description: str
+    stages: list[str | dict[str, StageConfig_T]]
