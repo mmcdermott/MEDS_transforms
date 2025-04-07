@@ -1,5 +1,7 @@
 """This file defines the structured base classes for the various configs used in MEDS-Transforms."""
 
+from __future__ import annotations
+
 import dataclasses
 import json
 import logging
@@ -7,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from meds import DatasetMetadata, dataset_metadata_filepath
+from omegaconf import DictConfig
 
 from .utils import OmegaConfResolver, hydra_registered_dataclass
 
@@ -183,9 +186,31 @@ class DatasetConfig:
     code_modifiers: list[str] = dataclasses.field(default_factory=list)
 
 
-StageConfig_T = dict[str, Any]
+UNRESOLVED_STAGE_CONFIG_T = str | dict[str, Any] | DictConfig
 
 
+@dataclasses.dataclass
+class StageConfig:
+    _name: str
+    _base_stage: str | None = None
+    _cfg: dict[str, Any] | DictConfig = dataclasses.field(default_factory=dict)
+
+    @classmethod
+    def parse(cls, raw: UNRESOLVED_STAGE_CONFIG_T) -> StageConfig:
+        match raw:
+            case str() as name:
+                return cls(_name=name)
+            case dict():
+                raise NotImplementedError
+            case DictConfig():
+                raise NotImplementedError
+            case _:
+                raise TypeError(
+                    f"Invalid stage configuration: {raw}. Expected a string, dictionary, or DictConfig."
+                )
+
+
+@dataclasses.dataclass
 class PipelineConfig:
     """A base configuration class for MEDS-transforms pipelines.
 
@@ -221,4 +246,4 @@ class PipelineConfig:
     name: str
     version: str
     description: str
-    stages: list[str | dict[str, StageConfig_T]]
+    stages: list[UNRESOLVED_STAGE_CONFIG_T] = dataclasses.field(default_factory=list)
