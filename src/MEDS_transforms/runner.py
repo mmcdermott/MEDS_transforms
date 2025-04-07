@@ -23,11 +23,9 @@ import logging
 # This is to ensure that the custom resolvers are added.
 from MEDS_transforms.utils import *  # noqa: F401, F403
 
-from .configs import PREPROCESS_CONFIG_YAML, RUNNER_CONFIG_YAML
+from .configs import RUNNER_CONFIG_YAML
 
 logger = logging.getLogger(__name__)
-
-RESERVED_CONFIG_NAMES = {c.stem for c in (PREPROCESS_CONFIG_YAML, RUNNER_CONFIG_YAML)}
 
 
 def get_parallelization_args(
@@ -239,13 +237,6 @@ def main(cfg: DictConfig):
     This script will launch many subsidiary commands via `subprocess`, one for each stage of the specified
     pipeline.
     """
-
-    pipeline_config_fp = Path(cfg.pipeline_config_fp)
-    if pipeline_config_fp.stem in RESERVED_CONFIG_NAMES:
-        raise ValueError(
-            f"Pipeline configuration file {pipeline_config_fp} must not have a name in "
-            f"{RESERVED_CONFIG_NAMES}."
-        )
 
     pipeline_config = load_yaml_file(cfg.pipeline_config_fp)
     stages = pipeline_config.get("stages", [])
