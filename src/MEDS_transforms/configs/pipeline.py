@@ -67,7 +67,15 @@ def resolve_pkg_path(pkg_path: str) -> Path:
 
 @dataclasses.dataclass
 class PipelineConfig:
-    """A base configuration class for MEDS-transforms pipelines."""
+    """A base configuration class for MEDS-transforms pipelines.
+
+    This class is used to define the structure of a pipeline configuration file. It manually tracks the
+    necessary parameters (`stages` and `stage_configs`) and stores all other parameters in an
+    `additional_params` `DictConfig`.
+
+    It's primary use is to abstract functionality for resolving stage specific parameters to form the stage
+    configuration object for a stage and pipeline realization from arguments.
+    """
 
     stages: list[str] | None = None
     stage_configs: dict[str, dict] = dataclasses.field(default_factory=dict)
