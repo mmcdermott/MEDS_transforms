@@ -84,11 +84,13 @@ def run_stage():
 
     all_stage_configs = pipeline_cfg.resolve_stages(all_loaded_stages)
 
+    pipeline_node = pipeline_cfg.structured_config
+    pipeline_node["stage_cfg"] = all_stage_configs[stage_name]
+
     cs = ConfigStore.instance()
     cs.store(group="stage_configs", name="_stage_configs", node=_stage_configs)
-    cs.store(name="_pipeline", node=pipeline_cfg.structured_config)
+    cs.store(name="_pipeline", node=pipeline_node)
     cs.store(name="_main", node=OmegaConf.load(MAIN_CFG_PATH))
-    cs.store(group="stage_cfg", name="_stage_cfg", node=all_stage_configs[stage_name])
 
     hydra_wrapper = hydra.main(version_base=None, config_name="_main")
 

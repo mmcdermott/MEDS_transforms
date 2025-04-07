@@ -3,7 +3,6 @@ defaults:
   - dataset: _base_dataset
   - _self_
   - _pipeline
-  - stage_cfg: _stage_cfg
 
 # Global IO
 input_dir: ${dataset.root_dir}

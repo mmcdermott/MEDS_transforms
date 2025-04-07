@@ -75,6 +75,18 @@ class PipelineConfig:
 
     It's primary use is to abstract functionality for resolving stage specific parameters to form the stage
     configuration object for a stage and pipeline realization from arguments.
+
+    Attributes:
+        stages: A list of stage names in the pipeline. Stages will be executed in the order they are
+            specified.
+        stage_configs: A dictionary of stage configurations. Each key is a stage name, and the values are the
+            stage-specific arguments for that stage. Default values are provided in the stage's default
+            configuration object.
+        additional_params: A dictionary of additional parameters that are not stage-specific.
+
+    The primary way to utilize this class is to (a) load it from an argument, (b) produced a structured
+    config node that can be added to the Hydra ConfigStore from this, then (c) produce stage specific
+    structured `stage_cfg` nodes that can further be added into the ConfigStore.
     """
 
     stages: list[str] | None = None
