@@ -40,30 +40,7 @@ def resolve_pkg_path(pkg_path: str) -> Path:
 
 @dataclasses.dataclass
 class PipelineConfig:
-    """A base configuration class for MEDS-transforms pipelines.
-
-    This class is used to define the base configuration class for a pipeline (largely for type safety
-    purposes). It contains a name, a version, a description, and a list of stages (alongside their
-    configuration objects). This is intended to be used largely in the context of the MEDS-Transforms
-    configuration stack, not as a standalone Hydra configuration object (as in that context, it will lack
-    sufficient information to infer stage-specific default arguments.
-
-    The primary information in this configuration is contained in the `stages` key, which contains the list of
-    all stages in this pipeline. It is a list, such that each element in the list has one of the following
-    forms:
-      1. A plain string that is the name of the (registered) target stage. This indicates that the stage
-         should be run with no changes to the default arguments (unless further changes are added on the
-         command line).
-      2. A dictionary with only one non-meta key that is the name of the target stage. The value of this
-         non-meta key points to a dictionary of configuration options to pass to the stage. Meta-keys
-         correspond to additional information aobut how the stage should be run, and currently consist solely
-         of the `_base_stage` option, which points to the string name of the registered stage that should be
-         run when the stage of the target name is called, if it is not the target name. This is useful for
-         stages that can be used repeatedly in the same pipeline with different arguments, such as aggregation
-         of code metadata.
-
-    See examples below for more information.
-    """
+    """A base configuration class for MEDS-transforms pipelines."""
 
     stages: list[str] | None = None
     stage_configs: dict[str, dict] = dataclasses.field(default_factory=dict)
