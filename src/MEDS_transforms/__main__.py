@@ -7,6 +7,8 @@ import hydra
 from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
 
+from . import __package_name__
+
 # We disable stage validation here as it is not needed on the CLI; instead, we manually validate that the
 # stage name matches after loading, and that plus the checks for duplicate stage entry points covers all
 # validation failure scenarios.
@@ -17,6 +19,9 @@ from .stages import get_all_registered_stages
 HELP_STRS = {"--help", "-h", "help", "h"}
 PKG_PFX = "pkg://"
 YAML_EXTENSIONS = {"yaml", "yml"}
+
+
+PIPELINE_BASE_PATH = files(__package_name__) / "configs" / "__pipeline.yaml"
 
 
 def print_help_stage():
@@ -99,12 +104,16 @@ def run_stage():
     cs = ConfigStore.instance()
     cs.store(group="stage_configs", name="_stage_configs", node=_stage_configs)
 
+    cs.store(name="_pipeline", node=OmegaConf.load(PIPELINE_BASE_PATH))
+
+    pipeline_config = OmegaConf.load(pipeline_yaml)
+    cs.store(name="_main", node=pipeline_config)
+
     main_fn = stage.main
 
     hydra_wrapper = hydra.main(
         version_base=None,
-        config_path=str(pipeline_yaml.parent),
-        config_name=pipeline_yaml.stem,
+        config_name="_main",
     )
 
     OmegaConf.register_new_resolver("stage_name", lambda: stage_name)
