@@ -13,8 +13,6 @@ from . import __package_name__
 HELP_STRS = {"--help", "-h", "help", "h"}
 PKG_PFX = "pkg://"
 YAML_EXTENSIONS = {"yaml", "yml"}
-
-
 MAIN_CFG_PATH = files(__package_name__) / "configs" / "_main.yaml"
 
 
