@@ -26,16 +26,43 @@ def resolve_pkg_path(pkg_path: str) -> Path:
         pkg_path (str): The package path to parse.
 
     Returns:
-        tuple[str, str]: The package name and the relative path.
+        The file-path on disk to the package resource.
+
+    Raises:
+        ValueError: If the package path is not valid.
+
+    Examples:
+        >>> resolve_pkg_path("pkg://MEDS_transforms.configs.pipeline.py")
+        PosixPath('...MEDS_transforms/configs/pipeline.py')
+
+        Files need not exist to be returned:
+
+        >>> resolve_pkg_path("pkg://MEDS_transforms.configs.pipeline.zip")
+        PosixPath('...MEDS_transforms/configs/pipeline.zip')
+
+        Note that this _returns something likely wrong_ for multi-suffix or no-suffix files!
+
+        >>> resolve_pkg_path("pkg://MEDS_transforms.configs.pipeline") # likely should end in /pipeline
+        PosixPath('...MEDS_transforms/configs.pipeline')
+        >>> resolve_pkg_path("pkg://MEDS_transforms.configs.data.tar.gz") # likely should end in /data.tar.gz
+        PosixPath('...MEDS_transforms/configs/data/tar.gz')
+
+        Errors occur if the package is not importable:
+
+        >>> resolve_pkg_path("pkg://non_existent_package.configs.pipeline.py")
+        Traceback (most recent call last):
+            ...
+        ValueError: Package 'non_existent_package' not found. Please check the package name.
     """
     parts = pkg_path[len(PKG_PFX) :].split(".")
     pkg_name = parts[0]
+
     suffix = parts[-1]
     relative_path = Path(os.path.join(*parts[1:-1])).with_suffix(f".{suffix}")
     try:
         return files(pkg_name) / relative_path
-    except ImportError:
-        raise ValueError(f"Package '{pkg_name}' not found. Please check the package name.")
+    except ModuleNotFoundError as e:
+        raise ValueError(f"Package '{pkg_name}' not found. Please check the package name.") from e
 
 
 @dataclasses.dataclass
