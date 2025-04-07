@@ -6,11 +6,45 @@ from collections.abc import Callable
 import polars as pl
 from omegaconf import DictConfig, ListConfig
 
-from MEDS_transforms.utils import get_smallest_valid_uint_type
-
 from .. import Stage
 
 logger = logging.getLogger(__name__)
+
+
+def get_smallest_valid_uint_type(num: int | float | pl.Expr) -> pl.DataType:
+    """Returns the smallest valid unsigned integral type for an ID variable with `num` unique options.
+
+    Args:
+        num: The number of IDs that must be uniquely expressed.
+
+    Raises:
+        ValueError: If there is no unsigned int type big enough to express the passed number of ID
+            variables.
+
+    Examples:
+        >>> get_smallest_valid_uint_type(num=1)
+        UInt8
+        >>> get_smallest_valid_uint_type(num=2**8-1)
+        UInt16
+        >>> get_smallest_valid_uint_type(num=2**16-1)
+        UInt32
+        >>> get_smallest_valid_uint_type(num=2**32-1)
+        UInt64
+        >>> get_smallest_valid_uint_type(num=2**64-1)
+        Traceback (most recent call last):
+            ...
+        ValueError: Value is too large to be expressed as an int!
+    """
+    if num >= (2**64) - 1:
+        raise ValueError("Value is too large to be expressed as an int!")
+    if num >= (2**32) - 1:
+        return pl.UInt64
+    elif num >= (2**16) - 1:
+        return pl.UInt32
+    elif num >= (2**8) - 1:
+        return pl.UInt16
+    else:
+        return pl.UInt8
 
 
 @Stage.register

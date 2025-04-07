@@ -5,47 +5,9 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 
 logger = logging.getLogger(__name__)
-
-from MEDS_transforms import __package_name__, __version__
-
-
-def get_smallest_valid_uint_type(num: int | float | pl.Expr) -> pl.DataType:
-    """Returns the smallest valid unsigned integral type for an ID variable with `num` unique options.
-
-    Args:
-        num: The number of IDs that must be uniquely expressed.
-
-    Raises:
-        ValueError: If there is no unsigned int type big enough to express the passed number of ID
-            variables.
-
-    Examples:
-        >>> get_smallest_valid_uint_type(num=1)
-        UInt8
-        >>> get_smallest_valid_uint_type(num=2**8-1)
-        UInt16
-        >>> get_smallest_valid_uint_type(num=2**16-1)
-        UInt32
-        >>> get_smallest_valid_uint_type(num=2**32-1)
-        UInt64
-        >>> get_smallest_valid_uint_type(num=2**64-1)
-        Traceback (most recent call last):
-            ...
-        ValueError: Value is too large to be expressed as an int!
-    """
-    if num >= (2**64) - 1:
-        raise ValueError("Value is too large to be expressed as an int!")
-    if num >= (2**32) - 1:
-        return pl.UInt64
-    elif num >= (2**16) - 1:
-        return pl.UInt32
-    elif num >= (2**8) - 1:
-        return pl.UInt16
-    else:
-        return pl.UInt8
 
 
 def write_lazyframe(df: pl.LazyFrame, out_fp: Path) -> None:
@@ -53,62 +15,6 @@ def write_lazyframe(df: pl.LazyFrame, out_fp: Path) -> None:
         df = df.collect()
     out_fp.parent.mkdir(parents=True, exist_ok=True)
     df.write_parquet(out_fp, use_pyarrow=True)
-
-
-def stage_init(cfg: DictConfig) -> tuple[Path, Path, Path]:
-    """Initializes the stage by logging the configuration and the stage-specific paths.
-
-    Args:
-        cfg: The global configuration object, which should have a ``cfg.stage_cfg`` attribute containing the
-            stage specific configuration.
-
-    Returns: The data input directory, stage output directory, and metadata input directory.
-    """
-    logger.info(f"Running stage with the following configuration:\n{OmegaConf.to_yaml(cfg)}")
-
-    input_dir = Path(cfg.stage_cfg.data_input_dir)
-    output_dir = Path(cfg.stage_cfg.output_dir)
-    metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
-
-    def chk(x: Path):
-        return "✅" if x.exists() else "❌"
-
-    paths_strs = [
-        f"  - {k}: {chk(v)} {str(v.resolve())}"
-        for k, v in {
-            "input_dir": input_dir,
-            "output_dir": output_dir,
-            "metadata_input_dir": metadata_input_dir,
-        }.items()
-    ]
-
-    logger_strs = [
-        f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}",
-        "Paths: (checkbox indicates if it exists)",
-    ]
-    logger.debug("\n".join(logger_strs + paths_strs))
-
-    return input_dir, output_dir, metadata_input_dir
-
-
-def get_package_name() -> str:
-    """Returns the name of the python package running this pipeline.
-
-    Examples:
-        >>> get_package_name()
-        'MEDS_transforms'
-    """
-    return __package_name__
-
-
-def get_package_version() -> str:
-    """Returns the version of the python package running this pipeline.
-
-    Examples:
-        >>> get_package_version()
-        '...'
-    """
-    return __version__
 
 
 def is_metadata_stage(stage: dict[str, Any] | DictConfig) -> bool:
@@ -334,8 +240,3 @@ def populate_stage(
             out[key] = val
 
     return out
-
-
-OmegaConf.register_new_resolver("populate_stage", populate_stage, replace=False)
-OmegaConf.register_new_resolver("get_package_version", get_package_version, replace=False)
-OmegaConf.register_new_resolver("get_package_name", get_package_name, replace=False)

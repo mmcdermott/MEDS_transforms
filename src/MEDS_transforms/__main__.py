@@ -8,7 +8,8 @@ import hydra
 from hydra.core.config_store import ConfigStore
 from omegaconf import DictConfig, OmegaConf
 
-from . import __package_name__
+from . import __package_name__, __version__
+from .utils import populate_stage
 
 HELP_STRS = {"--help", "-h", "help", "h"}
 PKG_PFX = "pkg://"
@@ -109,6 +110,9 @@ def run_stage():
 
     hydra_wrapper = hydra.main(version_base=None, config_name="_main")
 
+    OmegaConf.register_new_resolver("populate_stage", populate_stage, replace=False)
+    OmegaConf.register_new_resolver("get_package_version", lambda: __version__, replace=False)
+    OmegaConf.register_new_resolver("get_package_name", lambda: __package_name__, replace=False)
     OmegaConf.register_new_resolver("stage_name", lambda: stage_name)
     OmegaConf.register_new_resolver("stage_docstring", lambda: stage.stage_docstring.replace("$", "$$"))
 

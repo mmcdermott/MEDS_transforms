@@ -10,7 +10,7 @@ import polars as pl
 from meds import code_field, subject_id_field, subject_splits_filepath
 from omegaconf import DictConfig
 
-from ..utils import stage_init, write_lazyframe
+from ..utils import write_lazyframe
 from .compute_fn import ANY_COMPUTE_FN_T, COMPUTE_FN_T, bind_compute_fn
 from .mapper import map_over
 from .match_revise import is_match_revise, match_revise_fntr
@@ -36,8 +36,6 @@ def map_stage(
     write_fn: Callable[[DF_T, Path], None] = write_lazyframe,
     shard_iterator_fntr: SHARD_ITR_FNTR_T = shard_iterator,
 ) -> list[Path]:
-    stage_init(cfg)
-
     start = datetime.now()
 
     train_only = cfg.stage_cfg.get("train_only", False)
