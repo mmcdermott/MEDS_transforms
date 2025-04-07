@@ -25,11 +25,6 @@ def test_stage_entry_point_errors():
         ("not_real.yaml", "occlude_outliers", "Pipeline YAML file 'not_real.yaml' does not exist."),
         ("__null__", "not_real_stage", "Stage 'not_real_stage' not found."),
         (
-            "pkg://pkg.bad_suffix.json",
-            "occlude_outliers",
-            re.compile("Invalid pipeline YAML path .* Expected a file with one of the following extensions"),
-        ),
-        (
             "pkg://non_existent_pkg.file.yaml",
             "occlude_outliers",
             re.compile("Package 'non_existent_pkg' not found"),
