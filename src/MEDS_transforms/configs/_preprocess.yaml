@@ -1,12 +1,5 @@
-defaults:
-  - _pipeline
-  - _self_
-
 etl_metadata.pipeline_name: "preprocess"
 
-# Global pipeline parameters:
-# 1. Code modifiers will be used as adjoining parts of the `code` columns during group-bys and eventual
-#    tokenization.
 code_modifiers: ???
 
 # Pipeline Structure
