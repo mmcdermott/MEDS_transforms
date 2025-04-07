@@ -11,7 +11,8 @@ from pathlib import Path
 from hydra.core.config_store import ConfigStore
 from omegaconf import DictConfig, OmegaConf
 
-from ..stages import Stage, get_all_registered_stages
+from ..stages.base import Stage
+from ..stages.discovery import StageNotFoundError, get_all_registered_stages
 
 logger = logging.getLogger(__name__)
 
@@ -221,14 +222,31 @@ class PipelineConfig:
             returned is validated to be a registered stage.
 
         Raises:
-            ValueError: If the stage name is not a registered stage.
+            StageNotFoundError: If the stage name is not a registered stage.
+
+        Examples:
+
+            >>> pipeline_cfg = PipelineConfig()
+            >>> pipeline_cfg.resolve_stage_name("occlude_outliers")
+            'occlude_outliers'
+            >>> pipeline_cfg.resolve_stage_name("foobar_non_existent_stage")
+            Traceback (most recent call last):
+                ...
+            MEDS_transforms.stages.discovery.StageNotFoundError: Stage 'foobar_non_existent_stage' not
+                registered!
+
+            Stage names can be resolved to a base stage name, if specified in the stage configs:
+
+            >>> pipeline_cfg.stage_configs = {"count_codes": {"_base_stage": "aggregate_code_metadata"}}
+            >>> pipeline_cfg.resolve_stage_name("count_codes")
+            'aggregate_code_metadata'
         """
 
         resolved_stage_name = self.stage_configs.get(stage_name, {}).get("_base_stage", stage_name)
 
         all_stages = get_all_registered_stages()
         if resolved_stage_name not in all_stages:
-            raise ValueError(f"Stage '{resolved_stage_name}' not registered!")
+            raise StageNotFoundError(f"Stage '{resolved_stage_name}' not registered!")
 
         return resolved_stage_name
 

@@ -4,6 +4,10 @@ from importlib.metadata import EntryPoint, entry_points
 from .. import __package_name__
 
 
+class StageNotFoundError(Exception):
+    """Custom error for when a stage is not found."""
+
+
 class StageDiscoveryError(Exception):
     """Custom error for stage discovery."""
 

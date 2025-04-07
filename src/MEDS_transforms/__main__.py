@@ -8,7 +8,7 @@ from omegaconf import OmegaConf
 
 from . import __package_name__, __version__
 from .configs import PipelineConfig
-from .stages import Stage
+from .stages.discovery import get_all_registered_stages
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +16,8 @@ HELP_STRS = {"--help", "-h", "help", "h"}
 MAIN_CFG_PATH = files(__package_name__) / "configs" / "_main.yaml"
 
 
-@Stage.suppress_validation()
 def print_help_stage():
     """Print help for all stages."""
-    from .stages import get_all_registered_stages
 
     all_stage_names = list(get_all_registered_stages().keys())
 
