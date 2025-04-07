@@ -158,26 +158,21 @@ def run_stage(
         MEDS_transform-stage pipeline_config.yaml reshard_to_split
             --config-dir=...
             --config-name=pipeline_config
-            'hydra.searchpath=[pkg://MEDS_transforms.configs]'
             stage=reshard_to_split
         >>> run_stage(
         ...     cfg, "fit_vocabulary_indices", runner_fn=fake_shell_succeed
         ... )
-        foobar --config-dir=... --config-name=pipeline_config
-            'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=fit_vocabulary_indices
+        foobar --config-dir=... --config-name=pipeline_config stage=fit_vocabulary_indices
         >>> run_stage(cfg, "baz", runner_fn=fake_shell_succeed)
-        baz_script --config-dir=... --config-name=pipeline_config
-            'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=baz
+        baz_script --config-dir=... --config-name=pipeline_config stage=baz
         >>> cfg.do_profile = True
         >>> run_stage(cfg, "baz", runner_fn=fake_shell_succeed)
-        baz_script --config-dir=... --config-name=pipeline_config
-            'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=baz
+        baz_script --config-dir=... --config-name=pipeline_config stage=baz
             ++hydra.callbacks.profiler._target_=hydra_profiler.profiler.ProfilerCallback
         >>> cfg._stage_runners.baz.parallelize = {"n_workers": 2}
         >>> cfg.do_profile = False
         >>> run_stage(cfg, "baz", runner_fn=fake_shell_succeed)
-        baz_script --config-dir=... --config-name=pipeline_config --multirun
-            'hydra.searchpath=[pkg://MEDS_transforms.configs]' stage=baz worker="range(0,2)"
+        baz_script --config-dir=... --config-name=pipeline_config --multirun stage=baz worker="range(0,2)"
         >>> run_stage(cfg, "baz", runner_fn=fake_shell_fail)
         Traceback (most recent call last):
             ...
@@ -210,7 +205,6 @@ def run_stage(
         script,
         f"--config-dir={str(pipeline_config_fp.parent.resolve())}",
         f"--config-name={pipeline_config_fp.stem}",
-        "'hydra.searchpath=[pkg://MEDS_transforms.configs]'",
         f"stage={stage_name}",
     ]
 

@@ -495,7 +495,7 @@ class StageExample:
           - Cohort sub-directory: cohort
           - Config yaml file: config.yaml
             │   defaults:
-            │   - _preprocess
+            │   - _pipeline
             │   stages:
             │   - example_stage
             │   stage_configs:
@@ -505,9 +505,6 @@ class StageExample:
             │         arg3:
             │         - value3A
             │         - value3B
-            │   hydra:
-            │     searchpath:
-            │     - pkg://MEDS_transforms.configs
           - Script: MEDS_transform-stage /tmp/tmp.../config.yaml example_stage
                     input_dir=/tmp/tmp.../input cohort_dir=/tmp/tmp.../cohort
 
@@ -1011,9 +1008,8 @@ class StageExample:
 
         return OmegaConf.create(
             {
-                "defaults": ["_preprocess"],
+                "defaults": ["_pipeline"],
                 **self._pipeline_kwargs,
-                "hydra": {"searchpath": ["pkg://MEDS_transforms.configs"]},
             }
         )
 
