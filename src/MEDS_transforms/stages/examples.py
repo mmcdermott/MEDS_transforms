@@ -470,7 +470,7 @@ class StageExample:
                     └── subject_splits.parquet
           - Input sub-directory: input
           - Cohort sub-directory: cohort
-          - Script: MEDS_transform-stage pkg://MEDS_transforms.configs._preprocess.yaml example_stage
+          - Script: MEDS_transform-stage __null__ example_stage
                     'stages=["example_stage"]' input_dir=/tmp/tmp.../input cohort_dir=/tmp/tmp.../cohort
         >>> test_env.test_dir.is_dir()
         False
@@ -542,7 +542,7 @@ class StageExample:
                     └── subject_splits.parquet
           - Input sub-directory: input
           - Cohort sub-directory: cohort
-          - Script: MEDS_transform-stage pkg://MEDS_transforms.configs._preprocess.yaml example_stage
+          - Script: MEDS_transform-stage __null__ example_stage
                     'stages=["example_stage"]' input_dir=/tmp/tmp.../input cohort_dir=/tmp/tmp.../cohort
         Stdout:
         <BLANKLINE>
@@ -575,7 +575,7 @@ class StageExample:
                     └── subject_splits.parquet
           - Input sub-directory: input
           - Cohort sub-directory: cohort
-          - Script: MEDS_transform-stage pkg://MEDS_transforms.configs._preprocess.yaml example_stage
+          - Script: MEDS_transform-stage __null__ example_stage
                     'stages=["example_stage"]' input_dir=/tmp/tmp.../input cohort_dir=/tmp/tmp.../cohort
         Stdout:
         Success
@@ -830,7 +830,7 @@ class StageExample:
     do_use_config_yaml: bool = False
     df_check_kwargs: dict | None = None
 
-    BASE_PACKAGE: ClassVar[str] = "pkg://MEDS_transforms.configs._preprocess.yaml"
+    BASE_PACKAGE: ClassVar[str] = "__null__"
 
     def __post_init__(self):
         if self.want_data is None and self.want_metadata is None:

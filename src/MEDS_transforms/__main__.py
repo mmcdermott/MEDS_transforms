@@ -5,7 +5,7 @@ from pathlib import Path
 
 import hydra
 from hydra.core.config_store import ConfigStore
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 
 from . import __package_name__
 
@@ -39,9 +39,11 @@ def print_help_stage():
         print(f"  - {name}")
 
 
-def resolve_pipeline_yaml(pipeline_yaml: str):
+def resolve_pipeline_yaml(pipeline_yaml: str) -> DictConfig:
     """Resolve the pipeline YAML file path."""
-    if pipeline_yaml.startswith(PKG_PFX):
+    if pipeline_yaml == "__null__":
+        return DictConfig({})
+    elif pipeline_yaml.startswith(PKG_PFX):
         pipeline_yaml = pipeline_yaml[len(PKG_PFX) :]
         pipeline_parts = pipeline_yaml.split(".")
 
@@ -65,7 +67,7 @@ def resolve_pipeline_yaml(pipeline_yaml: str):
     if not pipeline_yaml.is_file():
         raise FileNotFoundError(f"Pipeline YAML file '{pipeline_yaml}' does not exist.")
 
-    return pipeline_yaml
+    return OmegaConf.load(pipeline_yaml)
 
 
 def run_stage():
@@ -83,7 +85,7 @@ def run_stage():
         print_help_stage()
         sys.exit(1)
 
-    pipeline_yaml = resolve_pipeline_yaml(sys.argv[1])
+    pipeline_cfg = resolve_pipeline_yaml(sys.argv[1])
     stage_name = sys.argv[2]
     sys.argv = sys.argv[2:]  # remove dispatcher arguments
 
@@ -104,7 +106,7 @@ def run_stage():
     cs = ConfigStore.instance()
     cs.store(group="stage_configs", name="_stage_configs", node=_stage_configs)
 
-    cs.store(name="_pipeline", node=OmegaConf.load(pipeline_yaml))
+    cs.store(name="_pipeline", node=pipeline_cfg)
 
     cs.store(name="_main", node=OmegaConf.load(MAIN_CFG_PATH))
 
