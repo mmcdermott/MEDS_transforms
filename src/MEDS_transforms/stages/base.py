@@ -13,10 +13,10 @@ from enum import StrEnum
 from functools import partial, wraps
 from importlib.metadata import EntryPoint
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import polars as pl
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from ..mapreduce import ANY_COMPUTE_FN_T, map_stage, mapreduce_stage
 from .discovery import get_all_registered_stages
@@ -154,14 +154,17 @@ class Stage:
             conform to the pattern mentioned above.
         output_schema_updates: A dictionary mapping column name to a Polars type for the output of the stage,
             with the base MEDS schema options as defaults for unspecified columns.
+        default_config: A dictionary containing the default configuration options for the stage. This can be
+            passed manually during registration or is set automatically based on the calling file location in
+            a manner similar to the examples directory.
 
     Examples:
 
     Most of the examples shown here are focused on more internal aspects of how stages work; for documentation
     on how you will most likely use stages, see the documentation for the `Stage.register` function.
 
-    Stages come with tracked test cases. If no special parameters are set on the command line, they won't be
-    tracked:
+    Stages come with tracked test cases and default configuration arguments. If no special parameters are set
+    on the command line, they won't be tracked:
 
         >>> Stage.WARN_IF_NO_ENTRY_POINT_AT_NAME = False
         >>> Stage.ERR_IF_ENTRY_POINT_IMPORTABLE = False
@@ -172,6 +175,8 @@ class Stage:
         >>> print(stage.examples_dir)
         None
         >>> stage.test_cases
+        {}
+        >>> print(stage.default_config)
         {}
 
     The test cases are inferred through the `examples_dir` attribute. This can be set manually:
@@ -185,8 +190,52 @@ class Stage:
         >>> stage.test_cases
         {}
 
-    Proper set-up means the directory is or has any children that satisfy the `StageExample.is_example_dir`
-    method.
+    If the example dir is not a `Path` and is not `None`, an error will be raised:
+
+        >>> stage = Stage(main_fn=main, examples_dir="foo")
+        Traceback (most recent call last):
+            ...
+        TypeError: examples_dir must be a Path or None. Got <class 'str'>: foo
+
+    Likewise, the default config can be set directly through the `default_config` attribute. When set
+    manually, it can be set to a dictionary or DictConfig object:
+
+        >>> stage = Stage(main_fn=main, default_config={"foo": "bar"})
+        >>> print(f"{type(stage.default_config).__name__}: {stage.default_config}")
+        DictConfig: {'foo': 'bar'}
+        >>> stage = Stage(main_fn=main, default_config=DictConfig({"foo_2": "bar_2"}))
+        >>> print(f"{type(stage.default_config).__name__}: {stage.default_config}")
+        DictConfig: {'foo_2': 'bar_2'}
+
+    Or it can be set to a Path or str pointing to a YAML file containing the configuration:
+
+        >>> config = DictConfig({"A": [1, 2, 3], "B": {"foo": "bar"}})
+        >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as tmpfile:
+        ...     OmegaConf.save(config, tmpfile.name)
+        ...     stage = Stage(main_fn=main, default_config=tmpfile.name)
+        >>> print(f"{type(stage.default_config).__name__}: {stage.default_config}")
+        DictConfig: {'A': [1, 2, 3], 'B': {'foo': 'bar'}}
+
+    If the corresponding file does not exist, an error will be raised:
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     Stage(main_fn=main, default_config=Path(tmpdir) / "foo.yaml")
+        Traceback (most recent call last):
+            ...
+        FileNotFoundError: Default configuration file /tmp/tmp.../foo.yaml does not exist.
+
+    Or if it is set to any other type, a TypeError will be raised:
+
+        >>> Stage(main_fn=main, default_config=42)
+        Traceback (most recent call last):
+            ...
+        TypeError: Default configuration must be a dictionary, DictConfig, or path to a YAML file. Got
+                   <class 'int'>: 42
+
+
+
+    Proper set-up for test cases means the directory is or has any children that satisfy the
+    `StageExample.is_example_dir` method.
 
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     example_dir = Path(tmpdir) / "examples"
@@ -339,13 +388,14 @@ class Stage:
     reduce_fn: ANY_COMPUTE_FN_T | None = None
     main_fn: MAIN_FN_T | None = None
 
-    examples_dir: Path | None = None
-
     output_schema_updates: dict[str, pl.DataType] | None = None
 
     __mimic_fn: Callable | None = None
     __stage_docstring: str | None = None
     __stage_name: str | None = None
+    __stage_dir: Path | None = None
+    __examples_dir: Path | None = None
+    __default_config: DictConfig | None = None
 
     WARN_IF_NO_ENTRY_POINT_AT_NAME: ClassVar[bool] = os.environ.get("DISABLE_STAGE_VALIDATION", "0") != "1"
     ERR_IF_ENTRY_POINT_IMPORTABLE: ClassVar[bool] = os.environ.get("DISABLE_STAGE_VALIDATION", "0") != "1"
@@ -379,6 +429,7 @@ class Stage:
         stage_docstring: str | None = None,
         output_schema_updates: dict[str, pl.DataType] | None = None,
         examples_dir: Path | None = None,
+        default_config: dict[str, Any] | DictConfig | Path | str | None = None,
         _calling_file: Path | None = None,
     ) -> MAIN_FN_T:
         """Wraps or returns a function that can serve as the main function for a stage."""
@@ -390,6 +441,11 @@ class Stage:
         self.main_fn = main_fn
         self.map_fn = map_fn
         self.reduce_fn = reduce_fn
+
+        self.__infer_stage_dir(_calling_file)
+
+        self.examples_dir = examples_dir
+        self.default_config = default_config
 
         do_skip_validation = os.environ.get("DISABLE_STAGE_VALIDATION", "0") == "1"
 
@@ -403,22 +459,19 @@ class Stage:
         else:
             self.__validate_stage_entry_point_registration()
 
-        if examples_dir is None:
-            self.__infer_examples_dir(_calling_file)
-        else:
-            self.examples_dir = examples_dir
-
         if output_schema_updates is None:
             self.output_schema_updates = {}
         else:
             self.output_schema_updates = copy.deepcopy(output_schema_updates)
 
-    def __infer_examples_dir(self, stage_definition_file: Path | None):
-        """Infers the examples directory from the calling file.
+    def __infer_stage_dir(self, stage_definition_file: Path | None) -> Path | None:
+        """Infers a possible stage directory based on the calling file.
 
-        This is done by looking for a directory with the same name as the stage being defined, and checking
-        for a subdirectory called "examples". If this is not found, the examples_dir will remain unset.
+        This is done by looking to see if the stage is defined in a file contained in a directory of the same
+        name as the stage. If so, that directory is stored as the stage directory. If not, this will be None.
         """
+        self.__stage_dir = None
+
         if stage_definition_file is None:
             return
 
@@ -439,16 +492,83 @@ class Stage:
             )
             return
 
-        possible_examples_dir = possible_stage_dir / "examples"
+        self.__stage_dir = possible_stage_dir
+
+    @property
+    def examples_dir(self) -> Path | None:
+        if self.__examples_dir is not None:
+            return self.__examples_dir
+        if self.__stage_dir is None:
+            return None
+
+        possible_examples_dir = self.__stage_dir / "examples"
 
         if possible_examples_dir.is_dir():
-            self.examples_dir = possible_examples_dir
+            return possible_examples_dir
         else:
             logger.debug(
-                f"Stage definition file {stage_definition_file} lacks an examples subdirectory. Can't infer "
+                f"Stage definition file {self.__stage_dir} lacks an examples subdirectory. Can't infer "
                 "examples directory."
             )
-            self.examples_dir = None
+            return None
+
+    @examples_dir.setter
+    def examples_dir(self, examples_dir: Path | None):
+        """Sets the examples directory for the stage.
+
+        Args:
+            examples_dir: The examples directory to set. This should be a directory containing nested
+                test cases for the stage.
+        """
+
+        match examples_dir:
+            case None | Path():
+                self.__examples_dir = examples_dir
+            case _:
+                raise TypeError(
+                    f"examples_dir must be a Path or None. Got {type(examples_dir)}: {examples_dir}"
+                )
+
+    @property
+    def default_config(self) -> DictConfig:
+        if self.__default_config is not None:
+            return self.__default_config
+
+        if self.__stage_dir is None:
+            return DictConfig({})
+
+        possible_default_config = self.__stage_dir / "config.yaml"
+        if possible_default_config.is_file():
+            return OmegaConf.load(possible_default_config)
+        else:
+            logger.debug(
+                f"Stage definition file {self.__stage_dir} lacks a config.yaml file. Can't infer default "
+                "configuration."
+            )
+            return DictConfig({})
+
+    @default_config.setter
+    def default_config(self, default_config: dict[str, Any] | DictConfig | Path | str | None):
+        """Sets the default configuration for the stage.
+
+        Args:
+            default_config: The default configuration to set. This can be a dictionary, a DictConfig object,
+                or a path to a YAML file containing the configuration.
+        """
+        match default_config:
+            case None | DictConfig():
+                self.__default_config = default_config
+            case dict():
+                self.__default_config = DictConfig(default_config)
+            case Path() | str() as default_config_fp:
+                if not Path(default_config_fp).is_file():
+                    raise FileNotFoundError(f"Default configuration file {default_config_fp} does not exist.")
+                self.__default_config = OmegaConf.load(default_config_fp)
+            case _:
+                raise TypeError(
+                    "Default configuration must be a dictionary, DictConfig, or path to a YAML file. Got "
+                    f"{type(default_config)}: {default_config}"
+                )
 
     @property
     def test_cases(self) -> dict[str, StageExample]:
@@ -681,6 +801,14 @@ class Stage:
         for line in docstring_lines:
             lines.extend(pretty_wrap(line))
 
+        if self.default_config:
+            lines.append("  Default config:")
+            lines.extend(textwrap.indent(str(OmegaConf.to_yaml(self.default_config)), "    | ").splitlines())
+
+        if self.output_schema_updates:
+            lines.append("  Output schema updates:")
+            lines.extend(pretty_wrap(str(self.output_schema_updates)))
+
         lines.extend(
             [
                 f"  Map function: {self.map_fn.__name__ if self.map_fn else None}",
@@ -726,18 +854,19 @@ class Stage:
         Args:
             *args: Positional arguments. If used as a decorator, this should be a single function, and no
                 keyword arguments should be set.
-            **kwargs: Keyword arguments. These can include `main_fn`, `map_fn`, `reduce_fn`,
-                `stage_name`, and `stage_docstring`. Other keyword arguments will cause an error. Not all
-                keyword arguments are required for all usages of the decorator.
+            **kwargs: Keyword arguments. These can include all keyword arguments to the `Stage` constructor
+                save for `_calling_file`; namely, `main_fn`, `map_fn`, `reduce_fn`, `stage_name`,
+                `stage_docstring`, `examples_dir`, `output_schema_updates`, and `default_config`.
+                Not all keyword arguments are required for all usages of the decorator.
 
-        ## Inference of static data examples:
+        ## Inference of static data examples and the default configuration filepath.
 
         When this function is called, it will attempt to locate the filepath of the file in which it was
         called, and pass that as the `_calling_file` argument to the `Stage` constructor. This is used to
-        infer the examples directory if it is not manually set. Note that this means that the parameter
-        `_calling_file` can not be used as a keyword argument to this function. You should never need this
-        parameter anyways, as if you are setting something manually you can directly set the example
-        directory.
+        infer the examples directory and default configuration option if thery are not manually set. Note that
+        this means that the parameter `_calling_file` can not be used as a keyword argument to this function.
+        You should never need this parameter anyways, as if you are setting something manually you can
+        directly set the example directory.
 
         Returns:
             Either a `Stage` object or a decorator function, depending on the arguments provided.
@@ -868,6 +997,38 @@ class Stage:
               Main function: main
               Mimic function: main
 
+            The acceptable keyword arguments to the decorator are the same as those to the constructor, except
+            for `_calling_file` (which is automatically inferred and will be discussed more later). For
+            example:
+
+            >>> @Stage.register(
+            ...     stage_name="foo",
+            ...     stage_docstring="bar",
+            ...     output_schema_updates={"foo": pl.Int64},
+            ...     examples_dir=Path("foo"),
+            ...     default_config={"arg1": {"option1": "foo"}, "arg2": [1, 2.3]},
+            ... )
+            ... def main(cfg: DictConfig):
+            ...     '''base main docstring'''
+            ...     return "main"
+            >>> print(main)
+            Stage foo:
+              Type: main
+              Docstring:
+                | bar
+              Default config:
+                | arg1:
+                |   option1: foo
+                | arg2:
+                | - 1
+                | - 2.3
+              Output schema updates:
+                | {'foo': Int64}
+              Map function: None
+              Reduce function: None
+              Main function: main
+              Mimic function: main
+
             The decorated function will be inferred to be a "main" function if it is named "main" and there is
             no reduce function specified in the parametrized keyword arguments to the decorator. Otherwise, it
             will be assumed to be a map function:
@@ -962,6 +1123,224 @@ class Stage:
                 ...
             ValueError: Cannot provide keyword arguments that are also automatically inferred. Got
             {'_calling_file'}
+
+            This is because this function sets the calling file to the location in the code where the
+            decorator is called, and from that the stage will try to infer the "stage directory" and the
+            associated default configuration file path and examples directory, if possible. We can demonstrate
+            how this works by mocking out the inspect module to return a file path that we'll create here:
+
+            >>> from unittest.mock import patch
+            >>> from MEDS_transforms.stages.utils import pretty_list_directory
+            >>> config = DictConfig({"arg1": {"option1": "foo"}, "arg2": [1, 2.3, None], "arg3": None})
+            >>> with tempfile.TemporaryDirectory() as tmpdir:
+            ...     # Make the stage directory:
+            ...     stage_dir = Path(tmpdir) / "stage_foo"
+            ...     stage_dir.mkdir()
+            ...     # Make the calling file:
+            ...     calling_file = stage_dir / "stage_foo.py"
+            ...     calling_file.touch()
+            ...     # Make the examples directory:
+            ...     examples_dir = stage_dir / "examples"
+            ...     # We'll make two example cases:
+            ...     example_1_dir = examples_dir / "example_1"
+            ...     example_1_dir.mkdir(parents=True)
+            ...     example_1_fp = example_1_dir / "out_data.yaml"
+            ...     _ = example_1_fp.write_text("data/0.parquet: 'code,time,subject_id,numeric_value'")
+            ...     example_2_dir = examples_dir / "example_2"
+            ...     example_2_dir.mkdir(parents=True)
+            ...     example_2_fp = example_2_dir / "out_data.yaml"
+            ...     _ = example_2_fp.write_text("data/1.parquet: 'code,time,subject_id,numeric_value'")
+            ...     # Save the config file:
+            ...     default_config_file = stage_dir / "config.yaml"
+            ...     OmegaConf.save(config, default_config_file)
+            ...     # What does the directory structure look like?
+            ...     print("Root directory:")
+            ...     print("-----------------")
+            ...     for line in pretty_list_directory(Path(tmpdir)): print(line)
+            ...     # Mock out the inspect module to return the calling file we're constructing:
+            ...     with patch("inspect.currentframe") as mock:
+            ...         mock.return_value.f_back.f_code.co_filename = str(calling_file)
+            ...         # Now we can create the stage:
+            ...         @Stage.register(stage_name="stage_foo")
+            ...         def main(cfg: DictConfig):
+            ...             '''base main docstring'''
+            ...             return "main"
+            ...         # Print the stage object and see if it has set the examples directory and default
+            ...         print("-----------------")
+            ...         print("Stage object:")
+            ...         print("-----------------")
+            ...         print(main)
+            ...         # Check the test cases, which aren't loaded with the stage by default as they aren't
+            ...         # necessary during normal runtime:
+            ...         print("-----------------")
+            ...         print("Test cases:")
+            ...         print("-----------------")
+            ...         print(main.test_cases)
+            Root directory:
+            -----------------
+            └── stage_foo
+                ├── config.yaml
+                ├── examples
+                │   ├── example_1
+                │   │   └── out_data.yaml
+                │   └── example_2
+                │       └── out_data.yaml
+                └── stage_foo.py
+            -----------------
+            Stage object:
+            -----------------
+            Stage stage_foo:
+              Type: main
+              Docstring:
+                | base main docstring
+              Default config:
+                | arg1:
+                |   option1: foo
+                | arg2:
+                | - 1
+                | - 2.3
+                | - null
+                | arg3: null
+              Map function: None
+              Reduce function: None
+              Main function: main
+              Mimic function: main
+            -----------------
+            Test cases:
+            -----------------
+            example_2:
+            │   StageExample [stage_foo/example_2]
+            │     stage_cfg: {}
+            │     want_data:
+            │       MEDSDataset:
+            │       dataset_metadata:
+            │       data_shards:
+            │         - 1:
+            │           pyarrow.Table
+            │           subject_id: int64
+            │           time: timestamp[us]
+            │           code: string
+            │           numeric_value: float
+            │           ----
+            │           subject_id: [[]]
+            │           time: [[]]
+            │           code: []
+            │           numeric_value: [[]]
+            │       code_metadata:
+            │         pyarrow.Table
+            │         code: string
+            │         description: string
+            │         parent_codes: list<item: string>
+            │           child 0, item: string
+            │         ----
+            │         code: []
+            │         description: []
+            │         parent_codes: []
+            │       subject_splits: None
+            example_1:
+            │   StageExample [stage_foo/example_1]
+            │     stage_cfg: {}
+            │     want_data:
+            │       MEDSDataset:
+            │       dataset_metadata:
+            │       data_shards:
+            │         - 0:
+            │           pyarrow.Table
+            │           subject_id: int64
+            │           time: timestamp[us]
+            │           code: string
+            │           numeric_value: float
+            │           ----
+            │           subject_id: [[]]
+            │           time: [[]]
+            │           code: []
+            │           numeric_value: [[]]
+            │       code_metadata:
+            │         pyarrow.Table
+            │         code: string
+            │         description: string
+            │         parent_codes: list<item: string>
+            │           child 0, item: string
+            │         ----
+            │         code: []
+            │         description: []
+            │         parent_codes: []
+            │       subject_splits: None
+
+            If the example set-up is the same, but the stage name doesn't agree with the parent directory of
+            the calling file, then we get a normal stage with none of the extra information as the examples
+            directory and config.yaml file are assumed to be unrelated:
+
+            >>> config = DictConfig({"arg1": {"option1": "foo"}, "arg2": [1, 2.3, None], "arg3": None})
+            >>> with tempfile.TemporaryDirectory() as tmpdir:
+            ...     # Make the stage directory:
+            ...     stage_dir = Path(tmpdir) / "stage_foo"
+            ...     stage_dir.mkdir()
+            ...     # Make the calling file:
+            ...     calling_file = stage_dir / "stage_foo.py"
+            ...     calling_file.touch()
+            ...     # Make the examples directory:
+            ...     examples_dir = stage_dir / "examples"
+            ...     # We'll make two example cases:
+            ...     example_1_dir = examples_dir / "example_1"
+            ...     example_1_dir.mkdir(parents=True)
+            ...     example_1_fp = example_1_dir / "out_data.yaml"
+            ...     _ = example_1_fp.write_text("data/0.parquet: 'code,time,subject_id,numeric_value'")
+            ...     example_2_dir = examples_dir / "example_2"
+            ...     example_2_dir.mkdir(parents=True)
+            ...     example_2_fp = example_2_dir / "out_data.yaml"
+            ...     _ = example_2_fp.write_text("data/1.parquet: 'code,time,subject_id,numeric_value'")
+            ...     # Save the config file:
+            ...     default_config_file = stage_dir / "config.yaml"
+            ...     OmegaConf.save(config, default_config_file)
+            ...     # What does the directory structure look like?
+            ...     print("Root directory:")
+            ...     print("-----------------")
+            ...     for line in pretty_list_directory(Path(tmpdir)): print(line)
+            ...     # Mock out the inspect module to return the calling file we're constructing:
+            ...     with patch("inspect.currentframe") as mock:
+            ...         mock.return_value.f_back.f_code.co_filename = str(calling_file)
+            ...         # Now we can create the stage:
+            ...         @Stage.register(stage_name="not_stage_foo")
+            ...         def main(cfg: DictConfig):
+            ...             '''base main docstring'''
+            ...             return "main"
+            ...         # Print the stage object and see if it has set the examples directory and default
+            ...         print("-----------------")
+            ...         print("Stage object:")
+            ...         print("-----------------")
+            ...         print(main)
+            ...         # Check the test cases, which aren't loaded with the stage by default as they aren't
+            ...         # necessary during normal runtime:
+            ...         print("-----------------")
+            ...         print("Test cases:")
+            ...         print("-----------------")
+            ...         print(main.test_cases)
+            Root directory:
+            -----------------
+            └── stage_foo
+                ├── config.yaml
+                ├── examples
+                │   ├── example_1
+                │   │   └── out_data.yaml
+                │   └── example_2
+                │       └── out_data.yaml
+                └── stage_foo.py
+            -----------------
+            Stage object:
+            -----------------
+            Stage not_stage_foo:
+              Type: main
+              Docstring:
+                | base main docstring
+              Map function: None
+              Reduce function: None
+              Main function: main
+              Mimic function: main
+            -----------------
+            Test cases:
+            -----------------
+            {}
 
             What about those warnings?
 

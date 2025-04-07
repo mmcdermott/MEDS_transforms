@@ -4,6 +4,7 @@ from importlib.resources import files
 from pathlib import Path
 
 import hydra
+from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
 
 from .configs import MAIN_YAML, register_structured_config
@@ -100,7 +101,20 @@ def run_stage():
             f"'{executable_stage_name}'!"
         )
 
+    _stage_configs = {}
+    for n, ep in all_stages.items():
+        _stage_configs.update(ep.load().default_config)
+
+    cs = ConfigStore.instance()
+    cs.store(group="stage_configs", name="_stage_configs", node=_stage_configs)
+
     main_fn = executable_stage.main
+
+    hydra_wrapper = hydra.main(
+        version_base=None,
+        config_path=str(pipeline_yaml.parent),
+        config_name=pipeline_yaml.stem,
+    )
 
     OmegaConf.register_new_resolver("stage_name", lambda: stage_name)
     OmegaConf.register_new_resolver("stage_docstring", lambda: main_fn.__doc__.replace("$", "$$"))
