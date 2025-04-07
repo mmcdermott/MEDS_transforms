@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 from meds import DatasetMetadata, dataset_metadata_filepath
-from omegaconf import DictConfig
 
 from .utils import OmegaConfResolver, hydra_registered_dataclass
 
@@ -184,10 +183,9 @@ class DatasetConfig:
     code_modifiers: list[str] = dataclasses.field(default_factory=list)
 
 
-StageConfig_T = dict[str, Any] | DictConfig
+StageConfig_T = dict[str, Any]
 
 
-@hydra_registered_dataclass(group="pipeline", name="_base_pipeline")
 class PipelineConfig:
     """A base configuration class for MEDS-transforms pipelines.
 
