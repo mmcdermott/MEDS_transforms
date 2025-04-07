@@ -15,7 +15,7 @@ from meds import subject_id_field, subject_splits_filepath, time_field
 from omegaconf import DictConfig
 
 from ...mapreduce import rwlock_wrap, shard_iterator, shuffle_shards
-from ...utils import stage_init, write_lazyframe
+from ...utils import write_lazyframe
 from .. import Stage
 
 logger = logging.getLogger(__name__)
@@ -264,8 +264,6 @@ def write_json(d: dict, fp: Path) -> None:
 def main(cfg: DictConfig):
     """Re-shard a MEDS cohort to in a manner that subdivides subject splits."""
 
-    stage_init(cfg)
-
     output_dir = Path(cfg.stage_cfg.output_dir)
 
     splits_file = Path(cfg.input_dir) / subject_splits_filepath
@@ -318,15 +316,12 @@ def main(cfg: DictConfig):
         def compute_fn(df: list[pl.DataFrame]) -> pl.LazyFrame:
             return df.sort(by=[subject_id_field, time_field], maintain_order=True, multithreaded=False)
 
-        def write_fn(df: pl.LazyFrame, out_fp: Path) -> None:
-            write_lazyframe(df, out_fp)
-
         logger.info(f"Merging sub-shards for {subshard_name} to {str(out_fp.resolve())}")
         rwlock_wrap(
             cfg.stage_cfg.data_input_dir,
             out_fp,
             read_fn,
-            write_fn,
+            write_lazyframe,
             compute_fn,
             do_overwrite=cfg.do_overwrite,
         )

@@ -1,5 +1,6 @@
 import os
 import sys
+from collections.abc import Sequence
 from importlib.resources import files
 from pathlib import Path
 
@@ -7,24 +8,16 @@ import hydra
 from hydra.core.config_store import ConfigStore
 from omegaconf import DictConfig, OmegaConf
 
-from . import __package_name__
-
-# We disable stage validation here as it is not needed on the CLI; instead, we manually validate that the
-# stage name matches after loading, and that plus the checks for duplicate stage entry points covers all
-# validation failure scenarios.
-os.environ["DISABLE_STAGE_VALIDATION"] = "1"
-
-from .stages import get_all_registered_stages
+from . import __package_name__, __version__
+from .utils import populate_stage
 
 HELP_STRS = {"--help", "-h", "help", "h"}
 PKG_PFX = "pkg://"
 YAML_EXTENSIONS = {"yaml", "yml"}
-
-
 MAIN_CFG_PATH = files(__package_name__) / "configs" / "_main.yaml"
 
 
-def print_help_stage():
+def print_help_stage(all_stage_names: Sequence[str]):
     """Print help for all stages."""
     print(f"Usage: {sys.argv[0]} <pipeline_yaml> <stage_name> [args]")
     print(
@@ -34,8 +27,7 @@ def print_help_stage():
     print("  * stage_name: Name of the stage to run.")
     print()
     print("Available stages:")
-    all_stages = get_all_registered_stages()
-    for name in sorted(all_stages):
+    for name in sorted(all_stage_names):
         print(f"  - {name}")
 
 
@@ -73,16 +65,24 @@ def resolve_pipeline_yaml(pipeline_yaml: str) -> DictConfig:
 def run_stage():
     """Run a stage based on command line arguments."""
 
+    # We disable stage validation here as it is not needed on the CLI; instead, we manually validate that the
+    # stage name matches after loading, and that plus the checks for duplicate stage entry points covers all
+    # validation failure scenarios.
+    os.environ["DISABLE_STAGE_VALIDATION"] = "1"
+
+    from .stages import get_all_registered_stages
+
     all_stages = get_all_registered_stages()
+    all_stage_names = list(all_stages.keys())
 
     if len(sys.argv) < 2:
-        print_help_stage()
+        print_help_stage(all_stage_names)
         sys.exit(1)
     elif sys.argv[1] in HELP_STRS:
-        print_help_stage()
+        print_help_stage(all_stage_names)
         sys.exit(0)
     elif len(sys.argv) < 3:
-        print_help_stage()
+        print_help_stage(all_stage_names)
         sys.exit(1)
 
     pipeline_cfg = resolve_pipeline_yaml(sys.argv[1])
@@ -100,24 +100,20 @@ def run_stage():
         )
 
     _stage_configs = {}
-    for n, ep in all_stages.items():
+    for ep in all_stages.values():
         _stage_configs.update(ep.load().default_config)
 
     cs = ConfigStore.instance()
     cs.store(group="stage_configs", name="_stage_configs", node=_stage_configs)
-
     cs.store(name="_pipeline", node=pipeline_cfg)
-
     cs.store(name="_main", node=OmegaConf.load(MAIN_CFG_PATH))
 
-    main_fn = stage.main
+    hydra_wrapper = hydra.main(version_base=None, config_name="_main")
 
-    hydra_wrapper = hydra.main(
-        version_base=None,
-        config_name="_main",
-    )
-
+    OmegaConf.register_new_resolver("populate_stage", populate_stage, replace=False)
+    OmegaConf.register_new_resolver("get_package_version", lambda: __version__, replace=False)
+    OmegaConf.register_new_resolver("get_package_name", lambda: __package_name__, replace=False)
     OmegaConf.register_new_resolver("stage_name", lambda: stage_name)
-    OmegaConf.register_new_resolver("stage_docstring", lambda: main_fn.__doc__.replace("$", "$$"))
+    OmegaConf.register_new_resolver("stage_docstring", lambda: stage.stage_docstring.replace("$", "$$"))
 
-    hydra_wrapper(main_fn)()
+    hydra_wrapper(stage.main)()

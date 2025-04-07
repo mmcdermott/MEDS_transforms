@@ -4,14 +4,23 @@ import logging
 from collections.abc import Callable
 
 import polars as pl
-from meds import subject_id_field
+from meds import code_field, numeric_value_field, subject_id_field, time_field
 from omegaconf import DictConfig
 
-from ... import DEPRECATED_NAMES, INFERRED_STAGE_KEYS, MANDATORY_TYPES
+from ... import INFERRED_STAGE_KEYS
 from ...parser import cfg_to_expr
 from .. import Stage
 
 logger = logging.getLogger(__name__)
+
+MANDATORY_TYPES = {
+    subject_id_field: pl.Int64,
+    time_field: pl.Datetime("us"),
+    code_field: pl.String,
+    numeric_value_field: pl.Float32,
+    "categorical_value": pl.String,
+    "text_value": pl.String,
+}
 
 
 @Stage.register
@@ -67,6 +76,7 @@ def extract_values(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFra
         ValueError: Missing columns: ['bar', 'foo']
 
     Note that deprecated column names like "numerical_value" or "timestamp" won't be re-typed.
+
         >>> stage_cfg = {"numerical_value": "foo"}
         >>> fn = extract_values(stage_cfg)
         >>> df = pl.DataFrame({"subject_id": [1, 1, 1], "time": [1, 2, 3], "foo": ["1", "2", "3"]})
@@ -103,11 +113,6 @@ def extract_values(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFra
                     )
                 if out_col_n == "time":  # pragma: no cover
                     logger.warning("Warning: `time` is being extracted post-hoc!")
-            case str() if out_col_n in DEPRECATED_NAMES:  # pragma: no cover
-                logger.warning(
-                    f"Deprecated column name: {out_col_n} -> {DEPRECATED_NAMES[out_col_n]}. "
-                    "This column name will not be re-typed."
-                )
             case str():  # pragma: no cover
                 pass
             case _:
