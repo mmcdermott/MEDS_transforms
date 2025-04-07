@@ -155,24 +155,20 @@ def run_stage(
         ...     },
         ... })
         >>> run_stage(cfg, "reshard_to_split", runner_fn=fake_shell_succeed)
-        MEDS_transform-stage pipeline_config.yaml reshard_to_split
-            --config-dir=...
-            --config-name=pipeline_config
-            stage=reshard_to_split
+        MEDS_transform-stage pipeline_config.yaml reshard_to_split stage=reshard_to_split
         >>> run_stage(
         ...     cfg, "fit_vocabulary_indices", runner_fn=fake_shell_succeed
         ... )
-        foobar --config-dir=... --config-name=pipeline_config stage=fit_vocabulary_indices
+        foobar stage=fit_vocabulary_indices
         >>> run_stage(cfg, "baz", runner_fn=fake_shell_succeed)
-        baz_script --config-dir=... --config-name=pipeline_config stage=baz
+        baz_script stage=baz
         >>> cfg.do_profile = True
         >>> run_stage(cfg, "baz", runner_fn=fake_shell_succeed)
-        baz_script --config-dir=... --config-name=pipeline_config stage=baz
-            ++hydra.callbacks.profiler._target_=hydra_profiler.profiler.ProfilerCallback
+        baz_script stage=baz ++hydra.callbacks.profiler._target_=hydra_profiler.profiler.ProfilerCallback
         >>> cfg._stage_runners.baz.parallelize = {"n_workers": 2}
         >>> cfg.do_profile = False
         >>> run_stage(cfg, "baz", runner_fn=fake_shell_succeed)
-        baz_script --config-dir=... --config-name=pipeline_config --multirun stage=baz worker="range(0,2)"
+        baz_script --multirun stage=baz worker="range(0,2)"
         >>> run_stage(cfg, "baz", runner_fn=fake_shell_fail)
         Traceback (most recent call last):
             ...
@@ -203,8 +199,6 @@ def run_stage(
 
     command_parts = [
         script,
-        f"--config-dir={str(pipeline_config_fp.parent.resolve())}",
-        f"--config-name={pipeline_config_fp.stem}",
         f"stage={stage_name}",
     ]
 
@@ -214,7 +208,7 @@ def run_stage(
 
     if parallelization_args:
         multirun = parallelization_args.pop(0)
-        command_parts = command_parts[:3] + [multirun] + command_parts[3:] + parallelization_args
+        command_parts = command_parts[:1] + [multirun] + command_parts[1:] + parallelization_args
 
     if do_profile:
         command_parts.append("++hydra.callbacks.profiler._target_=hydra_profiler.profiler.ProfilerCallback")

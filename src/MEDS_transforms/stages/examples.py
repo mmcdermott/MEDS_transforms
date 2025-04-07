@@ -494,8 +494,6 @@ class StageExample:
           - Input sub-directory: input
           - Cohort sub-directory: cohort
           - Config yaml file: config.yaml
-            │   defaults:
-            │   - _pipeline
             │   stages:
             │   - example_stage
             │   stage_configs:
@@ -1008,7 +1006,6 @@ class StageExample:
 
         return OmegaConf.create(
             {
-                "defaults": ["_pipeline"],
                 **self._pipeline_kwargs,
             }
         )
