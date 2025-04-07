@@ -9,6 +9,7 @@ except PackageNotFoundError:  # pragma: no cover
 
 INFERRED_STAGE_KEYS = {
     "is_metadata",
+    "train_only",
     "data_input_dir",
     "metadata_input_dir",
     "output_dir",

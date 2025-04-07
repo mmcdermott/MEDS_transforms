@@ -130,7 +130,7 @@ def stage_example(request: pytest.FixtureRequest, stage: str, stage_scenario: st
 
 def pipeline_tester(
     pipeline_yaml: str,
-    stage_runner_yaml: str,
+    stage_runner_yaml: str | None,
     stage_scenario_sequence: list[str],
     run_fn: Callable | None = subprocess.run,
 ):
@@ -240,14 +240,15 @@ def pipeline_tester(
         pipeline_config_fp = test_root / "pipeline.yaml"
         pipeline_config_fp.write_text(pipeline_yaml)
 
-        stage_runner_fp = test_root / "stage_runner.yaml"
-        stage_runner_fp.write_text(stage_runner_yaml)
-
         command = [
             "MEDS_transform-pipeline",
             f"pipeline_config_fp={pipeline_config_fp}",
-            f"stage_runner_fp={stage_runner_fp}",
         ]
+
+        if stage_runner_yaml is not None:
+            stage_runner_fp = test_root / "stage_runner.yaml"
+            stage_runner_fp.write_text(stage_runner_yaml)
+            command.append(f"stage_runner_fp={stage_runner_fp}")
 
         # 2. Run the pipeline
         out = run_fn(

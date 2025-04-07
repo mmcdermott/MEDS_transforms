@@ -152,6 +152,8 @@ class Stage:
         default_config: A dictionary containing the default configuration options for the stage. This can be
             passed manually during registration or is set automatically based on the calling file location in
             a manner similar to the examples directory.
+        is_metadata: A boolean indicating whether the stage is a metadata stage. This, in some cases, is set
+            automatically based on the functions passed or can be manually overridden.
 
     Examples:
 
@@ -162,10 +164,10 @@ class Stage:
     on the command line, they won't be tracked:
 
         >>> Stage.ERR_IF_ENTRY_POINT_IMPORTABLE = False
-        >>> def main(cfg: DictConfig):
-        ...     '''base main docstring'''
-        ...     return "main"
-        >>> stage = Stage(main_fn=main)
+        >>> def compute(cfg: DictConfig):
+        ...     '''base fn docstring'''
+        ...     return "compute"
+        >>> stage = Stage(map_fn=compute)
         >>> print(stage.examples_dir)
         None
         >>> stage.test_cases
@@ -175,7 +177,7 @@ class Stage:
 
     The test cases are inferred through the `examples_dir` attribute. This can be set manually:
 
-        >>> stage = Stage(main_fn=main, examples_dir=Path("foo"))
+        >>> stage = Stage(map_fn=compute, examples_dir=Path("foo"))
         >>> print(stage.examples_dir)
         foo
 
@@ -186,7 +188,7 @@ class Stage:
 
     If the example dir is not a `Path` and is not `None`, an error will be raised:
 
-        >>> stage = Stage(main_fn=main, examples_dir="foo")
+        >>> stage = Stage(map_fn=compute, examples_dir="foo")
         Traceback (most recent call last):
             ...
         TypeError: examples_dir must be a Path or None. Got <class 'str'>: foo
@@ -194,10 +196,10 @@ class Stage:
     Likewise, the default config can be set directly through the `default_config` attribute. When set
     manually, it can be set to a dictionary or DictConfig object:
 
-        >>> stage = Stage(main_fn=main, default_config={"foo": "bar"})
+        >>> stage = Stage(map_fn=compute, default_config={"foo": "bar"})
         >>> print(f"{type(stage.default_config).__name__}: {stage.default_config}")
         DictConfig: {'foo': 'bar'}
-        >>> stage = Stage(main_fn=main, default_config=DictConfig({"foo_2": "bar_2"}))
+        >>> stage = Stage(map_fn=compute, default_config=DictConfig({"foo_2": "bar_2"}))
         >>> print(f"{type(stage.default_config).__name__}: {stage.default_config}")
         DictConfig: {'foo_2': 'bar_2'}
 
@@ -206,21 +208,21 @@ class Stage:
         >>> config = DictConfig({"A": [1, 2, 3], "B": {"foo": "bar"}})
         >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as tmpfile:
         ...     OmegaConf.save(config, tmpfile.name)
-        ...     stage = Stage(main_fn=main, default_config=tmpfile.name)
+        ...     stage = Stage(map_fn=compute, default_config=tmpfile.name)
         >>> print(f"{type(stage.default_config).__name__}: {stage.default_config}")
         DictConfig: {'A': [1, 2, 3], 'B': {'foo': 'bar'}}
 
     If the corresponding file does not exist, an error will be raised:
 
         >>> with tempfile.TemporaryDirectory() as tmpdir:
-        ...     Stage(main_fn=main, default_config=Path(tmpdir) / "foo.yaml")
+        ...     Stage(map_fn=compute, default_config=Path(tmpdir) / "foo.yaml")
         Traceback (most recent call last):
             ...
         FileNotFoundError: Default configuration file /tmp/tmp.../foo.yaml does not exist.
 
     Or if it is set to any other type, a TypeError will be raised:
 
-        >>> Stage(main_fn=main, default_config=42)
+        >>> Stage(map_fn=compute, default_config=42)
         Traceback (most recent call last):
             ...
         TypeError: Default configuration must be a dictionary, DictConfig, or path to a YAML file. Got
@@ -236,7 +238,7 @@ class Stage:
         ...     example_dir.mkdir()
         ...     example_data = example_dir / "out_data.yaml"
         ...     _ = example_data.write_text("data/0.parquet: 'code,time,subject_id,numeric_value'")
-        ...     stage = Stage(main_fn=main, examples_dir=example_dir)
+        ...     stage = Stage(map_fn=compute, examples_dir=example_dir)
         ...     print(stage.test_cases)
         StageExample [base]
           stage_cfg: {}
@@ -281,7 +283,7 @@ class Stage:
         ...     ex_2.mkdir()
         ...     ex_2_metadata_fp = (ex_2 / "out_metadata.yaml")
         ...     _ = ex_2_metadata_fp.write_text("metadata/codes.parquet: 'code,description,parent_codes'")
-        ...     stage = Stage(main_fn=main, examples_dir=example_dir)
+        ...     stage = Stage(map_fn=compute, examples_dir=example_dir)
         ...     print(stage.test_cases)
         example_2_foo:
         │   StageExample [base/example_2_foo]
@@ -336,7 +338,7 @@ class Stage:
         ...     examples_dir = stage_dir / "examples"
         ...     examples_dir.mkdir(parents=True)
         ...     calling_file.touch()
-        ...     stage = Stage(main_fn=main, stage_name="stage_foo", _calling_file=calling_file)
+        ...     stage = Stage(map_fn=compute, stage_name="stage_foo", _calling_file=calling_file)
         ...     print(stage.examples_dir.relative_to(tmpdir))
         stage_foo/examples
 
@@ -348,7 +350,7 @@ class Stage:
         ...     examples_dir = stage_dir / "examples"
         ...     examples_dir.mkdir(parents=True)
         ...     calling_file.touch()
-        ...     stage = Stage(main_fn=main, stage_name="not_stage_foo", _calling_file=calling_file)
+        ...     stage = Stage(map_fn=compute, stage_name="not_stage_foo", _calling_file=calling_file)
         ...     print(stage.examples_dir)
         None
 
@@ -359,7 +361,7 @@ class Stage:
         ...     stage_dir.mkdir()
         ...     calling_file = stage_dir / "stage_foo.py"
         ...     calling_file.touch()
-        ...     stage = Stage(main_fn=main, stage_name="stage_foo", _calling_file=calling_file)
+        ...     stage = Stage(map_fn=compute, stage_name="stage_foo", _calling_file=calling_file)
         ...     print(stage.examples_dir)
         None
 
@@ -370,7 +372,7 @@ class Stage:
         ...     calling_file = stage_dir / "stage_foo.py"
         ...     examples_dir = stage_dir / "examples"
         ...     examples_dir.mkdir(parents=True)
-        ...     stage = Stage(main_fn=main, stage_name="stage_foo", _calling_file=calling_file)
+        ...     stage = Stage(map_fn=compute, stage_name="stage_foo", _calling_file=calling_file)
         ...     print(stage.examples_dir)
         None
     """
@@ -383,6 +385,7 @@ class Stage:
     main_fn: MAIN_FN_T | None = None
 
     output_schema_updates: dict[str, pl.DataType] | None = None
+    is_metadata: bool | None = None
 
     __mimic_fn: Callable | None = None
     __stage_docstring: str | None = None
@@ -424,6 +427,7 @@ class Stage:
         output_schema_updates: dict[str, pl.DataType] | None = None,
         examples_dir: Path | None = None,
         default_config: dict[str, Any] | DictConfig | Path | str | None = None,
+        is_metadata: bool | None = None,
         _calling_file: Path | None = None,
     ) -> MAIN_FN_T:
         """Wraps or returns a function that can serve as the main function for a stage."""
@@ -435,6 +439,24 @@ class Stage:
         self.main_fn = main_fn
         self.map_fn = map_fn
         self.reduce_fn = reduce_fn
+
+        if is_metadata is None:
+            if self.stage_type is StageType.MAPREDUCE:
+                self.is_metadata = True
+            elif self.stage_type is StageType.MAP:
+                self.is_metadata = False
+            else:
+                raise ValueError(
+                    "Stage type is not set to MAP or MAPREDUCE, but is_metadata is not set. Please set "
+                    "is_metadata manually."
+                )
+
+            logger.debug(
+                f"Automatically setting is_metadata={self.is_metadata} for {self.stage_name} as it is a "
+                f"{self.stage_type} stage."
+            )
+        else:
+            self.is_metadata = is_metadata
 
         self.__infer_stage_dir(_calling_file)
 
@@ -721,13 +743,13 @@ class Stage:
         imports of the stage function to work as expected. This property gets the function being mimicked.
 
         Examples:
-            >>> def main(cfg: DictConfig):
-            ...     '''base main docstring'''
-            ...     return "main"
+            >>> def compute(cfg: DictConfig):
+            ...     '''base compute docstring'''
+            ...     return "compute"
             >>> def baz_fn(foo: str, bar: int):
             ...     '''base baz docstring'''
             ...     return f"baz {foo} {bar}"
-            >>> stage = Stage.register(main_fn=main)
+            >>> stage = Stage.register(map_fn=compute)
             >>> print(stage.mimic_fn)
             None
             >>> stage.mimic_fn = baz_fn
@@ -783,6 +805,7 @@ class Stage:
         lines = [
             f"Stage {self.stage_name}:",
             f"  Type: {self.stage_type}",
+            f"  is_metadata: {self.is_metadata}",
             "  Docstring:",
         ]
 
@@ -887,10 +910,11 @@ class Stage:
             >>> def reduce_fn(cfg: DictConfig, stage_cfg: DictConfig):
             ...     '''base reduce docstring'''
             ...     return "reduce"
-            >>> stage = Stage.register(main_fn=main)
+            >>> stage = Stage.register(main_fn=main, is_metadata=True)
             >>> print(stage) # The name is inferred from the name of the file:
             Stage base:
               Type: main
+              is_metadata: True
               Docstring:
                 | base main docstring
               Map function: None
@@ -908,18 +932,20 @@ class Stage:
                 ...
             ValueError: Stage base has no function to mimic, so can't be called directly.
 
-            >>> print(Stage.register(map_fn=map_fn))
+            >>> print(Stage.register(map_fn=map_fn, is_metadata=False))
             Stage base:
               Type: map
+              is_metadata: False
               Docstring:
                 | base map docstring
               Map function: map_fn
               Reduce function: None
               Main function: None
               Mimic function: None
-            >>> print(Stage.register(map_fn=map_fn, reduce_fn=reduce_fn))
+            >>> print(Stage.register(map_fn=map_fn, reduce_fn=reduce_fn, is_metadata=True))
             Stage base:
               Type: mapreduce
+              is_metadata: True
               Docstring:
                 | Map Stage:
                 | base map docstring
@@ -942,16 +968,58 @@ class Stage:
                 ...
             ValueError: Only one of main_fn or map_fn/reduce_fn should be provided.
 
-            You can also use it as a decorator:
+            The `is_metadata` parameter is a bit special, in that you need to provide it if you are defining a
+            "main" stage; otherwise it can be omitted and inferred.
+
+            >>> print(Stage.register(map_fn=map_fn))
+            Stage base:
+              Type: map
+              is_metadata: False
+              Docstring:
+                | base map docstring
+              Map function: map_fn
+              Reduce function: None
+              Main function: None
+              Mimic function: None
+            >>> print(Stage.register(map_fn=map_fn, reduce_fn=reduce_fn))
+            Stage base:
+              Type: mapreduce
+              is_metadata: True
+              Docstring:
+                | Map Stage:
+                | base map docstring
+                | Reduce stage:
+                | base reduce docstring
+              Map function: map_fn
+              Reduce function: reduce_fn
+              Main function: None
+              Mimic function: None
+            >>> Stage.register(main_fn=main)
+            Traceback (most recent call last):
+                ...
+            ValueError: Stage type is not set to MAP or MAPREDUCE, but is_metadata is not set. Please set
+            is_metadata manually.
+
+            You can also use it as a decorator, either parametrized or not.
 
             >>> @Stage.register
+            ... def map_fn(cfg: DictConfig, stage_cfg: DictConfig):
+            ...     '''base map docstring'''
+            ...     return "map"
+            >>> @Stage.register(is_metadata=True)
             ... def main(cfg: DictConfig):
             ...     '''base main docstring'''
             ...     return "main"
 
-            The output of the decorator, saved here to the variable `main`, will "mimic" the decorated
-            function under normal usage:
+            The output of the decorator, which is stored in the variable of the name defined by the function,
+            will "mimic" the decorated function under normal usage:
 
+            >>> map_fn.__name__
+            'map_fn'
+            >>> map_fn.__doc__
+            'base map docstring'
+            >>> map_fn({}, {})
+            'map'
             >>> main.__name__
             'main'
             >>> main.__doc__
@@ -961,9 +1029,20 @@ class Stage:
 
             ... but it is actually a stage object defined by the decorator:
 
+            >>> print(map_fn)
+            Stage base:
+              Type: map
+              is_metadata: False
+              Docstring:
+                | base map docstring
+              Map function: map_fn
+              Reduce function: None
+              Main function: None
+              Mimic function: map_fn
             >>> print(main)
             Stage base:
               Type: main
+              is_metadata: True
               Docstring:
                 | base main docstring
               Map function: None
@@ -971,15 +1050,16 @@ class Stage:
               Main function: main
               Mimic function: main
 
-            When used as a decorator, you can also parametrize the decorator:
+            When used as a decorator, you can also parametrize the decorator with other parameters:
 
-            >>> @Stage.register(stage_name="foo", stage_docstring="bar")
+            >>> @Stage.register(stage_name="foo", stage_docstring="bar", is_metadata=False)
             ... def main(cfg: DictConfig):
             ...     '''base main docstring'''
             ...     return "main"
             >>> print(main)
             Stage foo:
               Type: main
+              is_metadata: False
               Docstring:
                 | bar
               Map function: None
@@ -998,12 +1078,13 @@ class Stage:
             ...     examples_dir=Path("foo"),
             ...     default_config={"arg1": {"option1": "foo"}, "arg2": [1, 2.3]},
             ... )
-            ... def main(cfg: DictConfig):
-            ...     '''base main docstring'''
-            ...     return "main"
-            >>> print(main)
+            ... def foobar(cfg: DictConfig):
+            ...     '''base map docstring'''
+            ...     return "map"
+            >>> print(foobar)
             Stage foo:
-              Type: main
+              Type: map
+              is_metadata: False
               Docstring:
                 | bar
               Default config:
@@ -1014,10 +1095,10 @@ class Stage:
                 | - 2.3
               Output schema updates:
                 | {'foo': Int64}
-              Map function: None
+              Map function: foobar
               Reduce function: None
-              Main function: main
-              Mimic function: main
+              Main function: None
+              Mimic function: foobar
 
             The decorated function will be inferred to be a "main" function if it is named "main" and there is
             no reduce function specified in the parametrized keyword arguments to the decorator. Otherwise, it
@@ -1030,6 +1111,7 @@ class Stage:
             >>> print(map_fn)
             Stage base:
               Type: map
+              is_metadata: False
               Docstring:
                 | base map docstring
               Map function: map_fn
@@ -1043,6 +1125,7 @@ class Stage:
             >>> print(main)
             Stage base:
               Type: mapreduce
+              is_metadata: True
               Docstring:
                 | Map Stage:
                 | base main docstring
@@ -1090,6 +1173,7 @@ class Stage:
             >>> print(manual_decorator(map_fn))
             Stage foo:
               Type: map
+              is_metadata: False
               Docstring:
                 | bar
               Map function: map_fn
@@ -1151,7 +1235,7 @@ class Stage:
             ...     with patch("inspect.currentframe") as mock:
             ...         mock.return_value.f_back.f_code.co_filename = str(calling_file)
             ...         # Now we can create the stage:
-            ...         @Stage.register(stage_name="stage_foo")
+            ...         @Stage.register(stage_name="stage_foo", is_metadata=True)
             ...         def main(cfg: DictConfig):
             ...             '''base main docstring'''
             ...             return "main"
@@ -1181,6 +1265,7 @@ class Stage:
             -----------------
             Stage stage_foo:
               Type: main
+              is_metadata: True
               Docstring:
                 | base main docstring
               Default config:
@@ -1291,7 +1376,7 @@ class Stage:
             ...     with patch("inspect.currentframe") as mock:
             ...         mock.return_value.f_back.f_code.co_filename = str(calling_file)
             ...         # Now we can create the stage:
-            ...         @Stage.register(stage_name="not_stage_foo")
+            ...         @Stage.register(stage_name="not_stage_foo", is_metadata=True)
             ...         def main(cfg: DictConfig):
             ...             '''base main docstring'''
             ...             return "main"
@@ -1321,6 +1406,7 @@ class Stage:
             -----------------
             Stage not_stage_foo:
               Type: main
+              is_metadata: True
               Docstring:
                 | base main docstring
               Map function: None
@@ -1337,7 +1423,7 @@ class Stage:
             print them here using the `print_warnings` context manager, defined in our `conftest.py` file.
 
             >>> with print_warnings():
-            ...     @Stage.register
+            ...     @Stage.register(is_metadata=True)
             ...     def main(cfg: DictConfig):
             ...         '''base main docstring'''
             ...         return "main"

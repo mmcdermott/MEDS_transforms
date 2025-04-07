@@ -324,13 +324,10 @@ class StageExample:
         example_stage
         >>> print(example.do_use_config_yaml)
         False
-        >>> print(example._pipeline_kwargs)
-        {'stages': ['example_stage'], 'stage_configs': {'example_stage': {}}}
         >>> print(example.cmd_pipeline_cfg)
         None
-        >>> for arg in example.cmd_args:
-        ...     print(arg)
-        'stages=["example_stage"]'
+        >>> print(example.cmd_args)
+        []
         >>> print(example._err_prefix)
         Stage example example_stage Failed:
 
@@ -471,7 +468,7 @@ class StageExample:
           - Input sub-directory: input
           - Cohort sub-directory: cohort
           - Script: MEDS_transform-stage __null__ example_stage
-                    'stages=["example_stage"]' input_dir=/tmp/tmp.../input cohort_dir=/tmp/tmp.../cohort
+                    input_dir=/tmp/tmp.../input cohort_dir=/tmp/tmp.../cohort
         >>> test_env.test_dir.is_dir()
         False
         >>> example = StageExample(
@@ -543,7 +540,7 @@ class StageExample:
           - Input sub-directory: input
           - Cohort sub-directory: cohort
           - Script: MEDS_transform-stage __null__ example_stage
-                    'stages=["example_stage"]' input_dir=/tmp/tmp.../input cohort_dir=/tmp/tmp.../cohort
+                    input_dir=/tmp/tmp.../input cohort_dir=/tmp/tmp.../cohort
         Stdout:
         <BLANKLINE>
         Stderr:
@@ -576,7 +573,7 @@ class StageExample:
           - Input sub-directory: input
           - Cohort sub-directory: cohort
           - Script: MEDS_transform-stage __null__ example_stage
-                    'stages=["example_stage"]' input_dir=/tmp/tmp.../input cohort_dir=/tmp/tmp.../cohort
+                    input_dir=/tmp/tmp.../input cohort_dir=/tmp/tmp.../cohort
         Stdout:
         Success
         Stderr:
@@ -996,23 +993,16 @@ class StageExample:
                 )
 
     @property
-    def _pipeline_kwargs(self) -> dict:
-        return {"stages": [self.stage_name], "stage_configs": {self.stage_name: self.stage_cfg}}
-
-    @property
     def cmd_pipeline_cfg(self) -> DictConfig | None:
         if not self.do_use_config_yaml:
             return None
 
-        return OmegaConf.create(
-            {
-                **self._pipeline_kwargs,
-            }
-        )
+        pipeline_kwargs = {"stages": [self.stage_name], "stage_configs": {self.stage_name: self.stage_cfg}}
+        return OmegaConf.create(pipeline_kwargs)
 
     @property
     def cmd_args(self) -> list[str]:
-        return [] if self.do_use_config_yaml else dict_to_hydra_kwargs(self._pipeline_kwargs)
+        return [] if self.do_use_config_yaml else dict_to_hydra_kwargs({"stage_cfg": self.stage_cfg})
 
     @property
     @contextmanager

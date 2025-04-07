@@ -79,22 +79,15 @@ STAGE_SCENARIO_SEQUENCE = [
 
 # Normally, you wouldn't need to specify all of these scripts, but in testing with local scripts we need to
 # specify them all as they need to point to their python paths.
-STAGE_RUNNER_YAML = """
-fit_normalization:
-  _base_stage: "aggregate_code_metadata"
-"""
-
-PARALLEL_STAGE_RUNNER_YAML = f"""
+PARALLEL_STAGE_RUNNER_YAML = """
 parallelize:
   n_workers: 2
   launcher: "joblib"
-
-{STAGE_RUNNER_YAML}
 """
 
 
 def test_example_pipeline():
-    pipeline_tester(PIPELINE_YAML, STAGE_RUNNER_YAML, STAGE_SCENARIO_SEQUENCE)
+    pipeline_tester(PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE)
 
 
 @pytest.mark.parallelized

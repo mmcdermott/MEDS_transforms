@@ -3,6 +3,7 @@ defaults:
   - dataset: _base_dataset
   - _self_
   - _pipeline
+  - stage_cfg: _stage_cfg
 
 # Global IO
 input_dir: ${dataset.root_dir}
@@ -23,7 +24,6 @@ polling_time: 300 # wait time in seconds before beginning reduction steps
 # Stage information
 stages: ??? # The list of stages to this overall pipeline (in order)
 stage: ${stage_name:}
-stage_cfg: ${oc.create:${populate_stage:${stage}, ${input_dir}, ${cohort_dir}, ${stages}, ${stage_configs}}}
 
 # Pipeline
 etl_metadata:

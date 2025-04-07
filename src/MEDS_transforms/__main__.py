@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 from collections.abc import Sequence
@@ -9,7 +10,8 @@ from omegaconf import OmegaConf
 
 from . import __package_name__, __version__
 from .configs import PipelineConfig
-from .utils import populate_stage
+
+logger = logging.getLogger(__name__)
 
 HELP_STRS = {"--help", "-h", "help", "h"}
 MAIN_CFG_PATH = files(__package_name__) / "configs" / "_main.yaml"
@@ -56,28 +58,40 @@ def run_stage():
     stage_name = sys.argv[2]
     sys.argv = sys.argv[2:]  # remove dispatcher arguments
 
-    if stage_name not in all_stages:
-        raise ValueError(f"Stage '{stage_name}' not found.")
+    load_stage_name = stage_name
+    if "_base_stage" in pipeline_cfg.stage_configs.get(stage_name, {}):
+        load_stage_name = pipeline_cfg.stage_configs[stage_name]["_base_stage"]
 
-    stage = all_stages[stage_name].load()
+    all_loaded_stages = {n: ep.load() for n, ep in all_stages.items()}
 
-    if stage.stage_name != stage_name:
+    if load_stage_name not in all_stages:
+        raise ValueError(f"Stage '{load_stage_name}' not found.")
+
+    stage = all_loaded_stages[load_stage_name]
+
+    if stage.stage_name != load_stage_name:
         raise ValueError(
-            f"Loaded stage name '{stage.stage_name}' does not match the provided name '{stage_name}'!"
+            f"Loaded stage name '{stage.stage_name}' does not match the provided name '{load_stage_name}'!"
         )
 
     _stage_configs = {}
-    for ep in all_stages.values():
-        _stage_configs.update(ep.load().default_config)
+    for s in all_loaded_stages.values():
+        _stage_configs.update(s.default_config)
+
+    if not pipeline_cfg.stages:
+        logger.warning("No stages specified in the pipeline config. Adding the target stage alone.")
+        pipeline_cfg.stages = [stage_name]
+
+    all_stage_configs = pipeline_cfg.resolve_stages(all_loaded_stages)
 
     cs = ConfigStore.instance()
     cs.store(group="stage_configs", name="_stage_configs", node=_stage_configs)
     cs.store(name="_pipeline", node=pipeline_cfg.structured_config)
     cs.store(name="_main", node=OmegaConf.load(MAIN_CFG_PATH))
+    cs.store(group="stage_cfg", name="_stage_cfg", node=all_stage_configs[stage_name])
 
     hydra_wrapper = hydra.main(version_base=None, config_name="_main")
 
-    OmegaConf.register_new_resolver("populate_stage", populate_stage, replace=False)
     OmegaConf.register_new_resolver("get_package_version", lambda: __version__, replace=False)
     OmegaConf.register_new_resolver("get_package_name", lambda: __package_name__, replace=False)
     OmegaConf.register_new_resolver("stage_name", lambda: stage_name)

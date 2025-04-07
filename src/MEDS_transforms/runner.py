@@ -187,11 +187,7 @@ def run_stage(
     elif "_script" in stage_config:
         script = stage_config._script
     elif "_base_stage" in stage_runner_config:
-        base_stage_name = stage_runner_config["_base_stage"]
-        script = f"MEDS_transform-stage {str(pipeline_config_fp)} {base_stage_name}"
-    elif "_base_stage" in stage_config:
-        base_stage_name = stage_config["_base_stage"]
-        script = f"MEDS_transform-stage {str(pipeline_config_fp)} {base_stage_name}"
+        raise ValueError("Put _base_stage args is in your pipeline config")
     else:
         script = f"MEDS_transform-stage {str(pipeline_config_fp)} {stage_name}"
 
