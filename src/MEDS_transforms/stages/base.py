@@ -8,6 +8,7 @@ import logging
 import os
 import textwrap
 from collections.abc import Callable
+from contextlib import contextmanager
 from enum import StrEnum
 from functools import partial, wraps
 from importlib.metadata import EntryPoint
@@ -24,6 +25,7 @@ from .examples import StageExample, StageExampleDict
 logger = logging.getLogger(__name__)
 
 MAIN_FN_T = Callable[[DictConfig], None]
+VALIDATION_ENV_VAR = "DISABLE_STAGE_VALIDATION"
 
 
 class StageType(StrEnum):
@@ -394,8 +396,8 @@ class Stage:
     __examples_dir: Path | None = None
     __default_config: DictConfig | None = None
 
-    WARN_IF_NO_ENTRY_POINT_AT_NAME: ClassVar[bool] = os.environ.get("DISABLE_STAGE_VALIDATION", "0") != "1"
-    ERR_IF_ENTRY_POINT_IMPORTABLE: ClassVar[bool] = os.environ.get("DISABLE_STAGE_VALIDATION", "0") != "1"
+    WARN_IF_NO_ENTRY_POINT_AT_NAME: ClassVar[bool] = os.environ.get(VALIDATION_ENV_VAR, "0") != "1"
+    ERR_IF_ENTRY_POINT_IMPORTABLE: ClassVar[bool] = os.environ.get(VALIDATION_ENV_VAR, "0") != "1"
 
     ENTRY_POINT_SETUP_STRING: ClassVar[str] = (
         "This may be due to a missing or incorrectly configured entry point in your setup.py or "
@@ -415,6 +417,26 @@ class Stage:
         "You can disable all validation by setting the environment variable "
         "`DISABLE_STAGE_VALIDATION` to `1`."
     )
+
+    @staticmethod
+    @contextmanager
+    def suppress_validation():
+        """Context manager to disable stage validation, to be used in testing and execution settings.
+
+        Example:
+            >>> with Stage.suppress_validation():
+            ...     # Your code here that requires no stage validation.
+            ...     pass
+        """
+        old_env_val = os.environ.get(VALIDATION_ENV_VAR, None)
+        os.environ[VALIDATION_ENV_VAR] = "1"
+        try:
+            yield
+        finally:
+            if old_env_val is None:
+                del os.environ[VALIDATION_ENV_VAR]
+            else:
+                os.environ[VALIDATION_ENV_VAR] = old_env_val
 
     def __init__(
         self,
@@ -463,7 +485,7 @@ class Stage:
         self.examples_dir = examples_dir
         self.default_config = default_config
 
-        do_skip_validation = os.environ.get("DISABLE_STAGE_VALIDATION", "0") == "1"
+        do_skip_validation = os.environ.get(VALIDATION_ENV_VAR, "0") == "1"
 
         if do_skip_validation:
             logger.debug(
@@ -641,30 +663,25 @@ class Stage:
         if not self.ERR_IF_ENTRY_POINT_IMPORTABLE:
             return
 
-        old_env_val = os.environ.get("DISABLE_STAGE_VALIDATION", "0")
-        try:
-            # Temporarily disable warnings to avoid circular imports.
-            os.environ["DISABLE_STAGE_VALIDATION"] = "1"
-
-            # Attempt to reload, which should cause an error if the stage being constructed is the same stage
-            # as the one being registered.
-            registered_stages[stage_name].load()
-            raise StageRegistrationError(
-                f"Stage {stage_name} is registered in the entry points, but an attempted reload causes "
-                "no issues. If this were the stage you are constructing, a reload would cause a circular "
-                "import error, so this means you are overwriting an external, different stage, which is a "
-                "problem!\n"
-                f"{self.ENTRY_POINT_SETUP_STRING}\n{self.DISABLE_ERROR_STRING}\n"
-                f"{self.DISABLE_ALL_STAGE_VALIDATION_STRING}"
-            )
-        except AttributeError as e:
-            if "circular import" not in str(e):
-                raise ValueError(
-                    f"Failed to validate stage {stage_name} for an unexpected reason; it is possible that "
-                    "an upstream stage defined with the same name is invalid."
-                ) from e
-        finally:
-            os.environ["DISABLE_STAGE_VALIDATION"] = old_env_val
+        with Stage.suppress_validation():
+            try:
+                # Attempt to reload, which should cause an error if the stage being constructed is the same
+                # stage as the one being registered.
+                registered_stages[stage_name].load()
+                raise StageRegistrationError(
+                    f"Stage {stage_name} is registered in the entry points, but an attempted reload causes "
+                    "no issues. If this were the stage you are constructing, a reload would cause a circular "
+                    "import error, so this means you are overwriting an external, different stage, which is "
+                    "a problem!\n"
+                    f"{self.ENTRY_POINT_SETUP_STRING}\n{self.DISABLE_ERROR_STRING}\n"
+                    f"{self.DISABLE_ALL_STAGE_VALIDATION_STRING}"
+                )
+            except AttributeError as e:
+                if "circular import" not in str(e):
+                    raise ValueError(
+                        f"Failed to validate stage {stage_name} for an unexpected reason; it is possible "
+                        "that an upstream stage defined with the same name is invalid."
+                    ) from e
 
     @property
     def stage_name(self) -> str:

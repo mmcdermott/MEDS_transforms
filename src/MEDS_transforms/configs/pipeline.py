@@ -8,9 +8,10 @@ import os
 from importlib.resources import files
 from pathlib import Path
 
+from hydra.core.config_store import ConfigStore
 from omegaconf import DictConfig, OmegaConf
 
-from ..stages.base import Stage
+from ..stages import Stage, get_all_registered_stages
 
 logger = logging.getLogger(__name__)
 
@@ -208,3 +209,63 @@ class PipelineConfig:
                 prior_data_stage = config
 
         return resolved_stage_configs
+
+    def resolve_stage_name(self, stage_name: str) -> str:
+        """Return the registered stage corresponding to the specified stage for the given pipeline.
+
+        Args:
+            stage_name: The name of the stage to resolve.
+
+        Returns: Either (a) the `_base_stage` specified in the pipeline config's `stage_configs` for this
+            stage, if specified, or (b) the stage name itself, otherwise. In both cases, the stage name
+            returned is validated to be a registered stage.
+
+        Raises:
+            ValueError: If the stage name is not a registered stage.
+        """
+
+        resolved_stage_name = self.stage_configs.get(stage_name, {}).get("_base_stage", stage_name)
+
+        all_stages = get_all_registered_stages()
+        if resolved_stage_name not in all_stages:
+            raise ValueError(f"Stage '{resolved_stage_name}' not registered!")
+
+        return resolved_stage_name
+
+    @Stage.suppress_validation()
+    def register_for(self, stage_name: str) -> Stage:
+        if not self.stages:
+            logger.warning("No stages specified in the pipeline config. Adding the target stage alone.")
+            self.stages = [stage_name]
+
+        resolved_stage_name = self.resolve_stage_name(stage_name)
+
+        registered_stages = get_all_registered_stages()
+        loaded_stages = {}
+        for raw_stage in self.stages:
+            s = self.resolve_stage_name(raw_stage)
+            if s not in loaded_stages:
+                loaded_stages[s] = registered_stages[s].load()
+
+        stage = loaded_stages[resolved_stage_name]
+
+        if stage.stage_name != resolved_stage_name:
+            raise ValueError(
+                f"Registered stage name '{stage.stage_name}' does not match the provided name "
+                f"'{resolved_stage_name}'!"
+            )
+
+        _stage_configs = {}
+        for s in loaded_stages.values():
+            _stage_configs.update(s.default_config)
+
+        all_stage_configs = self.resolve_stages(loaded_stages)
+
+        pipeline_node = self.structured_config
+        pipeline_node["stage_cfg"] = all_stage_configs[stage_name]
+
+        cs = ConfigStore.instance()
+        cs.store(group="stage_configs", name="_stage_configs", node=_stage_configs)
+        cs.store(name="_pipeline", node=pipeline_node)
+
+        return stage
