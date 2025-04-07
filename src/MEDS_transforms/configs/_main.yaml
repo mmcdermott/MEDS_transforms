@@ -1,5 +1,7 @@
 defaults:
   - stage_configs: _stage_configs
+  - _self_
+  - _pipeline
 
 # Global IO
 input_dir: ???
@@ -26,11 +28,13 @@ stage_cfg: ${oc.create:${populate_stage:${stage}, ${input_dir}, ${cohort_dir}, $
 
 # Pipeline
 etl_metadata:
-  pipeline_name: ???
+  pipeline_name: "MEDS-Transforms Pipeline"
   dataset_name: ???
   dataset_version: ???
   package_name: ${get_package_name:}
   package_version: ${get_package_version:}
+
+code_modifiers: null
 
 # Hydra
 hydra:

@@ -23,10 +23,6 @@ from MEDS_transforms.pytest_plugin import pipeline_tester
 RUNNER_SCRIPT = "MEDS_transform-pipeline"
 
 PIPELINE_YAML = """
-defaults:
-  - _preprocess
-  - _self_
-
 input_dir: {input_dir}
 cohort_dir: {cohort_dir}
 
@@ -68,9 +64,6 @@ stage_configs:
       - "values/n_occurrences"
       - "values/sum"
       - "values/sum_sqd"
-
-hydra:
-  searchpath: ["pkg://MEDS_transforms.configs"]
 """
 
 STAGE_SCENARIO_SEQUENCE = [

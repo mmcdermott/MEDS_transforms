@@ -21,7 +21,7 @@ PKG_PFX = "pkg://"
 YAML_EXTENSIONS = {"yaml", "yml"}
 
 
-PIPELINE_BASE_PATH = files(__package_name__) / "configs" / "__pipeline.yaml"
+MAIN_CFG_PATH = files(__package_name__) / "configs" / "_main.yaml"
 
 
 def print_help_stage():
@@ -104,10 +104,9 @@ def run_stage():
     cs = ConfigStore.instance()
     cs.store(group="stage_configs", name="_stage_configs", node=_stage_configs)
 
-    cs.store(name="_pipeline", node=OmegaConf.load(PIPELINE_BASE_PATH))
+    cs.store(name="_pipeline", node=OmegaConf.load(pipeline_yaml))
 
-    pipeline_config = OmegaConf.load(pipeline_yaml)
-    cs.store(name="_main", node=pipeline_config)
+    cs.store(name="_main", node=OmegaConf.load(MAIN_CFG_PATH))
 
     main_fn = stage.main
 
