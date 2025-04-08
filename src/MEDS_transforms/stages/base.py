@@ -734,18 +734,18 @@ class Stage:
 
                 @wraps(self.main_fn)
                 def main_fn(cfg: DictConfig):
-                    return self.main_fn(cfg)
+                    self.main_fn(cfg)
 
             case StageType.MAP:
 
                 @wraps(self.map_fn)
                 def main_fn(cfg: DictConfig):
-                    return map_stage(cfg, self.map_fn)
+                    map_stage(cfg, self.map_fn)
 
             case StageType.MAPREDUCE:
 
                 def main_fn(cfg: DictConfig):
-                    return mapreduce_stage(cfg, self.map_fn, self.reduce_fn)
+                    mapreduce_stage(cfg, self.map_fn, self.reduce_fn)
 
         main_fn.__name__ = self.stage_name
         main_fn.__doc__ = self.stage_docstring

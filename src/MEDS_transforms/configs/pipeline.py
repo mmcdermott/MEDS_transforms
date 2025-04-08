@@ -255,6 +255,14 @@ class PipelineConfig:
                        'reducer_output_dir': None,
                        'train_only': False,
                        'output_dir': '${cohort_dir}/filter_measurements'}}
+
+    If you try to register a pipeline that includes an unregistered stage, an error will be raised:
+
+        >>> pipeline_cfg = PipelineConfig(stages=["foobar"])
+        >>> pipeline_cfg.register_for("foobar")
+        Traceback (most recent call last):
+            ...
+        ValueError: Stage 'foobar' not registered! Registered stages: ...
     """
 
     stages: list[UNPARSED_STAGE_T] | ListConfig | None = None

@@ -97,7 +97,7 @@ def mapreduce_stage(
     read_fn: Callable[[Path], DF_T] = partial(pl.scan_parquet, glob=False),
     write_fn: Callable[[DF_T, Path], None] = write_lazyframe,
     shard_iterator_fntr: SHARD_ITR_FNTR_T = shard_iterator,
-) -> Path:
+):
 
     map_stage_out_fps = map_stage(
         cfg=cfg, map_fn=map_fn, read_fn=read_fn, write_fn=write_fn, shard_iterator_fntr=shard_iterator
@@ -122,14 +122,12 @@ def mapreduce_stage(
     reduce_over(
         in_fps=map_stage_out_fps,
         out_fp=reduce_stage_out_fp,
-        polling_time=cfg.polling_time,
         read_fn=read_fn,
         write_fn=write_fn,
         reduce_fn=reduce_fn,
         merge_fp=merge_fp,
         merge_fn=merge_fn,
         do_overwrite=cfg.do_overwrite,
+        polling_time=cfg.polling_time,
     )
     logger.info(f"Finished reduction in {datetime.now() - start}")
-
-    return reduce_stage_out_fp
