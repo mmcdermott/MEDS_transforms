@@ -492,9 +492,7 @@ class StageExample:
           - Cohort sub-directory: cohort
           - Config yaml file: config.yaml
             │   stages:
-            │   - example_stage
-            │   stage_configs:
-            │     example_stage:
+            │   - example_stage:
             │       arg1: value1
             │       arg2:
             │         arg3:
@@ -997,8 +995,7 @@ class StageExample:
         if not self.do_use_config_yaml:
             return None
 
-        pipeline_kwargs = {"stages": [self.stage_name], "stage_configs": {self.stage_name: self.stage_cfg}}
-        return OmegaConf.create(pipeline_kwargs)
+        return OmegaConf.create({"stages": [{self.stage_name: self.stage_cfg}]})
 
     @property
     def cmd_args(self) -> list[str]:

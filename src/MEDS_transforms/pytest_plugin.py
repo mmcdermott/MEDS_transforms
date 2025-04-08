@@ -9,6 +9,7 @@ import pytest
 from omegaconf import OmegaConf
 
 from . import __package_name__
+from .configs.stage import StageConfig
 from .stages import StageExample, get_all_registered_stages
 
 # Get all registered stages
@@ -99,7 +100,7 @@ def get_stages_under_test(config: pytest.Config) -> dict[str, dict[str, StageExa
             )
         out = {stage: ep for stage, ep in out.items() if stage in stages}
 
-    out = {n: ep.load().test_cases for n, ep in out.items()}
+    out = {n: ep.load() for n, ep in out.items()}
     return out
 
 
@@ -107,7 +108,8 @@ def pytest_generate_tests(metafunc):
     """Generate tests for registered stages based on the command line options."""
     config = metafunc.config
 
-    config.allowed_stage_scenarios = get_stages_under_test(config)
+    config.allowed_stages = get_stages_under_test(config)
+    config.allowed_stage_scenarios = {n: s.test_cases for n, s in config.allowed_stages.items()}
 
     if "stage_scenario" in metafunc.fixturenames:
         arg_names = ["stage", "stage_scenario"]
@@ -124,6 +126,13 @@ def stage_example(request: pytest.FixtureRequest, stage: str, stage_scenario: st
 
     if stage_scenario not in request.config.allowed_stage_scenarios[stage]:  # pragma: no cover
         raise ValueError(f"Stage scenario '{stage_scenario}' not found for stage '{stage}'.")
+
+    s = request.config.allowed_stages[stage]
+    if s.stage_name != stage:  # pragma: no cover
+        raise ValueError(
+            f"Stage '{stage}' has a misconfigured registration point!. It is registered at {stage}, "
+            f"but the loaded stage name is {s.name}."
+        )
 
     yield request.config.allowed_stage_scenarios[stage][stage_scenario]
 
@@ -201,7 +210,7 @@ def pipeline_tester(
         AssertionError: Pipeline failed to produce expected output for stage 'filter_subjects'
     """
 
-    pipeline_stages = list(OmegaConf.create(pipeline_yaml).stages)
+    pipeline_stages = [StageConfig.from_arg(s).name for s in OmegaConf.create(pipeline_yaml).stages]
 
     if len(pipeline_stages) != len(stage_scenario_sequence):
         raise ValueError(

@@ -29,41 +29,34 @@ cohort_dir: {cohort_dir}
 description: "A test pipeline for the MEDS-transforms pipeline runner."
 
 stages:
-  - filter_subjects
-  - add_time_derived_measurements
-  - fit_outlier_detection
-  - occlude_outliers
-  - fit_normalization
+  - filter_subjects:
+      min_events_per_subject: 5
+  - add_time_derived_measurements:
+      age:
+        DOB_code: "DOB"
+        age_code: "AGE"
+        age_unit: "years"
+      time_of_day:
+        time_of_day_code: "TIME_OF_DAY"
+        endpoints: [6, 12, 18, 24]
+  - fit_outlier_detection:
+      _base_stage: "aggregate_code_metadata"
+      aggregations:
+        - "values/n_occurrences"
+        - "values/sum"
+        - "values/sum_sqd"
+  - occlude_outliers:
+      stddev_cutoff: 1
+  - fit_normalization:
+      _base_stage: "aggregate_code_metadata"
+      aggregations:
+        - "code/n_occurrences"
+        - "code/n_subjects"
+        - "values/n_occurrences"
+        - "values/sum"
+        - "values/sum_sqd"
   - fit_vocabulary_indices
   - normalization
-
-stage_configs:
-  filter_subjects:
-    min_events_per_subject: 5
-  add_time_derived_measurements:
-    age:
-      DOB_code: "DOB"
-      age_code: "AGE"
-      age_unit: "years"
-    time_of_day:
-      time_of_day_code: "TIME_OF_DAY"
-      endpoints: [6, 12, 18, 24]
-  fit_outlier_detection:
-    _base_stage: "aggregate_code_metadata"
-    aggregations:
-      - "values/n_occurrences"
-      - "values/sum"
-      - "values/sum_sqd"
-  occlude_outliers:
-    stddev_cutoff: 1
-  fit_normalization:
-    _base_stage: "aggregate_code_metadata"
-    aggregations:
-      - "code/n_occurrences"
-      - "code/n_subjects"
-      - "values/n_occurrences"
-      - "values/sum"
-      - "values/sum_sqd"
 """
 
 STAGE_SCENARIO_SEQUENCE = [
