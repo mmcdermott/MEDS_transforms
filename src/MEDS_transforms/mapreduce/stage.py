@@ -22,13 +22,6 @@ from .types import DF_T
 logger = logging.getLogger(__name__)
 
 
-def resolve_mapper_fn(cfg: DictConfig, map_fn: ANY_COMPUTE_FN_T | None) -> COMPUTE_FN_T:
-    if is_match_revise(cfg.stage_cfg):
-        return match_revise_fntr(cfg, cfg.stage_cfg, map_fn)
-    else:
-        return bind_compute_fn(cfg, cfg.stage_cfg, map_fn)
-
-
 def map_stage(
     cfg: DictConfig,
     map_fn: COMPUTE_FN_T | None = None,
@@ -66,7 +59,10 @@ def map_stage(
     elif includes_only_train:  # pragma: no cover
         raise ValueError("All splits should be used, but shard iterator is returning only train splits?!?")
 
-    map_fn = resolve_mapper_fn(cfg, map_fn)
+    if is_match_revise(cfg.stage_cfg):
+        map_fn = match_revise_fntr(cfg, cfg.stage_cfg, map_fn)
+    else:
+        map_fn = bind_compute_fn(cfg, cfg.stage_cfg, map_fn)
 
     all_out_fps = map_over(
         shards=shards,
