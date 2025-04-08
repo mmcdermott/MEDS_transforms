@@ -273,17 +273,12 @@ class PipelineConfig:
                 f"'{resolved_stage_name}'!"
             )
 
-        _stage_configs = {}
-        for s in loaded_stages.values():
-            _stage_configs.update(s.default_config)
-
         all_stage_configs = self.resolve_stages(loaded_stages)
 
         pipeline_node = self.structured_config
         pipeline_node["stage_cfg"] = all_stage_configs[stage_name]
 
         cs = ConfigStore.instance()
-        cs.store(group="stage_configs", name="_stage_configs", node=_stage_configs)
         cs.store(name="_pipeline", node=pipeline_node)
 
         return stage

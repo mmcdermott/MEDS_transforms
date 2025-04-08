@@ -1,5 +1,4 @@
 defaults:
-  - stage_configs: _stage_configs
   - dataset: _base_dataset
   - _self_
   - _pipeline
