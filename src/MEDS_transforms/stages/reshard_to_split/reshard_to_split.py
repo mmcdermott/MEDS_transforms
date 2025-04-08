@@ -260,7 +260,7 @@ def write_json(d: dict, fp: Path) -> None:
     fp.write_text(json.dumps(d))
 
 
-@Stage.register
+@Stage.register(is_metadata=False)
 def main(cfg: DictConfig):
     """Re-shard a MEDS cohort to in a manner that subdivides subject splits."""
 

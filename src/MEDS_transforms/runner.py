@@ -6,6 +6,7 @@ To do this effectively, this runner functionally takes a "meta configuration" fi
      stage scripts and Hydra launcher configurations for each stage to control parallelism, resources, etc.
 """
 
+import logging
 import subprocess
 from pathlib import Path
 
@@ -13,17 +14,13 @@ import hydra
 import yaml
 from omegaconf import DictConfig, OmegaConf
 
+from .configs import RUNNER_CONFIG_YAML, PipelineConfig
+from .configs.utils import OmegaConfResolver
+
 try:
     from yaml import CLoader as Loader
 except ImportError:  # pragma: no cover
     from yaml import Loader
-
-import logging
-
-# This is to ensure that the custom resolvers are added.
-from MEDS_transforms.utils import *  # noqa: F401, F403
-
-from .configs import RUNNER_CONFIG_YAML
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +174,6 @@ def run_stage(
         default_parallelization_cfg = {}
 
     do_profile = cfg.get("do_profile", False)
-    pipeline_config_fp = Path(cfg.pipeline_config_fp)
     stage_config = cfg._local_pipeline_config.get("stage_configs", {}).get(stage_name, {})
     stage_runner_config = cfg._stage_runners.get(stage_name, {})
 
@@ -187,13 +183,9 @@ def run_stage(
     elif "_script" in stage_config:
         script = stage_config._script
     elif "_base_stage" in stage_runner_config:
-        base_stage_name = stage_runner_config["_base_stage"]
-        script = f"MEDS_transform-stage {str(pipeline_config_fp)} {base_stage_name}"
-    elif "_base_stage" in stage_config:
-        base_stage_name = stage_config["_base_stage"]
-        script = f"MEDS_transform-stage {str(pipeline_config_fp)} {base_stage_name}"
+        raise ValueError("Put _base_stage args is in your pipeline config")
     else:
-        script = f"MEDS_transform-stage {str(pipeline_config_fp)} {stage_name}"
+        script = f"MEDS_transform-stage {cfg.pipeline_config_fp} {stage_name}"
 
     command_parts = [
         script,
@@ -238,8 +230,7 @@ def main(cfg: DictConfig):
     pipeline.
     """
 
-    pipeline_config = load_yaml_file(cfg.pipeline_config_fp)
-    stages = pipeline_config.get("stages", [])
+    stages = PipelineConfig.from_arg(cfg.pipeline_config_fp).stages
     if not stages:
         raise ValueError("Pipeline configuration must specify at least one stage.")
 
@@ -280,6 +271,7 @@ def main(cfg: DictConfig):
     global_done_file.touch()
 
 
+@OmegaConfResolver
 def load_yaml_file(path: str | None) -> dict | DictConfig:
     """Loads a YAML file as an OmegaConf object.
 
@@ -324,6 +316,3 @@ def load_yaml_file(path: str | None) -> dict | DictConfig:
         logger.warning(f"Failed to load {path} as an OmegaConf: {e}. Trying as a plain YAML file.")
         yaml_text = path.read_text()
         return yaml.load(yaml_text, Loader=Loader)
-
-
-OmegaConf.register_new_resolver("load_yaml_file", load_yaml_file, replace=True)

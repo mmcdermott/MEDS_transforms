@@ -1,10 +1,10 @@
 defaults:
-  - stage_configs: _stage_configs
+  - dataset: _base_dataset
   - _self_
   - _pipeline
 
 # Global IO
-input_dir: ???
+input_dir: ${dataset.root_dir}
 cohort_dir: ???
 
 _default_description: |-
@@ -13,24 +13,21 @@ _default_description: |-
 
 log_dir: "${stage_cfg.output_dir}/.logs"
 
-# General pipeline variables
+# Control variables
 do_overwrite: False
 seed: 1
-stages: ??? # The list of stages to this overall pipeline (in order)
-
-# Mapreduce information
 worker: 0
 polling_time: 300 # wait time in seconds before beginning reduction steps
 
-# Filling in the current stage
+# Stage information
+stages: ??? # The list of stages to this overall pipeline (in order)
 stage: ${stage_name:}
-stage_cfg: ${oc.create:${populate_stage:${stage}, ${input_dir}, ${cohort_dir}, ${stages}, ${stage_configs}}}
 
 # Pipeline
 etl_metadata:
   pipeline_name: "MEDS-Transforms Pipeline"
-  dataset_name: ???
-  dataset_version: ???
+  dataset_name: ${dataset.name}
+  dataset_version: ${dataset.version}
   package_name: ${get_package_name:}
   package_version: ${get_package_version:}
 

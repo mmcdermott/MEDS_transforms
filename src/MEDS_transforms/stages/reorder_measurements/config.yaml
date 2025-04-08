@@ -1,2 +1,2 @@
 reorder_measurements:
-  ordered_code_patterns: ??? # List of ordered regex patterns to match measurement codes
+  ordered_code_patterns: null # List of ordered regex patterns to match measurement codes
