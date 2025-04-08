@@ -102,7 +102,7 @@ class PipelineConfig:
         merged = {}
         if self.stages is not None:
             merged["stages"] = self.stages
-        if self.stage_configs is not None:
+        if self.stage_configs:
             merged["stage_configs"] = self.stage_configs
         if self.additional_params is not None:
             merged.update(self.additional_params)
@@ -110,6 +110,70 @@ class PipelineConfig:
 
     @classmethod
     def from_arg(cls, pipeline_yaml: str | Path) -> PipelineConfig:
+        """Construct a pipeline configuration object from a specified pipeline YAML file.
+
+        Args:
+            pipeline_yaml: The path to the pipeline YAML file on disk or in the
+                'pkg://<pkg_name>.<relative_path>' format. It can also be the sentinel `__null__` string,
+                which will return an empty PipelineConfig object.
+
+        Returns:
+            A PipelineConfig object corresponding to the specified pipeline YAML file. Note that this object
+            will not exactly match the passed file; rather, the stages and stage configurations will be pulled
+            out separately and stored as direct attributes, and the rest of the parameters will be stored in
+            the `additional_params` attribute.
+
+        Raises:
+            TypeError: If the pipeline YAML path is not a string or Path object.
+            ValueError: If the pipeline YAML path does not have a valid file extension.
+            FileNotFoundError: If the pipeline YAML file does not exist.
+
+        Examples:
+            >>> PipelineConfig.from_arg("__null__")
+            PipelineConfig(stages=None, stage_configs={}, additional_params=None)
+            >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as pipeline_yaml:
+            ...     OmegaConf.save({"stages": ["stage1", "stage2"], "foobar": 3}, pipeline_yaml.name)
+            ...     PipelineConfig.from_arg(pipeline_yaml.name)
+            PipelineConfig(stages=['stage1', 'stage2'], stage_configs={}, additional_params={'foobar': 3})
+
+            To show the package path resolution, we can use the `pkg://` format, but for this test, we need to
+            mock the package structure:
+
+            >>> from unittest.mock import patch
+            >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as pipeline_yaml:
+            ...     pipeline_fp = Path(pipeline_yaml.name)
+            ...     OmegaConf.save({"stages": ["stage1", "stage2"], "qux": "a"}, pipeline_fp)
+            ...     with patch("MEDS_transforms.configs.pipeline.resolve_pkg_path", return_value=pipeline_fp):
+            ...         PipelineConfig.from_arg("pkg://fake_pkg.pipeline.yaml")
+            PipelineConfig(stages=['stage1', 'stage2'], stage_configs={}, additional_params={'qux': 'a'})
+
+            It will throw errors if the file has the wrong extension, does not exist, or is a directory, and
+            if the passed parameter is neither a string nor a Path object:
+
+            >>> PipelineConfig.from_arg(3)
+            Traceback (most recent call last):
+                ...
+            TypeError: Invalid pipeline YAML path type <class 'int'>. Expected str or Path.
+            >>> with tempfile.NamedTemporaryFile(suffix=".json") as pipeline_yaml:
+            ...     OmegaConf.save({"stages": ["stage1", "stage2"], "foobar": 3}, pipeline_yaml.name)
+            ...     PipelineConfig.from_arg(pipeline_yaml.name)
+            Traceback (most recent call last):
+                ...
+            ValueError: Invalid pipeline YAML path '/tmp/tmp....json'. Expected a file with one of the
+                following extensions: ['.yaml', '.yml']
+            >>> with tempfile.TemporaryDirectory() as tmpdir:
+            ...     pipeline_yaml = Path(tmpdir) / "pipeline.yaml"
+            ...     PipelineConfig.from_arg(pipeline_yaml)
+            Traceback (most recent call last):
+                ...
+            FileNotFoundError: Pipeline YAML file '/tmp/tmp.../pipeline.yaml' does not exist.
+            >>> with tempfile.TemporaryDirectory() as tmpdir:
+            ...     PipelineConfig.from_arg(tmpdir)
+            Traceback (most recent call last):
+                ...
+            FileNotFoundError: Pipeline YAML file '/tmp/tmp...' is a directory, not a file!
+        """
+
         match pipeline_yaml:
             case str() if pipeline_yaml == NULL_STR:
                 return cls()
@@ -122,18 +186,20 @@ class PipelineConfig:
                     f"Invalid pipeline YAML path type {type(pipeline_yaml)}. Expected str or Path."
                 )
 
-        if pipeline_fp.suffix not in YAML_EXTENSIONS:
+        if pipeline_fp.exists() and pipeline_fp.is_dir():
+            raise FileNotFoundError(f"Pipeline YAML file '{pipeline_yaml}' is a directory, not a file!")
+        elif pipeline_fp.suffix not in YAML_EXTENSIONS:
             raise ValueError(
                 f"Invalid pipeline YAML path '{pipeline_fp}'. "
-                f"Expected a file with one of the following extensions: {YAML_EXTENSIONS}"
+                f"Expected a file with one of the following extensions: {sorted(YAML_EXTENSIONS)}"
             )
-        elif not pipeline_fp.is_file():
+        elif not pipeline_fp.exists():
             raise FileNotFoundError(f"Pipeline YAML file '{pipeline_yaml}' does not exist.")
 
-        as_dict_config = OmegaConf.load(pipeline_yaml)
+        as_dict_config = OmegaConf.load(pipeline_fp)
 
         stages = as_dict_config.pop("stages", None)
-        stage_configs = as_dict_config.pop("stage_configs", None)
+        stage_configs = as_dict_config.pop("stage_configs", {})
         return cls(stages=stages, stage_configs=stage_configs, additional_params=as_dict_config)
 
     def resolve_stages(self, all_stages: dict[str, Stage]) -> dict[str, DictConfig]:
