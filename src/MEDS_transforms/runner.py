@@ -230,7 +230,7 @@ def main(cfg: DictConfig):
     pipeline.
     """
 
-    stages = PipelineConfig.from_arg(cfg.pipeline_config_fp).stages
+    stages = [s.name for s in PipelineConfig.from_arg(cfg.pipeline_config_fp).parsed_stages]
     if not stages:
         raise ValueError("Pipeline configuration must specify at least one stage.")
 

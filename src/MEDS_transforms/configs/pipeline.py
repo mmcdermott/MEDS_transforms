@@ -1,19 +1,21 @@
-"""This file defines the structured base classes for the various configs used in MEDS-Transforms."""
+"""This file defines an object-oriented backing for configuring pipelines in MEDS-Transforms."""
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 import logging
 import os
 from importlib.resources import files
 from pathlib import Path
-from typing import ClassVar
+from typing import Any
 
 from hydra.core.config_store import ConfigStore
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from ..stages.base import Stage
 from ..stages.discovery import StageNotFoundError, get_all_registered_stages
+from .stage import UNPARSED_STAGE_T, StageConfig
 
 logger = logging.getLogger(__name__)
 
@@ -69,207 +71,6 @@ def resolve_pkg_path(pkg_path: str) -> Path:
 
 
 @dataclasses.dataclass
-class StageConfig:
-    """A configuration class for a stage in the MEDS-transforms pipeline.
-
-    This class is used to define the structure of a stage configuration file. It is not intended to be
-    instantiated directly; rather, it is used as a base class for specific stage configurations.
-
-    Attributes:
-        name: The name of the stage.
-        config: The configuration for the stage.
-    """
-
-    name: str
-    base_stage: str | None = None
-    config: dict | DictConfig | None = None
-
-    META_KEYS: ClassVar[set[str]] = {
-        "_base_stage",
-    }
-
-    @classmethod
-    def _is_meta_key(cls, key: str) -> bool:
-        """Checks if a key is a meta-key for the configuration.
-
-        Meta-keys are keys that re in the `cls.META_KEYS` set.
-
-        Args:
-            key: The key to check.
-
-        Returns:
-            True if the key is a meta-key, False otherwise.
-
-        Examples:
-            >>> StageConfig._is_meta_key("_base_stage")
-            True
-            >>> StageConfig._is_meta_key("base_stage")
-            False
-            >>> StageConfig._is_meta_key("_foo")
-            False
-        """
-        return key in cls.META_KEYS
-
-    @classmethod
-    def _split_meta_keys(cls, config: dict | DictConfig) -> tuple[dict, dict]:
-        """Splits the meta-keys from the rest of the configuration.
-
-        Args:
-            config: The configuration to split.
-
-        Returns:
-            A tuple containing the dictionary's meta-keys and the rest of the configuration.
-
-        Examples:
-            >>> StageConfig._split_meta_keys({"_base_stage": "base_stage", "param1": 1})
-            ({'_base_stage': 'base_stage'}, {'param1': 1})
-            >>> StageConfig._split_meta_keys({"param1": 1})
-            ({}, {'param1': 1})
-            >>> StageConfig._split_meta_keys({"_base_stage": "base_stage"})
-            ({'_base_stage': 'base_stage'}, {})
-        """
-        meta_keys = {}
-        non_meta_keys = {}
-
-        for k, v in config.items():
-            if StageConfig._is_meta_key(k):
-                meta_keys[k] = v
-            else:
-                non_meta_keys[k] = v
-
-        return meta_keys, non_meta_keys
-
-    @classmethod
-    def _dict_arg_error_str(cls, arg: dict | DictConfig) -> str | None:
-        """Checks if the argument is a valid dictionary representation of a stage configuration.
-
-        Args:
-            arg: The argument to check.
-
-        Returns:
-            True if the argument is a valid dictionary representation, False otherwise. A valid dictionary has
-                all keys as strings and has only one key that is not a meta-key, which points to a dictionary.
-
-        Examples:
-            >>> print(StageConfig._dict_arg_error_str({"stage": {"param1": 1}}))
-            None
-            >>> print(StageConfig._dict_arg_error_str({"stage": {"_base_stage": "base_stage", "param1": 1}}))
-            None
-            >>> print(StageConfig._dict_arg_error_str({"stage": {"foo": "foobar"}, "_base_stage": "base"}))
-            None
-            >>> print(StageConfig._dict_arg_error_str({123: {"param1": 1}}))
-            All keys must be strings. Got key(s):
-              - int: 123
-            >>> print(StageConfig._dict_arg_error_str({"stage": {"param1": 1}, "param2": 2}))
-            Expected a single non-meta key-value pair representing the stage name and configuration. Got 2
-            non-meta keys: stage, param2.
-            >>> print(StageConfig._dict_arg_error_str({"S": {"_base_stage": "foo"}, "_base_stage": "foo"}))
-            You cannot specify meta keys in both the raw and stage configuration dictionaries. Got duplicate
-            meta keys: _base_stage.
-        """
-        if any(not isinstance(k, str) for k in arg.keys()):
-            non_str_keys = [k for k in arg.keys() if not isinstance(k, str)]
-            err_strs = [f"  - {type(key).__name__}: {key}" for key in non_str_keys]
-            err_str = "\n".join(err_strs)
-            return f"All keys must be strings. Got key(s):\n{err_str}"
-
-        meta_keys, non_meta_keys = cls._split_meta_keys(arg)
-        if len(non_meta_keys) != 1:
-            return (
-                "Expected a single non-meta key-value pair representing the stage name and configuration. "
-                f"Got {len(non_meta_keys)} non-meta keys: {', '.join(non_meta_keys.keys())}."
-            )
-
-        stage_config = list(non_meta_keys.values())[0]
-
-        meta_key_duplicates = [k for k in meta_keys if k in stage_config]
-        if meta_key_duplicates:
-            return (
-                "You cannot specify meta keys in both the raw and stage configuration dictionaries. "
-                f"Got duplicate meta keys: {', '.join(meta_key_duplicates)}."
-            )
-        return None
-
-    @classmethod
-    def from_arg(cls, arg: str | dict | DictConfig) -> StageConfig:
-        """Resolves a `StageConfig` object from a given argument (yaml file) representation.
-
-        Args:
-            arg: The argument to resolve. This can be a string representing the stage name, indicating no
-                additional configuration arguments, a dictionary representing the stage configuration in
-                resolved form, or a dictionary with a single key-value, non-meta-key pair representing the
-                stage name and its configuration, with meta-keys (e.g., `_base_stage`) being pulled from the
-                base dict or the stage configuration as appropriate.
-
-        Returns:
-            A `StageConfig` object representing the resolved stage configuration.
-
-        Raises:
-            ValueError: If the argument is not a valid stage configuration.
-            TypeError: If the argument is not a string, dictionary, or `DictConfig`.
-
-        Examples:
-            >>> StageConfig.from_arg("stage_name")
-            StageConfig(name='stage_name', base_stage=None, config=None)
-            >>> StageConfig.from_arg({"stage_name": {"param1": 1}})
-            StageConfig(name='stage_name', base_stage=None, config={'param1': 1})
-            >>> StageConfig.from_arg({"stage_name": {"_base_stage": "base_stage", "param1": 1}})
-            StageConfig(name='stage_name', base_stage='base_stage', config={'param1': 1})
-            >>> StageConfig.from_arg({"foobar": {"param1": 1}, "_base_stage": "barfoo"})
-            StageConfig(name='foobar', base_stage='barfoo', config={'param1': 1})
-
-            Errors are thrown if the argument is the wrong type:
-
-            >>> StageConfig.from_arg(3)
-            Traceback (most recent call last):
-                ...
-            TypeError: Invalid argument type <class 'int'>. Expected str, dict, or DictConfig.
-
-            Or if the argument is not a valid stage configuration. For example, if the argument is not a
-            single (non-meta) key-value pair:
-
-            >>> StageConfig.from_arg({"stage_name": {"param1": 1}, "param2": 2})
-            Traceback (most recent call last):
-                ...
-            ValueError: Invalid stage config: Expected a single non-meta key-value pair representing the stage
-            name and configuration. Got 2 non-meta keys: stage_name, param2.
-
-            Or if the argument is not a valid stage name, or if meta-keys are used improperly:
-
-            >>> StageConfig.from_arg({123: {"param1": 1}})
-            Traceback (most recent call last):
-                ...
-            ValueError: Invalid stage config: All keys must be strings. Got key(s):
-              - int: 123
-            >>> StageConfig.from_arg({"stage_name": {"_base_stage": "foobar"}, "_base_stage": "barfoo"})
-            Traceback (most recent call last):
-                ...
-            ValueError: Invalid stage config: You cannot specify meta keys in both the raw and stage
-                configuration dictionaries. Got duplicate meta keys: _base_stage.
-        """
-
-        match arg:
-            case str() as name:
-                return cls(name=name)
-            case dict() | DictConfig() as config:
-                if cls._dict_arg_error_str(config):
-                    raise ValueError(f"Invalid stage config: {cls._dict_arg_error_str(config)}")
-
-                meta_keys, non_meta_keys = cls._split_meta_keys(config)
-                stage_name = list(non_meta_keys.keys())[0]
-                stage_config = non_meta_keys[stage_name]
-
-                meta_keys = {k[1:]: v for k, v in meta_keys.items()}
-                for k in cls.META_KEYS:
-                    if k in stage_config:
-                        meta_keys[k[1:]] = stage_config.pop(k)
-
-                return cls(name=stage_name, config=stage_config, **meta_keys)
-            case _:
-                raise TypeError(f"Invalid argument type {type(arg)}. Expected str, dict, or DictConfig.")
-
-
-@dataclasses.dataclass
 class PipelineConfig:
     """A base configuration class for MEDS-transforms pipelines.
 
@@ -281,34 +82,66 @@ class PipelineConfig:
     configuration object for a stage and pipeline realization from arguments.
 
     Attributes:
-        stages: A list of Stage configuration objects that are part of the pipeline.
+        stages: A list of (raw) stage configuration specifications that are part of the pipeline.
         additional_params: A dictionary of additional parameters that are not stage-specific.
+
+    Raises:
+        TypeError: If the stages or additional_params are not of the expected type.
+        ValueError: If the pipeline configuration is invalid or if there are duplicate stage names.
 
     Examples:
 
         >>> PipelineConfig()
-        PipelineConfig(stages=None, stage_configs={}, additional_params=None)
-        >>> stages = ["stage1", "stage2"]
-        >>> stage_configs = {"stage1": {"param1": 1}}
+        PipelineConfig(stages=None, additional_params={})
+        >>> stages = [{"stage1": {"param1": 1}}, "stage2"]
         >>> additional_params = {"param2": 2}
-        >>> PipelineConfig(stages=stages, stage_configs=stage_configs, additional_params=additional_params)
-        PipelineConfig(stages=['stage1', 'stage2'],
-                       stage_configs={'stage1': {'param1': 1}},
+        >>> PipelineConfig(stages=stages, additional_params=additional_params)
+        PipelineConfig(stages=[{'stage1': {'param1': 1}}, 'stage2'],
                        additional_params={'param2': 2})
+
+    Some validation of the pipeline configuration is performed immediately after construction:
+
+        >>> PipelineConfig(stages="invalid_type")
+        Traceback (most recent call last):
+            ...
+        TypeError: Invalid type for stages: <class 'str'>. Expected list or ListConfig.
+        >>> PipelineConfig(stages=[{3: {"param1": 1}}, "stage2"])
+        Traceback (most recent call last):
+            ...
+        ValueError: Failed to parse pipeline configuration. Please check the pipeline YAML file 'stages' key.
+        >>> PipelineConfig(stages=[{"stage1": {"param1": 1}}, "stage1"])
+        Traceback (most recent call last):
+            ...
+        ValueError: Duplicate stage name found: stage1
+        >>> PipelineConfig(stages=[{"stage1": {"param1": 1}}, "stage2"], additional_params=3)
+        Traceback (most recent call last):
+            ...
+        TypeError: Invalid type for additional_params: <class 'int'>. Expected dict or DictConfig.
 
     While you can create a PipelineConfig object directly, it is more often created via the `from_arg` method,
     which loads a pipeline configuration from a YAML file. This YAML file is not structured precisely as the
     object is, as the additional parameters are flattened in the file representation. See the `from_arg`
     method for more details.
 
-        >>> file_representation = {"stages": stages, "stage_configs": stage_configs, **additional_params}
+        >>> file_representation = {"stages": stages, **additional_params}
         >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as pipeline_yaml:
         ...     OmegaConf.save(file_representation, pipeline_yaml.name)
         ...     cfg = PipelineConfig.from_arg(pipeline_yaml.name)
         >>> cfg
-        PipelineConfig(stages=['stage1', 'stage2'],
-                       stage_configs={'stage1': {'param1': 1}},
+        PipelineConfig(stages=[{'stage1': {'param1': 1}}, 'stage2'],
                        additional_params={'param2': 2})
+
+    Once defined, you can also access the `parsed_stages` property to get a list of the stages in the pipeline
+    parsed as `StageConfig` objects. This is how the user API for simple format of stages is translated to a
+    readable format.
+
+        >>> cfg.parsed_stages
+        [StageConfig(name='stage1', base_stage=None, config={'param1': 1}),
+         StageConfig(name='stage2', base_stage=None, config={})]
+        >>> PipelineConfig().parsed_stages
+        []
+        >>> PipelineConfig(stages=[{"stage1": {"_base_stage": "foo"}}]).parsed_stages
+        [StageConfig(name='stage1', base_stage='foo', config={})]
 
     Pipeline configurations can be resolved to a `DictConfig` representation suitable for Hydra registration
     via the `structured_config` property. This `DictConfig` representation has `additional_params` flattened
@@ -316,7 +149,7 @@ class PipelineConfig:
     automatically as well:
 
         >>> cfg.structured_config
-        {'stages': ['stage1', 'stage2'], 'stage_configs': {'stage1': {'param1': 1}}, 'param2': 2}
+        {'stages': [{'stage1': {'param1': 1}}, 'stage2'], 'param2': 2}
         >>> PipelineConfig().structured_config
         {}
 
@@ -371,32 +204,33 @@ class PipelineConfig:
     pipeline:
 
         >>> pipeline_cfg = PipelineConfig(
-        ...     stages=["count_codes", "filter_measurements", "fit_outlier_detection", "occlude_outliers"],
-        ...     stage_configs={
-        ...         "count_codes": {
+        ...     stages=[
+        ...         {
+        ...             "count_codes": {"aggregations": ["code/n_subjects", "code/n_occurrences"]},
         ...             "_base_stage": "aggregate_code_metadata",
-        ...             "aggregations": ["code/n_subjects", "code/n_occurrences"],
         ...         },
-        ...         "filter_measurements": {"min_subjects_per_code": 4, "min_occurrences_per_code": 10},
-        ...         "fit_outlier_detection": {
+        ...         {"filter_measurements": {"min_subjects_per_code": 4, "min_occurrences_per_code": 10}},
+        ...         {
+        ...             "fit_outlier_detection": {
+        ...                 "aggregations": ["values/n_occurrences", "values/sum", "values/sum_sqd"],
+        ...             },
         ...             "_base_stage": "aggregate_code_metadata",
-        ...             "aggregations": ["values/n_occurrences", "values/sum", "values/sum_sqd"],
         ...         },
-        ...     },
+        ...         "occlude_outliers",
+        ...     ],
         ... )
         >>> runnable_stage = pipeline_cfg.register_for("count_codes")
         >>> print(runnable_stage.stage_name)
         aggregate_code_metadata
         >>> cs.repo["_pipeline.yaml"].node
-        {'stages': ['count_codes', 'filter_measurements', 'fit_outlier_detection', 'occlude_outliers'],
-         'stage_configs': {'count_codes': {'_base_stage': 'aggregate_code_metadata',
-                                           'aggregations': ['code/n_subjects', 'code/n_occurrences']},
-                           'filter_measurements': {'min_subjects_per_code': 4,
-                                                   'min_occurrences_per_code': 10},
-                           'fit_outlier_detection': {'_base_stage': 'aggregate_code_metadata',
-                                                     'aggregations': ['values/n_occurrences',
-                                                                      'values/sum',
-                                                                      'values/sum_sqd']}},
+        {'stages': [{'count_codes': {'aggregations': ['code/n_subjects', 'code/n_occurrences']},
+                     '_base_stage': 'aggregate_code_metadata'},
+                    {'filter_measurements': {'min_subjects_per_code': 4, 'min_occurrences_per_code': 10}},
+                    {'fit_outlier_detection': {'aggregations': ['values/n_occurrences',
+                                                                'values/sum',
+                                                                'values/sum_sqd']},
+                     '_base_stage': 'aggregate_code_metadata'},
+                    'occlude_outliers'],
          'stage_cfg': {'data_input_dir': '${input_dir}/data',
                        'metadata_input_dir': '${input_dir}/metadata',
                        'output_dir': '${cohort_dir}/count_codes',
@@ -407,15 +241,14 @@ class PipelineConfig:
         >>> print(runnable_stage.stage_name)
         filter_measurements
         >>> cs.repo["_pipeline.yaml"].node
-        {'stages': ['count_codes', 'filter_measurements', 'fit_outlier_detection', 'occlude_outliers'],
-         'stage_configs': {'count_codes': {'_base_stage': 'aggregate_code_metadata',
-                                           'aggregations': ['code/n_subjects', 'code/n_occurrences']},
-                           'filter_measurements': {'min_subjects_per_code': 4,
-                                                   'min_occurrences_per_code': 10},
-                           'fit_outlier_detection': {'_base_stage': 'aggregate_code_metadata',
-                                                     'aggregations': ['values/n_occurrences',
-                                                                      'values/sum',
-                                                                      'values/sum_sqd']}},
+        {'stages': [{'count_codes': {'aggregations': ['code/n_subjects', 'code/n_occurrences']},
+                     '_base_stage': 'aggregate_code_metadata'},
+                    {'filter_measurements': {'min_subjects_per_code': 4, 'min_occurrences_per_code': 10}},
+                    {'fit_outlier_detection': {'aggregations': ['values/n_occurrences',
+                                                                'values/sum',
+                                                                'values/sum_sqd']},
+                     '_base_stage': 'aggregate_code_metadata'},
+                    'occlude_outliers'],
          'stage_cfg': {'min_subjects_per_code': 4,
                        'min_occurrences_per_code': 10,
                        'data_input_dir': '${input_dir}/data',
@@ -425,27 +258,8 @@ class PipelineConfig:
                        'output_dir': '${cohort_dir}/filter_measurements'}}
     """
 
-    stages: list[str] | None = None
-    stage_configs: dict[str, dict] = dataclasses.field(default_factory=dict)
-    additional_params: DictConfig | None = None
-
-    @property
-    def structured_config(self) -> DictConfig:
-        """Return a `DictConfig` representation of the pipeline configuration suitable for Hydra registration.
-
-        This `DictConfig` representation has `additional_params` flattened into the main configuration. This
-        means that were you to store the `DictConfig` in a file, then re-load it as a `PipelineConfig` via
-        `PipelineConfig.from_arg`, it would match the original `PipelineConfig` object.
-        """
-
-        merged = {}
-        if self.stages is not None:
-            merged["stages"] = self.stages
-        if self.stage_configs:
-            merged["stage_configs"] = self.stage_configs
-        if self.additional_params is not None:
-            merged.update(self.additional_params)
-        return OmegaConf.create(merged)
+    stages: list[UNPARSED_STAGE_T] | ListConfig | None = None
+    additional_params: dict[str, Any] | DictConfig = dataclasses.field(default_factory=dict)
 
     @classmethod
     def from_arg(cls, arg: str | Path) -> PipelineConfig:
@@ -469,11 +283,11 @@ class PipelineConfig:
 
         Examples:
             >>> PipelineConfig.from_arg("__null__")
-            PipelineConfig(stages=None, stage_configs={}, additional_params=None)
+            PipelineConfig(stages=None, additional_params={})
             >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as pipeline_yaml:
             ...     OmegaConf.save({"stages": ["stage1", "stage2"], "foobar": 3}, pipeline_yaml.name)
             ...     PipelineConfig.from_arg(pipeline_yaml.name)
-            PipelineConfig(stages=['stage1', 'stage2'], stage_configs={}, additional_params={'foobar': 3})
+            PipelineConfig(stages=['stage1', 'stage2'], additional_params={'foobar': 3})
 
             To show the package path resolution, we can use the `pkg://` format, but for this test, we need to
             mock the package structure:
@@ -484,7 +298,7 @@ class PipelineConfig:
             ...     OmegaConf.save({"stages": ["stage1", "stage2"], "qux": "a"}, pipeline_fp)
             ...     with patch("MEDS_transforms.configs.pipeline.resolve_pkg_path", return_value=pipeline_fp):
             ...         PipelineConfig.from_arg("pkg://fake_pkg.pipeline.yaml")
-            PipelineConfig(stages=['stage1', 'stage2'], stage_configs={}, additional_params={'qux': 'a'})
+            PipelineConfig(stages=['stage1', 'stage2'], additional_params={'qux': 'a'})
 
             It will throw errors if the file has the wrong extension, does not exist, or is a directory, and
             if the passed parameter is neither a string nor a Path object:
@@ -536,32 +350,83 @@ class PipelineConfig:
         as_dict_config = OmegaConf.load(pipeline_fp)
 
         stages = as_dict_config.pop("stages", None)
-        stage_configs = as_dict_config.pop("stage_configs", {})
-        return cls(stages=stages, stage_configs=stage_configs, additional_params=as_dict_config)
+        return cls(stages=stages, additional_params=as_dict_config)
+
+    def __post_init__(self):
+        if self.stages is not None and not isinstance(self.stages, (list, ListConfig)):
+            raise TypeError(f"Invalid type for stages: {type(self.stages)}. Expected list or ListConfig.")
+
+        try:
+            self.parsed_stages
+        except Exception as e:
+            raise ValueError(
+                "Failed to parse pipeline configuration. Please check the pipeline YAML file 'stages' key."
+            ) from e
+
+        duplicate_stages = set()
+        for s in self.parsed_stages:
+            if s.name in duplicate_stages:
+                raise ValueError(f"Duplicate stage name found: {s.name}")
+            duplicate_stages.add(s.name)
+
+        if not isinstance(self.additional_params, (DictConfig, dict)):
+            raise TypeError(
+                f"Invalid type for additional_params: {type(self.additional_params)}. "
+                f"Expected dict or DictConfig."
+            )
+
+    @property
+    def structured_config(self) -> DictConfig:
+        """Return a `DictConfig` representation of the pipeline configuration suitable for Hydra registration.
+
+        This `DictConfig` representation has `additional_params` flattened into the main configuration. This
+        means that were you to store the `DictConfig` in a file, then re-load it as a `PipelineConfig` via
+        `PipelineConfig.from_arg`, it would match the original `PipelineConfig` object.
+        """
+
+        merged = {}
+        if self.stages is not None:
+            merged["stages"] = self.stages
+        if self.additional_params:
+            merged.update(self.additional_params)
+        return OmegaConf.create(merged)
+
+    @property
+    def parsed_stages(self) -> list[StageConfig]:
+        """Return a list of `StageConfig` objects representing the stages in the pipeline.
+
+        This property parses the `stages` attribute and returns a list of `StageConfig` objects, which
+        represent the stages in the pipeline. The `StageConfig` objects are created by parsing the
+        `stages` attribute and resolving any base stage names.
+        """
+        if self.stages is None:
+            return []
+
+        return [StageConfig.from_arg(s) for s in copy.deepcopy(self.stages)]
+
+    @property
+    def parsed_stages_by_name(self) -> dict[str, StageConfig]:
+        return {s.name: s for s in self.parsed_stages}
 
     def _resolve_stages(self, all_stages: dict[str, Stage]) -> dict[str, DictConfig]:
         stage_objects = []
-        last_data_stage = None
-        last_metadata_stage = None
-        for s in self.stages:
-            if s in self.stage_configs:
-                config = self.stage_configs[s]
-            else:
-                config = {}
+        last_data_stage_name = None
+        last_metadata_stage_name = None
+        for s in self.parsed_stages:
+            config = {**s.config}
 
-            load_name = config.get("_base_stage", s)
-            if load_name not in all_stages:
+            if s.resolved_name not in all_stages:
                 raise ValueError(
                     f"Stage '{s}' not found in the registered stages. Please check the pipeline config."
                 )
 
-            stage = all_stages[load_name]
+            stage = all_stages[s.resolved_name]
 
             if stage.is_metadata:
-                last_metadata_stage = s
+                last_metadata_stage_name = s.name
             else:
-                last_data_stage = s
-            stage_objects.append((s, stage, config))
+                last_data_stage_name = s.name
+            stage_objects.append((s.name, stage, config))
 
         prior_data_stage = None
         prior_metadata_stage = None
@@ -571,7 +436,7 @@ class PipelineConfig:
         input_dir = Path("${input_dir}")
         cohort_dir = Path("${cohort_dir}")
 
-        for s, stage, config_overwrites in stage_objects:
+        for name, stage, config_overwrites in stage_objects:
             if stage.default_config:
                 config = {**stage.default_config[stage.stage_name]}
             else:
@@ -588,22 +453,22 @@ class PipelineConfig:
                 config["metadata_input_dir"] = prior_metadata_stage["reducer_output_dir"]
 
             if stage.is_metadata:
-                config["output_dir"] = str(cohort_dir / s)
+                config["output_dir"] = str(cohort_dir / name)
                 config["train_only"] = True
-                if s == last_metadata_stage:
+                if name == last_metadata_stage_name:
                     config["reducer_output_dir"] = str(cohort_dir / "metadata")
                 else:
-                    config["reducer_output_dir"] = str(cohort_dir / s)
+                    config["reducer_output_dir"] = str(cohort_dir / name)
             else:
                 config["reducer_output_dir"] = None
                 config["train_only"] = False
-                if s == last_data_stage:
+                if name == last_data_stage_name:
                     config["output_dir"] = str(cohort_dir / "data")
                 else:
-                    config["output_dir"] = str(cohort_dir / s)
+                    config["output_dir"] = str(cohort_dir / name)
 
             config.update({k: v for k, v in config_overwrites.items() if k != "_base_stage"})
-            resolved_stage_configs[s] = OmegaConf.create(config)
+            resolved_stage_configs[name] = OmegaConf.create(config)
 
             if stage.is_metadata:
                 prior_metadata_stage = config
@@ -623,27 +488,34 @@ class PipelineConfig:
             returned is validated to be a registered stage.
 
         Raises:
+            ValueError: If the stage name is not in the pipeline configuration.
             StageNotFoundError: If the stage name is not a registered stage.
 
         Examples:
 
-            >>> pipeline_cfg = PipelineConfig()
-            >>> pipeline_cfg._resolve_stage_name("occlude_outliers")
+            >>> PipelineConfig(stages=["occlude_outliers"])._resolve_stage_name("occlude_outliers")
             'occlude_outliers'
-            >>> pipeline_cfg._resolve_stage_name("foobar_non_existent_stage")
+            >>> PipelineConfig(stages=["occlude_outliers"])._resolve_stage_name("foobar")
             Traceback (most recent call last):
                 ...
-            MEDS_transforms.stages.discovery.StageNotFoundError: Stage 'foobar_non_existent_stage' not
+            ValueError: Stage foobar not in pipeline configuration!
+            >>> PipelineConfig(stages=["foobar"])._resolve_stage_name("foobar")
+            Traceback (most recent call last):
+                ...
+            MEDS_transforms.stages.discovery.StageNotFoundError: Stage 'foobar' not
                 registered! Registered stages: ...
 
             Stage names can be resolved to a base stage name, if specified in the stage configs:
 
-            >>> pipeline_cfg.stage_configs = {"count_codes": {"_base_stage": "aggregate_code_metadata"}}
-            >>> pipeline_cfg._resolve_stage_name("count_codes")
+            >>> cfg = PipelineConfig(stages=[{"count_codes": {"_base_stage": "aggregate_code_metadata"}}])
+            >>> cfg._resolve_stage_name("count_codes")
             'aggregate_code_metadata'
         """
 
-        resolved_stage_name = self.stage_configs.get(stage_name, {}).get("_base_stage", stage_name)
+        if stage_name not in self.parsed_stages_by_name:
+            raise ValueError(f"Stage {stage_name} not in pipeline configuration!")
+
+        resolved_stage_name = self.parsed_stages_by_name[stage_name].resolved_name
 
         all_stages = get_all_registered_stages()
         if resolved_stage_name not in all_stages:
@@ -662,26 +534,21 @@ class PipelineConfig:
 
         registered_stages = get_all_registered_stages()
         loaded_stages = {}
-        for raw_stage in self.stages:
-            s = self._resolve_stage_name(raw_stage)
-            if s not in loaded_stages:
-                loaded_stages[s] = registered_stages[s].load()
+        for s in self.parsed_stages:
+            if s.resolved_name not in registered_stages:
+                raise ValueError(
+                    f"Stage '{s.resolved_name}' not registered! Registered stages: "
+                    f"{', '.join(sorted(registered_stages.keys()))}"
+                )
+            if s.resolved_name not in loaded_stages:
+                loaded_stages[s.resolved_name] = registered_stages[s.resolved_name].load()
 
         resolved_stage_name = self._resolve_stage_name(stage_name)
-        stage = loaded_stages[resolved_stage_name]
-
-        if stage.stage_name != resolved_stage_name:
-            raise ValueError(
-                f"Registered stage name '{stage.stage_name}' does not match the provided name "
-                f"'{resolved_stage_name}'!"
-            )
-
-        all_stage_configs = self._resolve_stages(loaded_stages)
 
         pipeline_node = self.structured_config
-        pipeline_node["stage_cfg"] = all_stage_configs[stage_name]
+        pipeline_node["stage_cfg"] = self._resolve_stages(loaded_stages)[stage_name]
 
         cs = ConfigStore.instance()
         cs.store(name="_pipeline", node=pipeline_node)
 
-        return stage
+        return loaded_stages[resolved_stage_name]
