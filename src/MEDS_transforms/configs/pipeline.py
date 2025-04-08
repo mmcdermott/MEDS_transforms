@@ -171,9 +171,8 @@ class PipelineConfig:
             | Returns a function that filters subjects by the number of measurements and events they have.
             ...
           Default config:
-            | filter_subjects:
-            |   min_events_per_subject: null
-            |   min_measurements_per_subject: null
+            | min_events_per_subject: null
+            | min_measurements_per_subject: null
           Map function: filter_subjects
           Reduce function: None
           Main function: None
@@ -438,7 +437,7 @@ class PipelineConfig:
 
         for name, stage, config_overwrites in stage_objects:
             if stage.default_config:
-                config = {**stage.default_config[stage.stage_name]}
+                config = {**stage.default_config}
             else:
                 config = {}
 

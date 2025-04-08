@@ -1,8 +1,7 @@
-add_time_derived_measurements:
-  age:
-    DOB_code: "MEDS_BIRTH" # This is the MEDS official code for BIRTH
-    age_code: "AGE"
-    age_unit: "years"
-  time_of_day:
-    time_of_day_code: "TIME_OF_DAY"
-    endpoints: [6, 12, 18, 24]
+age:
+  DOB_code: "MEDS_BIRTH" # This is the MEDS official code for BIRTH
+  age_code: "AGE"
+  age_unit: "years"
+time_of_day:
+  time_of_day_code: "TIME_OF_DAY"
+  endpoints: [6, 12, 18, 24]

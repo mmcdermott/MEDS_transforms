@@ -1,3 +1,2 @@
-fit_vocabulary_indices:
-  is_metadata: true
-  ordering_method: "lexicographic"
+is_metadata: true
+ordering_method: "lexicographic"
