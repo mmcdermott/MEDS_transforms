@@ -130,7 +130,7 @@ def stage_example(request: pytest.FixtureRequest, stage: str, stage_scenario: st
     s = request.config.allowed_stages[stage]
     if s.stage_name != stage:  # pragma: no cover
         raise ValueError(
-            f"Stage '{stage}' has a misconfigured registraiton point!. It is registered at {stage}, "
+            f"Stage '{stage}' has a misconfigured registration point!. It is registered at {stage}, "
             f"but the loaded stage name is {s.name}."
         )
 
