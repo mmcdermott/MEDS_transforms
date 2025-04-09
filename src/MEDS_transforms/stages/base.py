@@ -6,7 +6,9 @@ import copy
 import inspect
 import logging
 import os
+import sys
 import textwrap
+import warnings
 from collections.abc import Callable
 from contextlib import contextmanager
 from enum import StrEnum
@@ -877,6 +879,16 @@ class Stage:
         self.__mimic_fn = fn
         self.__name__ = fn.__name__
         self.__doc__ = fn.__doc__
+
+        # Fix doctests
+        try:
+            module = sys.modules[fn.__module__]
+            if hasattr(module, "__test__"):  # pragma: no cover
+                module.__test__[fn.__name__] = fn
+            else:
+                module.__test__ = {fn.__name__: fn}
+        except Exception as e:  # pragma: no cover
+            warnings.warn(f"Failed to set doctest for {fn.__name__}: {e}")
 
     def __call__(self, *args, **kwargs):
         if self.mimic_fn is not None:
