@@ -366,6 +366,15 @@ def main(cfg: DictConfig):
         ...     profile_main(Path(test_dir))
         Running reshard_to_split with: {'n_workers': 3}
         Running count_codes with: {'n_workers': 3}
+
+        The runner will throw an error if the pipeline speified has no stages:
+
+        >>> pipeline_cfg.stages = []
+        >>> with tempfile.TemporaryDirectory() as test_dir:
+        ...     profile_main(Path(test_dir))
+        Traceback (most recent call last):
+            ...
+        ValueError: Pipeline configuration must specify at least one stage.
     """
 
     pipeline_config = PipelineConfig.from_arg(cfg.pipeline_config_fp)
