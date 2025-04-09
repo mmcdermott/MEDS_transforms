@@ -1,10 +1,7 @@
-from importlib.metadata import PackageNotFoundError, version
+from importlib.metadata import version
 
 __package_name__ = __package__
-try:
-    __version__ = version(__package_name__)
-except PackageNotFoundError:  # pragma: no cover
-    __version__ = "unknown"
+__version__ = version(__package_name__)
 
 
 INFERRED_STAGE_KEYS = {

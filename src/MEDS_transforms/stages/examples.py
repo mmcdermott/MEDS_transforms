@@ -27,7 +27,7 @@ from .utils import _BRANCH, _SPACE, pretty_list_directory
 
 try:
     from yaml import CLoader as Loader
-except ImportError:  # pragma: no cover
+except ImportError:
     from yaml import Loader
 
 

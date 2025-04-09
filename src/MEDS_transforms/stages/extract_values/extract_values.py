@@ -91,6 +91,13 @@ def extract_values(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFra
         │ 1          ┆ 2    ┆ 2   ┆ 2               │
         │ 1          ┆ 3    ┆ 3   ┆ 3               │
         └────────────┴──────┴─────┴─────────────────┘
+
+    If we try to extract a column that is in the MEDS mandatory fields, we will get a warning.
+
+        >>> stage_cfg = {"subject_id": "foo"}
+        >>> with print_warnings():
+        ...     fn = extract_values(stage_cfg)
+        Warning: You should almost CERTAINLY not be extracting subject_id as a value.
     """
 
     new_cols = []
@@ -107,13 +114,9 @@ def extract_values(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFra
         match out_col_n:
             case str() if out_col_n in MANDATORY_TYPES:
                 expr = expr.cast(MANDATORY_TYPES[out_col_n])
-                if out_col_n == subject_id_field:  # pragma: no cover
-                    logger.warning(
-                        f"You should almost CERTAINLY not be extracting {subject_id_field} as a value."
-                    )
-                if out_col_n == "time":  # pragma: no cover
-                    logger.warning("Warning: `time` is being extracted post-hoc!")
-            case str():  # pragma: no cover
+                if out_col_n in (subject_id_field, time_field):
+                    logger.warning(f"You should almost CERTAINLY not be extracting {out_col_n} as a value.")
+            case str():
                 pass
             case _:
                 raise ValueError(f"Invalid column name: {out_col_n}")

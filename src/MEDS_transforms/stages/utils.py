@@ -4,11 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-try:
-    pass
-except ImportError:  # pragma: no cover
-    pass
-
 _SPACE = "    "
 _BRANCH = "│   "
 _TEE = "├── "

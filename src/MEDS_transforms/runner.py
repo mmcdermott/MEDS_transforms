@@ -19,7 +19,7 @@ from .configs.utils import OmegaConfResolver
 
 try:
     from yaml import CLoader as Loader
-except ImportError:  # pragma: no cover
+except ImportError:
     from yaml import Loader
 
 logger = logging.getLogger(__name__)

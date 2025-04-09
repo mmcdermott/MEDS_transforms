@@ -377,6 +377,36 @@ class Stage:
         ...     stage = Stage(map_fn=compute, stage_name="stage_foo", _calling_file=calling_file)
         ...     print(stage.examples_dir)
         None
+
+    If the calling file is somehow misconfigured (e.g., it is a directory, not a file), a warning will be
+    logged, and nothing will be inferred:
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir, print_warnings(), Stage.suppress_validation():
+        ...     stage_dir = Path(tmpdir) / "stage_foo"
+        ...     examples_dir = stage_dir / "examples"
+        ...     examples_dir.mkdir(parents=True)
+        ...     stage = Stage(map_fn=compute, stage_name="stage_foo", _calling_file=stage_dir)
+        ...     print(stage.examples_dir)
+        None
+        Warning: Stage definition file /tmp/tmp.../stage_foo is not a file. Cannot infer examples
+            directory.
+
+    The stage, upon construction, attempts to validate that the stage is registered in the entry points. This
+    can be disabled (as shown above) with the `Stage.suppress_validation` context manager, or by setting
+    certain class variables. Had we disabled that, we would have seen
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir, print_warnings():
+        ...     stage_dir = Path(tmpdir) / "stage_foo"
+        ...     examples_dir = stage_dir / "examples"
+        ...     examples_dir.mkdir(parents=True)
+        ...     stage = Stage(map_fn=compute, stage_name="stage_foo")
+        Warning: Stage 'stage_foo' is not registered in the entry points. This may be due to a missing or
+        incorrectly configured entry point in your setup.py or pyproject.toml file. If this is during
+        development, you may need to run `pip install -e .` to install your package properly in editable mode
+        and ensure your stage registration is detected. You can disable this warning by setting the class
+        variable `WARN_IF_NO_ENTRY_POINT_AT_NAME` to `False`, or filtering out `StageRegistrationWarning`
+        warnings. You can disable all validation by setting the environment variable
+        `DISABLE_STAGE_VALIDATION` to `1`.
     """
 
     stage_type: StageType
@@ -513,7 +543,7 @@ class Stage:
         if stage_definition_file is None:
             return
 
-        if not stage_definition_file.is_file():  # pragma: no cover
+        if not stage_definition_file.is_file():
             logger.warning(
                 f"Stage definition file {stage_definition_file} is not a file. "
                 "Cannot infer examples directory."
