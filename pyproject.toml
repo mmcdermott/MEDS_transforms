@@ -69,5 +69,8 @@ markers = [
   "parallelized: mark test as parallelized, requiring hydra-joblib-launcher",
 ]
 
+[tool.coverage.report]
+exclude_also = ["logger\\.debug"]
+
 [project.entry-points.pytest11]
 MEDS_transforms = "MEDS_transforms.pytest_plugin"
