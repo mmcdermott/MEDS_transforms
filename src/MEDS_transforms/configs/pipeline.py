@@ -419,20 +419,13 @@ class PipelineConfig:
         last_data_stage_name = None
         last_metadata_stage_name = None
         for s in self.parsed_stages:
-            config = {**s.config}
-
-            if s.resolved_name not in all_stages:
-                raise ValueError(
-                    f"Stage '{s}' not found in the registered stages. Please check the pipeline config."
-                )
-
             stage = all_stages[s.resolved_name]
 
             if stage.is_metadata:
                 last_metadata_stage_name = s.name
             else:
                 last_data_stage_name = s.name
-            stage_objects.append((s.name, stage, config))
+            stage_objects.append((s.name, stage, {**s.config}))
 
         prior_data_stage = None
         prior_metadata_stage = None
