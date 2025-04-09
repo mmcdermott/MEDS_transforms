@@ -28,9 +28,14 @@ def print_warnings(caplog: pytest.LogCaptureFixture):
 
 
 @pytest.fixture(autouse=True)
-def _setup_doctest_namespace(doctest_namespace: dict[str, Any], caplog: pytest.LogCaptureFixture) -> None:
+def _setup_doctest_namespace(
+    doctest_namespace: dict[str, Any],
+    caplog: pytest.LogCaptureFixture,
+    simple_static_MEDS,
+) -> None:
     doctest_namespace.update(
         {
+            "simple_static_MEDS": simple_static_MEDS,
             "print_warnings": partial(print_warnings, caplog),
             "json": json,
             "pl": pl,
