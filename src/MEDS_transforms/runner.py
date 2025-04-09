@@ -114,6 +114,7 @@ def get_parallelization_args(
 
 def run_stage(
     cfg: DictConfig,
+    pipeline_cfg: PipelineConfig,
     stage_name: str,
     default_parallelization_cfg: dict | DictConfig | None = None,
     runner_fn: callable = subprocess.run,  # For dependency injection
@@ -134,54 +135,71 @@ def run_stage(
         >>> def fake_shell_fail(cmd, shell, capture_output):
         ...     print(cmd)
         ...     return subprocess.CompletedProcess(args=cmd, returncode=1, stdout=b"", stderr=b"")
-        >>> cfg = OmegaConf.create({
+        >>> cfg = DictConfig({
         ...     "pipeline_config_fp": "pipeline_config.yaml",
         ...     "do_profile": False,
-        ...     "_local_pipeline_config": {
-        ...         "stage_configs": {
-        ...             "reshard_to_split": {},
-        ...             "fit_vocabulary_indices": {"_script": "foobar"},
-        ...         },
-        ...     },
         ...     "_stage_runners": {
         ...         "reshard_to_split": {"_script": "not used"},
         ...         "fit_vocabulary_indices": {},
-        ...         "baz": {"script": "baz_script"},
+        ...         "reorder_measurements": {"script": "baz_script"},
         ...     },
         ... })
-        >>> run_stage(cfg, "reshard_to_split", runner_fn=fake_shell_succeed)
+        >>> pipeline_cfg = PipelineConfig(
+        ...     stages=[
+        ...         "reshard_to_split",
+        ...         {"fit_vocabulary_indices": {"_script": "foobar"}},
+        ...         "reorder_measurements",
+        ...     ],
+        ... )
+        >>> run_stage(cfg, pipeline_cfg, "reshard_to_split", runner_fn=fake_shell_succeed)
         MEDS_transform-stage pipeline_config.yaml reshard_to_split stage=reshard_to_split
         >>> run_stage(
-        ...     cfg, "fit_vocabulary_indices", runner_fn=fake_shell_succeed
+        ...     cfg, pipeline_cfg, "fit_vocabulary_indices", runner_fn=fake_shell_succeed
         ... )
         foobar stage=fit_vocabulary_indices
-        >>> run_stage(cfg, "baz", runner_fn=fake_shell_succeed)
-        baz_script stage=baz
+        >>> run_stage(cfg, pipeline_cfg, "reorder_measurements", runner_fn=fake_shell_succeed)
+        baz_script stage=reorder_measurements
         >>> cfg.do_profile = True
-        >>> run_stage(cfg, "baz", runner_fn=fake_shell_succeed)
-        baz_script stage=baz ++hydra.callbacks.profiler._target_=hydra_profiler.profiler.ProfilerCallback
-        >>> cfg._stage_runners.baz.parallelize = {"n_workers": 2}
+        >>> run_stage(cfg, pipeline_cfg, "reorder_measurements", runner_fn=fake_shell_succeed)
+        baz_script stage=reorder_measurements
+            ++hydra.callbacks.profiler._target_=hydra_profiler.profiler.ProfilerCallback
+        >>> cfg._stage_runners.reorder_measurements.parallelize = {"n_workers": 2}
         >>> cfg.do_profile = False
-        >>> run_stage(cfg, "baz", runner_fn=fake_shell_succeed)
-        baz_script --multirun stage=baz worker="range(0,2)"
-        >>> run_stage(cfg, "baz", runner_fn=fake_shell_fail)
+        >>> run_stage(cfg, pipeline_cfg, "reorder_measurements", runner_fn=fake_shell_succeed)
+        baz_script --multirun stage=reorder_measurements worker="range(0,2)"
+        >>> run_stage(cfg, pipeline_cfg, "reorder_measurements", runner_fn=fake_shell_fail)
         Traceback (most recent call last):
             ...
-        ValueError: Stage baz failed via ...
+        ValueError: Stage reorder_measurements failed via ...
+
+        Errors are also raised if the stage runner is improperly configured.
+
+        >>> cfg = DictConfig({
+        ...     "pipeline_config_fp": "pipeline_config.yaml",
+        ...     "do_profile": False,
+        ...     "_stage_runners": {
+        ...         "reshard_to_split": {"_base_stage": "belongs in the stage"},
+        ...     },
+        ... })
+        >>> pipeline_cfg = PipelineConfig(stages=["reshard_to_split"])
+        >>> run_stage(cfg, pipeline_cfg, "reshard_to_split", runner_fn=fake_shell_succeed)
+        Traceback (most recent call last):
+            ...
+        ValueError: Put _base_stage args is in your pipeline config
     """
 
     if default_parallelization_cfg is None:
         default_parallelization_cfg = {}
 
     do_profile = cfg.get("do_profile", False)
-    stage_config = cfg._local_pipeline_config.get("stage_configs", {}).get(stage_name, {})
+    stage_config = pipeline_cfg.parsed_stages_by_name[stage_name].config
     stage_runner_config = cfg._stage_runners.get(stage_name, {})
 
     script = None
     if "script" in stage_runner_config:
-        script = stage_runner_config.script
+        script = stage_runner_config.get("script")
     elif "_script" in stage_config:
-        script = stage_config._script
+        script = stage_config.get("_script")
     elif "_base_stage" in stage_runner_config:
         raise ValueError("Put _base_stage args is in your pipeline config")
     else:
@@ -228,9 +246,131 @@ def main(cfg: DictConfig):
 
     This script will launch many subsidiary commands via `subprocess`, one for each stage of the specified
     pipeline.
+
+    Args:
+        cfg: The Hydra configuration for the entire pipeline. See `configs/_runner.yaml` for details.
+
+    Raises:
+        ValueError: If the pipeline configuration is invalid, if any stage fails to run, or if you try to run
+            with `do_profile` without the `hydra-profiler` package installed.
+
+    Examples:
+
+        First, we need to construct an example config and pipeline config:
+
+        >>> cfg = DictConfig({
+        ...     "pipeline_config_fp": "???", # we'll fill this in each test.
+        ...     "log_dir": "???", # We'll fill this in each test.
+        ...     "do_profile": False,
+        ...     "_stage_runners": {},
+        ... })
+        >>> pipeline_cfg = DictConfig({
+        ...     "stages": ["reshard_to_split", {"count_codes": {"_base_stage": "aggregate_code_metadata"}}],
+        ... })
+
+        We'll consistently mock out the `run_stage` calls to avoid running the actual stages; instead, when
+        called, we'll just print out the stages. To do this, we'll set up a helper to run the full test.
+
+        >>> def mock_run_stage(cfg, pipeline_cfg, stage, *args, **kwargs):
+        ...     if "default_parallelization_cfg" in kwargs and kwargs["default_parallelization_cfg"]:
+        ...         print(f"Running {stage} with: {kwargs['default_parallelization_cfg']}")
+        ...     else:
+        ...         print(f"Running {stage}")
+        >>> def profile_main(test_dir: Path):
+        ...     # Copy the cfg
+        ...     test_cfg = DictConfig(cfg)
+        ...     # Make th log dir
+        ...     log_dir = test_dir / "logs"
+        ...     log_dir.mkdir(exist_ok=True, parents=True)
+        ...     test_cfg.log_dir = str(log_dir)
+        ...     # Save the pipeline config
+        ...     pipeline_cfg_fp = test_dir / "pipeline_config.yaml"
+        ...     OmegaConf.save(pipeline_cfg, pipeline_cfg_fp)
+        ...     test_cfg.pipeline_config_fp = str(pipeline_cfg_fp)
+        ...     # Mock the run_stage function
+        ...     with patch("MEDS_transforms.runner.run_stage") as mock:
+        ...         mock.side_effect = mock_run_stage
+        ...         # Run the main function
+        ...         main(test_cfg)
+
+        Now we can run some tests. Let's start with the runner in normal operation. We see it "runs" each
+        stage (here just prints them):
+
+        >>> with tempfile.TemporaryDirectory() as test_dir:
+        ...     test_dir = Path(test_dir)
+        ...     profile_main(test_dir)
+        Running reshard_to_split
+        Running count_codes
+
+        What controls exist? Firstly, upon completion of each stage, it also writes a ".done" file to the log
+        dir for that stage, and a global "_all_stages.done" file when the pipeline is done. Let's see them:
+
+        >>> from MEDS_transforms.stages.examples import pretty_list_directory
+        >>> with tempfile.TemporaryDirectory() as test_dir:
+        ...     test_dir = Path(test_dir)
+        ...     profile_main(test_dir)
+        ...     print("Log contents:")
+        ...     for line in pretty_list_directory(test_dir / "logs"): print(line)
+        Running reshard_to_split
+        Running count_codes
+        Log contents:
+        ├── _all_stages.done
+        ├── count_codes.done
+        └── reshard_to_split.done
+
+        If we the global done file exists in advance, the pipeline will skip all stages:
+
+        >>> from MEDS_transforms.stages.examples import pretty_list_directory
+        >>> with tempfile.TemporaryDirectory() as test_dir:
+        ...     test_dir = Path(test_dir)
+        ...     log_dir = test_dir / "logs"
+        ...     log_dir.mkdir()
+        ...     global_done_file = log_dir / "_all_stages.done"
+        ...     global_done_file.touch()
+        ...     profile_main(test_dir)
+        ...     print("Log contents:")
+        ...     for line in pretty_list_directory(log_dir): print(line)
+        Log contents:
+        └── _all_stages.done
+
+        This applies to each individual stage's done file too:
+
+        >>> from MEDS_transforms.stages.examples import pretty_list_directory
+        >>> with tempfile.TemporaryDirectory() as test_dir:
+        ...     test_dir = Path(test_dir)
+        ...     log_dir = test_dir / "logs"
+        ...     log_dir.mkdir()
+        ...     reshard_done_file = log_dir / "reshard_to_split.done"
+        ...     reshard_done_file.touch()
+        ...     profile_main(test_dir)
+        ...     print("Log contents:")
+        ...     for line in pretty_list_directory(log_dir): print(line)
+        Running count_codes
+        Log contents:
+        ├── _all_stages.done
+        ├── count_codes.done
+        └── reshard_to_split.done
+
+        We can also control parallelization, either through the pipeline config or the stage runner config:
+
+        >>> cfg.parallelize = {"n_workers": 2}
+        >>> with tempfile.TemporaryDirectory() as test_dir:
+        ...     profile_main(Path(test_dir))
+        Running reshard_to_split with: {'n_workers': 2}
+        Running count_codes with: {'n_workers': 2}
+
+        Stage runner parallelization takes priority, though:
+
+        >>> cfg._stage_runners.parallelize = {"n_workers": 3}
+        >>> with tempfile.TemporaryDirectory() as test_dir:
+        ...     profile_main(Path(test_dir))
+        Running reshard_to_split with: {'n_workers': 3}
+        Running count_codes with: {'n_workers': 3}
     """
 
-    stages = [s.name for s in PipelineConfig.from_arg(cfg.pipeline_config_fp).parsed_stages]
+    pipeline_config = PipelineConfig.from_arg(cfg.pipeline_config_fp)
+
+    stages = [s.name for s in pipeline_config.parsed_stages]
     if not stages:
         raise ValueError("Pipeline configuration must specify at least one stage.")
 
@@ -265,7 +405,7 @@ def main(cfg: DictConfig):
             logger.info(f"Skipping stage {stage} as it is already complete.")
         else:
             logger.info(f"Running stage: {stage}")
-            run_stage(cfg, stage, default_parallelization_cfg=default_parallelization_cfg)
+            run_stage(cfg, pipeline_config, stage, default_parallelization_cfg=default_parallelization_cfg)
             done_file.touch()
 
     global_done_file.touch()
