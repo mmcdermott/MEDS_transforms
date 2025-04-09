@@ -171,7 +171,7 @@ def map_stage(
 
         We'll also make a simple helper too to print the output for us
 
-        >>> def profile_mapping_stage(test_dir: str, in_MEDS_dir: Path | None = None, **kwargs):
+        >>> def profile_map_stage(test_dir: str, in_MEDS_dir: Path | None = None, **kwargs):
         ...     '''Makes a test config, adds the output directory, runs the mapping stage, & shows outputs'''
         ...     test_cfg = DictConfig(cfg)
         ...     test_cfg.stage_cfg.output_dir = Path(test_dir)
@@ -210,13 +210,13 @@ def map_stage(
         We'll also need a mapping function that will be applied to each shard. For this example, we'll just
         count the number of occurrences of each code:
 
-        >>> def count_codes(df: pl.DataFrame) -> pl.DataFrame:
+        >>> def count_codes(df: pl.LazyFrame) -> pl.LazyFrame:
         ...     return df.group_by("code", maintain_order=True).agg(pl.len().alias("count"))
 
         Now we can run the mapping stage:
 
         >>> with tempfile.TemporaryDirectory() as tmpdir:
-        ...     profile_mapping_stage(tmpdir, map_fn=count_codes)
+        ...     profile_map_stage(tmpdir, map_fn=count_codes)
         Output directory:
         ├── held_out
         │   └── 0.parquet
@@ -296,7 +296,7 @@ def map_stage(
 
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     cfg.stage_cfg.train_only = True
-        ...     profile_mapping_stage(tmpdir, map_fn=count_codes)
+        ...     profile_map_stage(tmpdir, map_fn=count_codes)
         ...     cfg.stage_cfg.train_only = False
         Output directory:
         └── train
@@ -357,7 +357,7 @@ def map_stage(
         >>> with tempfile.TemporaryDirectory() as MEDS_dir, tempfile.TemporaryDirectory() as out_dir:
         ...     copy_MEDS_without_split_sharding(Path(MEDS_dir))
         ...     cfg.stage_cfg.train_only = True
-        ...     profile_mapping_stage(out_dir, in_MEDS_dir=Path(MEDS_dir), map_fn=count_codes)
+        ...     profile_map_stage(out_dir, in_MEDS_dir=Path(MEDS_dir), map_fn=count_codes)
         ...     cfg.stage_cfg.train_only = False
         Output directory:
         ├── held_out_0.parquet
@@ -426,7 +426,7 @@ def map_stage(
         ...     (Path(MEDS_dir) / subject_splits_filepath).unlink()
         ...     cfg.stage_cfg.train_only = True
         ...     try:
-        ...         profile_mapping_stage(out_dir, in_MEDS_dir=Path(MEDS_dir), map_fn=count_codes)
+        ...         profile_map_stage(out_dir, in_MEDS_dir=Path(MEDS_dir), map_fn=count_codes)
         ...     finally:
         ...         cfg.stage_cfg.train_only = False
         Traceback (most recent call last):
@@ -451,7 +451,7 @@ def map_stage(
         ...     return out_fps, True
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     cfg.stage_cfg.train_only = False
-        ...     profile_mapping_stage(tmpdir, map_fn=count_codes, shard_iterator_fntr=bad_shard_iterator)
+        ...     profile_map_stage(tmpdir, map_fn=count_codes, shard_iterator_fntr=bad_shard_iterator)
         Traceback (most recent call last):
             ...
         ValueError: All splits should be used, but shard iterator is returning only train splits?!?
@@ -503,10 +503,39 @@ def map_stage(
     return all_out_fps
 
 
-def join_and_replace(new: pl.DataFrame, old: pl.DataFrame, join_cols: list[str]) -> pl.DataFrame:
-    """Join two dataframes and replace the old columns with the new columns."""
+def join_and_replace(new: DF_T, old: DF_T, join_cols: list[str]) -> DF_T:
+    """Join two dataframes and replace the old columns with the new columns.
+
+    Args:
+        new: The new dataframe to join.
+        old: The old dataframe to join.
+        join_cols: The columns to join on.
+
+    Returns:
+        Adds the columns from `old` that are not in `new` into new, without replacing any values in `new` or
+        changing the order of `new`, but while matching the join columns.
+
+    Examples:
+        >>> old = pl.DataFrame({"code": ["a", "b", "c"], "A": [1, 2, 3], "B": [4, 5, 6]})
+        >>> new = pl.DataFrame({"code": ["c", "b", "d"], "A": [7, None, 9], "C": [10, 11, None]})
+        >>> join_and_replace(new, old, ["code"])
+        shape: (3, 4)
+        ┌──────┬──────┬──────┬──────┐
+        │ code ┆ A    ┆ C    ┆ B    │
+        │ ---  ┆ ---  ┆ ---  ┆ ---  │
+        │ str  ┆ i64  ┆ i64  ┆ i64  │
+        ╞══════╪══════╪══════╪══════╡
+        │ c    ┆ 7    ┆ 10   ┆ 6    │
+        │ b    ┆ null ┆ 11   ┆ 5    │
+        │ d    ┆ 9    ┆ null ┆ null │
+        └──────┴──────┴──────┴──────┘
+    """
+
+    new_cols = new.collect_schema().names()
+    old_cols = old.collect_schema().names()
+
     return new.join(
-        old.drop(*[c for c in old.columns if c in set(new.columns) - set(join_cols)]),
+        old.drop(*[c for c in old_cols if c in set(new_cols) - set(join_cols)]),
         on=join_cols,
         how="left",
         coalesce=True,
@@ -522,8 +551,303 @@ def mapreduce_stage(
     write_fn: Callable[[DF_T, Path], None] = write_lazyframe,
     shard_iterator_fntr: SHARD_ITR_FNTR_T = shard_iterator,
 ):
+    """Performs a map-stage over shards produced by the shard iterator, then reduces over those outputs.
 
-    map_stage_out_fps = map_stage(
+    Args:
+        cfg: Configuration dictionary containing stage_cfg, input_dir, and other necessary parameters.
+        map_fn: Function to apply to each shard.
+        reduce_fn: Function to reduce the mapped data down to a single output.
+        merge_fn: Function to merge the reduced data with the original data. Defaults to None, which resolves
+            to `join_and_replace`, joining by the code column and any code modifiers.
+        read_fn: Function to read data from the input file paths. Defaults to reading parquet files with
+            polars.
+        write_fn: Function to write the transformed data to the output file paths. Defaults to writing
+            parquet files with polars.
+        shard_iterator_fntr: Function to create the shard iterator. Defaults to the default shard iterator,
+            which iterates over the parquet files in the data input directory within the `cfg.stage_cfg` in a
+            pseudo-random, worker-dependent manner.
+
+    Examples:
+
+        We'll show an example of this function using the `simple_static_MEDS` dataset provided as a pytest
+        fixture and loaded in this doctest via our `conftest.py` file in the
+        [`meds_testing_helpers`](https://github.com/Medical-Event-Data-Standard/meds_testing_helpers) package.
+
+        To see this data, let's inspect it:
+
+        >>> from meds_testing_helpers.dataset import MEDSDataset
+        >>> D = MEDSDataset(root_dir=simple_static_MEDS)
+
+        We can see how it is arranged on disk (which is merely the typical MEDS fashion):
+
+        >>> from MEDS_transforms.stages.examples import pretty_list_directory
+        >>> for line in pretty_list_directory(simple_static_MEDS): print(line)
+        ├── data
+        │   ├── held_out
+        │   │   └── 0.parquet
+        │   ├── train
+        │   │   ├── 0.parquet
+        │   │   └── 1.parquet
+        │   └── tuning
+        │       └── 0.parquet
+        └── metadata
+            ├── codes.parquet
+            ├── dataset.json
+            └── subject_splits.parquet
+
+        And inspect its contents directly:
+
+        >>> for k, df in D._pl_shards.items():
+        ...     print(f"{k}:")
+        ...     print(df)
+        held_out/0:
+        shape: (11, 4)
+        ┌────────────┬─────────────────────┬───────────────────────┬───────────────┐
+        │ subject_id ┆ time                ┆ code                  ┆ numeric_value │
+        │ ---        ┆ ---                 ┆ ---                   ┆ ---           │
+        │ i64        ┆ datetime[μs]        ┆ str                   ┆ f32           │
+        ╞════════════╪═════════════════════╪═══════════════════════╪═══════════════╡
+        │ 1500733    ┆ null                ┆ EYE_COLOR//BROWN      ┆ null          │
+        │ 1500733    ┆ null                ┆ HEIGHT                ┆ 158.601318    │
+        │ 1500733    ┆ 1986-07-20 00:00:00 ┆ DOB                   ┆ null          │
+        │ 1500733    ┆ 2010-06-03 14:54:38 ┆ ADMISSION//ORTHOPEDIC ┆ null          │
+        │ 1500733    ┆ 2010-06-03 14:54:38 ┆ HR                    ┆ 91.400002     │
+        │ …          ┆ …                   ┆ …                     ┆ …             │
+        │ 1500733    ┆ 2010-06-03 15:39:49 ┆ HR                    ┆ 84.400002     │
+        │ 1500733    ┆ 2010-06-03 15:39:49 ┆ TEMP                  ┆ 100.300003    │
+        │ 1500733    ┆ 2010-06-03 16:20:49 ┆ HR                    ┆ 90.099998     │
+        │ 1500733    ┆ 2010-06-03 16:20:49 ┆ TEMP                  ┆ 100.099998    │
+        │ 1500733    ┆ 2010-06-03 16:44:26 ┆ DISCHARGE             ┆ null          │
+        └────────────┴─────────────────────┴───────────────────────┴───────────────┘
+        train/0:
+        shape: (30, 4)
+        ┌────────────┬─────────────────────┬────────────────────┬───────────────┐
+        │ subject_id ┆ time                ┆ code               ┆ numeric_value │
+        │ ---        ┆ ---                 ┆ ---                ┆ ---           │
+        │ i64        ┆ datetime[μs]        ┆ str                ┆ f32           │
+        ╞════════════╪═════════════════════╪════════════════════╪═══════════════╡
+        │ 239684     ┆ null                ┆ EYE_COLOR//BROWN   ┆ null          │
+        │ 239684     ┆ null                ┆ HEIGHT             ┆ 175.271118    │
+        │ 239684     ┆ 1980-12-28 00:00:00 ┆ DOB                ┆ null          │
+        │ 239684     ┆ 2010-05-11 17:41:51 ┆ ADMISSION//CARDIAC ┆ null          │
+        │ 239684     ┆ 2010-05-11 17:41:51 ┆ HR                 ┆ 102.599998    │
+        │ …          ┆ …                   ┆ …                  ┆ …             │
+        │ 1195293    ┆ 2010-06-20 20:24:44 ┆ HR                 ┆ 107.699997    │
+        │ 1195293    ┆ 2010-06-20 20:24:44 ┆ TEMP               ┆ 100.0         │
+        │ 1195293    ┆ 2010-06-20 20:41:33 ┆ HR                 ┆ 107.5         │
+        │ 1195293    ┆ 2010-06-20 20:41:33 ┆ TEMP               ┆ 100.400002    │
+        │ 1195293    ┆ 2010-06-20 20:50:04 ┆ DISCHARGE          ┆ null          │
+        └────────────┴─────────────────────┴────────────────────┴───────────────┘
+        train/1:
+        shape: (14, 4)
+        ┌────────────┬─────────────────────┬───────────────────────┬───────────────┐
+        │ subject_id ┆ time                ┆ code                  ┆ numeric_value │
+        │ ---        ┆ ---                 ┆ ---                   ┆ ---           │
+        │ i64        ┆ datetime[μs]        ┆ str                   ┆ f32           │
+        ╞════════════╪═════════════════════╪═══════════════════════╪═══════════════╡
+        │ 68729      ┆ null                ┆ EYE_COLOR//HAZEL      ┆ null          │
+        │ 68729      ┆ null                ┆ HEIGHT                ┆ 160.395309    │
+        │ 68729      ┆ 1978-03-09 00:00:00 ┆ DOB                   ┆ null          │
+        │ 68729      ┆ 2010-05-26 02:30:56 ┆ ADMISSION//PULMONARY  ┆ null          │
+        │ 68729      ┆ 2010-05-26 02:30:56 ┆ HR                    ┆ 86.0          │
+        │ …          ┆ …                   ┆ …                     ┆ …             │
+        │ 814703     ┆ 1976-03-28 00:00:00 ┆ DOB                   ┆ null          │
+        │ 814703     ┆ 2010-02-05 05:55:39 ┆ ADMISSION//ORTHOPEDIC ┆ null          │
+        │ 814703     ┆ 2010-02-05 05:55:39 ┆ HR                    ┆ 170.199997    │
+        │ 814703     ┆ 2010-02-05 05:55:39 ┆ TEMP                  ┆ 100.099998    │
+        │ 814703     ┆ 2010-02-05 07:02:30 ┆ DISCHARGE             ┆ null          │
+        └────────────┴─────────────────────┴───────────────────────┴───────────────┘
+        tuning/0:
+        shape: (7, 4)
+        ┌────────────┬─────────────────────┬──────────────────────┬───────────────┐
+        │ subject_id ┆ time                ┆ code                 ┆ numeric_value │
+        │ ---        ┆ ---                 ┆ ---                  ┆ ---           │
+        │ i64        ┆ datetime[μs]        ┆ str                  ┆ f32           │
+        ╞════════════╪═════════════════════╪══════════════════════╪═══════════════╡
+        │ 754281     ┆ null                ┆ EYE_COLOR//BROWN     ┆ null          │
+        │ 754281     ┆ null                ┆ HEIGHT               ┆ 166.22261     │
+        │ 754281     ┆ 1988-12-19 00:00:00 ┆ DOB                  ┆ null          │
+        │ 754281     ┆ 2010-01-03 06:27:59 ┆ ADMISSION//PULMONARY ┆ null          │
+        │ 754281     ┆ 2010-01-03 06:27:59 ┆ HR                   ┆ 142.0         │
+        │ 754281     ┆ 2010-01-03 06:27:59 ┆ TEMP                 ┆ 99.800003     │
+        │ 754281     ┆ 2010-01-03 08:22:13 ┆ DISCHARGE            ┆ null          │
+        └────────────┴─────────────────────┴──────────────────────┴───────────────┘
+        >>> D._pl_subject_splits
+        shape: (6, 2)
+        ┌────────────┬──────────┐
+        │ subject_id ┆ split    │
+        │ ---        ┆ ---      │
+        │ i64        ┆ str      │
+        ╞════════════╪══════════╡
+        │ 239684     ┆ train    │
+        │ 1195293    ┆ train    │
+        │ 68729      ┆ train    │
+        │ 814703     ┆ train    │
+        │ 754281     ┆ tuning   │
+        │ 1500733    ┆ held_out │
+        └────────────┴──────────┘
+
+        For mapreduce stages, the input code metadata is also relevant:
+
+        >>> D._pl_code_metadata
+        shape: (5, 3)
+        ┌──────────────────┬─────────────────────────────────┬──────────────────┐
+        │ code             ┆ description                     ┆ parent_codes     │
+        │ ---              ┆ ---                             ┆ ---              │
+        │ str              ┆ str                             ┆ list[str]        │
+        ╞══════════════════╪═════════════════════════════════╪══════════════════╡
+        │ EYE_COLOR//BLUE  ┆ Blue Eyes. Less common than br… ┆ null             │
+        │ EYE_COLOR//BROWN ┆ Brown Eyes. The most common ey… ┆ null             │
+        │ EYE_COLOR//HAZEL ┆ Hazel eyes. These are uncommon  ┆ null             │
+        │ HR               ┆ Heart Rate                      ┆ ["LOINC/8867-4"] │
+        │ TEMP             ┆ Body Temperature                ┆ ["LOINC/8310-5"] │
+        └──────────────────┴─────────────────────────────────┴──────────────────┘
+
+        We'll also make a simple helper too to print the output for us
+
+        >>> def profile_mapreduce_stage(test_dir: str, worker: int | None = None, **kwargs):
+        ...     '''Makes a test config, adds the output directory, runs the mapping stage, & shows outputs'''
+        ...     test_cfg = DictConfig(cfg)
+        ...     test_cfg.stage_cfg.output_dir = Path(test_dir) / "data_output"
+        ...     test_cfg.stage_cfg.reducer_output_dir = Path(test_dir) / "reducer_output"
+        ...     if worker is not None:
+        ...         test_cfg.worker = worker
+        ...     mapreduce_stage(cfg=test_cfg, **kwargs)
+        ...     print("Data output directory:")
+        ...     for line in pretty_list_directory(test_cfg.stage_cfg.output_dir):
+        ...         print(line)
+        ...     if test_cfg.stage_cfg.reducer_output_dir.exists():
+        ...         print("Reducer output directory:")
+        ...         for line in pretty_list_directory(test_cfg.stage_cfg.reducer_output_dir):
+        ...             print(line)
+        ...     out_fp = test_cfg.stage_cfg.reducer_output_dir / "codes.parquet"
+        ...     if out_fp.exists():
+        ...         print("------------------")
+        ...         print("Reduced Output:")
+        ...         print("------------------")
+        ...         print(pl.read_parquet(out_fp))
+        ...     else:
+        ...         print("No reduced output found.")
+
+        To mapreduce over this data, we need a configuration file that will point our data input dir to this
+        dataset. Normally, the stage configuration is handled automatically by the Stage objects and the
+        `PipelineConfig` class, but we'll just fudge it here for the sake of the example. Note we haven't
+        added an output dir yet -- that will be a temporary directory we'll create just before we run the
+        stage.
+
+        >>> cfg = DictConfig({
+        ...     "worker": 0,
+        ...     "polling_time": 0.01,
+        ...     "do_overwrite": False,
+        ...     "input_dir": str(simple_static_MEDS),
+        ...     "stage_cfg": {
+        ...         "data_input_dir": str(simple_static_MEDS / "data"),
+        ...         "metadata_input_dir": str(simple_static_MEDS / "metadata"),
+        ...         "output_dir": "???",
+        ...         "reducer_output_dir": "???",
+        ...     }
+        ... })
+
+        We'll also need a mapping function that will be applied to each shard. For this example, we'll just
+        count the number of occurrences of each code:
+
+        >>> def count_codes(df: pl.LazyFrame) -> pl.LazyFrame:
+        ...     return df.group_by("code", maintain_order=True).agg(pl.len().alias("count"))
+
+        For our reducer function, we'll just sum the counts of each code across all shards:
+
+        >>> def sum_counts(*dfs: pl.LazyFrame) -> pl.LazyFrame:
+        ...     return pl.concat(dfs).group_by("code", maintain_order=True).agg(pl.sum("count"))
+
+        Now we can run the mapreduce stage:
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     profile_mapreduce_stage(tmpdir, map_fn=count_codes, reduce_fn=sum_counts)
+        Data output directory:
+        ├── held_out
+        │   └── 0.parquet
+        ├── train
+        │   ├── 0.parquet
+        │   └── 1.parquet
+        └── tuning
+            └── 0.parquet
+        Reducer output directory:
+        └── codes.parquet
+        ------------------
+        Reduced Output:
+        ------------------
+        shape: (11, 4)
+        ┌───────────────────────┬───────┬─────────────────────────────────┬──────────────────┐
+        │ code                  ┆ count ┆ description                     ┆ parent_codes     │
+        │ ---                   ┆ ---   ┆ ---                             ┆ ---              │
+        │ str                   ┆ u8    ┆ str                             ┆ list[str]        │
+        ╞═══════════════════════╪═══════╪═════════════════════════════════╪══════════════════╡
+        │ EYE_COLOR//BROWN      ┆ 3     ┆ Brown Eyes. The most common ey… ┆ null             │
+        │ HEIGHT                ┆ 6     ┆ null                            ┆ null             │
+        │ DOB                   ┆ 6     ┆ null                            ┆ null             │
+        │ ADMISSION//ORTHOPEDIC ┆ 2     ┆ null                            ┆ null             │
+        │ HR                    ┆ 16    ┆ Heart Rate                      ┆ ["LOINC/8867-4"] │
+        │ …                     ┆ …     ┆ …                               ┆ …                │
+        │ DISCHARGE             ┆ 6     ┆ null                            ┆ null             │
+        │ ADMISSION//PULMONARY  ┆ 2     ┆ null                            ┆ null             │
+        │ EYE_COLOR//HAZEL      ┆ 2     ┆ Hazel eyes. These are uncommon  ┆ null             │
+        │ ADMISSION//CARDIAC    ┆ 2     ┆ null                            ┆ null             │
+        │ EYE_COLOR//BLUE       ┆ 1     ┆ Blue Eyes. Less common than br… ┆ null             │
+        └───────────────────────┴───────┴─────────────────────────────────┴──────────────────┘
+
+        If we set `train_only` to `True`, we can see that the held-out and tuning splits are not included in
+        the output. This is generally desired for stages aggregating over codes, as you don't want to include
+        held out data in your normalization computation
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     cfg.stage_cfg.train_only = True
+        ...     profile_mapreduce_stage(tmpdir, map_fn=count_codes, reduce_fn=sum_counts)
+        ...     cfg.stage_cfg.train_only = False
+        Data output directory:
+        └── train
+            ├── 0.parquet
+            └── 1.parquet
+        Reducer output directory:
+        └── codes.parquet
+        ------------------
+        Reduced Output:
+        ------------------
+        shape: (11, 4)
+        ┌───────────────────────┬───────┬─────────────────────────────────┬──────────────────┐
+        │ code                  ┆ count ┆ description                     ┆ parent_codes     │
+        │ ---                   ┆ ---   ┆ ---                             ┆ ---              │
+        │ str                   ┆ u8    ┆ str                             ┆ list[str]        │
+        ╞═══════════════════════╪═══════╪═════════════════════════════════╪══════════════════╡
+        │ EYE_COLOR//HAZEL      ┆ 2     ┆ Hazel eyes. These are uncommon  ┆ null             │
+        │ HEIGHT                ┆ 4     ┆ null                            ┆ null             │
+        │ DOB                   ┆ 4     ┆ null                            ┆ null             │
+        │ ADMISSION//PULMONARY  ┆ 1     ┆ null                            ┆ null             │
+        │ HR                    ┆ 12    ┆ Heart Rate                      ┆ ["LOINC/8867-4"] │
+        │ …                     ┆ …     ┆ …                               ┆ …                │
+        │ DISCHARGE             ┆ 4     ┆ null                            ┆ null             │
+        │ ADMISSION//ORTHOPEDIC ┆ 1     ┆ null                            ┆ null             │
+        │ EYE_COLOR//BROWN      ┆ 1     ┆ Brown Eyes. The most common ey… ┆ null             │
+        │ ADMISSION//CARDIAC    ┆ 2     ┆ null                            ┆ null             │
+        │ EYE_COLOR//BLUE       ┆ 1     ┆ Blue Eyes. Less common than br… ┆ null             │
+        └───────────────────────┴───────┴─────────────────────────────────┴──────────────────┘
+
+        Lastly, note that mapreduce is special in that the reduction happens only in one worker -- so if the
+        config has `worker` set to anything other than 0, it will exit after the mapping stage, and the
+        reduction won't be completed:
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     profile_mapreduce_stage(tmpdir, worker=1, map_fn=count_codes, reduce_fn=sum_counts)
+        Data output directory:
+        ├── held_out
+        │   └── 0.parquet
+        ├── train
+        │   ├── 0.parquet
+        │   └── 1.parquet
+        └── tuning
+            └── 0.parquet
+        No reduced output found.
+    """
+
+    _out_fps = map_stage(
         cfg=cfg, map_fn=map_fn, read_fn=read_fn, write_fn=write_fn, shard_iterator_fntr=shard_iterator
     )
 
@@ -544,7 +868,7 @@ def mapreduce_stage(
     reduce_fn = bind_compute_fn(cfg, cfg.stage_cfg, reduce_fn)
 
     reduce_over(
-        in_fps=map_stage_out_fps,
+        in_fps=_out_fps,
         out_fp=reduce_stage_out_fp,
         read_fn=read_fn,
         write_fn=write_fn,

@@ -23,6 +23,7 @@ ANY_COMPUTE_FN_T = COMPUTE_FN_T | COMPUTE_FN_UNBOUND_T | COMPUTE_FNTR_T
 
 class ComputeFnArgs(TypedDict, total=False):
     df: NotRequired[DF_T]
+    dfs: NotRequired[DF_T]
     cfg: NotRequired[DictConfig]
     stage_cfg: NotRequired[DictConfig]
     code_modifiers: NotRequired[list[str]]
@@ -75,6 +76,9 @@ class ComputeFnType(Enum):
             >>> def compute_fn(df: pl.DataFrame) -> pl.DataFrame: return df
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.DIRECT: 1>
+            >>> def compute_fn(*dfs: pl.DataFrame) -> pl.DataFrame: return pl.concat(dfs)
+            >>> ComputeFnType.from_fn(compute_fn)
+            <ComputeFnType.DIRECT: 1>
             >>> def compute_fn(df: pl.DataFrame) -> dict[Any, list[Any]]: return df.to_dict(as_series=False)
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.DIRECT: 1>
@@ -112,7 +116,7 @@ class ComputeFnType(Enum):
         if not all_params_allowed:
             return None
 
-        has_df_param = "df" in sig.parameters
+        has_df_param = ("df" in sig.parameters) or ("dfs" in sig.parameters)
         has_only_df_param = has_df_param and (len(sig.parameters) == 1)
         has_return_annotation = sig.return_annotation.__name__ != "_empty"
         has_callable_return = sig.return_annotation.__name__ == "Callable"
