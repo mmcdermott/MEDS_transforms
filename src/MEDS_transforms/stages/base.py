@@ -11,7 +11,6 @@ from collections.abc import Callable
 from contextlib import contextmanager
 from enum import StrEnum
 from functools import partial, wraps
-from importlib.metadata import EntryPoint
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -165,7 +164,6 @@ class Stage:
     Stages come with tracked test cases and default configuration arguments. If no special parameters are set
     on the command line, they won't be tracked:
 
-        >>> Stage.ERR_IF_ENTRY_POINT_IMPORTABLE = False
         >>> def compute(cfg: DictConfig):
         ...     '''base fn docstring'''
         ...     return "compute"
@@ -395,18 +393,71 @@ class Stage:
     can be disabled (as shown above) with the `Stage.suppress_validation` context manager, or by setting
     certain class variables. Had we disabled that, we would have seen
 
-        >>> with tempfile.TemporaryDirectory() as tmpdir, print_warnings():
-        ...     stage_dir = Path(tmpdir) / "stage_foo"
-        ...     examples_dir = stage_dir / "examples"
-        ...     examples_dir.mkdir(parents=True)
+        >>> with print_warnings():
         ...     stage = Stage(map_fn=compute, stage_name="stage_foo")
-        Warning: Stage 'stage_foo' is not registered in the entry points. This may be due to a missing or
-        incorrectly configured entry point in your setup.py or pyproject.toml file. If this is during
-        development, you may need to run `pip install -e .` to install your package properly in editable mode
-        and ensure your stage registration is detected. You can disable this warning by setting the class
-        variable `WARN_IF_NO_ENTRY_POINT_AT_NAME` to `False`, or filtering out `StageRegistrationWarning`
-        warnings. You can disable all validation by setting the environment variable
-        `DISABLE_STAGE_VALIDATION` to `1`.
+        Warning: Stage 'stage_foo' is not registered in the entry points.
+        This may be due to a missing or incorrectly configured entry point in your setup.py or pyproject.toml
+        file. If this is during development, you may need to run `pip install -e .` to install your package
+        properly in editable mode and ensure your stage registration is detected.
+        You can disable this warning by setting the class variable `WARN_IF_NO_ENTRY_POINT_AT_NAME` to
+        `False`, or filtering out `StageRegistrationWarning` warnings.
+        You can disable all validation by setting the environment variable `DISABLE_STAGE_VALIDATION` to `1`.
+
+    This warning indicates that there is no stage registered in the entry points with the name `stage_foo`. It
+    is intended to flag to developers or users that they need to add their entry point to their package set-up
+    to ensure things work correctly. We can also turn off this warning by directly setting the class variable
+    `WARN_IF_NO_ENTRY_POINT_AT_NAME` to `False` on the `Stage` class or a derived class:
+
+        >>> class StageNoWarn(Stage):
+        ...     WARN_IF_NO_ENTRY_POINT_AT_NAME: ClassVar[bool] = False
+        >>> with print_warnings():
+        ...     stage = StageNoWarn(map_fn=compute, stage_name="stage_foo")
+
+    Warnings aren't the end of the stage validation; if the stage is correctly configured, not only will
+    `stage_foo` (or the stage name more generally) be registered, but it _will point to the Stage object being
+    registered at this moment_. The best we can do for now to ensure this is to validate that if we try to
+    load the Stage object being registered, we get an error due to attempting a circular import (as we would
+    be attempting to reload the code that is running the stage construction). To show the limits of this,
+    we'll patch out the stage registration object to return without errors and report a `stage_foo` being
+    registered, and see what happens:
+
+        >>> mock_stages = {"stage_foo": MagicMock()}
+        >>> mock_stages["stage_foo"].load.side_effect = lambda: None
+        >>> with patch("MEDS_transforms.stages.base.get_all_registered_stages", return_value=mock_stages):
+        ...     with print_warnings(): # No warnings are printed as the stage is listed as being registered.
+        ...         Stage(map_fn=compute, stage_name="stage_foo")
+        Traceback (most recent call last):
+            ...
+        MEDS_transforms.stages.base.StageRegistrationError: Stage stage_foo is registered, but an attempted
+        reload causes no issues. If this were the stage you are constructing, a reload would cause a circular
+        import error, so this means you are overwriting an external, different stage, which is a problem!
+        This may be due to a missing or incorrectly configured entry point in your setup.py or pyproject.toml
+        file. If this is during development, you may need to run `pip install -e .` to install your package
+        properly in editable mode and ensure your stage registration is detected.
+        You can disable reload-should-cause-error checking by setting the class variable
+        `ERR_IF_ENTRY_POINT_IMPORTABLE` to `False`.
+        You can disable all validation by setting the environment variable `DISABLE_STAGE_VALIDATION` to `1`.
+
+    These errors also occur if the loading of the stage raises an error that is not a circular import error.
+
+        >>> def raise_unexpected_error():
+        ...     raise AttributeError("unrelated")
+        >>> mock_stages["stage_foo"].load.side_effect = raise_unexpected_error
+        >>> with patch("MEDS_transforms.stages.base.get_all_registered_stages", return_value=mock_stages):
+        ...     with print_warnings(): # No warnings are printed as the stage is listed as being registered.
+        ...         Stage(map_fn=compute, stage_name="stage_foo")
+        Traceback (most recent call last):
+            ...
+        ValueError: Failed to validate stage stage_foo for an unexpected reason; it is
+        possible that a different stage is defined at this name.
+
+    You can also turn off these errors by setting the class variable `ERR_IF_ENTRY_POINT_IMPORTABLE` to
+    `False` on the `Stage` class or a derived class:
+
+        >>> class StageNoErr(Stage):
+        ...     ERR_IF_ENTRY_POINT_IMPORTABLE: ClassVar[bool] = False
+        >>> with patch("MEDS_transforms.stages.base.get_all_registered_stages", return_value=mock_stages):
+        ...     stage = StageNoErr(map_fn=compute, stage_name="stage_foo")
     """
 
     stage_type: StageType
@@ -515,7 +566,9 @@ class Stage:
         self.examples_dir = examples_dir
         self.default_config = default_config
 
-        do_skip_validation = os.environ.get(VALIDATION_ENV_VAR, "0") == "1"
+        do_skip_validation = (os.environ.get(VALIDATION_ENV_VAR, "0") == "1") or not (
+            self.WARN_IF_NO_ENTRY_POINT_AT_NAME or self.ERR_IF_ENTRY_POINT_IMPORTABLE
+        )
 
         if do_skip_validation:
             logger.debug(
@@ -665,26 +718,16 @@ class Stage:
 
         return StageExampleDict(**test_cases)
 
-    def __validate_stage_entry_point_registration(
-        self,
-        stage_name: str | None = None,  # For stage name inference.
-        registered_stages: dict[str, EntryPoint] | None = None,  # For dependency injection.
-    ):
+    def __validate_stage_entry_point_registration(self):
         """Validates that the stage is registered in the entry points."""
 
-        if not (self.WARN_IF_NO_ENTRY_POINT_AT_NAME or self.ERR_IF_ENTRY_POINT_IMPORTABLE):
-            return
+        registered_stages = get_all_registered_stages()
 
-        if registered_stages is None:
-            registered_stages = get_all_registered_stages()
-        if stage_name is None:
-            stage_name = self.stage_name
-
-        if stage_name not in registered_stages:
+        if self.stage_name not in registered_stages:
             if self.WARN_IF_NO_ENTRY_POINT_AT_NAME:
                 # If the stage is not registered, we warn.
                 logger.warning(
-                    f"Stage '{stage_name}' is not registered in the entry points.\n"
+                    f"Stage '{self.stage_name}' is not registered in the entry points.\n"
                     f"{self.ENTRY_POINT_SETUP_STRING}\n{self.DISABLE_WARNING_STRING}\n"
                     f"{self.DISABLE_ALL_STAGE_VALIDATION_STRING}",
                 )
@@ -697,9 +740,9 @@ class Stage:
             try:
                 # Attempt to reload, which should cause an error if the stage being constructed is the same
                 # stage as the one being registered.
-                registered_stages[stage_name].load()
+                registered_stages[self.stage_name].load()
                 raise StageRegistrationError(
-                    f"Stage {stage_name} is registered in the entry points, but an attempted reload causes "
+                    f"Stage {self.stage_name} is registered, but an attempted reload causes "
                     "no issues. If this were the stage you are constructing, a reload would cause a circular "
                     "import error, so this means you are overwriting an external, different stage, which is "
                     "a problem!\n"
@@ -709,8 +752,8 @@ class Stage:
             except AttributeError as e:
                 if "circular import" not in str(e):
                     raise ValueError(
-                        f"Failed to validate stage {stage_name} for an unexpected reason; it is possible "
-                        "that an upstream stage defined with the same name is invalid."
+                        f"Failed to validate stage {self.stage_name} for an unexpected reason; it is "
+                        "possible that a different stage is defined at this name."
                     ) from e
 
     @property
@@ -938,12 +981,6 @@ class Stage:
             ValueError: If both `main_fn` and `map_fn` or `reduce_fn` are provided.
 
         Examples:
-
-            Firstly, note that in normal usage, the Stage class raises a warning and/or errors if the stage is
-            not registered properly in an entry point. We'll disable that and other error checking for most of
-            the doctests here, then show it again at the end.
-
-            >>> Stage.ERR_IF_ENTRY_POINT_IMPORTABLE = False
 
             When used with only keyword arguments that fully define a function a stage set to mimic nothing is
             returned directly, with the parameters set as defined by what kind of stage is being created.
