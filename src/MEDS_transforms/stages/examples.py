@@ -318,8 +318,25 @@ class StageExample:
             │ bar  ┆ Bar         │
             └──────┴─────────────┘
 
+    An example must have at least `want_data` or `want_metadata` provided, and cannot have both:
+
+        >>> StageExample(stage_name="nothing_given")
+        Traceback (most recent call last):
+            ...
+        ValueError: Either want_data or want_metadata must be provided.
+        >>> StageExample(
+        ...     stage_name="both_given",
+        ...     want_data=MEDSDataset(root_dir=simple_static_MEDS),
+        ...     want_metadata=pl.DataFrame()
+        ... )
+        Traceback (most recent call last):
+            ...
+        ValueError: Either want_data or want_metadata must be provided, but not both.
+
     It has some helpful properties that you can access too, for its name, test kwargs, and testing usage:
 
+        >>> metadata_df = pl.DataFrame({"code": ["foo", "bar"], "description": ["Foo", "Bar"]})
+        >>> example = StageExample(stage_name="example_stage", want_metadata=metadata_df)
         >>> print(example.full_name)
         example_stage
         >>> print(example.do_use_config_yaml)
@@ -830,6 +847,8 @@ class StageExample:
     def __post_init__(self):
         if self.want_data is None and self.want_metadata is None:
             raise ValueError("Either want_data or want_metadata must be provided.")
+        elif self.want_data is not None and self.want_metadata is not None:
+            raise ValueError("Either want_data or want_metadata must be provided, but not both.")
 
         if self.scenario_name == ".":
             self.scenario_name = None
@@ -856,18 +875,11 @@ class StageExample:
         want_metadata_fp = example_dir / "out_metadata.yaml"
         test_cfg_fp = example_dir / "_test_cfg.yaml"
 
-        if want_data_fp.is_file() and want_metadata_fp.is_file():
-            raise ValueError(
-                f"Both want_data and want_metadata files found in {example_dir}. "
-                "Please provide only one of them."
-            )
-        elif not want_data_fp.is_file() and not want_metadata_fp.is_file():
-            raise FileNotFoundError(f"Neither {want_data_fp} nor {want_metadata_fp} files found.")
-        elif want_data_fp.is_file():
+        want_data = None
+        want_metadata = None
+        if want_data_fp.is_file():
             want_data = MEDSDataset.from_yaml(want_data_fp, **schema_updates)
-            want_metadata = None
-        else:
-            want_data = None
+        if want_metadata_fp.is_file():
             want_metadata = read_metadata_only(want_metadata_fp, **schema_updates)
 
         in_data = MEDSDataset.from_yaml(in_fp) if in_fp.is_file() else None

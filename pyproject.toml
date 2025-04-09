@@ -63,6 +63,7 @@ addopts = [
   "--ignore=docs",
   "--doctest-glob=*.md",
 ]
+python_classes = "!TestEnv"
 doctest_optionflags = ["NORMALIZE_WHITESPACE", "ELLIPSIS"]
 markers = [
   "parallelized: mark test as parallelized, requiring hydra-joblib-launcher",
