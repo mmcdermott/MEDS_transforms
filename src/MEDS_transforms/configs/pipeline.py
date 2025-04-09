@@ -297,9 +297,8 @@ class PipelineConfig:
             PipelineConfig(stages=['stage1', 'stage2'], additional_params={'foobar': 3})
 
             To show the package path resolution, we can use the `pkg://` format, but for this test, we need to
-            mock the package structure:
+            mock the package structure with unittest.mock.patch:
 
-            >>> from unittest.mock import patch
             >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as pipeline_yaml:
             ...     pipeline_fp = Path(pipeline_yaml.name)
             ...     OmegaConf.save({"stages": ["stage1", "stage2"], "qux": "a"}, pipeline_fp)

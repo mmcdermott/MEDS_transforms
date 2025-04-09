@@ -1218,9 +1218,8 @@ class Stage:
             This is because this function sets the calling file to the location in the code where the
             decorator is called, and from that the stage will try to infer the "stage directory" and the
             associated default configuration file path and examples directory, if possible. We can demonstrate
-            how this works by mocking out the inspect module to return a file path that we'll create here:
+            how this works by patching out the inspect module to return a file path that we'll create here:
 
-            >>> from unittest.mock import patch
             >>> from MEDS_transforms.stages.utils import pretty_list_directory
             >>> config = DictConfig({"arg1": {"option1": "foo"}, "arg2": [1, 2.3, None], "arg3": None})
             >>> with tempfile.TemporaryDirectory() as tmpdir:

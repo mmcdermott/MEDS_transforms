@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from functools import partial
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 import polars as pl
 import pytest
@@ -35,6 +36,8 @@ def _setup_doctest_namespace(
 ) -> None:
     doctest_namespace.update(
         {
+            "MagicMock": MagicMock,
+            "patch": patch,
             "simple_static_MEDS": simple_static_MEDS,
             "print_warnings": partial(print_warnings, caplog),
             "json": json,
