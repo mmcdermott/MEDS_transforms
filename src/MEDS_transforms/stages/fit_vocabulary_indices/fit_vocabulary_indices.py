@@ -197,15 +197,97 @@ VOCABULARY_SCHEMA_UPDATES = {"code/vocab_index": pl.UInt8}
 def main(cfg: DictConfig):
     """Assigns integral vocabulary IDs to codes in the metadata file, for use in tokenizing the dataset.
 
-    The `cfg.stage_cfg` object is a special key that is imputed by OmegaConf to contain the stage-specific
-    configuration arguments based on the global, pipeline-level configuration file. It cannot be overwritten
-    directly on the command line, but can be overwritten implicitly by overwriting components of the
-    `stage_configs.fit_vocabulary_indices` key.
+    This stage merely modifies the specified input code metadata file, by assigning a `code/vocab_index`
+    column to the input dataframe whose entries correspond to the ordered vocabulary index realized by the
+    specified ordering method over all unique codes.
 
     Args:
-        stage_configs.fit_vocabulary_indices.ordering_method: How would you like codes ordered in the
-            vocabulary? Currently, only `lexographic` is supported. File a GitHub issue if you'd like other
-            ordering methods supported.
+        stage_configs.fit_vocabulary_indices.ordering_method: How the code vocabulary should be ordered when
+            vocab indices are assigned. Currently, only `lexographic` is supported. File a GitHub issue if
+            you'd like other ordering methods supported.
+
+    Raises:
+        ValueError: If the ordering method is not one of the supported methods.
+
+    Examples:
+
+        To show this in action, we'll use this example code metadata file:
+
+        >>> code_metadata = pl.DataFrame({
+        ...     "code":      ["A", "B",   "A",  "A",  "B", "B"],
+        ...     "modifier1": ["X", "D",   None, "Z",  "Y", "Y"],
+        ...     "modifier2": [None, None, None, None, 2,   1],
+        ... })
+
+        We'll also use the following global configuration file:
+
+        >>> cfg = DictConfig({
+        ...     "stage": "fit_vocabulary_indices",
+        ...     "code_modifier_columns": ["modifier1", "modifier2"],
+        ...     "stage_cfg": {
+        ...         "metadata_input_dir": "???", # Will be assigned later in the test.
+        ...         "reducer_output_dir": "???", # Will be assigned later in the test.
+        ...         "ordering_method": "lexicographic",
+        ...     },
+        ... })
+
+        Now, we'll run the stage with the above code metadata and configuration:
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     # Set up the input and output directories.
+        ...     metadata_input_dir = Path(tmpdir) / "input"
+        ...     metadata_input_dir.mkdir(parents=True, exist_ok=True)
+        ...     code_metadata.write_parquet(metadata_input_dir / "codes.parquet")
+        ...     output_dir = Path(tmpdir) / "output"
+        ...     cfg.stage_cfg.metadata_input_dir = str(metadata_input_dir)
+        ...     cfg.stage_cfg.reducer_output_dir = str(output_dir)
+        ...     # Run the stage
+        ...     main(cfg)
+        ...     # Read the output file and print it.
+        ...     pl.read_parquet(output_dir / "codes.parquet")
+        shape: (6, 4)
+        ┌──────┬───────────┬───────────┬──────────────────┐
+        │ code ┆ modifier1 ┆ modifier2 ┆ code/vocab_index │
+        │ ---  ┆ ---       ┆ ---       ┆ ---              │
+        │ str  ┆ str       ┆ i64       ┆ u8               │
+        ╞══════╪═══════════╪═══════════╪══════════════════╡
+        │ A    ┆ X         ┆ null      ┆ 2                │
+        │ B    ┆ D         ┆ null      ┆ 4                │
+        │ A    ┆ null      ┆ null      ┆ 1                │
+        │ A    ┆ Z         ┆ null      ┆ 3                │
+        │ B    ┆ Y         ┆ 2         ┆ 6                │
+        │ B    ┆ Y         ┆ 1         ┆ 5                │
+        └──────┴───────────┴───────────┴──────────────────┘
+
+        If the `ordering_method` were set to another parameter, an error would be thrown (as right now only
+        lexicographic ordering is supported):
+
+        >>> cfg.stage_cfg.ordering_method = "other"
+        >>> main(cfg)
+        Traceback (most recent call last):
+            ...
+        ValueError: Invalid ordering method: other. Expected one of lexicographic
+
+        Note that if the code and code modifiers in the metadata file are not unique, an error will be thrown
+        as well -- this is because without unique assignments between codes/modifiers and indices, you would
+        not be able to convert between codes and indices in the raw data. We can see that in action here by
+        removing the (necessary) code modifiers from our configuration file:
+
+        >>> cfg.stage_cfg.ordering_method = "lexicographic"
+        >>> cfg.code_modifier_columns = None
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     # Set up the input and output directories.
+        ...     metadata_input_dir = Path(tmpdir) / "input"
+        ...     metadata_input_dir.mkdir(parents=True, exist_ok=True)
+        ...     code_metadata.write_parquet(metadata_input_dir / "codes.parquet")
+        ...     output_dir = Path(tmpdir) / "output"
+        ...     cfg.stage_cfg.metadata_input_dir = str(metadata_input_dir)
+        ...     cfg.stage_cfg.reducer_output_dir = str(output_dir)
+        ...     # Run the stage
+        ...     main(cfg)
+        Traceback (most recent call last):
+            ...
+        ValueError: The code and code modifiers are not unique: ...
     """
 
     logger.info(
@@ -214,11 +296,6 @@ def main(cfg: DictConfig):
         f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
     )
 
-    metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
-    output_dir = Path(cfg.stage_cfg.reducer_output_dir)
-
-    code_metadata = pl.read_parquet(metadata_input_dir / "codes.parquet", use_pyarrow=True)
-
     ordering_method = cfg.stage_cfg.get("ordering_method", VOCABULARY_ORDERING.LEXICOGRAPHIC)
 
     if ordering_method not in VOCABULARY_ORDERING_METHODS:
@@ -226,6 +303,11 @@ def main(cfg: DictConfig):
             f"Invalid ordering method: {ordering_method}. "
             f"Expected one of {', '.join(VOCABULARY_ORDERING_METHODS.keys())}"
         )
+
+    metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
+    output_dir = Path(cfg.stage_cfg.reducer_output_dir)
+
+    code_metadata = pl.read_parquet(metadata_input_dir / "codes.parquet", use_pyarrow=True)
 
     logger.info(f"Assigning code vocabulary indices via a {ordering_method} order.")
     ordering_fn = VOCABULARY_ORDERING_METHODS[ordering_method]
