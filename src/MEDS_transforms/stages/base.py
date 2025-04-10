@@ -13,16 +13,19 @@ import os
 from pathlib import Path
 import sys
 import textwrap
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 import warnings
 
 from omegaconf import DictConfig, OmegaConf
-import polars as pl
 
-from ..compute_modes import ANY_COMPUTE_FN_T
 from ..mapreduce import map_stage, mapreduce_stage
 from .discovery import get_all_registered_stages
 from .examples import StageExample, StageExampleDict
+
+if TYPE_CHECKING:
+    import polars as pl
+
+    from ..compute_modes import ANY_COMPUTE_FN_T
 
 logger = logging.getLogger(__name__)
 
@@ -888,7 +891,7 @@ class Stage:
             else:
                 module.__test__ = {fn.__name__: fn}
         except Exception as e:  # pragma: no cover
-            warnings.warn(f"Failed to set doctest for {fn.__name__}: {e}")
+            warnings.warn(f"Failed to set doctest for {fn.__name__}: {e}", stacklevel=2)
 
     def __call__(self, *args, **kwargs):
         if self.mimic_fn is not None:

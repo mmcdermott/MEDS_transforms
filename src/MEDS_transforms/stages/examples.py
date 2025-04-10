@@ -6,14 +6,13 @@ exposing examples for stages within this and derived packages programmatically f
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 import subprocess
 import tempfile
 import textwrap
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from meds import code_metadata_filepath
 from meds_testing_helpers.dataset import MEDSDataset
@@ -24,6 +23,9 @@ from polars.testing import assert_frame_equal
 from yaml import load as load_yaml
 
 from ..utils import pretty_list_directory
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 _SPACE = "    "
 _BRANCH = "│   "
@@ -230,13 +232,13 @@ def read_metadata_only(fp: Path, **schema_updates) -> pl.DataFrame:
 
     data = load_yaml(fp.read_text(), Loader=Loader)
 
-    if not isinstance(data, dict) or len(data) != 1 or list(data.keys())[0] != code_metadata_filepath:
+    if not isinstance(data, dict) or len(data) != 1 or next(iter(data.keys())) != code_metadata_filepath:
         raise ValueError(
             f"Expected YAML file to contain '{code_metadata_filepath}: ' pointing to contents, "
             f"but got:\n{data}"
         )
 
-    key = list(data.keys())[0]
+    key = next(iter(data.keys()))
 
     val = data[key]
 
@@ -857,7 +859,7 @@ class StageExample:
             self.scenario_name = None
 
         if self.df_check_kwargs is None:
-            self.df_check_kwargs = dict(rtol=1e-3, atol=1e-5)
+            self.df_check_kwargs = {"rtol": 1e-3, "atol": 1e-5}
 
     @classmethod
     def is_example_dir(cls, path: Path) -> bool:
@@ -1126,8 +1128,8 @@ class StageExampleDict(dict):
         if not self:
             return "{}"
 
-        if len(self) == 1 and list(self.keys())[0] == ".":
-            return str(list(self.values())[0])
+        if len(self) == 1 and next(iter(self.keys())) == ".":
+            return str(next(iter(self.values())))
 
         lines = []
         for k, v in self.items():

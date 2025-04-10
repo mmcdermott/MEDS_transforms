@@ -227,7 +227,7 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
 
     aggregations = stage_cfg.aggregations
     for agg in aggregations:
-        if isinstance(agg, (dict, DictConfig)):
+        if isinstance(agg, dict | DictConfig):
             agg = agg.get("name", None)
         if agg not in {fn.value for fn in METADATA_FN}:
             raise ValueError(
@@ -239,7 +239,7 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
         case None:
             return ["code"]
         case list() | ListConfig() if all(isinstance(col, str) for col in code_modifiers):
-            return ["code"] + code_modifiers
+            return ["code", *code_modifiers]
         case _:
             raise ValueError(f"code_modifiers must be a list of strings or None. Got {code_modifiers}")
 
@@ -737,7 +737,7 @@ def reducer_fntr(
 
     agg_operations = {}
     for agg in aggregations:
-        if isinstance(agg, (dict, DictConfig)):
+        if isinstance(agg, dict | DictConfig):
             agg_name = agg["name"]
             agg_kwargs = {k: v for k, v in agg.items() if k != "name"}
         else:
@@ -754,7 +754,7 @@ def reducer_fntr(
         for i, df in enumerate(dfs):
             agg_selectors = []
             for agg in aggregations:
-                if isinstance(agg, (dict, DictConfig)):
+                if isinstance(agg, dict | DictConfig):
                     agg = agg["name"]
                 if agg not in df.columns:
                     raise KeyError(f"Column {agg} not found in DataFrame {i} for reduction.")

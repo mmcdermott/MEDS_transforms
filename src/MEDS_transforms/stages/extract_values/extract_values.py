@@ -131,7 +131,7 @@ def extract_values(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFra
     def map_fn(df: pl.LazyFrame) -> pl.LazyFrame:
         in_cols = set(df.collect_schema().names())
         if not need_cols.issubset(in_cols):
-            raise ValueError(f"Missing columns: {sorted(list(need_cols - in_cols))}")
+            raise ValueError(f"Missing columns: {sorted(need_cols - in_cols)}")
 
         return df.with_columns(new_cols).sort(subject_id_field, "time", maintain_order=True)
 

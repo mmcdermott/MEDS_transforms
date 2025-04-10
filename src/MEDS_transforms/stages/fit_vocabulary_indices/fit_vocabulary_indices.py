@@ -87,7 +87,7 @@ def validate_code_metadata(code_metadata: pl.DataFrame, code_modifiers: list[str
         └──────┴───────────┴───────────┴───────┘
     """
 
-    cols = ["code"] + code_modifiers
+    cols = ["code", *code_modifiers]
 
     # Check that the code and code modifiers are present in the code metadata
     if not set(cols).issubset(code_metadata.columns):
@@ -185,7 +185,7 @@ def lexicographic_indices(code_metadata: pl.DataFrame, code_modifiers: list[str]
     # dataframe, and similarly does not require actually touching any of the memory of the dataframe. Though,
     # admittedly, it is not clear how significant this choice is in practice.
 
-    sort_cols = ["code"] + code_modifiers
+    sort_cols = ["code", *code_modifiers]
 
     return code_metadata.with_columns(
         (pl.arg_sort_by(pl.arg_sort_by(sort_cols, descending=False, nulls_last=False)) + 1)

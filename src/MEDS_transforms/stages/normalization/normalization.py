@@ -182,7 +182,7 @@ def normalization(
     if code_modifiers is None:
         code_modifiers = []
 
-    cols_to_select = ["code", "code/vocab_index"] + code_modifiers
+    cols_to_select = ["code", "code/vocab_index", *code_modifiers]
 
     mean_col = pl.col("values/sum") / pl.col("values/n_occurrences")
     stddev_col = (pl.col("values/sum_sqd") / pl.col("values/n_occurrences") - mean_col**2) ** 0.5
@@ -209,7 +209,7 @@ def normalization(
         df.with_row_index(idx_col)
         .join(
             code_metadata.lazy().select(cols_to_select),
-            on=["code"] + code_modifiers,
+            on=["code", *code_modifiers],
             how="inner",
             nulls_equal=True,
         )
