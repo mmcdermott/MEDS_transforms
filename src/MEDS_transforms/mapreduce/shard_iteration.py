@@ -52,19 +52,19 @@ def shuffle_shards(shards: list[str], cfg: DictConfig) -> list[str]:
         >>> shuffle_shards(shards, DictConfig({"worker": 1}))
         Traceback (most recent call last):
             ...
-        ValueError: Hash collision for shard train/0 with add_str 1!
+        ValueError: Shards must be unique, but found duplicates: train/0
     """
 
-    add_str = str(cfg["worker"]) if "worker" in cfg else str(datetime.now(tz=UTC))
+    if len(shards) != len(set(shards)):
+        duplicates = sorted({shard for shard in shards if shards.count(shard) > 1})
+        raise ValueError(f"Shards must be unique, but found duplicates: {', '.join(duplicates)}")
 
-    shard_keys = []
-    for shard in shards:
-        shard_hash = int(hashlib.sha256((add_str + shard).encode("utf-8")).hexdigest(), 16)
-        if shard_hash in shard_keys:
-            raise ValueError(f"Hash collision for shard {shard} with add_str {add_str}!")
-        shard_keys.append(shard_hash)
+    add_str = str(cfg.get("worker", datetime.now(tz=UTC)))
 
-    return [shard for _, shard in sorted(zip(shard_keys, shards, strict=False))]
+    def hash_fn(shard: str) -> int:
+        return int(hashlib.sha256((add_str + shard).encode("utf-8")).hexdigest(), 16)
+
+    return sorted(shards, key=hash_fn)
 
 
 def shard_iterator(
