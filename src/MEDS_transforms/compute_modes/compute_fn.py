@@ -1,7 +1,4 @@
-"""Code for manipulating compute functions w.r.t.
-
-configuration objects or stage configuration objects.
-"""
+"""Code for manipulating compute functions with respect to configuration or stage configuration objects."""
 
 from __future__ import annotations
 
