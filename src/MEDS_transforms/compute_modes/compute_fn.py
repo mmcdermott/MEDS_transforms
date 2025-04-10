@@ -7,12 +7,14 @@ from enum import Enum, auto
 from functools import partial
 import inspect
 from pathlib import Path
-from typing import Any, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Any, NotRequired, TypedDict
 
-from omegaconf import DictConfig
 import polars as pl
 
 from ..dataframe import DF_T
+
+if TYPE_CHECKING:
+    from omegaconf import DictConfig
 
 COMPUTE_FN_T = Callable[[DF_T], DF_T]
 COMPUTE_FN_UNBOUND_T = Callable[..., DF_T]
@@ -121,7 +123,7 @@ class ComputeFnType(Enum):
         sig = inspect.signature(compute_fn)
 
         allowed_params = {*ComputeFnArgs.__required_keys__, *ComputeFnArgs.__optional_keys__}
-        all_params_allowed = all(param in allowed_params for param in sig.parameters.keys())
+        all_params_allowed = all(param in allowed_params for param in sig.parameters)
         if not all_params_allowed:
             return None
 

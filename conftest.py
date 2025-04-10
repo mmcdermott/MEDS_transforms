@@ -7,6 +7,7 @@ import json
 import tempfile
 from typing import Any
 from unittest.mock import MagicMock, patch
+from omegaconf import DictConfig
 
 import polars as pl
 import pytest
@@ -38,6 +39,7 @@ def _setup_doctest_namespace(
 ) -> None:
     doctest_namespace.update(
         {
+            "DictConfig": DictConfig,
             "MagicMock": MagicMock,
             "patch": patch,
             "print_directory_contents": print_directory_contents,

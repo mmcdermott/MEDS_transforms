@@ -1,6 +1,6 @@
 """Basic code for a mapreduce stage."""
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from functools import partial
 import logging
 from pathlib import Path

@@ -212,7 +212,7 @@ def pytest_configure(config: pytest.Config):
         if pkg_valid and stage_valid:
             allowed_stages[n] = ep.load()
 
-    missing_stages = sorted(list(set(stages) - set(allowed_stages.keys())))
+    missing_stages = sorted(set(stages) - set(allowed_stages.keys()))
 
     if missing_stages:
         raise ValueError(f"Invalid stage(s) specified for {packages_to_test}: {', '.join(missing_stages)}.")

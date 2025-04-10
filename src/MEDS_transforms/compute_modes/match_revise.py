@@ -97,11 +97,11 @@ def validate_match_revise(stage_cfg: DictConfig):
         raise ValueError(f"Stage configuration must contain a {MATCH_REVISE_KEY} key")
 
     match_revise_options = stage_cfg[MATCH_REVISE_KEY]
-    if not isinstance(match_revise_options, (list, ListConfig)):
+    if not isinstance(match_revise_options, list | ListConfig):
         raise ValueError(f"Match revise options must be a list, got {type(match_revise_options)}")
 
     for i, match_revise_cfg in enumerate(match_revise_options):
-        if not isinstance(match_revise_cfg, (dict, DictConfig)):
+        if not isinstance(match_revise_cfg, dict | DictConfig):
             raise ValueError(f"Match revise config {i} must be a dict, got {type(match_revise_cfg)}")
 
         if MATCHER_KEY not in match_revise_cfg:
