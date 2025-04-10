@@ -15,7 +15,7 @@ from .. import Stage
 logger = logging.getLogger(__name__)
 
 
-class METADATA_FN(StrEnum):
+class MetadataFn(StrEnum):
     """Enumeration of metadata functions that can be applied to a group of codes.
 
     This enumeration contains the supported code-metadata collection and aggregation function names that can
@@ -148,7 +148,7 @@ def quantile_reducer(cols: cs._selector_proxy_, quantiles: list[float]) -> pl.Ex
         col: vals.quantile(q).alias(col) for col, q in zip(quantile_cols, quantiles, strict=False)
     }
 
-    return pl.struct(**quantiles_struct).alias(METADATA_FN.VALUES_QUANTILES)
+    return pl.struct(**quantiles_struct).alias(MetadataFn.VALUES_QUANTILES)
 
 
 VAL = pl.col("numeric_value")
@@ -156,19 +156,19 @@ VAL_PRESENT: pl.Expr = VAL.is_not_null() & VAL.is_not_nan()
 IS_INT: pl.Expr = VAL.round() == VAL
 PRESENT_VALS = VAL.filter(VAL_PRESENT)
 
-CODE_METADATA_AGGREGATIONS: dict[METADATA_FN, MapReducePair] = {
-    METADATA_FN.CODE_N_PATIENTS: MapReducePair(pl.col(subject_id_field).n_unique(), pl.sum_horizontal),
-    METADATA_FN.CODE_N_OCCURRENCES: MapReducePair(pl.len(), pl.sum_horizontal),
-    METADATA_FN.VALUES_N_PATIENTS: MapReducePair(
+CODE_METADATA_AGGREGATIONS: dict[MetadataFn, MapReducePair] = {
+    MetadataFn.CODE_N_PATIENTS: MapReducePair(pl.col(subject_id_field).n_unique(), pl.sum_horizontal),
+    MetadataFn.CODE_N_OCCURRENCES: MapReducePair(pl.len(), pl.sum_horizontal),
+    MetadataFn.VALUES_N_PATIENTS: MapReducePair(
         pl.col(subject_id_field).filter(VAL_PRESENT).n_unique(), pl.sum_horizontal
     ),
-    METADATA_FN.VALUES_N_OCCURRENCES: MapReducePair(PRESENT_VALS.len(), pl.sum_horizontal),
-    METADATA_FN.VALUES_N_INTS: MapReducePair(VAL.filter(VAL_PRESENT & IS_INT).len(), pl.sum_horizontal),
-    METADATA_FN.VALUES_SUM: MapReducePair(PRESENT_VALS.sum(), pl.sum_horizontal),
-    METADATA_FN.VALUES_SUM_SQD: MapReducePair((PRESENT_VALS**2).sum(), pl.sum_horizontal),
-    METADATA_FN.VALUES_MIN: MapReducePair(PRESENT_VALS.min(), pl.min_horizontal),
-    METADATA_FN.VALUES_MAX: MapReducePair(PRESENT_VALS.max(), pl.max_horizontal),
-    METADATA_FN.VALUES_QUANTILES: MapReducePair(PRESENT_VALS, quantile_reducer),
+    MetadataFn.VALUES_N_OCCURRENCES: MapReducePair(PRESENT_VALS.len(), pl.sum_horizontal),
+    MetadataFn.VALUES_N_INTS: MapReducePair(VAL.filter(VAL_PRESENT & IS_INT).len(), pl.sum_horizontal),
+    MetadataFn.VALUES_SUM: MapReducePair(PRESENT_VALS.sum(), pl.sum_horizontal),
+    MetadataFn.VALUES_SUM_SQD: MapReducePair((PRESENT_VALS**2).sum(), pl.sum_horizontal),
+    MetadataFn.VALUES_MIN: MapReducePair(PRESENT_VALS.min(), pl.min_horizontal),
+    MetadataFn.VALUES_MAX: MapReducePair(PRESENT_VALS.max(), pl.max_horizontal),
+    MetadataFn.VALUES_QUANTILES: MapReducePair(PRESENT_VALS, quantile_reducer),
 }
 
 
@@ -178,7 +178,7 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
     Args:
         stage_cfg: The configuration object for this stage. It must contain an `aggregations` field that has a
             list of aggregations that should be applied in this stage. Each aggregation must be a string in
-            the `METADATA_FN` enumeration.
+            the `MetadataFn` enumeration.
         code_modifiers: A list of column names that should be used in addition to the core `code`
             column to group the data before applying the aggregations. If None, only the `code` column will be
             used.
@@ -202,7 +202,7 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
         >>> validate_args_and_get_code_cols(invalid_agg_cfg, None)
         Traceback (most recent call last):
             ...
-        ValueError: Metadata aggregation function INVALID not found in METADATA_FN enumeration. Values are:
+        ValueError: Metadata aggregation function INVALID not found in MetadataFn enumeration. Values are:
             code/n_subjects, code/n_occurrences, values/n_subjects, values/n_occurrences, values/n_ints,
             values/sum, values/sum_sqd, values/min, values/max, values/quantiles
         >>> valid_cfg = DictConfig({"aggregations": ["code/n_subjects", {"name": "values/n_ints"}]})
@@ -229,10 +229,10 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
     for agg in aggregations:
         if isinstance(agg, dict | DictConfig):
             agg = agg.get("name", None)
-        if agg not in {fn.value for fn in METADATA_FN}:
+        if agg not in {fn.value for fn in MetadataFn}:
             raise ValueError(
-                f"Metadata aggregation function {agg} not found in METADATA_FN enumeration. Values are: "
-                f"{', '.join([fn.value for fn in METADATA_FN])}"
+                f"Metadata aggregation function {agg} not found in MetadataFn enumeration. Values are: "
+                f"{', '.join([fn.value for fn in MetadataFn])}"
             )
 
     match code_modifiers:
@@ -252,7 +252,7 @@ def mapper_fntr(
     Args:
         stage_cfg: The configuration object for this stage. It must contain an `aggregations` field that has a
             list of aggregations that should be applied in this stage. Each aggregation must be a string in
-            the `METADATA_FN` enumeration, and the mapper function is specified in the
+            the `MetadataFn` enumeration, and the mapper function is specified in the
             `CODE_METADATA_AGGREGATIONS` dictionary.
         code_modifiers: A list of column names that should be used in addition to the core `code`
             column to group the data before applying the aggregations. If None, only the `code` column will be
@@ -500,9 +500,9 @@ def mapper_fntr(
 
     def all_subjects_mapper(df: pl.LazyFrame) -> pl.LazyFrame:
         local_agg_operations = agg_operations.copy()
-        if METADATA_FN.VALUES_QUANTILES in agg_operations:
-            local_agg_operations[METADATA_FN.VALUES_QUANTILES] = agg_operations[
-                METADATA_FN.VALUES_QUANTILES
+        if MetadataFn.VALUES_QUANTILES in agg_operations:
+            local_agg_operations[MetadataFn.VALUES_QUANTILES] = agg_operations[
+                MetadataFn.VALUES_QUANTILES
             ].implode()
         return df.select(**local_agg_operations)
 
@@ -529,7 +529,7 @@ def reducer_fntr(
     Args:
         stage_cfg: The configuration object for this stage. It must contain an `aggregations` field that has a
             list of aggregations that should be applied in this stage. Each aggregation must be a string in
-            the `METADATA_FN` enumeration, and the reduction function is specified in the
+            the `MetadataFn` enumeration, and the reduction function is specified in the
             `CODE_METADATA_AGGREGATIONS` dictionary.
         code_modifiers: A list of column names that should be used in addition to the core `code`
             column to group the data before applying the aggregations. If None, only the `code` column will be

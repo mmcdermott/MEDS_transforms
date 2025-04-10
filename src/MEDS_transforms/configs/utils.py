@@ -12,7 +12,7 @@ from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
 
 
-def OmegaConfResolver(*args, **kwargs) -> Callable:
+def OmegaConfResolver(*args, **kwargs) -> Callable:  # noqa: N802
     """A decorator to register the decorated function as an OmegaConf resolver.
 
     If a name is passed via keyword arguments, it will be used as the name of the resolver. If no name is

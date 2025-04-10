@@ -362,7 +362,7 @@ class PipelineConfig:
             raise TypeError(f"Invalid type for stages: {type(self.stages)}. Expected list or ListConfig.")
 
         try:
-            self.parsed_stages
+            self.parsed_stages  # noqa: B018
         except Exception as e:
             raise ValueError(
                 "Failed to parse pipeline configuration. Please check the pipeline YAML file 'stages' key."

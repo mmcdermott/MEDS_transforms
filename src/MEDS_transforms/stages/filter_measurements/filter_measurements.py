@@ -151,11 +151,7 @@ def filter_measurements(
     allowed_code_metadata = (code_metadata.filter(pl.all_horizontal(filter_exprs)).select(join_cols)).lazy()
 
     def filter_measurements_fn(df: pl.LazyFrame) -> pl.LazyFrame:
-        f"""Filters subject events to only encompass those with a set of permissible codes.
-
-        In particular, this function filters the DataFrame to only include (code, modifier) pairs that have
-        at least {min_subjects_per_code} subjects and {min_occurrences_per_code} occurrences.
-        """
+        """Drops measurements that correspond to codes that occur too infrequently given the configuration."""
 
         idx_col = "_row_idx"
         df_columns = set(df.collect_schema().names())

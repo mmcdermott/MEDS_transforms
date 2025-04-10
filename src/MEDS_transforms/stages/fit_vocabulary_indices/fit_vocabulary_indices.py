@@ -13,7 +13,7 @@ from .. import Stage
 logger = logging.getLogger(__name__)
 
 
-class VOCABULARY_ORDERING(StrEnum):
+class VocabularyOrdering(StrEnum):
     """Enumeration of different ways a vocabulary order can be selected.
 
     These are stored as a `StrEnum` so that they can be easily specified by the user in a configuration file
@@ -194,8 +194,8 @@ def lexicographic_indices(code_metadata: pl.DataFrame, code_modifiers: list[str]
     )
 
 
-VOCABULARY_ORDERING_METHODS: dict[VOCABULARY_ORDERING, INDEX_ASSIGNMENT_FN] = {
-    VOCABULARY_ORDERING.LEXICOGRAPHIC: lexicographic_indices,
+VocabularyOrdering_METHODS: dict[VocabularyOrdering, INDEX_ASSIGNMENT_FN] = {
+    VocabularyOrdering.LEXICOGRAPHIC: lexicographic_indices,
 }
 
 VOCABULARY_SCHEMA_UPDATES = {"code/vocab_index": pl.UInt8}
@@ -308,12 +308,12 @@ def main(cfg: DictConfig):
         f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
     )
 
-    ordering_method = cfg.stage_cfg.get("ordering_method", VOCABULARY_ORDERING.LEXICOGRAPHIC)
+    ordering_method = cfg.stage_cfg.get("ordering_method", VocabularyOrdering.LEXICOGRAPHIC)
 
-    if ordering_method not in VOCABULARY_ORDERING_METHODS:
+    if ordering_method not in VocabularyOrdering_METHODS:
         raise ValueError(
             f"Invalid ordering method: {ordering_method}. "
-            f"Expected one of {', '.join(VOCABULARY_ORDERING_METHODS.keys())}"
+            f"Expected one of {', '.join(VocabularyOrdering_METHODS.keys())}"
         )
 
     metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
@@ -322,7 +322,7 @@ def main(cfg: DictConfig):
     code_metadata = pl.read_parquet(metadata_input_dir / "codes.parquet", use_pyarrow=True)
 
     logger.info(f"Assigning code vocabulary indices via a {ordering_method} order.")
-    ordering_fn = VOCABULARY_ORDERING_METHODS[ordering_method]
+    ordering_fn = VocabularyOrdering_METHODS[ordering_method]
 
     code_modifiers = cfg.get("code_modifier_columns", None)
     if code_modifiers is None:

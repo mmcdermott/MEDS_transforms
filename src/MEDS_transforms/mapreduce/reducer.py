@@ -12,7 +12,7 @@ from ..dataframe import DF_T, READ_FN_T, WRITE_FN_T
 logger = logging.getLogger(__name__)
 
 
-class REDUCE_FN_T(Protocol):
+class REDUCE_FN_T(Protocol):  # noqa: N801
     """Protocol for a function that takes a variable number dataframes and returns one dataframe."""
 
     def __call__(self, *dfs: DF_T) -> DF_T: ...

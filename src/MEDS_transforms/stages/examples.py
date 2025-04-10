@@ -598,7 +598,6 @@ class StageExample:
         Success
         Stderr:
         <BLANKLINE>
-        Expected cohort directory /tmp/tmp.../cohort to exist, but it does not.
 
     To explore test failures in more detail, we can use the `check_outputs` helper, which checks the output of
     the passed cohort directory is as expected. For example, if we add the expected metadata to a directory
@@ -654,9 +653,6 @@ class StageExample:
         ╞══════╪═════════════╡
         │ f    ┆ null        │
         └──────┴─────────────┘
-        DataFrames are different (dtypes do not match)
-        [left]:  {'code': String, 'description': String}
-        [right]: {'code': String, 'description': Null}
 
     Similar assertion cases are used for data comparisons
 
@@ -767,7 +763,6 @@ class StageExample:
               description: []
               parent_codes: []
             subject_splits: None
-            Shards differ: dict_keys(['1']) vs dict_keys(['0'])
 
     ...or if the contents of the data are different:
 
@@ -833,9 +828,6 @@ class StageExample:
           description: []
           parent_codes: []
         subject_splits: None
-        Data differs in (at least) shard 0: DataFrames are different (value mismatch for column 'time')
-        [left]:  [datetime.datetime(2015, 12, 1, 0, 0)]
-        [right]: [datetime.datetime(2012, 12, 1, 0, 0)]
     """
 
     stage_name: str
@@ -989,10 +981,10 @@ class StageExample:
                     try:
                         assert_frame_equal(got_df, want_df, **self.df_check_kwargs)
                     except AssertionError as e:
-                        raise AssertionError(f"Data differs in (at least) shard {shard_name}: {e}")
+                        raise AssertionError(f"Data differs in (at least) shard {shard_name}") from e
             except AssertionError as e:
                 pl.Config.set_tbl_rows(-1)
-                raise AssertionError(f"Want data:\n{self.want_data}\nGot data:\n{got_data}\n{e}")
+                raise AssertionError(f"Want data:\n{self.want_data}\nGot data:\n{got_data}") from e
 
         if self.want_metadata is not None:
             metadata_dir = cohort_dir if is_resolved_dir else cohort_dir / "metadata"
@@ -1003,8 +995,8 @@ class StageExample:
             except AssertionError as e:
                 pl.Config.set_tbl_rows(-1)
                 raise AssertionError(
-                    f"Want metadata:\n{self.want_metadata}\nGot metadata:\n{got_metadata}\n{e}"
-                )
+                    f"Want metadata:\n{self.want_metadata}\nGot metadata:\n{got_metadata}"
+                ) from e
 
     @property
     def cmd_pipeline_cfg(self) -> DictConfig | None:
@@ -1087,8 +1079,7 @@ class StageExample:
             try:
                 self.check_outputs(test_env.cohort_dir)
             except AssertionError as e:
-                err_lines.append(str(e))
-                raise AssertionError("\n".join(err_lines))
+                raise AssertionError("\n".join(err_lines)) from e
 
 
 class StageExampleDict(dict):
