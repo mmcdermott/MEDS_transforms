@@ -1,6 +1,7 @@
 """This script is a helper utility to run entire pipelines from a single script.
 
 To do this effectively, this runner functionally takes a "meta configuration" file that contains:
+
   1. The path to the pipeline configuration file.
   2. Configuration details for how to run each stage of the pipeline, including mappings to the underlying
      stage scripts and Hydra launcher configurations for each stage to control parallelism, resources, etc.
@@ -255,9 +256,6 @@ def main(cfg: DictConfig):
             with `do_profile` without the `hydra-profiler` package installed.
 
     Examples:
-
-        First, we need to construct an example config and pipeline config:
-
         >>> cfg = DictConfig({
         ...     "pipeline_config_fp": "???", # we'll fill this in each test.
         ...     "log_dir": "???", # We'll fill this in each test.
@@ -268,8 +266,8 @@ def main(cfg: DictConfig):
         ...     "stages": ["reshard_to_split", {"count_codes": {"_base_stage": "aggregate_code_metadata"}}],
         ... })
 
-        We'll consistently mock out the `run_stage` calls to avoid running the actual stages; instead, when
-        called, we'll just print out the stages. To do this, we'll set up a helper to run the full test.
+    We'll consistently mock out the `run_stage` calls to avoid running the actual stages; instead, when
+    called, we'll just print out the stages. To do this, we'll set up a helper to run the full test.
 
         >>> def mock_run_stage(cfg, pipeline_cfg, stage, *args, **kwargs):
         ...     if "default_parallelization_cfg" in kwargs and kwargs["default_parallelization_cfg"]:
@@ -293,8 +291,8 @@ def main(cfg: DictConfig):
         ...         # Run the main function
         ...         main(test_cfg)
 
-        Now we can run some tests. Let's start with the runner in normal operation. We see it "runs" each
-        stage (here just prints them):
+    Now we can run some tests. Let's start with the runner in normal operation. We see it "runs" each stage
+    (here just prints them):
 
         >>> with tempfile.TemporaryDirectory() as test_dir:
         ...     test_dir = Path(test_dir)
@@ -302,8 +300,8 @@ def main(cfg: DictConfig):
         Running reshard_to_split
         Running count_codes
 
-        What controls exist? Firstly, upon completion of each stage, it also writes a ".done" file to the log
-        dir for that stage, and a global "_all_stages.done" file when the pipeline is done. Let's see them:
+    What controls exist? Firstly, upon completion of each stage, it also writes a ".done" file to the log dir
+    for that stage, and a global "_all_stages.done" file when the pipeline is done. Let's see them:
 
         >>> with tempfile.TemporaryDirectory() as test_dir:
         ...     test_dir = Path(test_dir)
@@ -317,7 +315,7 @@ def main(cfg: DictConfig):
         ├── count_codes.done
         └── reshard_to_split.done
 
-        If we the global done file exists in advance, the pipeline will skip all stages:
+    If the global done file exists in advance, the pipeline will skip all stages:
 
         >>> with tempfile.TemporaryDirectory() as test_dir:
         ...     test_dir = Path(test_dir)
@@ -331,7 +329,7 @@ def main(cfg: DictConfig):
         Log contents:
         └── _all_stages.done
 
-        This applies to each individual stage's done file too:
+    This applies to each individual stage's done file too:
 
         >>> with tempfile.TemporaryDirectory() as test_dir:
         ...     test_dir = Path(test_dir)
@@ -348,7 +346,7 @@ def main(cfg: DictConfig):
         ├── count_codes.done
         └── reshard_to_split.done
 
-        We can also control parallelization, either through the pipeline config or the stage runner config:
+    We can also control parallelization, either through the pipeline config or the stage runner config:
 
         >>> cfg.parallelize = {"n_workers": 2}
         >>> with tempfile.TemporaryDirectory() as test_dir:
@@ -356,7 +354,7 @@ def main(cfg: DictConfig):
         Running reshard_to_split with: {'n_workers': 2}
         Running count_codes with: {'n_workers': 2}
 
-        Stage runner parallelization takes priority, though:
+    Stage runner parallelization takes priority, though:
 
         >>> cfg._stage_runners.parallelize = {"n_workers": 3}
         >>> with tempfile.TemporaryDirectory() as test_dir:
@@ -364,7 +362,7 @@ def main(cfg: DictConfig):
         Running reshard_to_split with: {'n_workers': 3}
         Running count_codes with: {'n_workers': 3}
 
-        The runner will throw an error if the pipeline speified has no stages:
+    The runner will throw an error if the pipeline speified has no stages:
 
         >>> pipeline_cfg.stages = []
         >>> with tempfile.TemporaryDirectory() as test_dir:
