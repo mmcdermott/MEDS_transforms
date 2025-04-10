@@ -76,7 +76,7 @@ class StageConfig:
     def _is_meta_key(cls, key: str) -> bool:
         """Checks if a key is a meta-key for the configuration.
 
-        Meta-keys are keys that re in the `cls.META_KEYS` set.
+        Meta-keys are keys that are in the `cls.META_KEYS` set.
 
         Args:
             key: The key to check.
