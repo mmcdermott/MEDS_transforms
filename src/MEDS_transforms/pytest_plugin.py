@@ -1,3 +1,17 @@
+"""This module defines test helpers for defining derived packages integrating with MEDS-Transforms.
+
+Pytest Plugin Capabilities:
+    - CLI options for specifying the packages and stages within those packages to include in automated testing
+      fixtures.
+    - The `stage_example` fixture which exposes a stage and test scenario for using built-in stage testing
+      support.
+    - A helper (`pipeline_tester`) to test a full pipeline by specifying a list of stage scenarios that should
+      capture the pipeline's behavior when run in sequence.
+    - A helper context manager (`suppress_logging`) to suppress logging. This is useful if you include in your
+      package some pytest setup code that iterates through partially defined stage examples, as many warnings
+      may be logged by MEDS testing helpers upon partial initialization of dataset examples.
+"""
+
 import logging
 import subprocess
 import tempfile
@@ -20,7 +34,31 @@ logger = logging.getLogger(__name__)
 
 @contextmanager
 def suppress_logging(level: int = logging.CRITICAL):
-    """Suppress logging at the specified level."""
+    """Suppress logging at the specified level within the context block.
+
+    Args:
+        level: The logging level at or below which logs will be suppressed. Defaults to CRITICAL.
+
+    Examples:
+        >>> import logging
+        >>> logger = logging.getLogger(__name__)
+        >>> with print_warnings():
+        ...     logger.warning("This will be logged, as suppress logging isn't used.")
+        Warning: This will be logged, as suppress logging isn't used.
+        >>> with print_warnings(), suppress_logging():
+        ...     logger.warning("This will not be logged.")
+        >>> with print_warnings():
+        ...     logger.warning("This will be logged again, as the suppression has been disabled.")
+        Warning: This will be logged again, as the suppression has been disabled.
+
+    Note that if you (for some reason) use both `print_warnings` and `suppress_logging` (as we do here so we
+    can show that `suppress_logging` works -- in normal usage you'd never need to do this), the order of the
+    two matters; if you reverse what we showed above, things will be printed:
+
+        >>> with suppress_logging(), print_warnings():
+        ...     logger.warning("Wrong order! This will be logged.")
+        Warning: Wrong order! This will be logged.
+    """
     logger = logging.getLogger()
     original_level = logger.getEffectiveLevel()
     logger.setLevel(level)
@@ -81,9 +119,6 @@ def pytest_configure(config: pytest.Config):
         ValueError: If any invalid stages are specified on the command line.
 
     Examples:
-
-        Let's set up some fake registered stages to use in this test.
-
         >>> mock_stages = {
         ...     "stage_1_1": MagicMock(), "stage_1_2": MagicMock(), "stage_2_1": MagicMock(),
         ...     "stage_meds_transforms": MagicMock()
@@ -97,7 +132,7 @@ def pytest_configure(config: pytest.Config):
         >>> mock_stages["stage_2_1"].load.return_value.test_cases = ["test_case5", "test_case6"]
         >>> mock_stages["stage_meds_transforms"].load.return_value.test_cases = ["test_case7", "test_case8"]
 
-        Let's also set up a fake config with CLI options
+    Let's also set up a fake config with CLI options
 
         >>> CLI_options = {
         ...     "test_stages_for_package": ["package1", "package2"],
@@ -106,8 +141,8 @@ def pytest_configure(config: pytest.Config):
         >>> config = MagicMock()
         >>> config.getoption.side_effect = lambda x: CLI_options.get(x, [])
 
-        Now, if we call the function with the fake config and stages, we should get the expected output. This
-        simulates reading the command line options and setting up the config object.
+    Now, if we call the function with the fake config and stages, we should get the expected output. This
+    simulates reading the command line options and setting up the config object.
 
         >>> with patch("MEDS_transforms.pytest_plugin.get_all_registered_stages", return_value=mock_stages):
         ...     pytest_configure(config)
@@ -116,7 +151,7 @@ def pytest_configure(config: pytest.Config):
         >>> config.allowed_stage_scenarios
         {'stage_1_1': ['test_case1', 'test_case2'], 'stage_2_1': ['test_case5', 'test_case6']}
 
-        What if we change the config options?
+    What if we change the config options?
 
         >>> CLI_options["test_stages_for_package"] = ["package1"]
         >>> CLI_options["test_stage"] = []
@@ -127,7 +162,7 @@ def pytest_configure(config: pytest.Config):
         >>> config.allowed_stage_scenarios
         {'stage_1_1': ['test_case1', 'test_case2'], 'stage_1_2': ['test_case3', 'test_case4']}
 
-        What if we request a stage not in the package?
+    What if we request a stage not in the package?
 
         >>> CLI_options["test_stage"] = ["stage_1_1", "stage_2_1", "invalid_stage"]
         >>> with patch("MEDS_transforms.pytest_plugin.get_all_registered_stages", return_value=mock_stages):
@@ -136,8 +171,8 @@ def pytest_configure(config: pytest.Config):
             ...
         ValueError: Invalid stage(s) specified for ['package1']: invalid_stage, stage_2_1.
 
-        If we don't pass any CLI options, then it should try to auto detect the package. But, if that doesn't
-        work (which we'll simulate here), it should test everything except MEDS-Transforms.
+    If we don't pass any CLI options, then it should try to auto detect the package. But, if that doesn't work
+    (which we'll simulate here), it should test everything except MEDS-Transforms.
 
         >>> CLI_options["test_stages_for_package"] = []
         >>> CLI_options["test_stage"] = []
@@ -200,12 +235,9 @@ def _auto_detect_package(root: Path) -> str | None:
         root: The rootpath of the pytest session.
 
     Returns:
-        The package name if found, otherwise None.
+        The package name if found, otherwise `None`.
 
     Examples:
-
-        If we find a pyproject.toml file, we can use that to get the package name.
-
         >>> toml_contents = '''
         ... [project]
         ... name = "my_package"
@@ -216,7 +248,7 @@ def _auto_detect_package(root: Path) -> str | None:
         ...     print(_auto_detect_package(Path(tmpdir)))
         my_package
 
-        If we can't find a pyproject.toml file or if it can't be parsed, we return None.
+    If we can't find a pyproject.toml file or if it can't be parsed, we return `None`.
 
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     print(_auto_detect_package(Path(tmpdir))) # No toml file!
@@ -227,7 +259,7 @@ def _auto_detect_package(root: Path) -> str | None:
         ...     print(_auto_detect_package(Path(tmpdir)))
         None
 
-        If a setup.py file is found, we warn the user that it is not supported and return None.
+    If a setup.py file is found, we warn the user that it is not supported and return `None`.
 
         >>> setup_contents = '''
         ... from setuptools import setup
@@ -321,10 +353,6 @@ def pipeline_tester(
         AssertionError: If the pipeline fails to produce expected output for any stage.
 
     Examples:
-
-        We just show error cases here for now, but check out the `tests/test_pipeline.py` file to see this in
-        action with the default stages.
-
         >>> pipeline_yaml = "stages: ['foo', 'bar']"
         >>> pipeline_tester(pipeline_yaml, "", ["just_one"])
         Traceback (most recent call last):
@@ -336,18 +364,18 @@ def pipeline_tester(
             ...
         ValueError: Error loading stage example for ...
 
-        To see it in action, we'll use fake run functions.
+    To see it in action, we'll use fake run functions.
 
         >>> def fake_run_success(script, shell, capture_output):
         ...     return subprocess.CompletedProcess([], returncode=0, stdout=b"Success", stderr=b"")
         >>> def fake_run_failure(script, shell, capture_output):
         ...     return subprocess.CompletedProcess([], returncode=1, stdout=b"", stderr=b"Failure")
 
-        We'll use the real, default example for the `filter_subjects` stage here.
+    We'll use the real, default example for the `filter_subjects` stage here.
 
         >>> pipeline_yaml = "stages: [filter_subjects]" # This wouldn't work in real life
 
-        If we run and throw an error from the fake shell runner, it will raise an AssertionError.
+    If we run and throw an error from the fake shell runner, it will raise an AssertionError.
 
         >>> pipeline_tester(pipeline_yaml, "", ["filter_subjects"], run_fn=fake_run_failure)
         Traceback (most recent call last):
@@ -358,8 +386,7 @@ def pipeline_tester(
         Stderr:
         Failure
 
-        If we run and succeed, it will still throw an error as the stage will fail to validate its expected
-        files.
+    If we run and succeed, it will still throw an error as the stage will fail to validate its expected files.
 
         >>> pipeline_tester(pipeline_yaml, "", ["filter_subjects"], run_fn=fake_run_success)
         Traceback (most recent call last):

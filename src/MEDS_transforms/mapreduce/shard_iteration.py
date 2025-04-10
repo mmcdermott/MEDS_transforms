@@ -42,10 +42,12 @@ def shuffle_shards(shards: list[str], cfg: DictConfig) -> list[str]:
 
         It can also shuffle the shards without a worker ID, but the order is then based on the time, which
         is not consistent across runs.
+
         >>> sorted(shuffle_shards(shards, DictConfig({})))
         ['held_out', 'train/0', 'train/1', 'tuning']
 
         If the shards aren't unique, it will error
+
         >>> shards = ["train/0", "train/0", "tuning", "held_out"]
         >>> shuffle_shards(shards, DictConfig({"worker": 1}))
         Traceback (most recent call last):
@@ -111,6 +113,7 @@ def shard_iterator(
 
     By default, this will load all shards in the input directory and write specify their appropriate output
     directories:
+
         >>> with tempfile.TemporaryDirectory() as tmp:
         ...     root = Path(tmp)
         ...     input_dir = root / "data"
@@ -130,6 +133,7 @@ def shard_iterator(
         False
 
     Different workers will shuffle the shards differently:
+
         >>> with tempfile.TemporaryDirectory() as tmp:
         ...     root = Path(tmp)
         ...     input_dir = root / "data"
@@ -150,6 +154,7 @@ def shard_iterator(
 
     We can also make it look within a specific input subdir of the data directory and change the output
     suffix. Note that using a specific input subdir is _different_ than requesting it load only train.
+
         >>> with tempfile.TemporaryDirectory() as tmp:
         ...     root = Path(tmp)
         ...     input_dir = root / "data"
@@ -168,6 +173,7 @@ def shard_iterator(
 
     We can also make it load only 'train' shards, in the case that there are shards with a valid "train/"
     prefix.
+
         >>> with tempfile.TemporaryDirectory() as tmp:
         ...     root = Path(tmp)
         ...     input_dir = root / "data"
@@ -188,6 +194,7 @@ def shard_iterator(
         True
 
     The train prefix used is precisely `train/` -- other uses of train will not work:
+
         >>> wrong_pfx_shards = {"train": [1, 2, 3], "train_1": [4, 5, 6], "train-2": [7, 8, 9]}
         >>> with tempfile.TemporaryDirectory() as tmp:
         ...     root = Path(tmp)
@@ -211,6 +218,7 @@ def shard_iterator(
 
     If there are no such shards, then it loads them all and assumes the filtering will be handled via the
     splits parquet file.
+
         >>> no_pfx_shards = {"0": [1, 2, 3], "1": [4, 5, 6], "2": [7, 8, 9]}
         >>> with tempfile.TemporaryDirectory() as tmp:
         ...     root = Path(tmp)
@@ -233,6 +241,7 @@ def shard_iterator(
         False
 
     If it can't find any files, it will error:
+
         >>> fps, includes_only_train = shard_iterator(cfg)
         Traceback (most recent call last):
             ...

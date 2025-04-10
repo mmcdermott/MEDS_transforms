@@ -126,6 +126,7 @@ def rwlock_wrap(
         >>> assert not out_fp.is_file() # Out file should not be created when the process crashes
 
     If the lock file already exists, the function will not do anything
+
         >>> def compute_fn(df: pl.DataFrame) -> pl.DataFrame:
         ...     return df.with_columns(pl.col("c") * 2).filter(pl.col("c") > 4)
         >>> out_fp = root / "output.csv"
@@ -135,6 +136,7 @@ def rwlock_wrap(
         ...     assert not result_computed
 
     The lock file will be removed after successful processing.
+
         >>> result_computed = rwlock_wrap(in_fp, out_fp, read_fn, write_fn, compute_fn)
         >>> assert result_computed
         >>> assert not lock_fp.exists()

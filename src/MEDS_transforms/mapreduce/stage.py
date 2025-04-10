@@ -52,17 +52,14 @@ def map_stage(
         ValueError: If includes_only_train is True but train_only is False.
 
     Examples:
-
-        We'll show an example of this function using the `simple_static_MEDS` dataset provided as a pytest
-        fixture and loaded in this doctest via our `conftest.py` file in the
-        [`meds_testing_helpers`](https://github.com/Medical-Event-Data-Standard/meds_testing_helpers) package.
-
-        To see this data, let's inspect it:
-
         >>> from meds_testing_helpers.dataset import MEDSDataset
         >>> D = MEDSDataset(root_dir=simple_static_MEDS)
 
-        We can see how it is arranged on disk (which is merely the typical MEDS fashion):
+    We'll show an example of this function using the `simple_static_MEDS` dataset provided as a pytest
+    fixture and loaded in this doctest via our `conftest.py` file in the
+    [`meds_testing_helpers`](https://github.com/Medical-Event-Data-Standard/meds_testing_helpers) package.
+
+    To see this data, let's inspect it, first on disk (which is merely the typical MEDS fashion):
 
         >>> print_directory_contents(simple_static_MEDS)
         ├── data
@@ -78,7 +75,7 @@ def map_stage(
             ├── dataset.json
             └── subject_splits.parquet
 
-        And inspect its contents directly:
+    As well as its actual contents:
 
         >>> for k, df in D._pl_shards.items():
         ...     print(f"{k}:")
@@ -170,7 +167,7 @@ def map_stage(
         │ 1500733    ┆ held_out │
         └────────────┴──────────┘
 
-        We'll also make a simple helper too to print the output for us
+    We'll also make a simple helper too to print the output for us
 
         >>> def profile_map_stage(test_dir: str, in_MEDS_dir: Path | None = None, **kwargs):
         ...     '''Makes a test config, adds the output directory, runs the mapping stage, & shows outputs'''
@@ -190,11 +187,10 @@ def map_stage(
         ...         print(f"  - {fp.relative_to(test_cfg.stage_cfg.output_dir)}:")
         ...         print(pl.read_parquet(fp))
 
-        To map over this data, we need a configuration file that will point our data input dir to this
-        dataset. Normally, the stage configuration is handled automatically by the Stage objects and the
-        `PipelineConfig` class, but we'll just fudge it here for the sake of the example. Note we haven't
-        added an output dir yet -- that will be a temporary directory we'll create just before we run the
-        stage.
+    To map over this data, we need a configuration file that will point our data input dir to this dataset.
+    Normally, the stage configuration is handled automatically by the Stage objects and the `PipelineConfig`
+    class, but we'll just fudge it here for the sake of the example. Note we haven't added an output dir yet
+    -- that will be a temporary directory we'll create just before we run the stage.
 
         >>> cfg = DictConfig({
         ...     "worker": 0,
@@ -207,13 +203,13 @@ def map_stage(
         ...     }
         ... })
 
-        We'll also need a mapping function that will be applied to each shard. For this example, we'll just
-        count the number of occurrences of each code:
+    We'll also need a mapping function that will be applied to each shard. For this example, we'll just count
+    the number of occurrences of each code:
 
         >>> def count_codes(df: pl.LazyFrame) -> pl.LazyFrame:
         ...     return df.group_by("code", maintain_order=True).agg(pl.len().alias("count"))
 
-        Now we can run the mapping stage:
+    Now we can run the mapping stage:
 
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     profile_map_stage(tmpdir, map_fn=count_codes)
@@ -291,8 +287,8 @@ def map_stage(
         │ EYE_COLOR//BLUE    ┆ 1     │
         └────────────────────┴───────┘
 
-        If we set `train_only` to `True`, we can see that the held-out and tuning splits are not included in
-        the output:
+    If we set `train_only` to `True`, we can see that the held-out and tuning splits are not included in the
+    output:
 
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     cfg.stage_cfg.train_only = True
@@ -338,10 +334,10 @@ def map_stage(
         │ EYE_COLOR//BLUE    ┆ 1     │
         └────────────────────┴───────┘
 
-        Note that, here, the held-out and tuning shards outright are not included in the output, as files or
-        otherwise -- this is because the `shard_iterator` function can tell by the prefix that this dataset is
-        sharded by split. What if that weren't the case? To show that, we need to copy our MEDS dataset to a
-        form not sharded by split. We'll use a simple helper to do that.
+    Note that, here, the held-out and tuning shards outright are not included in the output, as files or
+    otherwise -- this is because the `shard_iterator` function can tell by the prefix that this dataset is
+    sharded by split. What if that weren't the case? To show that, we need to copy our MEDS dataset to a form
+    not sharded by split. We'll use a simple helper to do that.
 
         >>> import shutil
         >>> def copy_MEDS_without_split_sharding(output_dir: Path):
@@ -416,10 +412,9 @@ def map_stage(
         │ EYE_COLOR//BLUE    ┆ 1     │
         └────────────────────┴───────┘
 
-        We can see that it keeps the files in this case (as it doesn't know they are only non-train files) but
-        they are empty, as the non-train subjects have been removed. This is because the subject-split data is
-        stored in the `metadata/subject_splits.parquet` file. If we remove this file as well, we'd get an
-        error:
+    We can see that it keeps the files in this case (as it doesn't know they are only non-train files) but
+    they are empty, as the non-train subjects have been removed. This is because the subject-split data is
+    stored in the `metadata/subject_splits.parquet` file. If we remove this file as well, we'd get an error:
 
         >>> with tempfile.TemporaryDirectory() as MEDS_dir, tempfile.TemporaryDirectory() as out_dir:
         ...     copy_MEDS_without_split_sharding(Path(MEDS_dir))
@@ -434,11 +429,10 @@ def map_stage(
         FileNotFoundError: Train split requested, but shard prefixes can't be used and subject split file not
         found at /.../metadata/subject_splits.parquet.
 
-
-        The examples so far have used the default shard iterator. You can read more about this in the
-        `shard_iteration.py` file and its documentation, but we can also pass in our own shard iterators here,
-        to show some more edge cases. For example, if we don't request train only, but the shard iterator
-        asserts it is only returning train samples, that will cause an error:
+    The examples so far have used the default shard iterator. You can read more about this in the
+    `shard_iteration.py` file and its documentation, but we can also pass in our own shard iterators here, to
+    show some more edge cases. For example, if we don't request train only, but the shard iterator asserts it
+    is only returning train samples, that will cause an error:
 
         >>> def bad_shard_iterator(cfg: DictConfig) -> tuple[list[tuple[Path, Path]], bool]:
         ...     out_fps = []
@@ -568,17 +562,14 @@ def mapreduce_stage(
             pseudo-random, worker-dependent manner.
 
     Examples:
-
-        We'll show an example of this function using the `simple_static_MEDS` dataset provided as a pytest
-        fixture and loaded in this doctest via our `conftest.py` file in the
-        [`meds_testing_helpers`](https://github.com/Medical-Event-Data-Standard/meds_testing_helpers) package.
-
-        To see this data, let's inspect it:
-
         >>> from meds_testing_helpers.dataset import MEDSDataset
         >>> D = MEDSDataset(root_dir=simple_static_MEDS)
 
-        We can see how it is arranged on disk (which is merely the typical MEDS fashion):
+    We'll show an example of this function using the `simple_static_MEDS` dataset provided as a pytest fixture
+    and loaded in this doctest via our `conftest.py` file in the
+    [`meds_testing_helpers`](https://github.com/Medical-Event-Data-Standard/meds_testing_helpers) package.
+
+    To see this data, let's inspect it, first on disk (which is merely the typical MEDS fashion):
 
         >>> print_directory_contents(simple_static_MEDS)
         ├── data
@@ -594,7 +585,7 @@ def mapreduce_stage(
             ├── dataset.json
             └── subject_splits.parquet
 
-        And inspect its contents directly:
+    As well as its actual contents:
 
         >>> for k, df in D._pl_shards.items():
         ...     print(f"{k}:")
@@ -686,7 +677,7 @@ def mapreduce_stage(
         │ 1500733    ┆ held_out │
         └────────────┴──────────┘
 
-        For mapreduce stages, the input code metadata is also relevant:
+    For mapreduce stages, the input code metadata is also relevant:
 
         >>> D._pl_code_metadata
         shape: (5, 3)
@@ -702,7 +693,7 @@ def mapreduce_stage(
         │ TEMP             ┆ Body Temperature                ┆ ["LOINC/8310-5"] │
         └──────────────────┴─────────────────────────────────┴──────────────────┘
 
-        We'll also make a simple helper too to print the output for us
+    We'll also make a simple helper too to print the output for us
 
         >>> def profile_mapreduce_stage(test_dir: str, worker: int | None = None, **kwargs):
         ...     '''Makes a test config, adds the output directory, runs the mapping stage, & shows outputs'''
@@ -726,11 +717,10 @@ def mapreduce_stage(
         ...     else:
         ...         print("No reduced output found.")
 
-        To mapreduce over this data, we need a configuration file that will point our data input dir to this
-        dataset. Normally, the stage configuration is handled automatically by the Stage objects and the
-        `PipelineConfig` class, but we'll just fudge it here for the sake of the example. Note we haven't
-        added an output dir yet -- that will be a temporary directory we'll create just before we run the
-        stage.
+    To mapreduce over this data, we need a configuration file that will point our data input dir to this
+    dataset. Normally, the stage configuration is handled automatically by the Stage objects and the
+    `PipelineConfig` class, but we'll just fudge it here for the sake of the example. Note we haven't added an
+    output dir yet -- that will be a temporary directory we'll create just before we run the stage.
 
         >>> cfg = DictConfig({
         ...     "worker": 0,
@@ -745,18 +735,18 @@ def mapreduce_stage(
         ...     }
         ... })
 
-        We'll also need a mapping function that will be applied to each shard. For this example, we'll just
-        count the number of occurrences of each code:
+    We'll also need a mapping function that will be applied to each shard. For this example, we'll just count
+    the number of occurrences of each code:
 
         >>> def count_codes(df: pl.LazyFrame) -> pl.LazyFrame:
         ...     return df.group_by("code", maintain_order=True).agg(pl.len().alias("count"))
 
-        For our reducer function, we'll just sum the counts of each code across all shards:
+    For our reducer function, we'll just sum the counts of each code across all shards:
 
         >>> def sum_counts(*dfs: pl.LazyFrame) -> pl.LazyFrame:
         ...     return pl.concat(dfs).group_by("code", maintain_order=True).agg(pl.sum("count"))
 
-        Now we can run the mapreduce stage:
+    Now we can run the mapreduce stage:
 
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     profile_mapreduce_stage(tmpdir, map_fn=count_codes, reduce_fn=sum_counts)
@@ -792,9 +782,9 @@ def mapreduce_stage(
         │ EYE_COLOR//BLUE       ┆ 1     ┆ Blue Eyes. Less common than br… ┆ null             │
         └───────────────────────┴───────┴─────────────────────────────────┴──────────────────┘
 
-        If we set `train_only` to `True`, we can see that the held-out and tuning splits are not included in
-        the output. This is generally desired for stages aggregating over codes, as you don't want to include
-        held out data in your normalization computation
+    If we set `train_only` to `True`, we can see that the held-out and tuning splits are not included in the
+    output. This is generally desired for stages aggregating over codes, as you don't want to include held out
+    data in your normalization computation
 
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     cfg.stage_cfg.train_only = True
@@ -828,9 +818,10 @@ def mapreduce_stage(
         │ EYE_COLOR//BLUE       ┆ 1     ┆ Blue Eyes. Less common than br… ┆ null             │
         └───────────────────────┴───────┴─────────────────────────────────┴──────────────────┘
 
-        Lastly, note that mapreduce is special in that the reduction happens only in one worker -- so if the
-        config has `worker` set to anything other than 0, it will exit after the mapping stage, and the
-        reduction won't be completed:
+    Lastly, note that mapreduce is special in that the reduction happens only in one worker -- so if the
+    config has `worker` set to anything other than 0, it will exit after the mapping stage, and the reduction
+    won't be completed:
+
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     profile_mapreduce_stage(tmpdir, worker=1, map_fn=count_codes, reduce_fn=sum_counts)
         Data output directory:

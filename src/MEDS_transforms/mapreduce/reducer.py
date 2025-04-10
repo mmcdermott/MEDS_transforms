@@ -47,10 +47,6 @@ def reduce_over(
         FileExistsError: If the output file already exists.
 
     Examples:
-
-        As there is a lot of set-up in this function, we'll start by making some shared arguments and
-        functions.
-
         >>> def reduce_fn(*dfs: pl.DataFrame) -> pl.DataFrame:
         ...     return pl.concat(dfs, how="vertical")
         >>> kwargs = {
@@ -82,7 +78,7 @@ def reduce_over(
         │ 3   ┆ 5   │
         └─────┴─────┘
 
-        If specified, the reducer will merge with the `merge_fp` via the specialized function
+    If specified, the reducer will merge with the `merge_fp` via the specialized function
 
         >>> merge_df = pl.DataFrame({"a": [-1, -2], "b": [-3, -4]})
         >>> def merge_fn(new: pl.DataFrame, old: pl.DataFrame) -> pl.DataFrame:
@@ -112,7 +108,7 @@ def reduce_over(
         └─────┴─────┘
 
 
-        The reducer will wait for all the input files to exist before performing the computation:
+    The reducer will wait for all the input files to exist before performing the computation:
 
         >>> import threading
         >>> def profile_reduce(dfs: list[pl.DataFrame], in_fps: list[Path], delay_per: float, out_fp: Path):
@@ -169,7 +165,7 @@ def reduce_over(
         │ 3   ┆ 5   │
         └─────┴─────┘
 
-        The reducer will error if the output file already exists, unless `do_overwrite` is set to `True`:
+    The reducer will error if the output file already exists, unless `do_overwrite` is set to `True`:
 
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     in_fps = [Path(tmpdir) / f"input_{i}.parquet" for i in range(3)]

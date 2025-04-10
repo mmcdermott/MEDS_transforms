@@ -5,18 +5,12 @@ This module contains two key concepts: column expressions and matchers.
 Matchers are used to specify conditionals over dataframes. They are expressed simply as dictionaries mapping
 column names to values. Exact equality is used to match the column values.
 
-Column expressions currently support the following types:
-  - COL (`'col'`): A column expression that extracts a specified column.
-  - STR (`'str'`): A column expression that is a string, with interpolation allowed to other column names via
-    python's f-string syntax.
-  - LITERAL (`'literal'`): A column expression that is a literal value regardless of type. No interpolation is
-    allowed here.
-
-Column expressions can be expressed either dictionary or via a shorthand string. If a structured dictionary,
-the dictionary has length 1 and the key is one of the column expression types and the value is the expression
-target (e.g., the column to load for `COL`, the string to interpolate with `{...}` escaped interpolation
-targets for `STR`, or the literal value for `LITERAL`). If a string, the string is interpreted as a `COL` if
-it has no interpolation targets, and as a `STR` otherwise.
+Column expressions currently support the types defined in the `ColExprType` enum. Column expressions can be
+expressed either dictionary or via a shorthand string. If a structured dictionary, the dictionary has length 1
+and the key is one of the column expression types and the value is the expression target (e.g., the column to
+load for `COL`, the string to interpolate with `{...}` escaped interpolation targets for `STR`, or the literal
+value for `LITERAL`). If a string, the string is interpreted as a `COL` if it has no interpolation targets,
+and as a `STR` otherwise.
 
 These types can be combined or filtered via two modes:
   - Coalescing: Multiple column expressions can be combined into a single expression where the first non-null
@@ -138,13 +132,14 @@ STR_INTERPOLATION_REGEX = r"\{([^}]+)\}"
 class ColExprType(StrEnum):
     """Enumeration of the different types of column expressions that can be parsed.
 
-    Members:
-        COL: A column expression that extracts a specified column.
-        STR: A column expression that is a string, with interpolation allowed to other column names
+    Attributes:
+        COL ("col"): A column expression that extracts a specified column.
+        STR ("str"): A column expression that is a string, with interpolation allowed to other column names
             via python's f-string syntax.
-        LITERAL: A column expression that is a literal value regardless of type. No interpolation is allowed
-            here.
-        EXTRACT: A column expression that extracts a substring from a column using a regex pattern.
+        LITERAL ("literal"): A column expression that is a literal value regardless of type. No interpolation
+            is allowed here.
+        EXTRACT ("extract"): A column expression that extracts a substring from a column using a regex
+            pattern.
     """
 
     COL = "col"
@@ -153,7 +148,7 @@ class ColExprType(StrEnum):
     EXTRACT = "extract"
 
     @classmethod
-    def _is_valid_extract_cfg(cls, cfg: dict[Any, Any]) -> tuple[bool, str | None]:
+    def _is_valid_extract_cfg(cls, cfg: dict) -> tuple[bool, str | None]:
         """Checks if a dictionary is a valid extract configuration.
 
         Args:
@@ -161,8 +156,8 @@ class ColExprType(StrEnum):
                 expression."
 
         Returns:
-            bool: True if the input is a valid extract configuration, False otherwise.
-            str | None: The reason the input is invalid, if it is invalid.
+            `True` if the input is a valid extract configuration, `False` otherwise.
+            The reason the input is invalid, if it is invalid.
 
         Examples:
             >>> ColExprType._is_valid_extract_cfg({"from": "foo", "regex": "bar"})
