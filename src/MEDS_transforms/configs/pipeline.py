@@ -90,7 +90,6 @@ class PipelineConfig:
         ValueError: If the pipeline configuration is invalid or if there are duplicate stage names.
 
     Examples:
-
         >>> PipelineConfig()
         PipelineConfig(stages=None, additional_params={})
         >>> stages = [{"stage1": {"param1": 1}}, "stage2"]
@@ -491,7 +490,6 @@ class PipelineConfig:
             StageNotFoundError: If the stage name is not a registered stage.
 
         Examples:
-
             >>> PipelineConfig(stages=["occlude_outliers"])._resolve_stage_name("occlude_outliers")
             'occlude_outliers'
             >>> PipelineConfig(stages=["occlude_outliers"])._resolve_stage_name("foobar")
@@ -504,7 +502,7 @@ class PipelineConfig:
             MEDS_transforms.stages.discovery.StageNotFoundError: Stage 'foobar' not
                 registered! Registered stages: ...
 
-            Stage names can be resolved to a base stage name, if specified in the stage configs:
+        Stage names can be resolved to a base stage name, if specified in the stage configs:
 
             >>> cfg = PipelineConfig(stages=[{"count_codes": {"_base_stage": "aggregate_code_metadata"}}])
             >>> cfg._resolve_stage_name("count_codes")

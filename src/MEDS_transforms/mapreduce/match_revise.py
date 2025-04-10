@@ -1,4 +1,9 @@
-"""Match-revise stage utilities."""
+"""This module contains utilities to run stages in "Match-revise" mode.
+
+Match-revise mode allows one to dynamically select a set of filters and different configuration parameters
+such that a given stage will run with the corresponding parameters on each of the sets of data in the input
+dataframe that matches the given filter.
+"""
 
 import logging
 from enum import StrEnum, auto

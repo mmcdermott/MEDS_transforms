@@ -3,6 +3,8 @@
 configuration objects or stage configuration objects.
 """
 
+from __future__ import annotations
+
 import inspect
 from collections.abc import Callable
 from enum import Enum, auto
@@ -44,33 +46,34 @@ class ComputeFnType(Enum):
     UNBOUND = auto()
     FUNCTOR = auto()
 
-    # A type specifier is omitted here because including future __annotations__ changes the returned
-    # annotation types
     @classmethod
-    def from_fn(cls, compute_fn: ANY_COMPUTE_FN_T):
+    def from_fn(cls, compute_fn: ANY_COMPUTE_FN_T) -> ComputeFnType | None:
         """Returns the type of a compute function or None if invalid.
 
-        Returns the type of the compute function:
-          - ComputeFnType.DIRECT if the compute function is a direct compute function -- i.e., if it takes
-            only a single parameter named ``"df"`` and if the return annotation (if one exists) is not a
-            `collections.abc.Callable` type annotation.
-          - ComputeFnType.UNBOUND if the compute function is an unbound compute function -- i.e., if it takes
-            a ``"df"`` parameter and at least one other parameter among the set of allowed additional or
-            functor parameters, and if the return annotation (if one exists) is not a
-            `collections.abc.Callable` type annotation.
-          - ComputeFnType.FUNCTOR if the compute function is a functor that returns a direct compute function
-            when called with the appropriate parameters -- i.e., if it takes no ``"df"`` parameter, if all
-            parameters are among the allowed functor parameters, and if the return annotation (if one exists)
-            is a `collections.abc.Callable` type annotation.
+        Behavior:
+          - Returns `ComputeFnType.DIRECT` if the compute function is a direct compute function -- i.e., if it
+            takes only a single parameter named `df` or `dfs` and if the return annotation (if one exists) is
+            not a `Callable` type annotation.
+          - Returns `ComputeFnType.UNBOUND` if the compute function is an unbound compute function -- i.e., if
+            it takes a `df` or `dfs` parameter and at least one other parameter among the set of allowed
+            additional or functor parameters, and if the return annotation (if one exists) is not a `Callable`
+            type annotation.
+          - Returns `ComputeFnType.FUNCTOR` if the compute function is a functor that returns a direct compute
+            function when called with the appropriate parameters -- i.e., if it takes no `df` parameter, if
+            all parameters are among the allowed functor parameters, and if the return annotation (if one
+            exists) is a `Callable` type annotation.
 
         Allowed functor parameters are:
-          - "cfg" for the DictConfig configuration object.
-          - "stage_cfg" for the DictConfig stage configuration object.
-          - "code_modifiers" for a list of code modifier columns.
-          - "code_metadata" for a Polars DataFrame of code metadata
+          - `cfg` for the DictConfig configuration object.
+          - `stage_cfg` for the DictConfig stage configuration object.
+          - `code_modifiers` for a list of code modifier columns.
+          - `code_metadata` for a Polars DataFrame of code metadata
 
         Args:
             compute_fn: The compute function to check.
+
+        Returns:
+            The type of the compute function or `None` if invalid.
 
         Examples:
             >>> def compute_fn(df: pl.DataFrame) -> pl.DataFrame: return df
@@ -86,14 +89,14 @@ class ComputeFnType(Enum):
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.DIRECT: 1>
             >>> def compute_fn(foo: pl.DataFrame): return None
-            >>> ComputeFnType.from_fn(compute_fn) is None
-            True
+            >>> print(ComputeFnType.from_fn(compute_fn))
+            None
             >>> def compute_fn(df: pl.DataFrame, cfg: DictConfig) -> pl.DataFrame: return df
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.UNBOUND: 2>
             >>> def compute_fn(df: pl.DataFrame, foo: DictConfig) -> pl.DataFrame: return df
-            >>> ComputeFnType.from_fn(compute_fn) is None
-            True
+            >>> print(ComputeFnType.from_fn(compute_fn))
+            None
             >>> def compute_fn(df: pl.LazyFrame, cfg: DictConfig): return df
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.UNBOUND: 2>
@@ -118,8 +121,22 @@ class ComputeFnType(Enum):
 
         has_df_param = ("df" in sig.parameters) or ("dfs" in sig.parameters)
         has_only_df_param = has_df_param and (len(sig.parameters) == 1)
-        has_return_annotation = sig.return_annotation.__name__ != "_empty"
-        has_callable_return = sig.return_annotation.__name__ == "Callable"
+
+        return_annotation = sig.return_annotation
+
+        if return_annotation is inspect.Signature.empty:
+            has_return_annotation = False
+            has_callable_return = False
+        elif isinstance(return_annotation, str):
+            has_return_annotation = True
+            has_callable_return = return_annotation.startswith("Callable[")
+        elif hasattr(return_annotation, "__name__"):
+            has_return_annotation = return_annotation.__name__ != "_empty"
+            has_callable_return = return_annotation.__name__.startswith("Callable")
+        else:  # pragma: no cover
+            raise ValueError(
+                f"Cannot parse return annotation type for {compute_fn.__name__}: {return_annotation}"
+            )
 
         if has_only_df_param:
             if has_return_annotation:
@@ -133,6 +150,8 @@ class ComputeFnType(Enum):
             if has_return_annotation:
                 return cls.FUNCTOR if has_callable_return else None
             return cls.FUNCTOR
+
+        print(sig.return_annotation)
 
 
 def identity_fn(df: Any) -> Any:

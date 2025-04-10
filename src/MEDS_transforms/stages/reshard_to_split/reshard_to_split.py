@@ -14,7 +14,8 @@ import polars as pl
 from meds import subject_id_field, subject_splits_filepath, time_field
 from omegaconf import DictConfig
 
-from ...mapreduce import rwlock_wrap, shard_iterator, shuffle_shards
+from ...mapreduce.rwlock import rwlock_wrap
+from ...mapreduce.shard_iteration import shard_iterator, shuffle_shards
 from ...utils import write_lazyframe
 from .. import Stage
 

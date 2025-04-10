@@ -31,15 +31,12 @@ def OmegaConfResolver(*args, **kwargs) -> Callable:
         TypeError: If the arguments are not valid for the OmegaConfResolver decorator.
 
     Examples:
-
-        This can be used as a simple decorator:
-
         >>> @OmegaConfResolver
         ... def my_resolver(x: int) -> str:
         ...     return str(x)
 
-        After decorating, the function is registered as an OmegaConf resolver via its name, and can be used as
-        a resolver in OmegaConf, but remains unchanged in the python scope.
+    After decorating, the function is registered as an OmegaConf resolver via its name, and can be used as a
+    resolver in OmegaConf, but remains unchanged in the python scope.
 
         >>> OmegaConf.has_resolver("my_resolver")
         True
@@ -49,7 +46,7 @@ def OmegaConfResolver(*args, **kwargs) -> Callable:
         >>> my_resolver(42) # The function is unchanged
         '42'
 
-        This can also be used as a parametrized decorator:
+    This can also be used as a parametrized decorator:
 
         >>> @OmegaConfResolver(name="my_resolver2")
         ... def my_resolver(x: int) -> str:
@@ -62,7 +59,7 @@ def OmegaConfResolver(*args, **kwargs) -> Callable:
         >>> my_resolver(8) # The function is unchanged
         '64'
 
-        Errors are raised if the arguments are not valid:
+    Errors are raised if the arguments are not valid:
 
         >>> OmegaConfResolver("foo")
         Traceback (most recent call last):

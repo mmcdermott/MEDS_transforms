@@ -28,7 +28,6 @@ class StageConfig:
         ValueError: If the base stage name is empty.
 
     Examples:
-
         >>> StageConfig(name="stage_name")
         StageConfig(name='stage_name', base_stage=None, config={})
         >>> StageConfig(name="stage_name", base_stage="base_stage", config={"param1": 1})

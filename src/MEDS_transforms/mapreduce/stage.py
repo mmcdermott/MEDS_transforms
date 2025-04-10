@@ -492,9 +492,9 @@ def map_stage(
 
     all_out_fps = map_over(
         shards=shards,
+        map_fn=map_fn,
         read_fn=read_fn,
         write_fn=write_fn,
-        map_fn=map_fn,
         do_overwrite=cfg.do_overwrite,
     )
     logger.info(f"Finished mapping in {datetime.now() - start}")
