@@ -129,7 +129,8 @@ def quantile_reducer(cols: cs._selector_proxy_, quantiles: list[float]) -> pl.Ex
         ╞══════════════════╡
         │ {1.0,3.0,30.0}   │
         └──────────────────┘
-        >>> df.select("key", expr.over("key"))
+        >>> quantiles_df = df.select("key", expr.over("key"))
+        >>> quantiles_df
         shape: (2, 2)
         ┌─────┬──────────────────┐
         │ key ┆ values/quantiles │
@@ -139,14 +140,24 @@ def quantile_reducer(cols: cs._selector_proxy_, quantiles: list[float]) -> pl.Ex
         │ 1   ┆ {1.0,3.0,4.0}    │
         │ 2   ┆ {3.0,30.0,30.0}  │
         └─────┴──────────────────┘
+
+        The keys are given by the syntax: "values/quantile/{quantile}", where {quantile} is the quantile value
+
+        >>> quantiles_df.unnest("values/quantiles")
+        shape: (2, 4)
+        ┌─────┬──────────────────────┬─────────────────────┬──────────────────────┐
+        │ key ┆ values/quantile/0.01 ┆ values/quantile/0.5 ┆ values/quantile/0.75 │
+        │ --- ┆ ---                  ┆ ---                 ┆ ---                  │
+        │ i64 ┆ f64                  ┆ f64                 ┆ f64                  │
+        ╞═════╪══════════════════════╪═════════════════════╪══════════════════════╡
+        │ 1   ┆ 1.0                  ┆ 3.0                 ┆ 4.0                  │
+        │ 2   ┆ 3.0                  ┆ 30.0                ┆ 30.0                 │
+        └─────┴──────────────────────┴─────────────────────┴──────────────────────┘
     """
 
     vals = pl.concat_list(cols.fill_null([])).explode()
 
-    quantile_cols = [f"values/quantile/{q}" for q in quantiles]
-    quantiles_struct = {
-        col: vals.quantile(q).alias(col) for col, q in zip(quantile_cols, quantiles, strict=False)
-    }
+    quantiles_struct = {f"values/quantile/{q}": vals.quantile(q) for q in quantiles}
 
     return pl.struct(**quantiles_struct).alias(MetadataFn.VALUES_QUANTILES)
 

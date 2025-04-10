@@ -470,13 +470,13 @@ def pipeline_tester(
         last_data_stage = (None, None)
         last_metadata_stage = (None, None)
 
-        for name, stage in zip(pipeline_stages, stage_examples, strict=False):
+        for name, stage in zip(pipeline_stages, stage_examples, strict=True):
             if stage.want_data is not None:
                 last_data_stage = (name, stage)
             if stage.want_metadata is not None:
                 last_metadata_stage = (name, stage)
 
-        for name, stage in zip(pipeline_stages, stage_examples, strict=False):
+        for name, stage in zip(pipeline_stages, stage_examples, strict=True):
             is_last_data_stage = last_data_stage[0] == name
             is_last_metadata_stage = last_metadata_stage[0] == name
 
