@@ -16,7 +16,6 @@ from .stages import StageExample, get_all_registered_stages
 logger = logging.getLogger(__name__)
 
 # Get all registered stages
-REGISTERED_STAGES = get_all_registered_stages()
 
 
 @contextmanager
@@ -58,7 +57,100 @@ def pytest_addoption(parser):  # pragma: no cover
 
 
 def pytest_configure(config: pytest.Config):
-    """Configure pytest by attaching the appropriate package to use to the config object."""
+    """Configure pytest by attaching the appropriate package to use to the config object.
+
+    This adds the following attributes to the config object:
+        - `allowed_stages`: A dictionary of the registered stages that are allowed to be run.
+        - `allowed_stage_scenarios`: A dictionary of the registered stages and their scenarios that are
+          set-up for automated testing.
+
+    It does so based on the command line options passed to pytest (to determine the packages and stages to set
+    up for testing). If no command line stages are passed, all stages in the allowed packages will be
+    included. If no command line packages are passed, all stages in the current package will be included, if
+    the current package can be auto-detected; otherwise all packages _except_ for the base MEDS-Transforms
+    package will be tested (as this is only likely to happen in downstream derived packages, and you don't
+    want to re-test all the base stages in such a case).
+
+    This function also checks for any invalid stages specified on the command line and raises an error if
+    any are found.
+
+    Args:
+        config: The pytest config object. It will be modified by having the above attributes added to it.
+
+    Raises:
+        ValueError: If any invalid stages are specified on the command line.
+
+    Examples:
+
+        Let's set up some fake registered stages to use in this test.
+
+        >>> mock_stages = {
+        ...     "stage_1_1": MagicMock(), "stage_1_2": MagicMock(), "stage_2_1": MagicMock(),
+        ...     "stage_meds_transforms": MagicMock()
+        ... }
+        >>> mock_stages["stage_1_1"].dist.metadata.__getitem__.return_value = "package1"
+        >>> mock_stages["stage_1_2"].dist.metadata.__getitem__.return_value = "package1"
+        >>> mock_stages["stage_2_1"].dist.metadata.__getitem__.return_value = "package2"
+        >>> mock_stages["stage_meds_transforms"].dist.metadata.__getitem__.return_value = __package_name__
+        >>> mock_stages["stage_1_1"].load.return_value.test_cases = ["test_case1", "test_case2"]
+        >>> mock_stages["stage_1_2"].load.return_value.test_cases = ["test_case3", "test_case4"]
+        >>> mock_stages["stage_2_1"].load.return_value.test_cases = ["test_case5", "test_case6"]
+        >>> mock_stages["stage_meds_transforms"].load.return_value.test_cases = ["test_case7", "test_case8"]
+
+        Let's also set up a fake config with CLI options
+
+        >>> CLI_options = {
+        ...     "test_stages_for_package": ["package1", "package2"],
+        ...     "test_stage": ["stage_1_1", "stage_2_1"]
+        ... }
+        >>> config = MagicMock()
+        >>> config.getoption.side_effect = lambda x: CLI_options.get(x, [])
+
+        Now, if we call the function with the fake config and stages, we should get the expected output. This
+        simulates reading the command line options and setting up the config object.
+
+        >>> with patch("MEDS_transforms.pytest_plugin.get_all_registered_stages", return_value=mock_stages):
+        ...     pytest_configure(config)
+        >>> list(config.allowed_stages.keys())
+        ['stage_1_1', 'stage_2_1']
+        >>> config.allowed_stage_scenarios
+        {'stage_1_1': ['test_case1', 'test_case2'], 'stage_2_1': ['test_case5', 'test_case6']}
+
+        What if we change the config options?
+
+        >>> CLI_options["test_stages_for_package"] = ["package1"]
+        >>> CLI_options["test_stage"] = []
+        >>> with patch("MEDS_transforms.pytest_plugin.get_all_registered_stages", return_value=mock_stages):
+        ...     pytest_configure(config)
+        >>> list(config.allowed_stages.keys())
+        ['stage_1_1', 'stage_1_2']
+        >>> config.allowed_stage_scenarios
+        {'stage_1_1': ['test_case1', 'test_case2'], 'stage_1_2': ['test_case3', 'test_case4']}
+
+        What if we request a stage not in the package?
+
+        >>> CLI_options["test_stage"] = ["stage_1_1", "stage_2_1", "invalid_stage"]
+        >>> with patch("MEDS_transforms.pytest_plugin.get_all_registered_stages", return_value=mock_stages):
+        ...     pytest_configure(config)
+        Traceback (most recent call last):
+            ...
+        ValueError: Invalid stage(s) specified for ['package1']: invalid_stage, stage_2_1.
+
+        If we don't pass any CLI options, then it should try to auto detect the package. But, if that doesn't
+        work (which we'll simulate here), it should test everything except MEDS-Transforms.
+
+        >>> CLI_options["test_stages_for_package"] = []
+        >>> CLI_options["test_stage"] = []
+        >>> with patch("MEDS_transforms.pytest_plugin.get_all_registered_stages", return_value=mock_stages):
+        ...    with patch("MEDS_transforms.pytest_plugin._auto_detect_package", return_value=None):
+        ...        pytest_configure(config)
+        >>> list(config.allowed_stages.keys())
+        ['stage_1_1', 'stage_1_2', 'stage_2_1']
+        >>> config.allowed_stage_scenarios
+        {'stage_1_1': ['test_case1', 'test_case2'],
+         'stage_1_2': ['test_case3', 'test_case4'],
+         'stage_2_1': ['test_case5', 'test_case6']}
+    """
 
     if cli_packages := config.getoption("test_stages_for_package"):
         packages_to_test = cli_packages
@@ -69,8 +161,10 @@ def pytest_configure(config: pytest.Config):
 
     stages = config.getoption("test_stage")
 
+    registered_stages = get_all_registered_stages()
+
     allowed_stages = {}
-    for n, ep in REGISTERED_STAGES.items():
+    for n, ep in registered_stages.items():
         pkg = ep.dist.metadata["Name"]
 
         no_packages_specified = len(packages_to_test) == 0
@@ -84,10 +178,7 @@ def pytest_configure(config: pytest.Config):
     missing_stages = sorted(list(set(stages) - set(allowed_stages.keys())))
 
     if missing_stages:
-        raise ValueError(
-            f"Invalid stage(s) specified: {', '.join(missing_stages)}. "
-            f"Available stages given specified package ({packages_to_test}) are: {', '.join(allowed_stages)}."
-        )
+        raise ValueError(f"Invalid stage(s) specified for {packages_to_test}: {', '.join(missing_stages)}.")
 
     config.allowed_stages = allowed_stages
     with suppress_logging():
@@ -285,6 +376,8 @@ def pipeline_tester(
             "stage scenarios were provided."
         )
 
+    registered_stages = get_all_registered_stages()
+
     stage_examples = []
     for stage_scenario in stage_scenario_sequence:
         parts = stage_scenario.split("/")
@@ -295,7 +388,7 @@ def pipeline_tester(
             scenario_name = "."
 
         try:
-            stage_examples.append(REGISTERED_STAGES[stage_name].load().test_cases[scenario_name])
+            stage_examples.append(registered_stages[stage_name].load().test_cases[scenario_name])
         except Exception as e:
             raise ValueError(f"Error loading stage example for {stage_name}/{scenario_name}") from e
 
