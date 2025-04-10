@@ -5,9 +5,6 @@ site_author: Matthew McDermott
 
 nav:
   - Home: index.md
-  - "Pipeline Configuration": pipeline_configuration.md
-  - "Pre-processing Operations": preprocessing_operation_prototypes.md
-  - "Terminology": terminology.md
   - API: api/
   - Issues: https://github.com/mmcdermott/MEDS_transforms/issues
 
