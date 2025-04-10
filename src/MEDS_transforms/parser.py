@@ -59,12 +59,12 @@ def is_matcher(matcher_cfg: dict[str, Any]) -> tuple[bool, str | None]:
         >>> is_matcher({})
         (True, None)
     """
-    if not isinstance(matcher_cfg, (dict, DictConfig)):
+    if not isinstance(matcher_cfg, dict | DictConfig):
         return False, f"Matcher configuration must be a dictionary. Got {matcher_cfg}"
     if not all(isinstance(k, str) for k in matcher_cfg):
         return False, f"Matcher configuration must be a dictionary with string keys. Got {matcher_cfg}"
     for k, cfg in matcher_cfg.items():
-        if isinstance(cfg, (dict, DictConfig)) and set(cfg.keys()) != {
+        if isinstance(cfg, dict | DictConfig) and set(cfg.keys()) != {
             "regex",
         }:
             return False, (
@@ -117,10 +117,7 @@ def matcher_to_expr(matcher_cfg: DictConfig | dict) -> tuple[pl.Expr, set[str]]:
 
     all_exprs = []
     for k, v in matcher_cfg.items():
-        if isinstance(v, (dict, DictConfig)):
-            expr = pl.col(k).str.contains(v["regex"])
-        else:
-            expr = pl.col(k) == v
+        expr = pl.col(k).str.contains(v["regex"]) if isinstance(v, dict | DictConfig) else pl.col(k) == v
         all_exprs.append(expr)
 
     return pl.all_horizontal(all_exprs), set(matcher_cfg.keys())
@@ -183,14 +180,14 @@ class ColExprType(StrEnum):
         MANDATORY_KEYS = {"from": str, "regex": str}
         ALLOWED_KEYS = {**MANDATORY_KEYS, "group_index": Annotated[int, "non-negative integer"]}
 
-        if not isinstance(cfg, (dict, DictConfig)):
+        if not isinstance(cfg, dict | DictConfig):
             return False, f"Extract expressions must be a dictionary. Got {cfg}"
         if not set(MANDATORY_KEYS).issubset(set(cfg.keys())):
             return False, f"Extract expressions must have a 'from' and 'regex' key. Got {list(cfg.keys())}"
         if not set(ALLOWED_KEYS).issuperset(set(cfg.keys())):
             return False, (
                 "Extract expressions must have only 'from', 'regex', and 'group_index' keys. "
-                f"Got {sorted(list(set(cfg.keys()) - set(ALLOWED_KEYS)))}"
+                f"Got {sorted(set(cfg.keys()) - set(ALLOWED_KEYS))}"
             )
 
         for key, allowed_T in ALLOWED_KEYS.items():
@@ -240,7 +237,7 @@ class ColExprType(StrEnum):
             (False, "Column expressions must be a dictionary. Got [('col', 'foo')]")
         """
 
-        if not isinstance(expr_dict, (dict, DictConfig)):
+        if not isinstance(expr_dict, dict | DictConfig):
             return False, f"Column expressions must be a dictionary. Got {expr_dict}"
         if len(expr_dict) != 1:
             return False, f"Column expressions can only contain a single key-value pair. Got {expr_dict}"
@@ -398,7 +395,7 @@ def parse_col_expr(cfg: str | list | dict[str, str] | ListConfig | DictConfig) -
             return {"str": cfg}
         case str():
             return {"col": cfg}
-        case list() | ListConfig() if all(isinstance(x, (str, dict, DictConfig)) for x in cfg):
+        case list() | ListConfig() if all(isinstance(x, str | dict | DictConfig) for x in cfg):
             return [parse_col_expr(x) for x in cfg]
         case list() | ListConfig():
             raise ValueError(
