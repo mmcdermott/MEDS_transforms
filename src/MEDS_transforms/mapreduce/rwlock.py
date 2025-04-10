@@ -1,7 +1,7 @@
 """Locking functions."""
 
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, UTC
 import logging
 from pathlib import Path
 
@@ -159,14 +159,14 @@ def rwlock_wrap(
         return False
 
     try:
-        st_time = datetime.now()
+        st_time = datetime.now(tz=UTC)
         logger.info(f"Reading input dataframe from {in_fp}")
         df = read_fn(in_fp)
         logger.info("Read dataset")
         df = compute_fn(df)
         logger.info(f"Writing final output to {out_fp}")
         write_fn(df, out_fp)
-        logger.info(f"Succeeded in {datetime.now() - st_time}")
+        logger.info(f"Succeeded in {datetime.now(tz=UTC) - st_time}")
         return True
     finally:
         lock.release()

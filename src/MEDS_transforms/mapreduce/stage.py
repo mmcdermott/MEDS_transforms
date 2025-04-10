@@ -1,6 +1,6 @@
 """Basic code for a mapreduce stage."""
 
-from datetime import datetime
+from datetime import datetime, UTC
 from functools import partial
 import logging
 from pathlib import Path
@@ -453,7 +453,7 @@ def map_stage(
         ValueError: All splits should be used, but shard iterator is returning only train splits?!?
     """
 
-    start = datetime.now()
+    start = datetime.now(tz=UTC)
 
     train_only = cfg.stage_cfg.get("train_only", False)
 
@@ -495,7 +495,7 @@ def map_stage(
         write_fn=write_fn,
         do_overwrite=cfg.do_overwrite,
     )
-    logger.info(f"Finished mapping in {datetime.now() - start}")
+    logger.info(f"Finished mapping in {datetime.now(tz=UTC) - start}")
     return all_out_fps
 
 
@@ -848,7 +848,7 @@ def mapreduce_stage(
         return
 
     logger.info("Starting reduction process")
-    start = datetime.now()
+    start = datetime.now(tz=UTC)
 
     merge_fp = Path(cfg.stage_cfg.metadata_input_dir) / "codes.parquet"
     reduce_stage_out_fp = Path(cfg.stage_cfg.reducer_output_dir) / "codes.parquet"
@@ -870,4 +870,4 @@ def mapreduce_stage(
         do_overwrite=cfg.do_overwrite,
         polling_time=cfg.polling_time,
     )
-    logger.info(f"Finished reduction in {datetime.now() - start}")
+    logger.info(f"Finished reduction in {datetime.now(tz=UTC) - start}")

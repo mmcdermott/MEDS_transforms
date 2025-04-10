@@ -358,7 +358,7 @@ class PipelineConfig:
         return cls(stages=stages, additional_params=as_dict_config)
 
     def __post_init__(self):
-        if self.stages is not None and not isinstance(self.stages, (list, ListConfig)):
+        if self.stages is not None and not isinstance(self.stages, list | ListConfig):
             raise TypeError(f"Invalid type for stages: {type(self.stages)}. Expected list or ListConfig.")
 
         try:
@@ -374,7 +374,7 @@ class PipelineConfig:
                 raise ValueError(f"Duplicate stage name found: {s.name}")
             duplicate_stages.add(s.name)
 
-        if not isinstance(self.additional_params, (DictConfig, dict)):
+        if not isinstance(self.additional_params, DictConfig | dict):
             raise TypeError(
                 f"Invalid type for additional_params: {type(self.additional_params)}. "
                 f"Expected dict or DictConfig."
@@ -435,10 +435,7 @@ class PipelineConfig:
         cohort_dir = Path("${cohort_dir}")
 
         for name, stage, config_overwrites in stage_objects:
-            if stage.default_config:
-                config = {**stage.default_config}
-            else:
-                config = {}
+            config = {**stage.default_config} if stage.default_config else {}
 
             if prior_data_stage is None:
                 config["data_input_dir"] = str(input_dir / "data")

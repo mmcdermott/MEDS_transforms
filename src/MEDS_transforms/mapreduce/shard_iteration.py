@@ -1,7 +1,7 @@
 """Basic utilities for parallelizable mapreduces on sharded MEDS datasets with caching and locking."""
 
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, UTC
 import hashlib
 import logging
 from pathlib import Path
@@ -55,7 +55,7 @@ def shuffle_shards(shards: list[str], cfg: DictConfig) -> list[str]:
         ValueError: Hash collision for shard train/0 with add_str 1!
     """
 
-    add_str = str(cfg["worker"]) if "worker" in cfg else str(datetime.now())
+    add_str = str(cfg["worker"]) if "worker" in cfg else str(datetime.now(tz=UTC))
 
     shard_keys = []
     for shard in shards:
