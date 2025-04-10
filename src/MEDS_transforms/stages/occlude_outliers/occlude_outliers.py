@@ -97,11 +97,7 @@ def occlude_outliers(
     code_metadata = code_metadata.lazy().select(cols_to_select)
 
     def occlude_outliers_fn(df: pl.LazyFrame) -> pl.LazyFrame:
-        f"""Filters out outlier numeric values from subject events.
-
-        In particular, this function filters the DataFrame to only include numeric values that are within
-        {stddev_cutoff} standard deviations of the mean for the corresponding (code, modifier) pair.
-        """
+        """Drops numeric values that are more than `stddev_cutoff` standard deviations from the mean."""
 
         val = pl.col("numeric_value")
         mean = pl.col("values/mean")
