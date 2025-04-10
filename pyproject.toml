@@ -70,7 +70,7 @@ markers = [
 ]
 
 [tool.coverage.report]
-exclude_also = ["logger\\.debug", "except ImportError:"]
+exclude_also = ["logger\\.debug", "except ImportError:", "if TYPE_CHECKING:"]
 
 [project.entry-points.pytest11]
 MEDS_transforms = "MEDS_transforms.pytest_plugin"
