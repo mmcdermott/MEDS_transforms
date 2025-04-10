@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+from importlib.resources import files
 import logging
 import os
-from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
@@ -47,9 +47,9 @@ def resolve_pkg_path(pkg_path: str) -> Path:
 
         Note that this _returns something likely wrong_ for multi-suffix or no-suffix files!
 
-        >>> resolve_pkg_path("pkg://MEDS_transforms.configs.pipeline") # likely should end in /pipeline
+        >>> resolve_pkg_path("pkg://MEDS_transforms.configs.pipeline")  # likely should end in /pipeline
         PosixPath('...MEDS_transforms/configs.pipeline')
-        >>> resolve_pkg_path("pkg://MEDS_transforms.configs.data.tar.gz") # likely should end in /data.tar.gz
+        >>> resolve_pkg_path("pkg://MEDS_transforms.configs.data.tar.gz")  # likely should end in /data.tar.gz
         PosixPath('...MEDS_transforms/configs/data/tar.gz')
 
         Errors occur if the package is not importable:
@@ -358,11 +358,11 @@ class PipelineConfig:
         return cls(stages=stages, additional_params=as_dict_config)
 
     def __post_init__(self):
-        if self.stages is not None and not isinstance(self.stages, (list, ListConfig)):
+        if self.stages is not None and not isinstance(self.stages, list | ListConfig):
             raise TypeError(f"Invalid type for stages: {type(self.stages)}. Expected list or ListConfig.")
 
         try:
-            self.parsed_stages
+            self.parsed_stages  # noqa: B018
         except Exception as e:
             raise ValueError(
                 "Failed to parse pipeline configuration. Please check the pipeline YAML file 'stages' key."
@@ -374,7 +374,7 @@ class PipelineConfig:
                 raise ValueError(f"Duplicate stage name found: {s.name}")
             duplicate_stages.add(s.name)
 
-        if not isinstance(self.additional_params, (DictConfig, dict)):
+        if not isinstance(self.additional_params, DictConfig | dict):
             raise TypeError(
                 f"Invalid type for additional_params: {type(self.additional_params)}. "
                 f"Expected dict or DictConfig."
@@ -435,10 +435,7 @@ class PipelineConfig:
         cohort_dir = Path("${cohort_dir}")
 
         for name, stage, config_overwrites in stage_objects:
-            if stage.default_config:
-                config = {**stage.default_config}
-            else:
-                config = {}
+            config = {**stage.default_config} if stage.default_config else {}
 
             if prior_data_stage is None:
                 config["data_input_dir"] = str(input_dir / "data")

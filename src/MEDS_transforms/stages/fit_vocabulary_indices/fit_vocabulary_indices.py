@@ -1,19 +1,19 @@
 """Simple helper functions to define a consistent code vocabulary for normalizing a MEDS dataset."""
 
-import logging
 from collections.abc import Callable
 from enum import StrEnum
+import logging
 from pathlib import Path
 
-import polars as pl
 from omegaconf import DictConfig, OmegaConf
+import polars as pl
 
 from .. import Stage
 
 logger = logging.getLogger(__name__)
 
 
-class VOCABULARY_ORDERING(StrEnum):
+class VocabularyOrdering(StrEnum):
     """Enumeration of different ways a vocabulary order can be selected.
 
     These are stored as a `StrEnum` so that they can be easily specified by the user in a configuration file
@@ -46,27 +46,33 @@ def validate_code_metadata(code_metadata: pl.DataFrame, code_modifiers: list[str
         ValueError: If the `code_metadata` dataset is not unique on the `code` and `code_modifiers` columns.
 
     Examples:
-        >>> code_metadata = pl.DataFrame({
-        ...     "code":      ["A", "B",   "A",  "A"],
-        ...     "modifier1": ["X", "D",   "Z",  "Z"],
-        ...     "modifier2": [None, None, None, 3],
-        ... })
+        >>> code_metadata = pl.DataFrame(
+        ...     {
+        ...         "code": ["A", "B", "A", "A"],
+        ...         "modifier1": ["X", "D", "Z", "Z"],
+        ...         "modifier2": [None, None, None, 3],
+        ...     }
+        ... )
         >>> validate_code_metadata(code_metadata, ["modifier1", "modifier2"])
         >>> # This returns None in the absence of an exception.
-        >>> code_metadata = pl.DataFrame({
-        ...     "code":      ["A", "B",   "A",  "A"],
-        ...     "modifier1": ["X", "D",   "Z",  "Z"],
-        ...     "modifier2": [None, None, None, 3],
-        ... })
+        >>> code_metadata = pl.DataFrame(
+        ...     {
+        ...         "code": ["A", "B", "A", "A"],
+        ...         "modifier1": ["X", "D", "Z", "Z"],
+        ...         "modifier2": [None, None, None, 3],
+        ...     }
+        ... )
         >>> validate_code_metadata(code_metadata, ["modifier1", "modifier2", "missing_modifier"])
         Traceback (most recent call last):
             ...
         KeyError: "The following columns are not present in the code metadata: 'missing_modifier'."
-        >>> code_metadata = pl.DataFrame({
-        ...     "code":      ["A", "B",   "A",  "A", "B", "B"],
-        ...     "modifier1": ["X", "D",   "Z",  "Z", "Y", "Y"],
-        ...     "modifier2": [None, None, None, None, 2,  1],
-        ... })
+        >>> code_metadata = pl.DataFrame(
+        ...     {
+        ...         "code": ["A", "B", "A", "A", "B", "B"],
+        ...         "modifier1": ["X", "D", "Z", "Z", "Y", "Y"],
+        ...         "modifier2": [None, None, None, None, 2, 1],
+        ...     }
+        ... )
         >>> validate_code_metadata(code_metadata, ["modifier1", "modifier2"])
         Traceback (most recent call last):
             ...
@@ -81,7 +87,7 @@ def validate_code_metadata(code_metadata: pl.DataFrame, code_modifiers: list[str
         └──────┴───────────┴───────────┴───────┘
     """
 
-    cols = ["code"] + code_modifiers
+    cols = ["code", *code_modifiers]
 
     # Check that the code and code modifiers are present in the code metadata
     if not set(cols).issubset(code_metadata.columns):
@@ -129,11 +135,13 @@ def lexicographic_indices(code_metadata: pl.DataFrame, code_modifiers: list[str]
         ValueError: If the `code` and `code_modifier` columns are not all lexicographically orderable.
 
     Examples:
-        >>> code_metadata = pl.DataFrame({
-        ...     "code":      ["A", "B",   "A",  "A",  "B", "B"],
-        ...     "modifier1": ["X", "D",   None, "Z",  "Y", "Y"],
-        ...     "modifier2": [None, None, None, None, 2,   1],
-        ... })
+        >>> code_metadata = pl.DataFrame(
+        ...     {
+        ...         "code": ["A", "B", "A", "A", "B", "B"],
+        ...         "modifier1": ["X", "D", None, "Z", "Y", "Y"],
+        ...         "modifier2": [None, None, None, None, 2, 1],
+        ...     }
+        ... )
         >>> code_modifiers = ["modifier1", "modifier2"]
         >>> lexicographic_indices(code_metadata, code_modifiers)
         shape: (6, 4)
@@ -177,7 +185,7 @@ def lexicographic_indices(code_metadata: pl.DataFrame, code_modifiers: list[str]
     # dataframe, and similarly does not require actually touching any of the memory of the dataframe. Though,
     # admittedly, it is not clear how significant this choice is in practice.
 
-    sort_cols = ["code"] + code_modifiers
+    sort_cols = ["code", *code_modifiers]
 
     return code_metadata.with_columns(
         (pl.arg_sort_by(pl.arg_sort_by(sort_cols, descending=False, nulls_last=False)) + 1)
@@ -186,8 +194,8 @@ def lexicographic_indices(code_metadata: pl.DataFrame, code_modifiers: list[str]
     )
 
 
-VOCABULARY_ORDERING_METHODS: dict[VOCABULARY_ORDERING, INDEX_ASSIGNMENT_FN] = {
-    VOCABULARY_ORDERING.LEXICOGRAPHIC: lexicographic_indices,
+VocabularyOrdering_METHODS: dict[VocabularyOrdering, INDEX_ASSIGNMENT_FN] = {
+    VocabularyOrdering.LEXICOGRAPHIC: lexicographic_indices,
 }
 
 VOCABULARY_SCHEMA_UPDATES = {"code/vocab_index": pl.UInt8}
@@ -213,23 +221,27 @@ def main(cfg: DictConfig):
 
         To show this in action, we'll use this example code metadata file:
 
-        >>> code_metadata = pl.DataFrame({
-        ...     "code":      ["A", "B",   "A",  "A",  "B", "B"],
-        ...     "modifier1": ["X", "D",   None, "Z",  "Y", "Y"],
-        ...     "modifier2": [None, None, None, None, 2,   1],
-        ... })
+        >>> code_metadata = pl.DataFrame(
+        ...     {
+        ...         "code": ["A", "B", "A", "A", "B", "B"],
+        ...         "modifier1": ["X", "D", None, "Z", "Y", "Y"],
+        ...         "modifier2": [None, None, None, None, 2, 1],
+        ...     }
+        ... )
 
         We'll also use the following global configuration file:
 
-        >>> cfg = DictConfig({
-        ...     "stage": "fit_vocabulary_indices",
-        ...     "code_modifier_columns": ["modifier1", "modifier2"],
-        ...     "stage_cfg": {
-        ...         "metadata_input_dir": "???", # Will be assigned later in the test.
-        ...         "reducer_output_dir": "???", # Will be assigned later in the test.
-        ...         "ordering_method": "lexicographic",
-        ...     },
-        ... })
+        >>> cfg = DictConfig(
+        ...     {
+        ...         "stage": "fit_vocabulary_indices",
+        ...         "code_modifier_columns": ["modifier1", "modifier2"],
+        ...         "stage_cfg": {
+        ...             "metadata_input_dir": "???",  # Will be assigned later in the test.
+        ...             "reducer_output_dir": "???",  # Will be assigned later in the test.
+        ...             "ordering_method": "lexicographic",
+        ...         },
+        ...     }
+        ... )
 
         Now, we'll run the stage with the above code metadata and configuration:
 
@@ -296,12 +308,12 @@ def main(cfg: DictConfig):
         f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
     )
 
-    ordering_method = cfg.stage_cfg.get("ordering_method", VOCABULARY_ORDERING.LEXICOGRAPHIC)
+    ordering_method = cfg.stage_cfg.get("ordering_method", VocabularyOrdering.LEXICOGRAPHIC)
 
-    if ordering_method not in VOCABULARY_ORDERING_METHODS:
+    if ordering_method not in VocabularyOrdering_METHODS:
         raise ValueError(
             f"Invalid ordering method: {ordering_method}. "
-            f"Expected one of {', '.join(VOCABULARY_ORDERING_METHODS.keys())}"
+            f"Expected one of {', '.join(VocabularyOrdering_METHODS.keys())}"
         )
 
     metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
@@ -310,7 +322,7 @@ def main(cfg: DictConfig):
     code_metadata = pl.read_parquet(metadata_input_dir / "codes.parquet", use_pyarrow=True)
 
     logger.info(f"Assigning code vocabulary indices via a {ordering_method} order.")
-    ordering_fn = VOCABULARY_ORDERING_METHODS[ordering_method]
+    ordering_fn = VocabularyOrdering_METHODS[ordering_method]
 
     code_modifiers = cfg.get("code_modifier_columns", None)
     if code_modifiers is None:

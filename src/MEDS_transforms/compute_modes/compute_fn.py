@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-import inspect
 from collections.abc import Callable
 from enum import Enum, auto
 from functools import partial
+import inspect
 from pathlib import Path
-from typing import Any, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Any, NotRequired, TypedDict
 
 import polars as pl
-from omegaconf import DictConfig
 
 from ..dataframe import DF_T
+
+if TYPE_CHECKING:
+    from omegaconf import DictConfig
 
 COMPUTE_FN_T = Callable[[DF_T], DF_T]
 COMPUTE_FN_UNBOUND_T = Callable[..., DF_T]
@@ -73,35 +75,44 @@ class ComputeFnType(Enum):
             The type of the compute function or `None` if invalid.
 
         Examples:
-            >>> def compute_fn(df: pl.DataFrame) -> pl.DataFrame: return df
+            >>> def compute_fn(df: pl.DataFrame) -> pl.DataFrame:
+            ...     return df
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.DIRECT: 1>
-            >>> def compute_fn(*dfs: pl.DataFrame) -> pl.DataFrame: return pl.concat(dfs)
+            >>> def compute_fn(*dfs: pl.DataFrame) -> pl.DataFrame:
+            ...     return pl.concat(dfs)
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.DIRECT: 1>
-            >>> def compute_fn(df: pl.DataFrame) -> dict[Any, list[Any]]: return df.to_dict(as_series=False)
+            >>> def compute_fn(df: pl.DataFrame) -> dict[Any, list[Any]]:
+            ...     return df.to_dict(as_series=False)
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.DIRECT: 1>
-            >>> def compute_fn(df: pl.DataFrame): return None
+            >>> def compute_fn(df: pl.DataFrame):
+            ...     return None
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.DIRECT: 1>
-            >>> def compute_fn(foo: pl.DataFrame): return None
+            >>> def compute_fn(foo: pl.DataFrame):
+            ...     return None
             >>> print(ComputeFnType.from_fn(compute_fn))
             None
-            >>> def compute_fn(df: pl.DataFrame, cfg: DictConfig) -> pl.DataFrame: return df
+            >>> def compute_fn(df: pl.DataFrame, cfg: DictConfig) -> pl.DataFrame:
+            ...     return df
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.UNBOUND: 2>
-            >>> def compute_fn(df: pl.DataFrame, foo: DictConfig) -> pl.DataFrame: return df
+            >>> def compute_fn(df: pl.DataFrame, foo: DictConfig) -> pl.DataFrame:
+            ...     return df
             >>> print(ComputeFnType.from_fn(compute_fn))
             None
-            >>> def compute_fn(df: pl.LazyFrame, cfg: DictConfig): return df
+            >>> def compute_fn(df: pl.LazyFrame, cfg: DictConfig):
+            ...     return df
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.UNBOUND: 2>
             >>> def compute_fn(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
             ...     return lambda df: df
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.FUNCTOR: 3>
-            >>> def compute_fn(cfg: DictConfig): return lambda df: df
+            >>> def compute_fn(cfg: DictConfig):
+            ...     return lambda df: df
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.FUNCTOR: 3>
             >>> def compute_fn(df: pl.DataFrame, cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
@@ -112,7 +123,7 @@ class ComputeFnType(Enum):
         sig = inspect.signature(compute_fn)
 
         allowed_params = {*ComputeFnArgs.__required_keys__, *ComputeFnArgs.__optional_keys__}
-        all_params_allowed = all(param in allowed_params for param in sig.parameters.keys())
+        all_params_allowed = all(param in allowed_params for param in sig.parameters)
         if not all_params_allowed:
             return None
 

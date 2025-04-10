@@ -1,12 +1,12 @@
 """Locking functions."""
 
-import logging
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
+import logging
 from pathlib import Path
 
-import pyarrow.parquet as pq
 from filelock import FileLock, Timeout
+import pyarrow.parquet as pq
 
 from ..compute_modes import COMPUTE_FN_T
 from ..dataframe import READ_FN_T, WRITE_FN_T
@@ -123,7 +123,7 @@ def rwlock_wrap(
             ...
         polars.exceptions.ColumnNotFoundError: unable to find column "d"; valid columns: ["a", "b", "c"]
         ...
-        >>> assert not out_fp.is_file() # Out file should not be created when the process crashes
+        >>> assert not out_fp.is_file()  # Out file should not be created when the process crashes
 
     If the lock file already exists, the function will not do anything
 
@@ -159,14 +159,14 @@ def rwlock_wrap(
         return False
 
     try:
-        st_time = datetime.now()
+        st_time = datetime.now(tz=UTC)
         logger.info(f"Reading input dataframe from {in_fp}")
         df = read_fn(in_fp)
         logger.info("Read dataset")
         df = compute_fn(df)
         logger.info(f"Writing final output to {out_fp}")
         write_fn(df, out_fp)
-        logger.info(f"Succeeded in {datetime.now() - st_time}")
+        logger.info(f"Succeeded in {datetime.now(tz=UTC) - st_time}")
         return True
     finally:
         lock.release()

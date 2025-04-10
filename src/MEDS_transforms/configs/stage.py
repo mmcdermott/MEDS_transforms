@@ -150,8 +150,8 @@ class StageConfig:
             You cannot specify meta keys in both the raw and stage configuration dictionaries. Got duplicate
             meta keys: _base_stage.
         """
-        if any(not isinstance(k, str) for k in arg.keys()):
-            non_str_keys = [k for k in arg.keys() if not isinstance(k, str)]
+        if any(not isinstance(k, str) for k in arg):
+            non_str_keys = [k for k in arg if not isinstance(k, str)]
             err_strs = [f"  - {type(key).__name__}: {key}" for key in non_str_keys]
             err_str = "\n".join(err_strs)
             return f"All keys must be strings. Got key(s):\n{err_str}"
@@ -163,7 +163,7 @@ class StageConfig:
                 f"Got {len(non_meta_keys)} non-meta keys: {', '.join(non_meta_keys.keys())}."
             )
 
-        stage_config = list(non_meta_keys.values())[0]
+        stage_config = next(iter(non_meta_keys.values()))
 
         meta_key_duplicates = [k for k in meta_keys if k in stage_config]
         if meta_key_duplicates:
@@ -241,7 +241,7 @@ class StageConfig:
                     raise ValueError(f"Invalid stage config: {error_str}")
 
                 meta_keys, non_meta_keys = cls._split_meta_keys(config)
-                stage_name = list(non_meta_keys.keys())[0]
+                stage_name = next(iter(non_meta_keys.keys()))
                 stage_config = non_meta_keys[stage_name]
 
                 meta_keys = {k[1:]: v for k, v in meta_keys.items()}
@@ -262,7 +262,7 @@ class StageConfig:
             if not self.base_stage:
                 raise ValueError("If specified, base stage name cannot be empty.")
 
-        if not isinstance(self.config, (dict, DictConfig)):
+        if not isinstance(self.config, dict | DictConfig):
             raise TypeError(f"Invalid config type {type(self.config)}. Expected dict or DictConfig.")
 
     @property

@@ -1,13 +1,13 @@
 """Basic code for a mapreduce stage."""
 
-import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import partial
+import logging
 from pathlib import Path
 
-import polars as pl
 from meds import code_field, subject_id_field, subject_splits_filepath
 from omegaconf import DictConfig
+import polars as pl
 
 from ..compute_modes import (
     ANY_COMPUTE_FN_T,
@@ -192,16 +192,18 @@ def map_stage(
     class, but we'll just fudge it here for the sake of the example. Note we haven't added an output dir yet
     -- that will be a temporary directory we'll create just before we run the stage.
 
-        >>> cfg = DictConfig({
-        ...     "worker": 0,
-        ...     "do_overwrite": False,
-        ...     "input_dir": str(simple_static_MEDS),
-        ...     "stage_cfg": {
-        ...         "data_input_dir": str(simple_static_MEDS / "data"),
-        ...         "metadata_input_dir": str(simple_static_MEDS / "metadata"),
-        ...         "output_dir": "???",
+        >>> cfg = DictConfig(
+        ...     {
+        ...         "worker": 0,
+        ...         "do_overwrite": False,
+        ...         "input_dir": str(simple_static_MEDS),
+        ...         "stage_cfg": {
+        ...             "data_input_dir": str(simple_static_MEDS / "data"),
+        ...             "metadata_input_dir": str(simple_static_MEDS / "metadata"),
+        ...             "output_dir": "???",
+        ...         },
         ...     }
-        ... })
+        ... )
 
     We'll also need a mapping function that will be applied to each shard. For this example, we'll just count
     the number of occurrences of each code:
@@ -451,7 +453,7 @@ def map_stage(
         ValueError: All splits should be used, but shard iterator is returning only train splits?!?
     """
 
-    start = datetime.now()
+    start = datetime.now(tz=UTC)
 
     train_only = cfg.stage_cfg.get("train_only", False)
 
@@ -461,10 +463,10 @@ def map_stage(
         split_fp = Path(cfg.input_dir) / subject_splits_filepath
         if includes_only_train:
             logger.info(
-                f"Processing train split only via shard prefix. Not filtering with {str(split_fp.resolve())}."
+                f"Processing train split only via shard prefix. Not filtering with {split_fp.resolve()!s}."
             )
         elif split_fp.exists():
-            logger.info(f"Processing train split only by filtering read dfs via {str(split_fp.resolve())}")
+            logger.info(f"Processing train split only by filtering read dfs via {split_fp.resolve()!s}")
             train_subjects = (
                 pl.scan_parquet(split_fp)
                 .filter(pl.col("split") == "train")
@@ -476,7 +478,7 @@ def map_stage(
         else:
             raise FileNotFoundError(
                 f"Train split requested, but shard prefixes can't be used and "
-                f"subject split file not found at {str(split_fp.resolve())}."
+                f"subject split file not found at {split_fp.resolve()!s}."
             )
     elif includes_only_train:
         raise ValueError("All splits should be used, but shard iterator is returning only train splits?!?")
@@ -493,7 +495,7 @@ def map_stage(
         write_fn=write_fn,
         do_overwrite=cfg.do_overwrite,
     )
-    logger.info(f"Finished mapping in {datetime.now() - start}")
+    logger.info(f"Finished mapping in {datetime.now(tz=UTC) - start}")
     return all_out_fps
 
 
@@ -722,18 +724,20 @@ def mapreduce_stage(
     `PipelineConfig` class, but we'll just fudge it here for the sake of the example. Note we haven't added an
     output dir yet -- that will be a temporary directory we'll create just before we run the stage.
 
-        >>> cfg = DictConfig({
-        ...     "worker": 0,
-        ...     "polling_time": 0.01,
-        ...     "do_overwrite": False,
-        ...     "input_dir": str(simple_static_MEDS),
-        ...     "stage_cfg": {
-        ...         "data_input_dir": str(simple_static_MEDS / "data"),
-        ...         "metadata_input_dir": str(simple_static_MEDS / "metadata"),
-        ...         "output_dir": "???",
-        ...         "reducer_output_dir": "???",
+        >>> cfg = DictConfig(
+        ...     {
+        ...         "worker": 0,
+        ...         "polling_time": 0.01,
+        ...         "do_overwrite": False,
+        ...         "input_dir": str(simple_static_MEDS),
+        ...         "stage_cfg": {
+        ...             "data_input_dir": str(simple_static_MEDS / "data"),
+        ...             "metadata_input_dir": str(simple_static_MEDS / "metadata"),
+        ...             "output_dir": "???",
+        ...             "reducer_output_dir": "???",
+        ...         },
         ...     }
-        ... })
+        ... )
 
     We'll also need a mapping function that will be applied to each shard. For this example, we'll just count
     the number of occurrences of each code:
@@ -844,7 +848,7 @@ def mapreduce_stage(
         return
 
     logger.info("Starting reduction process")
-    start = datetime.now()
+    start = datetime.now(tz=UTC)
 
     merge_fp = Path(cfg.stage_cfg.metadata_input_dir) / "codes.parquet"
     reduce_stage_out_fp = Path(cfg.stage_cfg.reducer_output_dir) / "codes.parquet"
@@ -866,4 +870,4 @@ def mapreduce_stage(
         do_overwrite=cfg.do_overwrite,
         polling_time=cfg.polling_time,
     )
-    logger.info(f"Finished reduction in {datetime.now() - start}")
+    logger.info(f"Finished reduction in {datetime.now(tz=UTC) - start}")

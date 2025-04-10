@@ -2,8 +2,8 @@
 
 from collections.abc import Callable
 
-import polars as pl
 from omegaconf import DictConfig
+import polars as pl
 
 from .. import Stage
 
@@ -22,17 +22,21 @@ def filter_measurements(
         The processed DataFrame.
 
     Examples:
-        >>> code_metadata_df = pl.DataFrame({
-        ...     "code":               ["A", "A", "B", "C"],
-        ...     "modifier1":          [1,   2,   1,   2],
-        ...     "code/n_subjects":    [2,   1,   3,   2],
-        ...     "code/n_occurrences": [4,   5,   3,   2],
-        ... })
-        >>> data = pl.DataFrame({
-        ...     "subject_id": [1,   1,   2,   2],
-        ...     "code":       ["A", "B", "A", "C"],
-        ...     "modifier1":  [1,   1,   2,   2],
-        ... }).lazy()
+        >>> code_metadata_df = pl.DataFrame(
+        ...     {
+        ...         "code": ["A", "A", "B", "C"],
+        ...         "modifier1": [1, 2, 1, 2],
+        ...         "code/n_subjects": [2, 1, 3, 2],
+        ...         "code/n_occurrences": [4, 5, 3, 2],
+        ...     }
+        ... )
+        >>> data = pl.DataFrame(
+        ...     {
+        ...         "subject_id": [1, 1, 2, 2],
+        ...         "code": ["A", "B", "A", "C"],
+        ...         "modifier1": [1, 1, 2, 2],
+        ...     }
+        ... ).lazy()
         >>> stage_cfg = DictConfig({"min_subjects_per_code": 2, "min_occurrences_per_code": 3})
         >>> fn = filter_measurements(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
@@ -98,18 +102,22 @@ def filter_measurements(
         └────────────┴──────┴───────────┘
 
     This stage works even if the default row index column exists:
-        >>> code_metadata_df = pl.DataFrame({
-        ...     "code":               ["A", "A", "B", "C"],
-        ...     "modifier1":          [1,   2,   1,   2],
-        ...     "code/n_subjects":    [2,   1,   3,   2],
-        ...     "code/n_occurrences": [4,   5,   3,   2],
-        ... })
-        >>> data = pl.DataFrame({
-        ...     "subject_id": [1,   1,   2,   2],
-        ...     "code":       ["A", "B", "A", "C"],
-        ...     "modifier1":  [1,   1,   2,   2],
-        ...     "_row_idx":   [1,   1,   1,   1],
-        ... }).lazy()
+        >>> code_metadata_df = pl.DataFrame(
+        ...     {
+        ...         "code": ["A", "A", "B", "C"],
+        ...         "modifier1": [1, 2, 1, 2],
+        ...         "code/n_subjects": [2, 1, 3, 2],
+        ...         "code/n_occurrences": [4, 5, 3, 2],
+        ...     }
+        ... )
+        >>> data = pl.DataFrame(
+        ...     {
+        ...         "subject_id": [1, 1, 2, 2],
+        ...         "code": ["A", "B", "A", "C"],
+        ...         "modifier1": [1, 1, 2, 2],
+        ...         "_row_idx": [1, 1, 1, 1],
+        ...     }
+        ... ).lazy()
         >>> stage_cfg = DictConfig({"min_subjects_per_code": 2, "min_occurrences_per_code": 3})
         >>> fn = filter_measurements(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
@@ -143,11 +151,7 @@ def filter_measurements(
     allowed_code_metadata = (code_metadata.filter(pl.all_horizontal(filter_exprs)).select(join_cols)).lazy()
 
     def filter_measurements_fn(df: pl.LazyFrame) -> pl.LazyFrame:
-        f"""Filters subject events to only encompass those with a set of permissible codes.
-
-        In particular, this function filters the DataFrame to only include (code, modifier) pairs that have
-        at least {min_subjects_per_code} subjects and {min_occurrences_per_code} occurrences.
-        """
+        """Drops measurements that correspond to codes that occur too infrequently given the configuration."""
 
         idx_col = "_row_idx"
         df_columns = set(df.collect_schema().names())

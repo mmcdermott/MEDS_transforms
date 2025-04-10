@@ -94,7 +94,7 @@ def get_dataset_name_from_root(root: str, default: str = "Unknown") -> str:
         >>> with print_warnings(), tempfile.TemporaryDirectory() as MEDS_root:
         ...     metadata_fp = Path(MEDS_root) / dataset_metadata_filepath
         ...     metadata_fp.parent.mkdir(parents=True, exist_ok=False)
-        ...     _ = metadata_fp.write_text("def foo(): return 42") # Invalid JSON
+        ...     _ = metadata_fp.write_text("def foo(): return 42")  # Invalid JSON
         ...     get_dataset_name_from_root(MEDS_root, default="Foo")
         'Foo'
         Warning: Valid dataset metadata file not found in /tmp/tmp...:
@@ -144,7 +144,7 @@ def get_dataset_version_from_root(root: str, default: str = "Unknown") -> str:
         >>> with print_warnings(), tempfile.TemporaryDirectory() as MEDS_root:
         ...     metadata_fp = Path(MEDS_root) / dataset_metadata_filepath
         ...     metadata_fp.parent.mkdir(parents=True, exist_ok=False)
-        ...     _ = metadata_fp.write_text("Hello world!") # Invalid JSON
+        ...     _ = metadata_fp.write_text("Hello world!")  # Invalid JSON
         ...     get_dataset_version_from_root(MEDS_root, default="Bar")
         'Bar'
         Warning: Valid dataset metadata file not found in /tmp/tmp...:

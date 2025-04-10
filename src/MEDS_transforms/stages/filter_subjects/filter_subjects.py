@@ -1,11 +1,11 @@
 """A polars-to-polars transformation function for filtering subjects by sequence length."""
 
-import logging
 from collections.abc import Callable
 from functools import partial
+import logging
 
-import polars as pl
 from omegaconf import DictConfig
+import polars as pl
 
 from .. import Stage
 
@@ -23,10 +23,12 @@ def filter_subjects_by_num_measurements(df: pl.LazyFrame, min_measurements_per_s
         The filtered DataFrame.
 
     Examples:
-        >>> df = pl.DataFrame({
-        ...     "subject_id": [1, 1, 1, 2, 2, 3, 3,    4],
-        ...     "time":       [1, 2, 1, 1, 2, 1, None, None],
-        ... })
+        >>> df = pl.DataFrame(
+        ...     {
+        ...         "subject_id": [1, 1, 1, 2, 2, 3, 3, 4],
+        ...         "time": [1, 2, 1, 1, 2, 1, None, None],
+        ...     }
+        ... )
         >>> filter_subjects_by_num_measurements(df, 1)
         shape: (7, 2)
         ┌────────────┬──────┐
@@ -99,10 +101,12 @@ def filter_subjects_by_num_events(df: pl.LazyFrame, min_events_per_subject: int)
         The filtered DataFrame.
 
     Examples:
-        >>> df = pl.DataFrame({
-        ...     "subject_id": [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4],
-        ...     "time": [1, 1, 1, 1, 2, 1, 1, 2, 3, None, None, 1, 2, 3],
-        ... })
+        >>> df = pl.DataFrame(
+        ...     {
+        ...         "subject_id": [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4],
+        ...         "time": [1, 1, 1, 1, 2, 1, 1, 2, 3, None, None, 1, 2, 3],
+        ...     }
+        ... )
         >>> with pl.Config(tbl_rows=15):
         ...     filter_subjects_by_num_events(df, 1)
         shape: (14, 2)
@@ -210,10 +214,12 @@ def filter_subjects(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFr
         The function that filters subjects by the number of measurements and/or events they have.
 
     Examples:
-        >>> df = pl.DataFrame({
-        ...     "subject_id": [1, 1, 1, 1, 1, 2, 2, 2, 3,    3,    4, 4, 4, 4,    5, 5, 5, 5],
-        ...     "time":       [1, 1, 1, 1, 1, 1, 2, 3, None, None, 1, 2, 2, None, 1, 2, 3, 1],
-        ... })
+        >>> df = pl.DataFrame(
+        ...     {
+        ...         "subject_id": [1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5],
+        ...         "time": [1, 1, 1, 1, 1, 1, 2, 3, None, None, 1, 2, 2, None, 1, 2, 3, 1],
+        ...     }
+        ... )
         >>> stage_cfg = DictConfig({"min_measurements_per_subject": 4, "min_events_per_subject": 2})
         >>> filter_subjects(stage_cfg)(df)
         shape: (4, 2)

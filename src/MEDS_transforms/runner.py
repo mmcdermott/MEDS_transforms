@@ -8,12 +8,12 @@ To do this effectively, this runner functionally takes a "meta configuration" fi
 """
 
 import logging
-import subprocess
 from pathlib import Path
+import subprocess
 
 import hydra
-import yaml
 from omegaconf import DictConfig, OmegaConf
+import yaml
 
 from .configs import RUNNER_CONFIG_YAML, PipelineConfig
 from .configs.utils import OmegaConfResolver
@@ -45,16 +45,13 @@ def get_parallelization_args(
         []
         >>> get_parallelization_args({"launcher": "joblib"}, {})
         ['--multirun', 'worker="range(0,1)"', 'hydra/launcher=joblib']
-        >>> get_parallelization_args({"n_workers": 2, "launcher_params": 'foo'}, {})
+        >>> get_parallelization_args({"n_workers": 2, "launcher_params": "foo"}, {})
         Traceback (most recent call last):
             ...
         ValueError: If launcher_params is provided, launcher must also be provided.
         >>> get_parallelization_args({"n_workers": 2}, {})
         ['--multirun', 'worker="range(0,2)"']
-        >>> get_parallelization_args(
-        ...     {"launcher": "slurm"},
-        ...     {"n_workers": 3, "launcher": "joblib"}
-        ... )
+        >>> get_parallelization_args({"launcher": "slurm"}, {"n_workers": 3, "launcher": "joblib"})
         ['--multirun', 'worker="range(0,3)"', 'hydra/launcher=slurm']
         >>> get_parallelization_args(
         ...     {"n_workers": 2, "launcher": "joblib"},
@@ -136,15 +133,17 @@ def run_stage(
         >>> def fake_shell_fail(cmd, shell, capture_output):
         ...     print(cmd)
         ...     return subprocess.CompletedProcess(args=cmd, returncode=1, stdout=b"", stderr=b"")
-        >>> cfg = DictConfig({
-        ...     "pipeline_config_fp": "pipeline_config.yaml",
-        ...     "do_profile": False,
-        ...     "_stage_runners": {
-        ...         "reshard_to_split": {"_script": "not used"},
-        ...         "fit_vocabulary_indices": {},
-        ...         "reorder_measurements": {"script": "baz_script"},
-        ...     },
-        ... })
+        >>> cfg = DictConfig(
+        ...     {
+        ...         "pipeline_config_fp": "pipeline_config.yaml",
+        ...         "do_profile": False,
+        ...         "_stage_runners": {
+        ...             "reshard_to_split": {"_script": "not used"},
+        ...             "fit_vocabulary_indices": {},
+        ...             "reorder_measurements": {"script": "baz_script"},
+        ...         },
+        ...     }
+        ... )
         >>> pipeline_cfg = PipelineConfig(
         ...     stages=[
         ...         "reshard_to_split",
@@ -154,9 +153,7 @@ def run_stage(
         ... )
         >>> run_stage(cfg, pipeline_cfg, "reshard_to_split", runner_fn=fake_shell_succeed)
         MEDS_transform-stage pipeline_config.yaml reshard_to_split stage=reshard_to_split
-        >>> run_stage(
-        ...     cfg, pipeline_cfg, "fit_vocabulary_indices", runner_fn=fake_shell_succeed
-        ... )
+        >>> run_stage(cfg, pipeline_cfg, "fit_vocabulary_indices", runner_fn=fake_shell_succeed)
         foobar stage=fit_vocabulary_indices
         >>> run_stage(cfg, pipeline_cfg, "reorder_measurements", runner_fn=fake_shell_succeed)
         baz_script stage=reorder_measurements
@@ -175,13 +172,15 @@ def run_stage(
 
         Errors are also raised if the stage runner is improperly configured.
 
-        >>> cfg = DictConfig({
-        ...     "pipeline_config_fp": "pipeline_config.yaml",
-        ...     "do_profile": False,
-        ...     "_stage_runners": {
-        ...         "reshard_to_split": {"_base_stage": "belongs in the stage"},
-        ...     },
-        ... })
+        >>> cfg = DictConfig(
+        ...     {
+        ...         "pipeline_config_fp": "pipeline_config.yaml",
+        ...         "do_profile": False,
+        ...         "_stage_runners": {
+        ...             "reshard_to_split": {"_base_stage": "belongs in the stage"},
+        ...         },
+        ...     }
+        ... )
         >>> pipeline_cfg = PipelineConfig(stages=["reshard_to_split"])
         >>> run_stage(cfg, pipeline_cfg, "reshard_to_split", runner_fn=fake_shell_succeed)
         Traceback (most recent call last):
@@ -256,15 +255,22 @@ def main(cfg: DictConfig):
             with `do_profile` without the `hydra-profiler` package installed.
 
     Examples:
-        >>> cfg = DictConfig({
-        ...     "pipeline_config_fp": "???", # we'll fill this in each test.
-        ...     "log_dir": "???", # We'll fill this in each test; it is added by Hydra during CLI usage.
-        ...     "do_profile": False,
-        ...     "_stage_runners": {},
-        ... })
-        >>> pipeline_cfg = DictConfig({
-        ...     "stages": ["reshard_to_split", {"count_codes": {"_base_stage": "aggregate_code_metadata"}}],
-        ... })
+        >>> cfg = DictConfig(
+        ...     {
+        ...         "pipeline_config_fp": "???",  # we'll fill this in each test.
+        ...         "log_dir": "???",  # We'll fill this in each test; it is added by Hydra during CLI usage.
+        ...         "do_profile": False,
+        ...         "_stage_runners": {},
+        ...     }
+        ... )
+        >>> pipeline_cfg = DictConfig(
+        ...     {
+        ...         "stages": [
+        ...             "reshard_to_split",
+        ...             {"count_codes": {"_base_stage": "aggregate_code_metadata"}},
+        ...         ],
+        ...     }
+        ... )
 
     We'll consistently mock out the `run_stage` calls to avoid running the actual stages; instead, when
     called, we'll just print out the stages. To do this, we'll set up a helper to run the full test.

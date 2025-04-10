@@ -2,8 +2,8 @@
 
 from collections.abc import Callable
 
-import polars as pl
 from omegaconf import DictConfig
+import polars as pl
 
 from .. import Stage
 
@@ -22,23 +22,27 @@ def occlude_outliers(
         The processed DataFrame.
 
     Examples:
-        >>> code_metadata_df = pl.DataFrame({
-        ...     "code":                 ["A",  "A",  "B",  "C"],
-        ...     "modifier1":            [1,    2,    1,    2],
-        ...     "values/n_occurrences": [3,    1,    3,    2],
-        ...     "values/sum":           [0.0,  4.0,  12.0, 2.0],
-        ...     "values/sum_sqd":       [27.0, 16.0, 75.0, 4.0],
-        ... # for clarity: ----- mean = [0.0,  4.0,  4.0,  1.0]
-        ... # for clarity: --- stddev = [3.0,  0.0,  3.0,  1.0]
-        ... })
-        >>> data = pl.DataFrame({
-        ...     "subject_id":      [1,   1,   2,   2],
-        ...     "code":            ["A", "B", "A", "C"],
-        ...     "modifier1":       [1,   1,   2,   2],
-        ... # for clarity: mean    [0.0, 4.0, 4.0, 1.0]
-        ... # for clarity: stddev  [3.0, 3.0, 0.0, 1.0]
-        ...     "numeric_value": [15., 16., 3.9, 1.0],
-        ... }).lazy()
+        >>> code_metadata_df = pl.DataFrame(
+        ...     {
+        ...         "code": ["A", "A", "B", "C"],
+        ...         "modifier1": [1, 2, 1, 2],
+        ...         "values/n_occurrences": [3, 1, 3, 2],
+        ...         "values/sum": [0.0, 4.0, 12.0, 2.0],
+        ...         "values/sum_sqd": [27.0, 16.0, 75.0, 4.0],
+        ...         # for clarity: ----- mean = [0.0,  4.0,  4.0,  1.0]
+        ...         # for clarity: --- stddev = [3.0,  0.0,  3.0,  1.0]
+        ...     }
+        ... )
+        >>> data = pl.DataFrame(
+        ...     {
+        ...         "subject_id": [1, 1, 2, 2],
+        ...         "code": ["A", "B", "A", "C"],
+        ...         "modifier1": [1, 1, 2, 2],
+        ...         # for clarity: mean    [0.0, 4.0, 4.0, 1.0]
+        ...         # for clarity: stddev  [3.0, 3.0, 0.0, 1.0]
+        ...         "numeric_value": [15.0, 16.0, 3.9, 1.0],
+        ...     }
+        ... ).lazy()
         >>> stage_cfg = DictConfig({"stddev_cutoff": 4.5})
         >>> fn = occlude_outliers(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data).collect()
@@ -93,11 +97,7 @@ def occlude_outliers(
     code_metadata = code_metadata.lazy().select(cols_to_select)
 
     def occlude_outliers_fn(df: pl.LazyFrame) -> pl.LazyFrame:
-        f"""Filters out outlier numeric values from subject events.
-
-        In particular, this function filters the DataFrame to only include numeric values that are within
-        {stddev_cutoff} standard deviations of the mean for the corresponding (code, modifier) pair.
-        """
+        """Drops numeric values that are more than `stddev_cutoff` standard deviations from the mean."""
 
         val = pl.col("numeric_value")
         mean = pl.col("values/mean")

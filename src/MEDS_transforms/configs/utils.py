@@ -4,15 +4,15 @@
 2. A decorator to annotate functions as OmegaConf resolvers in the global namespace.
 """
 
-import dataclasses
 from collections.abc import Callable
+import dataclasses
 from functools import partial
 
 from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
 
 
-def OmegaConfResolver(*args, **kwargs) -> Callable:
+def OmegaConfResolver(*args, **kwargs) -> Callable:  # noqa: N802
     """A decorator to register the decorated function as an OmegaConf resolver.
 
     If a name is passed via keyword arguments, it will be used as the name of the resolver. If no name is
@@ -43,7 +43,7 @@ def OmegaConfResolver(*args, **kwargs) -> Callable:
         >>> cfg = OmegaConf.create("foo: ${my_resolver:42}")
         >>> cfg.foo
         '42'
-        >>> my_resolver(42) # The function is unchanged
+        >>> my_resolver(42)  # The function is unchanged
         '42'
 
     This can also be used as a parametrized decorator:
@@ -56,7 +56,7 @@ def OmegaConfResolver(*args, **kwargs) -> Callable:
         >>> cfg = OmegaConf.create("foo: ${my_resolver2:8}")
         >>> cfg.foo
         '64'
-        >>> my_resolver(8) # The function is unchanged
+        >>> my_resolver(8)  # The function is unchanged
         '64'
 
     Errors are raised if the arguments are not valid:
@@ -102,16 +102,16 @@ def hydra_registered_dataclass(*, group: str | None, name: str | None = None) ->
     Examples:
         >>> @hydra_registered_dataclass(group="foo")
         ... class Bar:
-        ...     baz: str = 'baz'
+        ...     baz: str = "baz"
         >>> dataclasses.is_dataclass(Bar)
         True
         >>> cs = ConfigStore.instance()
-        >>> cs.repo['foo']
+        >>> cs.repo["foo"]
         {'Bar.yaml': ConfigNode(name='Bar.yaml', node={'baz': 'baz'}, group='foo', ...)}
         >>> @hydra_registered_dataclass(group="foo", name="Bar2")
         ... class Bar:
-        ...     qux: str = 'quux'
-        >>> cs.repo['foo']
+        ...     qux: str = "quux"
+        >>> cs.repo["foo"]
         {'Bar.yaml': ..., 'Bar2.yaml': ConfigNode(name='Bar2.yaml', node={'qux': 'quux'}, ...)}
     """
 

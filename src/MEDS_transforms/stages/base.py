@@ -2,27 +2,30 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from contextlib import contextmanager
 import copy
+from enum import StrEnum
+from functools import partial, wraps
 import inspect
 import logging
 import os
+from pathlib import Path
 import sys
 import textwrap
+from typing import TYPE_CHECKING, Any, ClassVar
 import warnings
-from collections.abc import Callable
-from contextlib import contextmanager
-from enum import StrEnum
-from functools import partial, wraps
-from pathlib import Path
-from typing import Any, ClassVar
 
-import polars as pl
 from omegaconf import DictConfig, OmegaConf
 
-from ..compute_modes import ANY_COMPUTE_FN_T
 from ..mapreduce import map_stage, mapreduce_stage
 from .discovery import get_all_registered_stages
 from .examples import StageExample, StageExampleDict
+
+if TYPE_CHECKING:
+    import polars as pl
+
+    from ..compute_modes import ANY_COMPUTE_FN_T
 
 logger = logging.getLogger(__name__)
 
@@ -278,12 +281,12 @@ class Stage:
         ...     # Example # 1
         ...     ex_1 = example_dir / "example_1"
         ...     ex_1.mkdir(parents=True)
-        ...     ex_1_data_fp = (ex_1 / "out_data.yaml")
+        ...     ex_1_data_fp = ex_1 / "out_data.yaml"
         ...     _ = ex_1_data_fp.write_text("data/0.parquet: 'code,time,subject_id,numeric_value'")
         ...     # Example # 2
         ...     ex_2 = example_dir / "example_2_foo"
         ...     ex_2.mkdir()
-        ...     ex_2_metadata_fp = (ex_2 / "out_metadata.yaml")
+        ...     ex_2_metadata_fp = ex_2 / "out_metadata.yaml"
         ...     _ = ex_2_metadata_fp.write_text("metadata/codes.parquet: 'code,description,parent_codes'")
         ...     stage = Stage(map_fn=compute, examples_dir=example_dir)
         ...     print(stage.test_cases)
@@ -426,7 +429,7 @@ class Stage:
         >>> mock_stages = {"stage_foo": MagicMock()}
         >>> mock_stages["stage_foo"].load.side_effect = lambda: None
         >>> with patch("MEDS_transforms.stages.base.get_all_registered_stages", return_value=mock_stages):
-        ...     with print_warnings(): # No warnings are printed as the stage is listed as being registered.
+        ...     with print_warnings():  # No warnings are printed as the stage is listed as being registered.
         ...         Stage(map_fn=compute, stage_name="stage_foo")
         Traceback (most recent call last):
             ...
@@ -446,7 +449,7 @@ class Stage:
         ...     raise AttributeError("unrelated")
         >>> mock_stages["stage_foo"].load.side_effect = raise_unexpected_error
         >>> with patch("MEDS_transforms.stages.base.get_all_registered_stages", return_value=mock_stages):
-        ...     with print_warnings(): # No warnings are printed as the stage is listed as being registered.
+        ...     with print_warnings():  # No warnings are printed as the stage is listed as being registered.
         ...         Stage(map_fn=compute, stage_name="stage_foo")
         Traceback (most recent call last):
             ...
@@ -849,7 +852,7 @@ class Stage:
             'baz_fn'
             >>> stage.__doc__
             'base baz docstring'
-            >>> stage('foo', 42)
+            >>> stage("foo", 42)
             'baz foo 42'
             >>> stage.mimic_fn = "main"
             Traceback (most recent call last):
@@ -888,7 +891,7 @@ class Stage:
             else:
                 module.__test__ = {fn.__name__: fn}
         except Exception as e:  # pragma: no cover
-            warnings.warn(f"Failed to set doctest for {fn.__name__}: {e}")
+            warnings.warn(f"Failed to set doctest for {fn.__name__}: {e}", stacklevel=2)
 
     def __call__(self, *args, **kwargs):
         if self.mimic_fn is not None:
@@ -1003,7 +1006,7 @@ class Stage:
             ...     '''base reduce docstring'''
             ...     return "reduce"
             >>> stage = Stage.register(main_fn=main, is_metadata=True)
-            >>> print(stage) # The name is inferred from the name of the file:
+            >>> print(stage)  # The name is inferred from the name of the file:
             Stage base:
               Type: main
               is_metadata: True
@@ -1329,11 +1332,13 @@ class Stage:
             ...     # Mock out the inspect module to return the calling file we're constructing:
             ...     with patch("inspect.currentframe") as mock:
             ...         mock.return_value.f_back.f_code.co_filename = str(calling_file)
+            ...
             ...         # Now we can create the stage:
             ...         @Stage.register(stage_name="stage_foo", is_metadata=True)
             ...         def main(cfg: DictConfig):
             ...             '''base main docstring'''
             ...             return "main"
+            ...
             ...         # Print the stage object and see if it has set the examples directory and default
             ...         print("-----------------")
             ...         print("Stage object:")
@@ -1470,11 +1475,13 @@ class Stage:
             ...     # Mock out the inspect module to return the calling file we're constructing:
             ...     with patch("inspect.currentframe") as mock:
             ...         mock.return_value.f_back.f_code.co_filename = str(calling_file)
+            ...
             ...         # Now we can create the stage:
             ...         @Stage.register(stage_name="not_stage_foo", is_metadata=True)
             ...         def main(cfg: DictConfig):
             ...             '''base main docstring'''
             ...             return "main"
+            ...
             ...         # Print the stage object and see if it has set the examples directory and default
             ...         print("-----------------")
             ...         print("Stage object:")
@@ -1518,6 +1525,7 @@ class Stage:
         here using the `print_warnings` context manager, defined in our `conftest.py` file.
 
             >>> with print_warnings():
+            ...
             ...     @Stage.register(is_metadata=True)
             ...     def main(cfg: DictConfig):
             ...         '''base main docstring'''

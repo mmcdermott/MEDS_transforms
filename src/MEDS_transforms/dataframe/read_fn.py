@@ -1,7 +1,7 @@
 """Functionality for reading input data shards."""
 
-import logging
 from collections.abc import Callable
+import logging
 from pathlib import Path
 
 import polars as pl
@@ -19,7 +19,7 @@ def read_df(in_fp: Path) -> DF_T:
     return pl.scan_parquet(in_fp, glob=False)
 
 
-def read_and_filter_fntr(filter_expr: pl.Expr, read_fn: READ_FN_T) -> READ_FN_T:
+def read_and_filter_fntr(filter_expr: pl.Expr, read_fn: READ_FN_T = read_df) -> READ_FN_T:
     """Create a function that reads a DataFrame from a file and filters it based on a given expression.
 
     This is specified as a functor in this way to allow it to modify arbitrary other read functions for use in
@@ -35,7 +35,7 @@ def read_and_filter_fntr(filter_expr: pl.Expr, read_fn: READ_FN_T) -> READ_FN_T:
     Examples:
         >>> dfs = {
         ...     "df1": pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]}),
-        ...     "df2": pl.DataFrame({"a": [4, 5, 6], "b": [7, 8, 9]})
+        ...     "df2": pl.DataFrame({"a": [4, 5, 6], "b": [7, 8, 9]}),
         ... }
         >>> read_fn = lambda key: dfs[key]
         >>> fn = read_and_filter_fntr((pl.col("a") % 2) == 0, read_fn)

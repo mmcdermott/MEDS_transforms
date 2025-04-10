@@ -1,3 +1,3 @@
-from .stage import map_stage, mapreduce_stage  # noqa: F401
+from .stage import map_stage, mapreduce_stage
 
 __all__ = ["map_stage", "mapreduce_stage"]

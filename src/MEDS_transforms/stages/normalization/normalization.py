@@ -73,13 +73,13 @@ def normalization(
         ...         "numeric_value": [1, 3, None, 3, None, None, None],
         ...         "unit": ["mg/dL", "g/dL", None, "mg/dL", None, None, None],
         ...     },
-        ...     schema = {
+        ...     schema={
         ...         "subject_id": pl.UInt32,
         ...         "time": pl.Datetime,
         ...         "code": pl.Utf8,
         ...         "numeric_value": pl.Float32,
         ...         "unit": pl.Utf8,
-        ...    },
+        ...     },
         ... )
         >>> code_metadata = pl.DataFrame(
         ...     {
@@ -88,7 +88,7 @@ def normalization(
         ...         "values/mean": [2.0, None, None, None, 3],
         ...         "values/std": [0.5, None, None, None, 0.2],
         ...     },
-        ...     schema = {
+        ...     schema={
         ...         "code": pl.Utf8,
         ...         "code/vocab_index": pl.UInt32,
         ...         "values/mean": pl.Float32,
@@ -125,13 +125,13 @@ def normalization(
         ...         "numeric_value": [1, 3, None, 3, None, None, None],
         ...         "unit": ["mg/dL", "g/dL", None, "mg/dL", None, None, None],
         ...     },
-        ...     schema = {
+        ...     schema={
         ...         "subject_id": pl.UInt32,
         ...         "time": pl.Datetime,
         ...         "code": pl.Utf8,
         ...         "numeric_value": pl.Float32,
         ...         "unit": pl.Utf8,
-        ...    },
+        ...     },
         ... )
         >>> code_metadata = pl.DataFrame(
         ...     {
@@ -141,7 +141,7 @@ def normalization(
         ...         "values/mean": [2.0, 3.0, None, None, None, 3],
         ...         "values/std": [0.5, 2.0, None, None, None, 0.2],
         ...     },
-        ...     schema = {
+        ...     schema={
         ...         "code": pl.Utf8,
         ...         "unit": pl.Utf8,
         ...         "code/vocab_index": pl.UInt32,
@@ -182,7 +182,7 @@ def normalization(
     if code_modifiers is None:
         code_modifiers = []
 
-    cols_to_select = ["code", "code/vocab_index"] + code_modifiers
+    cols_to_select = ["code", "code/vocab_index", *code_modifiers]
 
     mean_col = pl.col("values/sum") / pl.col("values/n_occurrences")
     stddev_col = (pl.col("values/sum_sqd") / pl.col("values/n_occurrences") - mean_col**2) ** 0.5
@@ -209,7 +209,7 @@ def normalization(
         df.with_row_index(idx_col)
         .join(
             code_metadata.lazy().select(cols_to_select),
-            on=["code"] + code_modifiers,
+            on=["code", *code_modifiers],
             how="inner",
             nulls_equal=True,
         )

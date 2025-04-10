@@ -87,7 +87,7 @@ def map_over(
 
     all_out_fps = []
     for in_fp, out_fp in shards:
-        logger.info(f"Processing {str(in_fp.resolve())} into {str(out_fp.resolve())}")
+        logger.info(f"Processing {in_fp.resolve()!s} into {out_fp.resolve()!s}")
         rwlock_wrap(
             in_fp,
             out_fp,

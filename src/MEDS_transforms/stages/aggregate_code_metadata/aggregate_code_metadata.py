@@ -1,21 +1,21 @@
 """Utilities for grouping and/or reducing MEDS cohort files by code to collect metadata properties."""
 
-import logging
 from collections.abc import Callable, Sequence
 from enum import StrEnum
+import logging
 from typing import NamedTuple
 
-import polars as pl
-import polars.selectors as cs
 from meds import subject_id_field
 from omegaconf import DictConfig, ListConfig, OmegaConf
+import polars as pl
+import polars.selectors as cs
 
 from .. import Stage
 
 logger = logging.getLogger(__name__)
 
 
-class METADATA_FN(StrEnum):
+class MetadataFn(StrEnum):
     """Enumeration of metadata functions that can be applied to a group of codes.
 
     This enumeration contains the supported code-metadata collection and aggregation function names that can
@@ -111,11 +111,14 @@ def quantile_reducer(cols: cs._selector_proxy_, quantiles: list[float]) -> pl.Ex
         values in `cols`.
 
     Examples:
-        >>> df = pl.DataFrame({
-        ...     "key": [1, 2],
-        ...     "vals/shard1": [[1, 2, float('nan')], [None, 3]],
-        ...     "vals/shard2": [[3.0, 4], [30]],
-        ... }, strict=False)
+        >>> df = pl.DataFrame(
+        ...     {
+        ...         "key": [1, 2],
+        ...         "vals/shard1": [[1, 2, float("nan")], [None, 3]],
+        ...         "vals/shard2": [[3.0, 4], [30]],
+        ...     },
+        ...     strict=False,
+        ... )
         >>> expr = quantile_reducer(cs.starts_with("vals/"), [0.01, 0.5, 0.75])
         >>> df.select(expr)
         shape: (1, 1)
@@ -126,7 +129,8 @@ def quantile_reducer(cols: cs._selector_proxy_, quantiles: list[float]) -> pl.Ex
         ╞══════════════════╡
         │ {1.0,3.0,30.0}   │
         └──────────────────┘
-        >>> df.select("key", expr.over("key"))
+        >>> quantiles_df = df.select("key", expr.over("key"))
+        >>> quantiles_df
         shape: (2, 2)
         ┌─────┬──────────────────┐
         │ key ┆ values/quantiles │
@@ -136,14 +140,26 @@ def quantile_reducer(cols: cs._selector_proxy_, quantiles: list[float]) -> pl.Ex
         │ 1   ┆ {1.0,3.0,4.0}    │
         │ 2   ┆ {3.0,30.0,30.0}  │
         └─────┴──────────────────┘
+
+        The keys are given by the syntax: "values/quantile/{quantile}", where {quantile} is the quantile value
+
+        >>> quantiles_df.unnest("values/quantiles")
+        shape: (2, 4)
+        ┌─────┬──────────────────────┬─────────────────────┬──────────────────────┐
+        │ key ┆ values/quantile/0.01 ┆ values/quantile/0.5 ┆ values/quantile/0.75 │
+        │ --- ┆ ---                  ┆ ---                 ┆ ---                  │
+        │ i64 ┆ f64                  ┆ f64                 ┆ f64                  │
+        ╞═════╪══════════════════════╪═════════════════════╪══════════════════════╡
+        │ 1   ┆ 1.0                  ┆ 3.0                 ┆ 4.0                  │
+        │ 2   ┆ 3.0                  ┆ 30.0                ┆ 30.0                 │
+        └─────┴──────────────────────┴─────────────────────┴──────────────────────┘
     """
 
     vals = pl.concat_list(cols.fill_null([])).explode()
 
-    quantile_cols = [f"values/quantile/{q}" for q in quantiles]
-    quantiles_struct = {col: vals.quantile(q).alias(col) for col, q in zip(quantile_cols, quantiles)}
+    quantiles_struct = {f"values/quantile/{q}": vals.quantile(q) for q in quantiles}
 
-    return pl.struct(**quantiles_struct).alias(METADATA_FN.VALUES_QUANTILES)
+    return pl.struct(**quantiles_struct).alias(MetadataFn.VALUES_QUANTILES)
 
 
 VAL = pl.col("numeric_value")
@@ -151,19 +167,19 @@ VAL_PRESENT: pl.Expr = VAL.is_not_null() & VAL.is_not_nan()
 IS_INT: pl.Expr = VAL.round() == VAL
 PRESENT_VALS = VAL.filter(VAL_PRESENT)
 
-CODE_METADATA_AGGREGATIONS: dict[METADATA_FN, MapReducePair] = {
-    METADATA_FN.CODE_N_PATIENTS: MapReducePair(pl.col(subject_id_field).n_unique(), pl.sum_horizontal),
-    METADATA_FN.CODE_N_OCCURRENCES: MapReducePair(pl.len(), pl.sum_horizontal),
-    METADATA_FN.VALUES_N_PATIENTS: MapReducePair(
+CODE_METADATA_AGGREGATIONS: dict[MetadataFn, MapReducePair] = {
+    MetadataFn.CODE_N_PATIENTS: MapReducePair(pl.col(subject_id_field).n_unique(), pl.sum_horizontal),
+    MetadataFn.CODE_N_OCCURRENCES: MapReducePair(pl.len(), pl.sum_horizontal),
+    MetadataFn.VALUES_N_PATIENTS: MapReducePair(
         pl.col(subject_id_field).filter(VAL_PRESENT).n_unique(), pl.sum_horizontal
     ),
-    METADATA_FN.VALUES_N_OCCURRENCES: MapReducePair(PRESENT_VALS.len(), pl.sum_horizontal),
-    METADATA_FN.VALUES_N_INTS: MapReducePair(VAL.filter(VAL_PRESENT & IS_INT).len(), pl.sum_horizontal),
-    METADATA_FN.VALUES_SUM: MapReducePair(PRESENT_VALS.sum(), pl.sum_horizontal),
-    METADATA_FN.VALUES_SUM_SQD: MapReducePair((PRESENT_VALS**2).sum(), pl.sum_horizontal),
-    METADATA_FN.VALUES_MIN: MapReducePair(PRESENT_VALS.min(), pl.min_horizontal),
-    METADATA_FN.VALUES_MAX: MapReducePair(PRESENT_VALS.max(), pl.max_horizontal),
-    METADATA_FN.VALUES_QUANTILES: MapReducePair(PRESENT_VALS, quantile_reducer),
+    MetadataFn.VALUES_N_OCCURRENCES: MapReducePair(PRESENT_VALS.len(), pl.sum_horizontal),
+    MetadataFn.VALUES_N_INTS: MapReducePair(VAL.filter(VAL_PRESENT & IS_INT).len(), pl.sum_horizontal),
+    MetadataFn.VALUES_SUM: MapReducePair(PRESENT_VALS.sum(), pl.sum_horizontal),
+    MetadataFn.VALUES_SUM_SQD: MapReducePair((PRESENT_VALS**2).sum(), pl.sum_horizontal),
+    MetadataFn.VALUES_MIN: MapReducePair(PRESENT_VALS.min(), pl.min_horizontal),
+    MetadataFn.VALUES_MAX: MapReducePair(PRESENT_VALS.max(), pl.max_horizontal),
+    MetadataFn.VALUES_QUANTILES: MapReducePair(PRESENT_VALS, quantile_reducer),
 }
 
 
@@ -173,7 +189,7 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
     Args:
         stage_cfg: The configuration object for this stage. It must contain an `aggregations` field that has a
             list of aggregations that should be applied in this stage. Each aggregation must be a string in
-            the `METADATA_FN` enumeration.
+            the `MetadataFn` enumeration.
         code_modifiers: A list of column names that should be used in addition to the core `code`
             column to group the data before applying the aggregations. If None, only the `code` column will be
             used.
@@ -197,7 +213,7 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
         >>> validate_args_and_get_code_cols(invalid_agg_cfg, None)
         Traceback (most recent call last):
             ...
-        ValueError: Metadata aggregation function INVALID not found in METADATA_FN enumeration. Values are:
+        ValueError: Metadata aggregation function INVALID not found in MetadataFn enumeration. Values are:
             code/n_subjects, code/n_occurrences, values/n_subjects, values/n_occurrences, values/n_ints,
             values/sum, values/sum_sqd, values/min, values/max, values/quantiles
         >>> valid_cfg = DictConfig({"aggregations": ["code/n_subjects", {"name": "values/n_ints"}]})
@@ -222,19 +238,19 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
 
     aggregations = stage_cfg.aggregations
     for agg in aggregations:
-        if isinstance(agg, (dict, DictConfig)):
+        if isinstance(agg, dict | DictConfig):
             agg = agg.get("name", None)
-        if agg not in {fn.value for fn in METADATA_FN}:
+        if agg not in {fn.value for fn in MetadataFn}:
             raise ValueError(
-                f"Metadata aggregation function {agg} not found in METADATA_FN enumeration. Values are: "
-                f"{', '.join([fn.value for fn in METADATA_FN])}"
+                f"Metadata aggregation function {agg} not found in MetadataFn enumeration. Values are: "
+                f"{', '.join([fn.value for fn in MetadataFn])}"
             )
 
     match code_modifiers:
         case None:
             return ["code"]
         case list() | ListConfig() if all(isinstance(col, str) for col in code_modifiers):
-            return ["code"] + code_modifiers
+            return ["code", *code_modifiers]
         case _:
             raise ValueError(f"code_modifiers must be a list of strings or None. Got {code_modifiers}")
 
@@ -247,7 +263,7 @@ def mapper_fntr(
     Args:
         stage_cfg: The configuration object for this stage. It must contain an `aggregations` field that has a
             list of aggregations that should be applied in this stage. Each aggregation must be a string in
-            the `METADATA_FN` enumeration, and the mapper function is specified in the
+            the `MetadataFn` enumeration, and the mapper function is specified in the
             `CODE_METADATA_AGGREGATIONS` dictionary.
         code_modifiers: A list of column names that should be used in addition to the core `code`
             column to group the data before applying the aggregations. If None, only the `code` column will be
@@ -265,13 +281,15 @@ def mapper_fntr(
 
     Examples:
         >>> import numpy as np
-        >>> df = pl.DataFrame({
-        ...     "code":             ["A", "B", "A", "B", "C", "A", "C", "B",          "D"],
-        ...     "modifier1":        [1,   2,   1,   2,   1,   2,   1,   2,            None],
-        ...     "modifier_ignored": [3,   3,   4,   4,   5,   5,   6,   6,            7],
-        ...     "subject_id":       [1,   2,   1,   3,   1,   2,   2,   2,            1],
-        ...     "numeric_value":    [1.1, 2.,  1.1, 4.,  5.,  6.,  7.5, float('nan'), None],
-        ... })
+        >>> df = pl.DataFrame(
+        ...     {
+        ...         "code": ["A", "B", "A", "B", "C", "A", "C", "B", "D"],
+        ...         "modifier1": [1, 2, 1, 2, 1, 2, 1, 2, None],
+        ...         "modifier_ignored": [3, 3, 4, 4, 5, 5, 6, 6, 7],
+        ...         "subject_id": [1, 2, 1, 3, 1, 2, 2, 2, 1],
+        ...         "numeric_value": [1.1, 2.0, 1.1, 4.0, 5.0, 6.0, 7.5, float("nan"), None],
+        ...     }
+        ... )
         >>> df
         shape: (9, 5)
         ┌──────┬───────────┬──────────────────┬────────────┬───────────────┐
@@ -289,10 +307,9 @@ def mapper_fntr(
         │ B    ┆ 2         ┆ 6                ┆ 2          ┆ NaN           │
         │ D    ┆ null      ┆ 7                ┆ 1          ┆ null          │
         └──────┴───────────┴──────────────────┴────────────┴───────────────┘
-        >>> stage_cfg = DictConfig({
-        ...     "aggregations": ["code/n_subjects", "values/n_ints"],
-        ...     "do_summarize_over_all_codes": True
-        ... })
+        >>> stage_cfg = DictConfig(
+        ...     {"aggregations": ["code/n_subjects", "values/n_ints"], "do_summarize_over_all_codes": True}
+        ... )
         >>> mapper = mapper_fntr(stage_cfg, None)
         >>> mapper(df.lazy()).collect()
         shape: (5, 3)
@@ -352,10 +369,12 @@ def mapper_fntr(
         │ C    ┆ 1         ┆ 2                  ┆ 12.5       │
         │ D    ┆ null      ┆ 1                  ┆ 0.0        │
         └──────┴───────────┴────────────────────┴────────────┘
-        >>> stage_cfg = DictConfig({
-        ...     "aggregations": ["code/n_occurrences", "values/sum"],
-        ...     "do_summarize_over_all_codes": True,
-        ... })
+        >>> stage_cfg = DictConfig(
+        ...     {
+        ...         "aggregations": ["code/n_occurrences", "values/sum"],
+        ...         "do_summarize_over_all_codes": True,
+        ...     }
+        ... )
         >>> mapper = mapper_fntr(stage_cfg, code_modifiers)
         >>> mapper(df.lazy()).collect()
         shape: (6, 4)
@@ -401,9 +420,9 @@ def mapper_fntr(
         │ C    ┆ 1         ┆ 81.25          ┆ 5.0        ┆ 7.5        │
         │ D    ┆ null      ┆ 0.0            ┆ null       ┆ null       │
         └──────┴───────────┴────────────────┴────────────┴────────────┘
-        >>> stage_cfg = DictConfig({
-        ...     "aggregations": [{"name": "values/quantiles", "quantiles": [0.25, 0.5, 0.75]}]
-        ... })
+        >>> stage_cfg = DictConfig(
+        ...     {"aggregations": [{"name": "values/quantiles", "quantiles": [0.25, 0.5, 0.75]}]}
+        ... )
         >>> mapper = mapper_fntr(stage_cfg, code_modifiers)
         >>> mapper(df.lazy()).collect().select("code", "modifier1", pl.col("values/quantiles"))
         shape: (5, 3)
@@ -418,10 +437,12 @@ def mapper_fntr(
         │ C    ┆ 1         ┆ [5.0, 7.5]       │
         │ D    ┆ null      ┆ []               │
         └──────┴───────────┴──────────────────┘
-        >>> stage_cfg = DictConfig({
-        ...     "aggregations": [{"name": "values/quantiles", "quantiles": [0.25, 0.5, 0.75]}],
-        ...     "do_summarize_over_all_codes": True,
-        ... })
+        >>> stage_cfg = DictConfig(
+        ...     {
+        ...         "aggregations": [{"name": "values/quantiles", "quantiles": [0.25, 0.5, 0.75]}],
+        ...         "do_summarize_over_all_codes": True,
+        ...     }
+        ... )
         >>> mapper = mapper_fntr(stage_cfg, code_modifiers)
         >>> mapper(df.lazy()).collect().select("code", "modifier1", pl.col("values/quantiles"))
         shape: (6, 3)
@@ -439,13 +460,16 @@ def mapper_fntr(
         └──────┴───────────┴───────────────────┘
 
     Empty dataframes are handled as you would expect
-        >>> df_empty = pl.DataFrame({
-        ...     "code": [],
-        ...     "modifier1": [],
-        ...     "modifier_ignored": [],
-        ...     "subject_id": [],
-        ...     "numeric_value": [],
-        ... }, schema=df.schema)
+        >>> df_empty = pl.DataFrame(
+        ...     {
+        ...         "code": [],
+        ...         "modifier1": [],
+        ...         "modifier_ignored": [],
+        ...         "subject_id": [],
+        ...         "numeric_value": [],
+        ...     },
+        ...     schema=df.schema,
+        ... )
         >>> stage_cfg = DictConfig({"aggregations": ["values/sum_sqd", "values/min", "values/max"]})
         >>> mapper = mapper_fntr(stage_cfg, code_modifiers)
         >>> mapper(df_empty.lazy()).collect()
@@ -456,10 +480,12 @@ def mapper_fntr(
         │ str  ┆ i64       ┆ f64            ┆ f64        ┆ f64        │
         ╞══════╪═══════════╪════════════════╪════════════╪════════════╡
         └──────┴───────────┴────────────────┴────────────┴────────────┘
-        >>> stage_cfg = DictConfig({
-        ...     "aggregations": ["values/sum_sqd", "values/min", "values/max"],
-        ...     "do_summarize_over_all_codes": True,
-        ... })
+        >>> stage_cfg = DictConfig(
+        ...     {
+        ...         "aggregations": ["values/sum_sqd", "values/min", "values/max"],
+        ...         "do_summarize_over_all_codes": True,
+        ...     }
+        ... )
         >>> mapper = mapper_fntr(stage_cfg, code_modifiers)
         >>> mapper(df_empty.lazy()).collect()
         shape: (1, 5)
@@ -485,9 +511,9 @@ def mapper_fntr(
 
     def all_subjects_mapper(df: pl.LazyFrame) -> pl.LazyFrame:
         local_agg_operations = agg_operations.copy()
-        if METADATA_FN.VALUES_QUANTILES in agg_operations:
-            local_agg_operations[METADATA_FN.VALUES_QUANTILES] = agg_operations[
-                METADATA_FN.VALUES_QUANTILES
+        if MetadataFn.VALUES_QUANTILES in agg_operations:
+            local_agg_operations[MetadataFn.VALUES_QUANTILES] = agg_operations[
+                MetadataFn.VALUES_QUANTILES
             ].implode()
         return df.select(**local_agg_operations)
 
@@ -514,7 +540,7 @@ def reducer_fntr(
     Args:
         stage_cfg: The configuration object for this stage. It must contain an `aggregations` field that has a
             list of aggregations that should be applied in this stage. Each aggregation must be a string in
-            the `METADATA_FN` enumeration, and the reduction function is specified in the
+            the `MetadataFn` enumeration, and the reduction function is specified in the
             `CODE_METADATA_AGGREGATIONS` dictionary.
         code_modifiers: A list of column names that should be used in addition to the core `code`
             column to group the data before applying the aggregations. If None, only the `code` column will be
@@ -527,76 +553,88 @@ def reducer_fntr(
     Raises: See `validate_args_and_get_code_cols`.
 
     Examples:
-        >>> df_1 = pl.DataFrame({
-        ...     "code": [None, "A", "A", "B", "C"],
-        ...     "modifier1": [None, 1, 2, 1, 2],
-        ...     "code/n_subjects":  [10, 1, 1, 2, 2],
-        ...     "code/n_occurrences": [13, 2, 1, 3, 2],
-        ...     "values/n_subjects":  [8, 1, 1, 2, 2],
-        ...     "values/n_occurrences": [12, 2, 1, 3, 2],
-        ...     "values/n_ints": [4, 0, 1, 3, 1],
-        ...     "values/sum": [13.2, 2.2, 6.0, 14.0, 12.5],
-        ...     "values/sum_sqd": [21.3, 2.42, 36.0, 84.0, 81.25],
-        ...     "values/min": [-1, 0, -1, 2, 2],
-        ...     "values/max": [8.0, 1.1, 6.0, 8.0, 7.5],
-        ...     "values/quantiles": [[1.1, 1.1], [6.0], [6.0], [5.0, 7.5], []],
-        ... })
-        >>> df_2 = pl.DataFrame({
-        ...     "code": ["A", "A", "B", "C"],
-        ...     "modifier1": [1, 2, 1, None],
-        ...     "code/n_subjects":  [3, 3, 4, 4],
-        ...     "code/n_occurrences": [10, 11, 8, 11],
-        ...     "values/n_subjects":  [0, 1, 2, 2],
-        ...     "values/n_occurrences": [0, 4, 3, 2],
-        ...     "values/n_ints": [0, 1, 3, 1],
-        ...     "values/sum": [0., 7.0, 14.0, 12.5],
-        ...     "values/sum_sqd": [0., 103.2, 84.0, 81.25],
-        ...     "values/min": [None, -1., 0.2, -2.],
-        ...     "values/max": [None, 6.2, 1.0, 1.5],
-        ...     "values/quantiles": [[1.3, -1.1, 2.0], [6.0, 1.2], [3.0, 2.5], [11.1, 12.]],
-        ... })
-        >>> df_3 = pl.DataFrame({
-        ...     "code": ["D"],
-        ...     "modifier1": [1],
-        ...     "code/n_subjects": [2],
-        ...     "code/n_occurrences": [2],
-        ...     "values/n_subjects": [1],
-        ...     "values/n_occurrences": [3],
-        ...     "values/n_ints": [3],
-        ...     "values/sum": [2],
-        ...     "values/sum_sqd": [4],
-        ...     "values/min": [0],
-        ...     "values/max": [2],
-        ...     "values/quantiles": [[]],
-        ... })
-        >>> df_empty = pl.DataFrame({
-        ...     "code": [],
-        ...     "modifier1": [],
-        ...     "code/n_subjects": [],
-        ...     "code/n_occurrences": [],
-        ...     "values/n_subjects": [],
-        ...     "values/n_occurrences": [],
-        ...     "values/n_ints": [],
-        ...     "values/sum": [],
-        ...     "values/sum_sqd": [],
-        ...     "values/min": [],
-        ...     "values/max": [],
-        ...     "values/quantiles": [],
-        ... }, schema=df_3.schema)
-        >>> df_null_empty = pl.DataFrame({
-        ...     "code": [None],
-        ...     "modifier1": [None],
-        ...     "code/n_subjects": [0],
-        ...     "code/n_occurrences": [0],
-        ...     "values/n_subjects": [0],
-        ...     "values/n_occurrences": [0],
-        ...     "values/n_ints": [0],
-        ...     "values/sum": [0],
-        ...     "values/sum_sqd": [0],
-        ...     "values/min": [None],
-        ...     "values/max": [None],
-        ...     "values/quantiles": [None],
-        ... }, schema=df_3.schema)
+        >>> df_1 = pl.DataFrame(
+        ...     {
+        ...         "code": [None, "A", "A", "B", "C"],
+        ...         "modifier1": [None, 1, 2, 1, 2],
+        ...         "code/n_subjects": [10, 1, 1, 2, 2],
+        ...         "code/n_occurrences": [13, 2, 1, 3, 2],
+        ...         "values/n_subjects": [8, 1, 1, 2, 2],
+        ...         "values/n_occurrences": [12, 2, 1, 3, 2],
+        ...         "values/n_ints": [4, 0, 1, 3, 1],
+        ...         "values/sum": [13.2, 2.2, 6.0, 14.0, 12.5],
+        ...         "values/sum_sqd": [21.3, 2.42, 36.0, 84.0, 81.25],
+        ...         "values/min": [-1, 0, -1, 2, 2],
+        ...         "values/max": [8.0, 1.1, 6.0, 8.0, 7.5],
+        ...         "values/quantiles": [[1.1, 1.1], [6.0], [6.0], [5.0, 7.5], []],
+        ...     }
+        ... )
+        >>> df_2 = pl.DataFrame(
+        ...     {
+        ...         "code": ["A", "A", "B", "C"],
+        ...         "modifier1": [1, 2, 1, None],
+        ...         "code/n_subjects": [3, 3, 4, 4],
+        ...         "code/n_occurrences": [10, 11, 8, 11],
+        ...         "values/n_subjects": [0, 1, 2, 2],
+        ...         "values/n_occurrences": [0, 4, 3, 2],
+        ...         "values/n_ints": [0, 1, 3, 1],
+        ...         "values/sum": [0.0, 7.0, 14.0, 12.5],
+        ...         "values/sum_sqd": [0.0, 103.2, 84.0, 81.25],
+        ...         "values/min": [None, -1.0, 0.2, -2.0],
+        ...         "values/max": [None, 6.2, 1.0, 1.5],
+        ...         "values/quantiles": [[1.3, -1.1, 2.0], [6.0, 1.2], [3.0, 2.5], [11.1, 12.0]],
+        ...     }
+        ... )
+        >>> df_3 = pl.DataFrame(
+        ...     {
+        ...         "code": ["D"],
+        ...         "modifier1": [1],
+        ...         "code/n_subjects": [2],
+        ...         "code/n_occurrences": [2],
+        ...         "values/n_subjects": [1],
+        ...         "values/n_occurrences": [3],
+        ...         "values/n_ints": [3],
+        ...         "values/sum": [2],
+        ...         "values/sum_sqd": [4],
+        ...         "values/min": [0],
+        ...         "values/max": [2],
+        ...         "values/quantiles": [[]],
+        ...     }
+        ... )
+        >>> df_empty = pl.DataFrame(
+        ...     {
+        ...         "code": [],
+        ...         "modifier1": [],
+        ...         "code/n_subjects": [],
+        ...         "code/n_occurrences": [],
+        ...         "values/n_subjects": [],
+        ...         "values/n_occurrences": [],
+        ...         "values/n_ints": [],
+        ...         "values/sum": [],
+        ...         "values/sum_sqd": [],
+        ...         "values/min": [],
+        ...         "values/max": [],
+        ...         "values/quantiles": [],
+        ...     },
+        ...     schema=df_3.schema,
+        ... )
+        >>> df_null_empty = pl.DataFrame(
+        ...     {
+        ...         "code": [None],
+        ...         "modifier1": [None],
+        ...         "code/n_subjects": [0],
+        ...         "code/n_occurrences": [0],
+        ...         "values/n_subjects": [0],
+        ...         "values/n_occurrences": [0],
+        ...         "values/n_ints": [0],
+        ...         "values/sum": [0],
+        ...         "values/sum_sqd": [0],
+        ...         "values/min": [None],
+        ...         "values/max": [None],
+        ...         "values/quantiles": [None],
+        ...     },
+        ...     schema=df_3.schema,
+        ... )
         >>> code_modifiers = ["modifier1"]
         >>> stage_cfg = DictConfig({"aggregations": ["code/n_subjects", "values/n_ints"]})
         >>> reducer = reducer_fntr(stage_cfg, code_modifiers)
@@ -615,16 +653,18 @@ def reducer_fntr(
         │ C    ┆ 2         ┆ 2               ┆ 1             │
         │ D    ┆ 1         ┆ 2               ┆ 3             │
         └──────┴───────────┴─────────────────┴───────────────┘
-        >>> cfg = DictConfig({
-        ...     "code_modifiers": ["modifier1"],
-        ...     "code_processing_stages": {
-        ...         "stage1": ["code/n_subjects", "values/n_ints"],
-        ...         "stage2": ["code/n_occurrences", "values/sum"],
-        ...         "stage3.A": ["values/n_subjects", "values/n_occurrences"],
-        ...         "stage3.B": ["values/sum_sqd", "values/min", "values/max"],
-        ...         "stage4": ["INVALID"],
+        >>> cfg = DictConfig(
+        ...     {
+        ...         "code_modifiers": ["modifier1"],
+        ...         "code_processing_stages": {
+        ...             "stage1": ["code/n_subjects", "values/n_ints"],
+        ...             "stage2": ["code/n_occurrences", "values/sum"],
+        ...             "stage3.A": ["values/n_subjects", "values/n_occurrences"],
+        ...             "stage3.B": ["values/sum_sqd", "values/min", "values/max"],
+        ...             "stage4": ["INVALID"],
+        ...         },
         ...     }
-        ... })
+        ... )
         >>> stage_cfg = DictConfig({"aggregations": ["code/n_occurrences", "values/sum"]})
         >>> reducer = reducer_fntr(stage_cfg, code_modifiers)
         >>> reducer(df_1, df_2, df_3, df_empty, df_null_empty)
@@ -680,9 +720,11 @@ def reducer_fntr(
         Traceback (most recent call last):
             ...
         KeyError: 'Column values/min not found in DataFrame 0 for reduction.'
-        >>> stage_cfg = DictConfig({
-        ...     "aggregations": [{"name": "values/quantiles", "quantiles": [0.25, 0.5, 0.75]}],
-        ... })
+        >>> stage_cfg = DictConfig(
+        ...     {
+        ...         "aggregations": [{"name": "values/quantiles", "quantiles": [0.25, 0.5, 0.75]}],
+        ...     }
+        ... )
         >>> reducer = reducer_fntr(stage_cfg, code_modifiers)
         >>> reducer(df_1, df_2, df_3, df_empty, df_null_empty).unnest("values/quantiles")
         shape: (7, 5)
@@ -706,7 +748,7 @@ def reducer_fntr(
 
     agg_operations = {}
     for agg in aggregations:
-        if isinstance(agg, (dict, DictConfig)):
+        if isinstance(agg, dict | DictConfig):
             agg_name = agg["name"]
             agg_kwargs = {k: v for k, v in agg.items() if k != "name"}
         else:
@@ -723,7 +765,7 @@ def reducer_fntr(
         for i, df in enumerate(dfs):
             agg_selectors = []
             for agg in aggregations:
-                if isinstance(agg, (dict, DictConfig)):
+                if isinstance(agg, dict | DictConfig):
                     agg = agg["name"]
                 if agg not in df.columns:
                     raise KeyError(f"Column {agg} not found in DataFrame {i} for reduction.")

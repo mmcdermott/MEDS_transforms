@@ -23,9 +23,9 @@ for path in sorted(src.rglob("*.py")):
         doc_path = doc_path.with_name("index.md")
         full_doc_path = full_doc_path.with_name("index.md")
 
-        readme_path = Path("/".join(parts + ("README.md",)))
+        readme_path = Path("/".join((*parts, "README.md")))
         if (src / readme_path).exists():
-            md_file_lines.append(f'--8<-- "src/{str(readme_path)}"')
+            md_file_lines.append(f'--8<-- "src/{readme_path!s}"')
     elif parts[-1] == "__main__":
         continue
 

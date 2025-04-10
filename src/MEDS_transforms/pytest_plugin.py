@@ -12,16 +12,16 @@ Pytest Plugin Capabilities:
       may be logged by MEDS testing helpers upon partial initialization of dataset examples.
 """
 
+from collections.abc import Callable
+from contextlib import contextmanager
 import logging
+from pathlib import Path
 import subprocess
 import tempfile
 import tomllib
-from collections.abc import Callable
-from contextlib import contextmanager
-from pathlib import Path
 
-import pytest
 from omegaconf import OmegaConf
+import pytest
 
 from . import __package_name__
 from .configs.stage import StageConfig
@@ -120,8 +120,10 @@ def pytest_configure(config: pytest.Config):
 
     Examples:
         >>> mock_stages = {
-        ...     "stage_1_1": MagicMock(), "stage_1_2": MagicMock(), "stage_2_1": MagicMock(),
-        ...     "stage_meds_transforms": MagicMock()
+        ...     "stage_1_1": MagicMock(),
+        ...     "stage_1_2": MagicMock(),
+        ...     "stage_2_1": MagicMock(),
+        ...     "stage_meds_transforms": MagicMock(),
         ... }
         >>> mock_stages["stage_1_1"].dist.metadata.__getitem__.return_value = "package1"
         >>> mock_stages["stage_1_2"].dist.metadata.__getitem__.return_value = "package1"
@@ -136,7 +138,7 @@ def pytest_configure(config: pytest.Config):
 
         >>> CLI_options = {
         ...     "test_stages_for_package": ["package1", "package2"],
-        ...     "test_stage": ["stage_1_1", "stage_2_1"]
+        ...     "test_stage": ["stage_1_1", "stage_2_1"],
         ... }
         >>> config = MagicMock()
         >>> config.getoption.side_effect = lambda x: CLI_options.get(x, [])
@@ -177,8 +179,8 @@ def pytest_configure(config: pytest.Config):
         >>> CLI_options["test_stages_for_package"] = []
         >>> CLI_options["test_stage"] = []
         >>> with patch("MEDS_transforms.pytest_plugin.get_all_registered_stages", return_value=mock_stages):
-        ...    with patch("MEDS_transforms.pytest_plugin._auto_detect_package", return_value=None):
-        ...        pytest_configure(config)
+        ...     with patch("MEDS_transforms.pytest_plugin._auto_detect_package", return_value=None):
+        ...         pytest_configure(config)
         >>> list(config.allowed_stages.keys())
         ['stage_1_1', 'stage_1_2', 'stage_2_1']
         >>> config.allowed_stage_scenarios
@@ -210,7 +212,7 @@ def pytest_configure(config: pytest.Config):
         if pkg_valid and stage_valid:
             allowed_stages[n] = ep.load()
 
-    missing_stages = sorted(list(set(stages) - set(allowed_stages.keys())))
+    missing_stages = sorted(set(stages) - set(allowed_stages.keys()))
 
     if missing_stages:
         raise ValueError(f"Invalid stage(s) specified for {packages_to_test}: {', '.join(missing_stages)}.")
@@ -251,7 +253,7 @@ def _auto_detect_package(root: Path) -> str | None:
     If we can't find a pyproject.toml file or if it can't be parsed, we return `None`.
 
         >>> with tempfile.TemporaryDirectory() as tmpdir:
-        ...     print(_auto_detect_package(Path(tmpdir))) # No toml file!
+        ...     print(_auto_detect_package(Path(tmpdir)))  # No toml file!
         None
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     pyproject_fp = Path(tmpdir) / "pyproject.toml"
@@ -373,7 +375,7 @@ def pipeline_tester(
 
     We'll use the real, default example for the `filter_subjects` stage here.
 
-        >>> pipeline_yaml = "stages: [filter_subjects]" # This wouldn't work in real life
+        >>> pipeline_yaml = "stages: [filter_subjects]"  # This wouldn't work in real life
 
     If we run and throw an error from the fake shell runner, it will raise an AssertionError.
 
@@ -468,13 +470,13 @@ def pipeline_tester(
         last_data_stage = (None, None)
         last_metadata_stage = (None, None)
 
-        for name, stage in zip(pipeline_stages, stage_examples):
+        for name, stage in zip(pipeline_stages, stage_examples, strict=True):
             if stage.want_data is not None:
                 last_data_stage = (name, stage)
             if stage.want_metadata is not None:
                 last_metadata_stage = (name, stage)
 
-        for name, stage in zip(pipeline_stages, stage_examples):
+        for name, stage in zip(pipeline_stages, stage_examples, strict=True):
             is_last_data_stage = last_data_stage[0] == name
             is_last_metadata_stage = last_metadata_stage[0] == name
 

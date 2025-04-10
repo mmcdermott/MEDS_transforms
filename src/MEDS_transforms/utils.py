@@ -55,7 +55,8 @@ def pretty_list_directory(path: Path, prefix: str | None = None) -> list[str]:
         ...     (path / "foo").mkdir()
         ...     (path / "bar").mkdir()
         ...     (path / "bar" / "baz.csv").touch()
-        ...     for l in pretty_list_directory(path): print(l) # This is just used as newlines break doctests
+        ...     for l in pretty_list_directory(path):
+        ...         print(l)  # This is just used as newlines break doctests
         ├── bar
         │   └── baz.csv
         ├── file1.txt
@@ -92,7 +93,7 @@ def pretty_list_directory(path: Path, prefix: str | None = None) -> list[str]:
 
     lines = []
 
-    children = sorted(list(path.iterdir()))
+    children = sorted(path.iterdir())
 
     for i, child in enumerate(children):
         is_last = i == len(children) - 1

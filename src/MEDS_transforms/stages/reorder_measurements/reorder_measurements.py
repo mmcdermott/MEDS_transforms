@@ -1,10 +1,10 @@
 """A polars-to-polars transformation function for filtering subjects by sequence length."""
 
-import logging
 from collections.abc import Callable
+import logging
 
-import polars as pl
 from omegaconf import DictConfig, ListConfig
+import polars as pl
 
 from .. import Stage
 
@@ -24,13 +24,13 @@ def get_smallest_valid_uint_type(num: int | float | pl.Expr) -> pl.DataType:
     Examples:
         >>> get_smallest_valid_uint_type(num=1)
         UInt8
-        >>> get_smallest_valid_uint_type(num=2**8-1)
+        >>> get_smallest_valid_uint_type(num=2**8 - 1)
         UInt16
-        >>> get_smallest_valid_uint_type(num=2**16-1)
+        >>> get_smallest_valid_uint_type(num=2**16 - 1)
         UInt32
-        >>> get_smallest_valid_uint_type(num=2**32-1)
+        >>> get_smallest_valid_uint_type(num=2**32 - 1)
         UInt64
-        >>> get_smallest_valid_uint_type(num=2**64-1)
+        >>> get_smallest_valid_uint_type(num=2**64 - 1)
         Traceback (most recent call last):
             ...
         ValueError: Value is too large to be expressed as an int!
@@ -69,10 +69,14 @@ def reorder_measurements(
 
     Examples:
         >>> code_metadata_df = pl.DataFrame({"code": ["A", "A", "B", "C"], "modifier1": [1, 2, 1, 2]})
-        >>> data = pl.DataFrame({
-        ...     "subject_id":[1, 1, 2, 2], "time": [1, 1, 1, 1],
-        ...     "code": ["A", "B", "A", "C"], "modifier1": [1, 2, 1, 2]
-        ... })
+        >>> data = pl.DataFrame(
+        ...     {
+        ...         "subject_id": [1, 1, 2, 2],
+        ...         "time": [1, 1, 1, 1],
+        ...         "code": ["A", "B", "A", "C"],
+        ...         "modifier1": [1, 2, 1, 2],
+        ...     }
+        ... )
         >>> stage_cfg = DictConfig({"ordered_code_patterns": ["B", "A"]})
         >>> fn = reorder_measurements(stage_cfg, code_metadata_df, ["modifier1"])
         >>> fn(data.lazy()).collect()
@@ -87,17 +91,28 @@ def reorder_measurements(
         │ 2          ┆ 1    ┆ A    ┆ 1         │
         │ 2          ┆ 1    ┆ C    ┆ 2         │
         └────────────┴──────┴──────┴───────────┘
-        >>> code_metadata_df = pl.DataFrame({
-        ...     "code": ["LAB//foo", "ADMISSION//bar", "LAB//baz", "ADMISSION//qux", "DISCHARGE"],
-        ... })
-        >>> data = pl.DataFrame({
-        ...     "subject_id":[1, 1, 1, 2, 2, 2],
-        ...     "time": [1, 1, 1, 1, 2, 3],
-        ...     "code": ["LAB//foo", "ADMISSION//bar", "LAB//baz", "ADMISSION//qux", "DISCHARGE", "LAB//baz"],
-        ... })
-        >>> stage_cfg = DictConfig({
-        ...     "ordered_code_patterns": ["ADMISSION.*", "LAB//baza", "LAB//f$", "LAB//b.*", "DISCHARGE"]
-        ... })
+        >>> code_metadata_df = pl.DataFrame(
+        ...     {
+        ...         "code": ["LAB//foo", "ADMISSION//bar", "LAB//baz", "ADMISSION//qux", "DISCHARGE"],
+        ...     }
+        ... )
+        >>> data = pl.DataFrame(
+        ...     {
+        ...         "subject_id": [1, 1, 1, 2, 2, 2],
+        ...         "time": [1, 1, 1, 1, 2, 3],
+        ...         "code": [
+        ...             "LAB//foo",
+        ...             "ADMISSION//bar",
+        ...             "LAB//baz",
+        ...             "ADMISSION//qux",
+        ...             "DISCHARGE",
+        ...             "LAB//baz",
+        ...         ],
+        ...     }
+        ... )
+        >>> stage_cfg = DictConfig(
+        ...     {"ordered_code_patterns": ["ADMISSION.*", "LAB//baza", "LAB//f$", "LAB//b.*", "DISCHARGE"]}
+        ... )
         >>> fn = reorder_measurements(stage_cfg, code_metadata_df)
         >>> fn(data.lazy()).collect()
         shape: (6, 3)
@@ -142,7 +157,7 @@ def reorder_measurements(
     if not ordered_code_patterns:
         return lambda df: df
 
-    if not isinstance(ordered_code_patterns, (list, ListConfig)):
+    if not isinstance(ordered_code_patterns, list | ListConfig):
         raise ValueError(
             f"The 'ordered_code_patterns' field must be a list of strings. Got {ordered_code_patterns}."
         )
