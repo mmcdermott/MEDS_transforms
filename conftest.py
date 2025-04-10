@@ -11,6 +11,8 @@ from unittest.mock import MagicMock, patch
 import polars as pl
 import pytest
 
+from MEDS_transforms.utils import print_directory_contents
+
 
 @contextmanager
 def print_warnings(caplog: pytest.LogCaptureFixture):
@@ -38,6 +40,7 @@ def _setup_doctest_namespace(
         {
             "MagicMock": MagicMock,
             "patch": patch,
+            "print_directory_contents": print_directory_contents,
             "simple_static_MEDS": simple_static_MEDS,
             "print_warnings": partial(print_warnings, caplog),
             "json": json,

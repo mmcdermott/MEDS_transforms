@@ -23,7 +23,10 @@ from omegaconf import DictConfig, OmegaConf
 from polars.testing import assert_frame_equal
 from yaml import load as load_yaml
 
-from .utils import _BRANCH, _SPACE, pretty_list_directory
+from ..utils import pretty_list_directory
+
+_SPACE = "    "
+_BRANCH = "│   "
 
 try:
     from yaml import CLoader as Loader

@@ -1,8 +1,9 @@
-import importlib
+import logging
 import subprocess
 import tempfile
 import tomllib
 from collections.abc import Callable
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -12,8 +13,22 @@ from . import __package_name__
 from .configs.stage import StageConfig
 from .stages import StageExample, get_all_registered_stages
 
+logger = logging.getLogger(__name__)
+
 # Get all registered stages
 REGISTERED_STAGES = get_all_registered_stages()
+
+
+@contextmanager
+def suppress_logging(level: int = logging.CRITICAL):
+    """Suppress logging at the specified level."""
+    logger = logging.getLogger()
+    original_level = logger.getEffectiveLevel()
+    logger.setLevel(level)
+    try:
+        yield
+    finally:
+        logger.setLevel(original_level)
 
 
 def pytest_addoption(parser):  # pragma: no cover
@@ -43,27 +58,105 @@ def pytest_addoption(parser):  # pragma: no cover
 
 
 def pytest_configure(config: pytest.Config):
-    detected_package = _auto_detect_package(config)
-    config.detected_package = detected_package
+    """Configure pytest by attaching the appropriate package to use to the config object."""
 
-    cli_packages = config.getoption("test_stages_for_package")
-
-    # Set packages_to_test based on CLI or detection
-    if cli_packages:
+    if cli_packages := config.getoption("test_stages_for_package"):
         packages_to_test = cli_packages
-    elif detected_package:
+    elif detected_package := _auto_detect_package(Path(config.rootpath)):
         packages_to_test = [detected_package]
     else:
-        packages_to_test = None  # will handle later
+        packages_to_test = []
 
-    config.packages_to_test = packages_to_test
+    stages = config.getoption("test_stage")
+
+    allowed_stages = {}
+    for n, ep in REGISTERED_STAGES.items():
+        pkg = ep.dist.metadata["Name"]
+
+        no_packages_specified = len(packages_to_test) == 0
+        pkg_valid = (no_packages_specified and (pkg != __package_name__)) or (pkg in packages_to_test)
+
+        stage_valid = (not stages) or (n in stages)
+
+        if pkg_valid and stage_valid:
+            allowed_stages[n] = ep.load()
+
+    missing_stages = sorted(list(set(stages) - set(allowed_stages.keys())))
+
+    if missing_stages:
+        raise ValueError(
+            f"Invalid stage(s) specified: {', '.join(missing_stages)}. "
+            f"Available stages given specified package ({packages_to_test}) are: {', '.join(allowed_stages)}."
+        )
+
+    config.allowed_stages = allowed_stages
+    with suppress_logging():
+        config.allowed_stage_scenarios = {n: s.test_cases for n, s in allowed_stages.items()}
 
 
-def _auto_detect_package(config: pytest.Config) -> str | None:
-    """Attempts to automatically detect the package name based on the pytest Config's rootpath."""
-    rootpath = Path(config.rootpath)
-    pyproject_file = rootpath / "pyproject.toml"
-    setup_file = rootpath / "setup.py"
+def _auto_detect_package(root: Path) -> str | None:
+    """Attempts to automatically detect the package name based on the pytest Config's rootpath.
+
+    This is a best-effort attempt to find the package name by looking for a pyproject.toml file in the
+    rootpath of the pytest config (passed directly). If this file is not found, or if the package name cannot
+    be determined, `None` is returned.
+
+    > [!Warning]
+    > This function _only_ works with `pyproject.toml` files that are stored in the `root` path. `setup.py`
+    > files are not supported!
+
+    Args:
+        root: The rootpath of the pytest session.
+
+    Returns:
+        The package name if found, otherwise None.
+
+    Examples:
+
+        If we find a pyproject.toml file, we can use that to get the package name.
+
+        >>> toml_contents = '''
+        ... [project]
+        ... name = "my_package"
+        ... '''
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     pyproject_fp = Path(tmpdir) / "pyproject.toml"
+        ...     _ = pyproject_fp.write_text(toml_contents)
+        ...     print(_auto_detect_package(Path(tmpdir)))
+        my_package
+
+        If we can't find a pyproject.toml file or if it can't be parsed, we return None.
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     print(_auto_detect_package(Path(tmpdir))) # No toml file!
+        None
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     pyproject_fp = Path(tmpdir) / "pyproject.toml"
+        ...     _ = pyproject_fp.write_text("Invalid TOML")
+        ...     print(_auto_detect_package(Path(tmpdir)))
+        None
+
+        If a setup.py file is found, we warn the user that it is not supported and return None.
+
+        >>> setup_contents = '''
+        ... from setuptools import setup
+        ... setup(
+        ...     name="my_package",
+        ...     version="0.1",
+        ...     packages=["my_package"],
+        ... )
+        ... '''
+        >>> with tempfile.TemporaryDirectory() as tmpdir, print_warnings():
+        ...     setup_fp = Path(tmpdir) / "setup.py"
+        ...     _ = setup_fp.write_text(setup_contents)
+        ...     print(_auto_detect_package(Path(tmpdir)))
+        None
+        Warning: setup.py file found in /tmp/tmp..., but no pyproject.toml. Auto detection of package
+        name only works with pyproject.toml files currently, so `None` will be returned.
+    """
+
+    pyproject_file = root / "pyproject.toml"
+    setup_file = root / "setup.py"
 
     if pyproject_file.exists():
         try:
@@ -72,44 +165,17 @@ def _auto_detect_package(config: pytest.Config) -> str | None:
                 return pyproject.get("project", {}).get("name")
         except Exception:  # pragma: no cover
             pass
-    if setup_file.exists():
-        spec = importlib.util.spec_from_file_location("setup", setup_file)
-        setup_module = importlib.util.module_from_spec(spec)
-        try:
-            spec.loader.exec_module(setup_module)
-            return getattr(setup_module, "__name__", None)
-        except Exception:  # pragma: no cover
-            pass
+    elif setup_file.exists():
+        logger.warning(
+            f"setup.py file found in {root}, but no pyproject.toml. Auto detection of package name only "
+            "works with pyproject.toml files currently, so `None` will be returned."
+        )
     return None
-
-
-def get_stages_under_test(config: pytest.Config) -> dict[str, dict[str, StageExample]]:
-    packages = config.packages_to_test
-
-    if packages is None:
-        out = {n: ep for n, ep in REGISTERED_STAGES.items() if ep.dist.metadata["Name"] != __package_name__}
-    else:
-        out = {n: ep for n, ep in REGISTERED_STAGES.items() if ep.dist.metadata["Name"] in packages}
-
-    stages = config.getoption("test_stage")
-    if stages:
-        if any(stage not in out for stage in stages):
-            raise ValueError(
-                f"Invalid stage(s) specified: {', '.join(s for s in stages if s not in out)}. "
-                f"Available stages given specified package ({packages}) are: {', '.join(out.keys())}."
-            )
-        out = {stage: ep for stage, ep in out.items() if stage in stages}
-
-    out = {n: ep.load() for n, ep in out.items()}
-    return out
 
 
 def pytest_generate_tests(metafunc):
     """Generate tests for registered stages based on the command line options."""
     config = metafunc.config
-
-    config.allowed_stages = get_stages_under_test(config)
-    config.allowed_stage_scenarios = {n: s.test_cases for n, s in config.allowed_stages.items()}
 
     if "stage_scenario" in metafunc.fixturenames:
         arg_names = ["stage", "stage_scenario"]

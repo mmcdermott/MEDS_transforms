@@ -1299,7 +1299,6 @@ class Stage:
             associated default configuration file path and examples directory, if possible. We can demonstrate
             how this works by patching out the inspect module to return a file path that we'll create here:
 
-            >>> from MEDS_transforms.stages.utils import pretty_list_directory
             >>> config = DictConfig({"arg1": {"option1": "foo"}, "arg2": [1, 2.3, None], "arg3": None})
             >>> with tempfile.TemporaryDirectory() as tmpdir:
             ...     # Make the stage directory:
@@ -1325,7 +1324,7 @@ class Stage:
             ...     # What does the directory structure look like?
             ...     print("Root directory:")
             ...     print("-----------------")
-            ...     for line in pretty_list_directory(Path(tmpdir)): print(line)
+            ...     print_directory_contents(tmpdir)
             ...     # Mock out the inspect module to return the calling file we're constructing:
             ...     with patch("inspect.currentframe") as mock:
             ...         mock.return_value.f_back.f_code.co_filename = str(calling_file)
@@ -1466,7 +1465,7 @@ class Stage:
             ...     # What does the directory structure look like?
             ...     print("Root directory:")
             ...     print("-----------------")
-            ...     for line in pretty_list_directory(Path(tmpdir)): print(line)
+            ...     print_directory_contents(tmpdir)
             ...     # Mock out the inspect module to return the calling file we're constructing:
             ...     with patch("inspect.currentframe") as mock:
             ...         mock.return_value.f_back.f_code.co_filename = str(calling_file)

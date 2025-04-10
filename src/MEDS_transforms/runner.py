@@ -305,12 +305,11 @@ def main(cfg: DictConfig):
         What controls exist? Firstly, upon completion of each stage, it also writes a ".done" file to the log
         dir for that stage, and a global "_all_stages.done" file when the pipeline is done. Let's see them:
 
-        >>> from MEDS_transforms.stages.examples import pretty_list_directory
         >>> with tempfile.TemporaryDirectory() as test_dir:
         ...     test_dir = Path(test_dir)
         ...     profile_main(test_dir)
         ...     print("Log contents:")
-        ...     for line in pretty_list_directory(test_dir / "logs"): print(line)
+        ...     print_directory_contents(test_dir / "logs")
         Running reshard_to_split
         Running count_codes
         Log contents:
@@ -320,7 +319,6 @@ def main(cfg: DictConfig):
 
         If we the global done file exists in advance, the pipeline will skip all stages:
 
-        >>> from MEDS_transforms.stages.examples import pretty_list_directory
         >>> with tempfile.TemporaryDirectory() as test_dir:
         ...     test_dir = Path(test_dir)
         ...     log_dir = test_dir / "logs"
@@ -329,13 +327,12 @@ def main(cfg: DictConfig):
         ...     global_done_file.touch()
         ...     profile_main(test_dir)
         ...     print("Log contents:")
-        ...     for line in pretty_list_directory(log_dir): print(line)
+        ...     print_directory_contents(log_dir)
         Log contents:
         └── _all_stages.done
 
         This applies to each individual stage's done file too:
 
-        >>> from MEDS_transforms.stages.examples import pretty_list_directory
         >>> with tempfile.TemporaryDirectory() as test_dir:
         ...     test_dir = Path(test_dir)
         ...     log_dir = test_dir / "logs"
@@ -344,7 +341,7 @@ def main(cfg: DictConfig):
         ...     reshard_done_file.touch()
         ...     profile_main(test_dir)
         ...     print("Log contents:")
-        ...     for line in pretty_list_directory(log_dir): print(line)
+        ...     print_directory_contents(log_dir)
         Running count_codes
         Log contents:
         ├── _all_stages.done
