@@ -55,10 +55,7 @@ def shuffle_shards(shards: list[str], cfg: DictConfig) -> list[str]:
         ValueError: Hash collision for shard train/0 with add_str 1!
     """
 
-    if "worker" in cfg:
-        add_str = str(cfg["worker"])
-    else:
-        add_str = str(datetime.now())
+    add_str = str(cfg["worker"]) if "worker" in cfg else str(datetime.now())
 
     shard_keys = []
     for shard in shards:
