@@ -1,7 +1,7 @@
 default_language_version:
   python: python3.12
 
-exclude: "docs/index.md|MIMIC-IV_Example/README.md|eICU_Example/README.md|AUMCdb_Example/README.md"
+exclude: "docs/index.md"
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -22,14 +22,14 @@ repos:
 
   # python code formatting
   - repo: https://github.com/psf/black
-    rev: 24.10.0
+    rev: 25.1.0
     hooks:
       - id: black
         args: [--line-length, "110"]
 
   # python import sorting
   - repo: https://github.com/PyCQA/isort
-    rev: 5.13.2
+    rev: 6.0.1
     hooks:
       - id: isort
         args: ["--profile", "black", "--filter-files", "-o", "wandb"]
@@ -42,7 +42,7 @@ repos:
 
   # python upgrading syntax to newer version
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.19.0
+    rev: v3.19.1
     hooks:
       - id: pyupgrade
         args: [--py311-plus]
@@ -56,7 +56,7 @@ repos:
 
   # python check (PEP8), programming errors and code complexity
   - repo: https://github.com/PyCQA/flake8
-    rev: 7.1.1
+    rev: 7.2.0
     hooks:
       - id: flake8
         args:
@@ -87,12 +87,13 @@ repos:
 
   # md formatting
   - repo: https://github.com/executablebooks/mdformat
-    rev: 0.7.18
+    rev: 0.7.22
     hooks:
       - id: mdformat
         args: ["--number"]
         additional_dependencies:
           - mdformat-gfm
+          - mdformat-gfm-alerts
           - mdformat-tables
           - mdformat_frontmatter
           - mdformat-black
@@ -100,11 +101,10 @@ repos:
           - mdformat-shfmt
           - mdformat-mkdocs
           - mdformat-toc
-          - mdformat-admon
 
   # word spelling linter
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.3.0
+    rev: v2.4.1
     hooks:
       - id: codespell
         args:
@@ -113,13 +113,13 @@ repos:
 
   # jupyter notebook cell output clearing
   - repo: https://github.com/kynan/nbstripout
-    rev: 0.7.1
+    rev: 0.8.1
     hooks:
       - id: nbstripout
 
   # jupyter notebook linting
   - repo: https://github.com/nbQA-dev/nbQA
-    rev: 1.8.7
+    rev: 1.9.1
     hooks:
       - id: nbqa-black
         args: ["--line-length=110"]

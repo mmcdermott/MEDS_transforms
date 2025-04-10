@@ -1,4 +1,4 @@
-# MEDS Transforms
+# MEDS Transforms: Build and run complex pipelines over MEDS datasets via simple parts
 
 [![PyPI - Version](https://img.shields.io/pypi/v/MEDS-transforms)](https://pypi.org/project/MEDS-transforms/)
 ![python](https://img.shields.io/badge/-Python_3.12-blue?logo=python&logoColor=white)
@@ -10,6 +10,97 @@
 [![license](https://img.shields.io/badge/License-MIT-green.svg?labelColor=gray)](https://github.com/mmcdermott/MEDS_transforms#license)
 [![PRs](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/mmcdermott/MEDS_transforms/pulls)
 [![contributors](https://img.shields.io/github/contributors/mmcdermott/MEDS_transforms.svg)](https://github.com/mmcdermott/MEDS_transforms/graphs/contributors)
+
+## 🚀 Quick Start
+
+### 1. Install via `pip`:
+
+```bash
+pip install MEDS-transforms
+```
+
+### 2. Craft a pipeline YAML file:
+
+```yaml
+input_dir: $MEDS_ROOT
+cohort_dir: $PIPELINE_OUTPUT
+
+description: Your special pipeline
+
+stages:
+  - filter_subjects:
+      min_events_per_subject: 5
+  - add_time_derived_measurements:
+      age:
+        DOB_code: MEDS_BIRTH
+        age_code: AGE
+        age_unit: years
+      time_of_day:
+        time_of_day_code: TIME_OF_DAY
+        endpoints: [6, 12, 18, 24]
+  - fit_outlier_detection:
+      _base_stage: aggregate_code_metadata
+      aggregations:
+        - values/n_occurrences
+        - values/sum
+        - values/sum_sqd
+  - occlude_outliers:
+      stddev_cutoff: 1
+  - fit_normalization:
+      _base_stage: aggregate_code_metadata
+      aggregations:
+        - code/n_occurrences
+        - code/n_subjects
+        - values/n_occurrences
+        - values/sum
+        - values/sum_sqd
+  - fit_vocabulary_indices
+  - normalization
+```
+
+Save your pipeline YAML file on disk at `$PIPELINE_YAML`.
+
+### 3. Run the pipeline
+
+In the terminal, run
+
+```bash
+MEDS_transform-pipeline pipeline_fp="$PIPELINE_YAML"
+```
+
+After you do, you will see output files stored in `$PIPELINE_OUTPUT` with the results of each stage of the
+pipeline, stored in stage specific directories, and the global output in `$PIPELINE_OUTPUT/data` and
+`$PIPELINE_OUTPUT/metadata` (for data and metadata outputs, respectively). That's it!
+
+## Advanced Features
+
+### Supported Operations
+
+MEDS-Transforms pipelines are broken down into a series of _stages_; each of which is a small, simple function
+that can be applied to MEDS data or metadata shards. Stages can be built-in or defined in your own or other
+packages. See [the documentation](<>) for a full list of supported stages that are built in with MEDS-Transforms!
+
+### Parallelization
+
+MEDS-Transforms pipelines can be run in serial mode or with controllable parallelization via Hydra launchers.
+The use of Hydra launchers and the core design principle of this library means that this parallelization is as
+simple as launching the individual stages multiple times with near-identical arguments to spin up more workers
+in parallel, and they can be launched in any mode over a networked file-system that you like. For example,
+default supported modes include:
+
+- Local parallelism via the `joblib` Hydra launcher, which can be used to run multiple copies of the same
+    script in parallel on a single machine.
+- Slurm parallelism via the `submitit` Hydra launcher, which can be used to run multiple copies of the
+    same script in parallel on a cluster.
+
+> [!NOTE]
+> The `joblib` and `submitit` Hydra launchers are optional dependencies of this package. To install them, you
+> can run `pip install MEDS-transforms[local_parallelism]` or
+> `pip install MEDS-transforms[slurm_parallelism]`, respectively.
+
+### Defining your own stages
+
+## Documentation
 
 This repository contains a set of functions and scripts for extraction to and transformation/pre-processing of
 MEDS-formatted data.

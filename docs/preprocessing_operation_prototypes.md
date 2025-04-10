@@ -1,6 +1,7 @@
 # MEDS Pre-processing Operation Prototypes STILL IN PROGRESS
 
-**NOTE**: This document is currently aspirational, not yet implemented. Some functions in these patterns are
+[!NOTE]
+This document is currently aspirational, not yet implemented. Some functions in these patterns are
 implemented, but not universally.
 
 To support communal development and sharing of pre-processing operations, MEDS defines a set of core operation

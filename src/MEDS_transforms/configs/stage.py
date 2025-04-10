@@ -237,8 +237,8 @@ class StageConfig:
             case str() as name:
                 return cls(name=name)
             case dict() | DictConfig() as config:
-                if cls._dict_arg_error_str(config):
-                    raise ValueError(f"Invalid stage config: {cls._dict_arg_error_str(config)}")
+                if error_str := cls._dict_arg_error_str(config):
+                    raise ValueError(f"Invalid stage config: {error_str}")
 
                 meta_keys, non_meta_keys = cls._split_meta_keys(config)
                 stage_name = list(non_meta_keys.keys())[0]

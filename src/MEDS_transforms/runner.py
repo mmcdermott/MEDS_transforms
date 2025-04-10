@@ -258,7 +258,7 @@ def main(cfg: DictConfig):
     Examples:
         >>> cfg = DictConfig({
         ...     "pipeline_config_fp": "???", # we'll fill this in each test.
-        ...     "log_dir": "???", # We'll fill this in each test.
+        ...     "log_dir": "???", # We'll fill this in each test; it is added by Hydra during CLI usage.
         ...     "do_profile": False,
         ...     "_stage_runners": {},
         ... })
