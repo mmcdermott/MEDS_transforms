@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-import inspect
 from collections.abc import Callable
 from enum import Enum, auto
 from functools import partial
+import inspect
 from pathlib import Path
 from typing import Any, NotRequired, TypedDict
 
-import polars as pl
 from omegaconf import DictConfig
+import polars as pl
 
 from ..dataframe import DF_T
 
@@ -73,35 +73,44 @@ class ComputeFnType(Enum):
             The type of the compute function or `None` if invalid.
 
         Examples:
-            >>> def compute_fn(df: pl.DataFrame) -> pl.DataFrame: return df
+            >>> def compute_fn(df: pl.DataFrame) -> pl.DataFrame:
+            ...     return df
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.DIRECT: 1>
-            >>> def compute_fn(*dfs: pl.DataFrame) -> pl.DataFrame: return pl.concat(dfs)
+            >>> def compute_fn(*dfs: pl.DataFrame) -> pl.DataFrame:
+            ...     return pl.concat(dfs)
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.DIRECT: 1>
-            >>> def compute_fn(df: pl.DataFrame) -> dict[Any, list[Any]]: return df.to_dict(as_series=False)
+            >>> def compute_fn(df: pl.DataFrame) -> dict[Any, list[Any]]:
+            ...     return df.to_dict(as_series=False)
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.DIRECT: 1>
-            >>> def compute_fn(df: pl.DataFrame): return None
+            >>> def compute_fn(df: pl.DataFrame):
+            ...     return None
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.DIRECT: 1>
-            >>> def compute_fn(foo: pl.DataFrame): return None
+            >>> def compute_fn(foo: pl.DataFrame):
+            ...     return None
             >>> print(ComputeFnType.from_fn(compute_fn))
             None
-            >>> def compute_fn(df: pl.DataFrame, cfg: DictConfig) -> pl.DataFrame: return df
+            >>> def compute_fn(df: pl.DataFrame, cfg: DictConfig) -> pl.DataFrame:
+            ...     return df
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.UNBOUND: 2>
-            >>> def compute_fn(df: pl.DataFrame, foo: DictConfig) -> pl.DataFrame: return df
+            >>> def compute_fn(df: pl.DataFrame, foo: DictConfig) -> pl.DataFrame:
+            ...     return df
             >>> print(ComputeFnType.from_fn(compute_fn))
             None
-            >>> def compute_fn(df: pl.LazyFrame, cfg: DictConfig): return df
+            >>> def compute_fn(df: pl.LazyFrame, cfg: DictConfig):
+            ...     return df
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.UNBOUND: 2>
             >>> def compute_fn(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
             ...     return lambda df: df
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.FUNCTOR: 3>
-            >>> def compute_fn(cfg: DictConfig): return lambda df: df
+            >>> def compute_fn(cfg: DictConfig):
+            ...     return lambda df: df
             >>> ComputeFnType.from_fn(compute_fn)
             <ComputeFnType.FUNCTOR: 3>
             >>> def compute_fn(df: pl.DataFrame, cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:

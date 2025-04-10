@@ -1,12 +1,12 @@
 """Simple helper functions to define a consistent code vocabulary for normalizing a MEDS dataset."""
 
-import logging
 from collections.abc import Callable
 from enum import StrEnum
+import logging
 from pathlib import Path
 
-import polars as pl
 from omegaconf import DictConfig, OmegaConf
+import polars as pl
 
 from .. import Stage
 
@@ -46,27 +46,33 @@ def validate_code_metadata(code_metadata: pl.DataFrame, code_modifiers: list[str
         ValueError: If the `code_metadata` dataset is not unique on the `code` and `code_modifiers` columns.
 
     Examples:
-        >>> code_metadata = pl.DataFrame({
-        ...     "code":      ["A", "B",   "A",  "A"],
-        ...     "modifier1": ["X", "D",   "Z",  "Z"],
-        ...     "modifier2": [None, None, None, 3],
-        ... })
+        >>> code_metadata = pl.DataFrame(
+        ...     {
+        ...         "code": ["A", "B", "A", "A"],
+        ...         "modifier1": ["X", "D", "Z", "Z"],
+        ...         "modifier2": [None, None, None, 3],
+        ...     }
+        ... )
         >>> validate_code_metadata(code_metadata, ["modifier1", "modifier2"])
         >>> # This returns None in the absence of an exception.
-        >>> code_metadata = pl.DataFrame({
-        ...     "code":      ["A", "B",   "A",  "A"],
-        ...     "modifier1": ["X", "D",   "Z",  "Z"],
-        ...     "modifier2": [None, None, None, 3],
-        ... })
+        >>> code_metadata = pl.DataFrame(
+        ...     {
+        ...         "code": ["A", "B", "A", "A"],
+        ...         "modifier1": ["X", "D", "Z", "Z"],
+        ...         "modifier2": [None, None, None, 3],
+        ...     }
+        ... )
         >>> validate_code_metadata(code_metadata, ["modifier1", "modifier2", "missing_modifier"])
         Traceback (most recent call last):
             ...
         KeyError: "The following columns are not present in the code metadata: 'missing_modifier'."
-        >>> code_metadata = pl.DataFrame({
-        ...     "code":      ["A", "B",   "A",  "A", "B", "B"],
-        ...     "modifier1": ["X", "D",   "Z",  "Z", "Y", "Y"],
-        ...     "modifier2": [None, None, None, None, 2,  1],
-        ... })
+        >>> code_metadata = pl.DataFrame(
+        ...     {
+        ...         "code": ["A", "B", "A", "A", "B", "B"],
+        ...         "modifier1": ["X", "D", "Z", "Z", "Y", "Y"],
+        ...         "modifier2": [None, None, None, None, 2, 1],
+        ...     }
+        ... )
         >>> validate_code_metadata(code_metadata, ["modifier1", "modifier2"])
         Traceback (most recent call last):
             ...
@@ -129,11 +135,13 @@ def lexicographic_indices(code_metadata: pl.DataFrame, code_modifiers: list[str]
         ValueError: If the `code` and `code_modifier` columns are not all lexicographically orderable.
 
     Examples:
-        >>> code_metadata = pl.DataFrame({
-        ...     "code":      ["A", "B",   "A",  "A",  "B", "B"],
-        ...     "modifier1": ["X", "D",   None, "Z",  "Y", "Y"],
-        ...     "modifier2": [None, None, None, None, 2,   1],
-        ... })
+        >>> code_metadata = pl.DataFrame(
+        ...     {
+        ...         "code": ["A", "B", "A", "A", "B", "B"],
+        ...         "modifier1": ["X", "D", None, "Z", "Y", "Y"],
+        ...         "modifier2": [None, None, None, None, 2, 1],
+        ...     }
+        ... )
         >>> code_modifiers = ["modifier1", "modifier2"]
         >>> lexicographic_indices(code_metadata, code_modifiers)
         shape: (6, 4)
@@ -213,23 +221,27 @@ def main(cfg: DictConfig):
 
         To show this in action, we'll use this example code metadata file:
 
-        >>> code_metadata = pl.DataFrame({
-        ...     "code":      ["A", "B",   "A",  "A",  "B", "B"],
-        ...     "modifier1": ["X", "D",   None, "Z",  "Y", "Y"],
-        ...     "modifier2": [None, None, None, None, 2,   1],
-        ... })
+        >>> code_metadata = pl.DataFrame(
+        ...     {
+        ...         "code": ["A", "B", "A", "A", "B", "B"],
+        ...         "modifier1": ["X", "D", None, "Z", "Y", "Y"],
+        ...         "modifier2": [None, None, None, None, 2, 1],
+        ...     }
+        ... )
 
         We'll also use the following global configuration file:
 
-        >>> cfg = DictConfig({
-        ...     "stage": "fit_vocabulary_indices",
-        ...     "code_modifier_columns": ["modifier1", "modifier2"],
-        ...     "stage_cfg": {
-        ...         "metadata_input_dir": "???", # Will be assigned later in the test.
-        ...         "reducer_output_dir": "???", # Will be assigned later in the test.
-        ...         "ordering_method": "lexicographic",
-        ...     },
-        ... })
+        >>> cfg = DictConfig(
+        ...     {
+        ...         "stage": "fit_vocabulary_indices",
+        ...         "code_modifier_columns": ["modifier1", "modifier2"],
+        ...         "stage_cfg": {
+        ...             "metadata_input_dir": "???",  # Will be assigned later in the test.
+        ...             "reducer_output_dir": "???",  # Will be assigned later in the test.
+        ...             "ordering_method": "lexicographic",
+        ...         },
+        ...     }
+        ... )
 
         Now, we'll run the stage with the above code metadata and configuration:
 

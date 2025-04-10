@@ -25,12 +25,12 @@ These types can be combined or filtered via two modes:
 
 from __future__ import annotations
 
-import re
 from enum import StrEnum
+import re
 from typing import Annotated, Any
 
-import polars as pl
 from omegaconf import DictConfig, ListConfig, OmegaConf
+import polars as pl
 
 
 def is_matcher(matcher_cfg: dict[str, Any]) -> tuple[bool, str | None]:
@@ -61,7 +61,7 @@ def is_matcher(matcher_cfg: dict[str, Any]) -> tuple[bool, str | None]:
     """
     if not isinstance(matcher_cfg, (dict, DictConfig)):
         return False, f"Matcher configuration must be a dictionary. Got {matcher_cfg}"
-    if not all(isinstance(k, str) for k in matcher_cfg.keys()):
+    if not all(isinstance(k, str) for k in matcher_cfg):
         return False, f"Matcher configuration must be a dictionary with string keys. Got {matcher_cfg}"
     for k, cfg in matcher_cfg.items():
         if isinstance(cfg, (dict, DictConfig)) and set(cfg.keys()) != {
@@ -342,7 +342,7 @@ def parse_col_expr(cfg: str | list | dict[str, str] | ListConfig | DictConfig) -
         {'col': 'foo'}
         >>> parse_col_expr("bar//{foo}")
         {'str': 'bar//{foo}'}
-        >>> parse_col_expr({'col': 'bar//{foo}'})
+        >>> parse_col_expr({"col": "bar//{foo}"})
         {'col': 'bar//{foo}'}
         >>> parse_col_expr({"literal": ["foo", "bar"]})
         {'literal': ['foo', 'bar']}
@@ -373,7 +373,7 @@ def parse_col_expr(cfg: str | list | dict[str, str] | ListConfig | DictConfig) -
                     simple-form conditional expression with a single key-value pair where the key is the
                     conditional value and the value is a valid matcher dict. Got a dictionary with 3 elements:
                     {'foo': 'bar', 'buzz': 'baz', 'fuzz': 'fizz'}
-        >>> parse_col_expr(('foo', 'bar'))
+        >>> parse_col_expr(("foo", "bar"))
         Traceback (most recent call last):
             ...
         ValueError: A simple column expression must be a string, list, or dictionary.
@@ -551,11 +551,7 @@ def cfg_to_expr(cfg: str | ListConfig | DictConfig) -> tuple[pl.Expr, set[str]]:
         set[str]: The set of input columns needed to form the returned expression.
 
     Examples:
-        >>> data = pl.DataFrame({
-        ...     "foo": ["a", "b", "c"],
-        ...     "bar": ["d", "e", "f"],
-        ...     "baz": [1,   2,   3]
-        ... })
+        >>> data = pl.DataFrame({"foo": ["a", "b", "c"], "bar": ["d", "e", "f"], "baz": [1, 2, 3]})
         >>> expr, cols = cfg_to_expr("foo")
         >>> data.select(expr.alias("out"))["out"].to_list()
         ['a', 'b', 'c']
@@ -582,8 +578,8 @@ def cfg_to_expr(cfg: str | ListConfig | DictConfig) -> tuple[pl.Expr, set[str]]:
         >>> sorted(cols)
         ['foo']
         >>> cfg = [
-        ...    {"matcher": {"baz": 2}, "output": {"str": "bar//{baz}"}},
-        ...    {"literal": "34.2"},
+        ...     {"matcher": {"baz": 2}, "output": {"str": "bar//{baz}"}},
+        ...     {"literal": "34.2"},
         ... ]
         >>> expr, cols = cfg_to_expr(cfg)
         >>> data.select(expr.alias("out"))["out"].to_list()

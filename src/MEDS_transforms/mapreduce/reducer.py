@@ -1,8 +1,8 @@
 """Basic utilities for serialized reduce operations on sharded MEDS datasets with caching and locking."""
 
 import logging
-import time
 from pathlib import Path
+import time
 from typing import Protocol
 
 import polars.selectors as cs
@@ -50,13 +50,14 @@ def reduce_over(
         >>> def reduce_fn(*dfs: pl.DataFrame) -> pl.DataFrame:
         ...     return pl.concat(dfs, how="vertical")
         >>> kwargs = {
-        ...     "read_fn": pl.read_parquet, "write_fn": pl.DataFrame.write_parquet,
-        ...     "reduce_fn": reduce_fn
+        ...     "read_fn": pl.read_parquet,
+        ...     "write_fn": pl.DataFrame.write_parquet,
+        ...     "reduce_fn": reduce_fn,
         ... }
-        >>> dfs = [pl.DataFrame({"a": [i, i+1], "b": [i+2, i+3]}) for i in range(3)]
+        >>> dfs = [pl.DataFrame({"a": [i, i + 1], "b": [i + 2, i + 3]}) for i in range(3)]
         >>> def write_dfs(in_fps: list[Path], dfs: list[pl.DataFrame] = dfs, delay_per: float = 0):
         ...     for i, (fp, df) in enumerate(zip(in_fps, dfs)):
-        ...         time.sleep(delay_per) # simulate slow write
+        ...         time.sleep(delay_per)  # simulate slow write
         ...         df.write_parquet(fp)
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     in_fps = [Path(tmpdir) / f"input_{i}.parquet" for i in range(3)]
@@ -123,7 +124,8 @@ def reduce_over(
         ...     print(f"Reduction completed in: ~{(datetime.now() - st).total_seconds():.1f} seconds")
         ...     print(pl.read_parquet(out_fp))
         ...     thread.join()
-        ...     for fp in in_fps: fp.unlink()
+        ...     for fp in in_fps:
+        ...         fp.unlink()
         ...     out_fp.unlink()
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     in_fps = [Path(tmpdir) / f"input_{i}.parquet" for i in range(3)]
@@ -199,7 +201,7 @@ def reduce_over(
     """
 
     if out_fp.is_file() and not do_overwrite:
-        raise FileExistsError(f"Output file already exists: {str(out_fp.resolve())}")
+        raise FileExistsError(f"Output file already exists: {out_fp.resolve()!s}")
 
     while not all(fp.is_file() for fp in in_fps):
         logger.info("Waiting to begin reduction for all files to be written...")

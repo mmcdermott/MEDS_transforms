@@ -1,9 +1,9 @@
 """Basic utilities for parallelizable mapreduces on sharded MEDS datasets with caching and locking."""
 
-import hashlib
-import logging
 from collections.abc import Callable
 from datetime import datetime
+import hashlib
+import logging
 from pathlib import Path
 from typing import NamedTuple
 
@@ -67,7 +67,7 @@ def shuffle_shards(shards: list[str], cfg: DictConfig) -> list[str]:
             raise ValueError(f"Hash collision for shard {shard} with add_str {add_str}!")
         shard_keys.append(shard_hash)
 
-    return [shard for _, shard in sorted(zip(shard_keys, shards))]
+    return [shard for _, shard in sorted(zip(shard_keys, shards, strict=False))]
 
 
 def shard_iterator(
@@ -95,20 +95,27 @@ def shard_iterator(
         seeded by the worker ID in ``cfg``, if provided, otherwise it is left unseeded.
 
     Examples:
-        >>> df = pl.DataFrame({
-        ...     "subject_id": [1, 2, 3, 4, 5, 6, 7, 8, 9],
-        ...     "code": ["A", "B", "C", "D", "E", "F", "G", "H", "I"],
-        ...     "time": [1, 2, 3, 4, 5, 6, 1, 2, 3],
-        ... })
+        >>> df = pl.DataFrame(
+        ...     {
+        ...         "subject_id": [1, 2, 3, 4, 5, 6, 7, 8, 9],
+        ...         "code": ["A", "B", "C", "D", "E", "F", "G", "H", "I"],
+        ...         "time": [1, 2, 3, 4, 5, 6, 1, 2, 3],
+        ...     }
+        ... )
         >>> shards = {"train/0": [1, 2, 3, 4], "train/1": [5, 6, 7], "tuning": [8], "held_out": [9]}
-        >>> def write_dfs(input_dir: Path, df: pl.DataFrame=df, shards: dict=shards, sfx: str=".parquet"):
+        >>> def write_dfs(
+        ...     input_dir: Path, df: pl.DataFrame = df, shards: dict = shards, sfx: str = ".parquet"
+        ... ):
         ...     for shard_name, subject_ids in shards.items():
         ...         df = df.filter(pl.col("subject_id").is_in(subject_ids))
         ...         shard_fp = input_dir / f"{shard_name}{sfx}"
         ...         shard_fp.parent.mkdir(exist_ok=True, parents=True)
-        ...         if sfx == ".parquet": df.write_parquet(shard_fp)
-        ...         elif sfx == ".csv": df.write_csv(shard_fp)
-        ...         else: raise ValueError(f"Unsupported suffix {sfx}")
+        ...         if sfx == ".parquet":
+        ...             df.write_parquet(shard_fp)
+        ...         elif sfx == ".csv":
+        ...             df.write_csv(shard_fp)
+        ...         else:
+        ...             raise ValueError(f"Unsupported suffix {sfx}")
         ...     return
 
     By default, this will load all shards in the input directory and write specify their appropriate output
@@ -119,10 +126,12 @@ def shard_iterator(
         ...     input_dir = root / "data"
         ...     output_dir = root / "output"
         ...     write_dfs(input_dir)
-        ...     cfg = DictConfig({
-        ...         "stage_cfg": {"data_input_dir": str(input_dir), "output_dir": str(output_dir)},
-        ...         "worker": 1,
-        ...     })
+        ...     cfg = DictConfig(
+        ...         {
+        ...             "stage_cfg": {"data_input_dir": str(input_dir), "output_dir": str(output_dir)},
+        ...             "worker": 1,
+        ...         }
+        ...     )
         ...     fps, includes_only_train = shard_iterator(cfg)
         >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps]
         [(PosixPath('data/train/1.parquet'),  PosixPath('output/train/1.parquet')),
@@ -139,10 +148,12 @@ def shard_iterator(
         ...     input_dir = root / "data"
         ...     output_dir = root / "output"
         ...     write_dfs(input_dir)
-        ...     cfg = DictConfig({
-        ...         "stage_cfg": {"data_input_dir": str(input_dir), "output_dir": str(output_dir)},
-        ...         "worker": 2,
-        ...     })
+        ...     cfg = DictConfig(
+        ...         {
+        ...             "stage_cfg": {"data_input_dir": str(input_dir), "output_dir": str(output_dir)},
+        ...             "worker": 2,
+        ...         }
+        ...     )
         ...     fps, includes_only_train = shard_iterator(cfg)
         >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps]
         [(PosixPath('data/tuning.parquet'),   PosixPath('output/tuning.parquet')),
@@ -160,10 +171,12 @@ def shard_iterator(
         ...     input_dir = root / "data"
         ...     output_dir = root / "output"
         ...     write_dfs(input_dir)
-        ...     cfg = DictConfig({
-        ...         "stage_cfg": {"data_input_dir": str(input_dir), "output_dir": str(output_dir)},
-        ...         "worker": 1,
-        ...     })
+        ...     cfg = DictConfig(
+        ...         {
+        ...             "stage_cfg": {"data_input_dir": str(input_dir), "output_dir": str(output_dir)},
+        ...             "worker": 1,
+        ...         }
+        ...     )
         ...     fps, includes_only_train = shard_iterator(cfg, in_prefix="train", out_suffix=".csv")
         >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps]
         [(PosixPath('data/train/0.parquet'),  PosixPath('output/0.csv')),
@@ -179,13 +192,16 @@ def shard_iterator(
         ...     input_dir = root / "data"
         ...     output_dir = root / "output"
         ...     write_dfs(input_dir)
-        ...     cfg = DictConfig({
-        ...         "stage_cfg": {
-        ...             "data_input_dir": str(input_dir), "output_dir": str(output_dir),
-        ...             "train_only": True,
-        ...         },
-        ...         "worker": 1,
-        ...     })
+        ...     cfg = DictConfig(
+        ...         {
+        ...             "stage_cfg": {
+        ...                 "data_input_dir": str(input_dir),
+        ...                 "output_dir": str(output_dir),
+        ...                 "train_only": True,
+        ...             },
+        ...             "worker": 1,
+        ...         }
+        ...     )
         ...     fps, includes_only_train = shard_iterator(cfg)
         >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps]
         [(PosixPath('data/train/1.parquet'),  PosixPath('output/train/1.parquet')),
@@ -201,13 +217,16 @@ def shard_iterator(
         ...     input_dir = root / "data"
         ...     output_dir = root / "output"
         ...     write_dfs(input_dir, shards=wrong_pfx_shards)
-        ...     cfg = DictConfig({
-        ...         "stage_cfg": {
-        ...             "data_input_dir": str(input_dir), "output_dir": str(output_dir),
-        ...             "train_only": True,
-        ...         },
-        ...         "worker": 1,
-        ...     })
+        ...     cfg = DictConfig(
+        ...         {
+        ...             "stage_cfg": {
+        ...                 "data_input_dir": str(input_dir),
+        ...                 "output_dir": str(output_dir),
+        ...                 "train_only": True,
+        ...             },
+        ...             "worker": 1,
+        ...         }
+        ...     )
         ...     fps, includes_only_train = shard_iterator(cfg)
         >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps]
         [(PosixPath('data/train_1.parquet'),  PosixPath('output/train_1.parquet')),
@@ -225,13 +244,16 @@ def shard_iterator(
         ...     input_dir = root / "data"
         ...     output_dir = root / "output"
         ...     write_dfs(input_dir, shards=no_pfx_shards)
-        ...     cfg = DictConfig({
-        ...         "stage_cfg": {
-        ...             "data_input_dir": str(input_dir), "output_dir": str(output_dir),
-        ...             "train_only": True,
-        ...         },
-        ...         "worker": 1,
-        ...     })
+        ...     cfg = DictConfig(
+        ...         {
+        ...             "stage_cfg": {
+        ...                 "data_input_dir": str(input_dir),
+        ...                 "output_dir": str(output_dir),
+        ...                 "train_only": True,
+        ...             },
+        ...             "worker": 1,
+        ...         }
+        ...     )
         ...     fps, includes_only_train = shard_iterator(cfg)
         >>> [(i.relative_to(root), o.relative_to(root)) for i, o in fps]
         [(PosixPath('data/0.parquet'), PosixPath('output/0.parquet')),

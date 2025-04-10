@@ -1,10 +1,10 @@
 """Test set-up and fixtures code."""
 
-import json
-import tempfile
 from contextlib import contextmanager
 from datetime import datetime
 from functools import partial
+import json
+import tempfile
 from typing import Any
 from unittest.mock import MagicMock, patch
 

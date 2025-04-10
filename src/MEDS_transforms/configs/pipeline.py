@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+from importlib.resources import files
 import logging
 import os
-from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
@@ -47,9 +47,9 @@ def resolve_pkg_path(pkg_path: str) -> Path:
 
         Note that this _returns something likely wrong_ for multi-suffix or no-suffix files!
 
-        >>> resolve_pkg_path("pkg://MEDS_transforms.configs.pipeline") # likely should end in /pipeline
+        >>> resolve_pkg_path("pkg://MEDS_transforms.configs.pipeline")  # likely should end in /pipeline
         PosixPath('...MEDS_transforms/configs.pipeline')
-        >>> resolve_pkg_path("pkg://MEDS_transforms.configs.data.tar.gz") # likely should end in /data.tar.gz
+        >>> resolve_pkg_path("pkg://MEDS_transforms.configs.data.tar.gz")  # likely should end in /data.tar.gz
         PosixPath('...MEDS_transforms/configs/data/tar.gz')
 
         Errors occur if the package is not importable:

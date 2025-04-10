@@ -6,20 +6,20 @@ exposing examples for stages within this and derived packages programmatically f
 
 from __future__ import annotations
 
-import subprocess
-import tempfile
-import textwrap
 from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
+import subprocess
+import tempfile
+import textwrap
 from typing import ClassVar
 
-import polars as pl
 from meds import code_metadata_filepath
 from meds_testing_helpers.dataset import MEDSDataset
 from meds_testing_helpers.static_sample_data import SIMPLE_STATIC_SHARDED_BY_SPLIT
 from omegaconf import DictConfig, OmegaConf
+import polars as pl
 from polars.testing import assert_frame_equal
 from yaml import load as load_yaml
 
@@ -47,9 +47,9 @@ def dict_to_hydra_kwargs(d: dict[str, str]) -> list[str]:
         ValueError: If a key in the dictionary is not dot-list compatible.
 
     Examples:
-        >>> args = dict_to_hydra_kwargs({
-        ...     "a": 1, "b": "foo", "c": {"d": True, "e": False, "f": ["foo", "bar"], "g": None}
-        ... })
+        >>> args = dict_to_hydra_kwargs(
+        ...     {"a": 1, "b": "foo", "c": {"d": True, "e": False, "f": ["foo", "bar"], "g": None}}
+        ... )
         >>> for arg in args:
         ...     print(arg)
         a=1
@@ -90,7 +90,7 @@ def dict_to_hydra_kwargs(d: dict[str, str]) -> list[str]:
                     handled = False
                     for mod in modifier_chars:
                         if inner_kv.startswith(mod):
-                            out.append(f"{mod}{k}.{inner_kv[len(mod):]}")
+                            out.append(f"{mod}{k}.{inner_kv[len(mod) :]}")
                             handled = True
                             break
                     if not handled:
@@ -123,11 +123,13 @@ def read_metadata_only(fp: Path, **schema_updates) -> pl.DataFrame:
             not supported.
 
     Examples:
-        >>> metadata_df = pl.DataFrame({
-        ...     "code": ["foo", "bar"],
-        ...     "description": ["Foo", "Bar"],
-        ...     "fake_number": [1, 2],
-        ... })
+        >>> metadata_df = pl.DataFrame(
+        ...     {
+        ...         "code": ["foo", "bar"],
+        ...         "description": ["Foo", "Bar"],
+        ...         "fake_number": [1, 2],
+        ...     }
+        ... )
         >>> csv_rep = {"metadata/codes.parquet": metadata_df.write_csv()}
         >>> rows_rep = {"metadata/codes.parquet": metadata_df.to_dicts()}
         >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as tmp:
@@ -327,7 +329,7 @@ class StageExample:
         >>> StageExample(
         ...     stage_name="both_given",
         ...     want_data=MEDSDataset(root_dir=simple_static_MEDS),
-        ...     want_metadata=pl.DataFrame()
+        ...     want_metadata=pl.DataFrame(),
         ... )
         Traceback (most recent call last):
             ...
@@ -489,7 +491,8 @@ class StageExample:
         >>> test_env.test_dir.is_dir()
         False
         >>> example = StageExample(
-        ...     stage_name="example_stage", want_metadata=metadata_df,
+        ...     stage_name="example_stage",
+        ...     want_metadata=metadata_df,
         ...     stage_cfg={"arg1": "value1", "arg2": {"arg3": ["value3A", "value3B"]}},
         ...     in_data=data,
         ...     do_use_config_yaml=True,
@@ -602,7 +605,7 @@ class StageExample:
         >>> example = StageExample(stage_name="example_stage", want_metadata=metadata_df)
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     cohort_dir = Path(tmpdir)
-        ...     (cohort_dir / 'metadata').mkdir()
+        ...     (cohort_dir / "metadata").mkdir()
         ...     example.want_metadata.write_parquet(cohort_dir / code_metadata_filepath)
         ...     example.check_outputs(cohort_dir)
         ...     print("No error was raised!")
@@ -615,7 +618,7 @@ class StageExample:
         >>> example = StageExample(stage_name="example_stage", want_metadata=metadata_df)
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     cohort_dir = Path(tmpdir)
-        ...     (cohort_dir / 'metadata').mkdir()
+        ...     (cohort_dir / "metadata").mkdir()
         ...     example.check_outputs(cohort_dir)
         Traceback (most recent call last):
             ...
@@ -624,7 +627,7 @@ class StageExample:
         └── metadata
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     cohort_dir = Path(tmpdir)
-        ...     (cohort_dir / 'metadata').mkdir()
+        ...     (cohort_dir / "metadata").mkdir()
         ...     wrong_metadata = pl.DataFrame({"code": ["f"], "description": [None]})
         ...     wrong_metadata.write_parquet(cohort_dir / code_metadata_filepath)
         ...     example.check_outputs(cohort_dir)
@@ -669,8 +672,8 @@ class StageExample:
         No error was raised!
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     cohort_dir = Path(tmpdir)
-        ...     (cohort_dir / 'data').mkdir()
-        ...     (cohort_dir / 'data' / 'foo.json').write_text('{"foo": "bar"}')
+        ...     (cohort_dir / "data").mkdir()
+        ...     (cohort_dir / "data" / "foo.json").write_text('{"foo": "bar"}')
         ...     example.check_outputs(cohort_dir)
         Traceback (most recent call last):
             ...
@@ -694,7 +697,7 @@ class StageExample:
         >>> example = StageExample(stage_name="example_stage", want_metadata=metadata_df)
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     cohort_dir = Path(tmpdir)
-        ...     (cohort_dir / 'metadata').mkdir()
+        ...     (cohort_dir / "metadata").mkdir()
         ...     example.want_metadata.write_parquet(cohort_dir / code_metadata_filepath)
         ...     example.check_outputs(cohort_dir / "metadata", is_resolved_dir=True)
         ...     print("No error was raised!")
@@ -965,8 +968,7 @@ class StageExample:
             metadata_fp = metadata_dir / "codes.parquet"
             if not metadata_fp.is_file():
                 raise AssertionError(
-                    f"Expected metadata file {code_metadata_filepath} in {cohort_dir}. Got:\n"
-                    f"{all_files_str}"
+                    f"Expected metadata file {code_metadata_filepath} in {cohort_dir}. Got:\n{all_files_str}"
                 )
 
     def check_outputs(self, cohort_dir: Path, is_resolved_dir: bool = False) -> None:
@@ -977,9 +979,9 @@ class StageExample:
             got_data = MEDSDataset(data_shards=self.__data_shards(data_dir), dataset_metadata={})
 
             try:
-                assert (
-                    got_data._pl_shards.keys() == self.want_data._pl_shards.keys()
-                ), f"Shards differ: {got_data._pl_shards.keys()} vs {self.want_data._pl_shards.keys()}"
+                assert got_data._pl_shards.keys() == self.want_data._pl_shards.keys(), (
+                    f"Shards differ: {got_data._pl_shards.keys()} vs {self.want_data._pl_shards.keys()}"
+                )
                 for shard_name, got_df in got_data._pl_shards.items():
                     want_df = self.want_data._pl_shards[shard_name]
                     try:

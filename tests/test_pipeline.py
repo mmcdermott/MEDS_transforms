@@ -12,9 +12,9 @@ In this test, the following stages are run:
 The stage configuration arguments will be as given in the yaml block below:
 """
 
+from pathlib import Path
 import subprocess
 import tempfile
-from pathlib import Path
 
 import pytest
 

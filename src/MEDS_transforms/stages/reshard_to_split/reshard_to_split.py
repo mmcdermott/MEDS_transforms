@@ -1,20 +1,20 @@
 """Utilities for re-sharding a MEDS cohort to subsharded splits."""
 
-import json
-import logging
-import math
-import time
 from collections import defaultdict
 from collections.abc import Sequence
 from functools import partial
+import json
+import logging
+import math
 from pathlib import Path
+import time
 
-import numpy as np
-import polars as pl
 from meds import subject_id_field, subject_splits_filepath, time_field
+import numpy as np
 from omegaconf import DictConfig
+import polars as pl
 
-from ...dataframe import write_df
+from ...dataframe import read_and_filter_fntr, write_df
 from ...mapreduce.rwlock import rwlock_wrap
 from ...mapreduce.shard_iteration import shard_iterator, shuffle_shards
 from .. import Stage
@@ -26,7 +26,7 @@ def shard_subjects(
     subjects: np.ndarray,
     n_subjects_per_shard: int = 50000,
     external_splits: dict[str, Sequence[int]] | None = None,
-    split_fracs_dict: dict[str, float] | None = {"train": 0.8, "tuning": 0.1, "held_out": 0.1},
+    split_fracs_dict: dict[str, float] | None = {"train": 0.8, "tuning": 0.1, "held_out": 0.1},  # noqa: B006
     seed: int = 1,
 ) -> dict[str, list[int]]:
     """Shard a list of subjects, nested within train/tuning/held-out splits.
@@ -65,15 +65,15 @@ def shard_subjects(
         >>> subjects = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], dtype=int)
         >>> shard_subjects(subjects, n_subjects_per_shard=3)
         {'train/0': [9, 4, 8], 'train/1': [2, 1, 10], 'train/2': [6, 5], 'tuning/0': [3], 'held_out/0': [7]}
-        >>> shard_subjects(subjects, 3, split_fracs_dict={'train': 0.8, 'tuning': 0.2, 'held_out': None})
+        >>> shard_subjects(subjects, 3, split_fracs_dict={"train": 0.8, "tuning": 0.2, "held_out": None})
         {'train/0': [5, 9, 6], 'train/1': [3, 10, 8], 'train/2': [1, 2], 'tuning/0': [7, 4]}
-        >>> shard_subjects(subjects, 3, split_fracs_dict={'train': 0.8, 'held_out': None})
+        >>> shard_subjects(subjects, 3, split_fracs_dict={"train": 0.8, "held_out": None})
         Traceback (most recent call last):
             ...
         ValueError: The sum of the split fractions must be equal to 1. Got 0.8 through {'train': 0.8}.
         >>> external_splits = {
-        ...     'taskA/held_out': np.array([8, 9, 10], dtype=int),
-        ...     'taskB/held_out': np.array([10, 8, 9], dtype=int),
+        ...     "taskA/held_out": np.array([8, 9, 10], dtype=int),
+        ...     "taskB/held_out": np.array([10, 8, 9], dtype=int),
         ... }
         >>> shard_subjects(subjects, 3, external_splits)
         {'train/0': [5, 7, 4],
@@ -82,7 +82,7 @@ def shard_subjects(
          'held_out/0': [6],
          'taskA/held_out/0': [8, 9, 10],
          'taskB/held_out/0': [10, 8, 9]}
-        >>> shard_subjects(subjects, n_subjects_per_shard=3, split_fracs_dict={'train': 0.5})
+        >>> shard_subjects(subjects, n_subjects_per_shard=3, split_fracs_dict={"train": 0.5})
         Traceback (most recent call last):
             ...
         ValueError: The sum of the split fractions must be equal to 1. Got 0.5 through {'train': 0.5}.
@@ -91,8 +91,8 @@ def shard_subjects(
             ...
         ValueError: Unable to adjust splits to ensure all splits have at least 1 subject.
         >>> external_splits = {
-        ...     'train': np.array([1, 2, 3, 4, 5, 6], dtype=int),
-        ...     'test': np.array([7, 8, 9, 10], dtype=int),
+        ...     "train": np.array([1, 2, 3, 4, 5, 6], dtype=int),
+        ...     "test": np.array([7, 8, 9, 10], dtype=int),
         ... }
         >>> shard_subjects(subjects, 6, external_splits, split_fracs_dict=None)
         {'train/0': [1, 2, 3, 4, 5, 6], 'test/0': [7, 8, 9, 10]}
@@ -157,7 +157,7 @@ def shard_subjects(
         subjects = rng.permutation(subject_ids_to_split)
         subjects_per_split = np.split(subjects, split_lens.cumsum())
 
-        splits = {**{k: v for k, v in zip(split_names, subjects_per_split)}, **splits}
+        splits = {**dict(zip(split_names, subjects_per_split, strict=False)), **splits}
     else:
         if split_fracs_dict:
             logger.warning(
@@ -302,22 +302,21 @@ def main(cfg: DictConfig):
     for subshard_name, out_fp in new_shards_iter:
         subjects = new_sharded_splits[subshard_name]
 
+        read_df = read_and_filter_fntr(pl.col(subject_id_field).is_in(subjects))
+
         def read_fn(input_dir: Path) -> pl.LazyFrame:
             df = None
-            logger.info(f"Reading shards for {subshard_name} (file names are in the input sharding scheme):")
+            logger.info(f"Reading shards for {subshard_name} (file names are in the input sharding scheme):")  # noqa: B023
             for in_fp, _ in orig_shards_iter:
-                logger.info(f"  - {str(in_fp.relative_to(input_dir).resolve())}")
-                new_df = pl.scan_parquet(in_fp, glob=False).filter(pl.col(subject_id_field).is_in(subjects))
-                if df is None:
-                    df = new_df
-                else:
-                    df = df.merge_sorted(new_df, key=subject_id_field)
+                logger.info(f"  - {in_fp.relative_to(input_dir).resolve()!s}")
+                df = read_df(in_fp) if df is None else df.merge_sorted(read_df(in_fp), key=subject_id_field)  # noqa: B023
+
             return df
 
         def compute_fn(df: list[pl.DataFrame]) -> pl.LazyFrame:
             return df.sort(by=[subject_id_field, time_field], maintain_order=True, multithreaded=False)
 
-        logger.info(f"Merging sub-shards for {subshard_name} to {str(out_fp.resolve())}")
+        logger.info(f"Merging sub-shards for {subshard_name} to {out_fp.resolve()!s}")
         rwlock_wrap(
             cfg.stage_cfg.data_input_dir,
             out_fp,

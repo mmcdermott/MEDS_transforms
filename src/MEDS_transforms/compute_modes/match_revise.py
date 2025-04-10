@@ -5,14 +5,14 @@ such that a given stage will run with the corresponding parameters on each of th
 dataframe that matches the given filter.
 """
 
-import logging
 from enum import StrEnum, auto
 from functools import wraps
+import logging
 
 import hydra
-import polars as pl
 from meds import subject_id_field
 from omegaconf import DictConfig, ListConfig
+import polars as pl
 
 from ..dataframe import DF_T
 from ..parser import is_matcher, matcher_to_expr
@@ -156,24 +156,37 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
         ValueError: If the stage configuration is not in a match and revise format.
 
     Examples:
-        >>> df = pl.DataFrame({
-        ...     "subject_id": [1, 1, 1, 2, 2, 2],
-        ...     "time": [1, 2, 2, 1, 1, 2],
-        ...     "initial_idx": [0, 1, 2, 3, 4, 5],
-        ...     "code": ["FINAL", "CODE//TEMP_2", "CODE//TEMP_1", "FINAL", "CODE//TEMP_2", "CODE//TEMP_1"]
-        ... })
+        >>> df = pl.DataFrame(
+        ...     {
+        ...         "subject_id": [1, 1, 1, 2, 2, 2],
+        ...         "time": [1, 2, 2, 1, 1, 2],
+        ...         "initial_idx": [0, 1, 2, 3, 4, 5],
+        ...         "code": [
+        ...             "FINAL",
+        ...             "CODE//TEMP_2",
+        ...             "CODE//TEMP_1",
+        ...             "FINAL",
+        ...             "CODE//TEMP_2",
+        ...             "CODE//TEMP_1",
+        ...         ],
+        ...     }
+        ... )
         >>> def compute_fn(df: pl.DataFrame, stage_cfg: DictConfig) -> pl.DataFrame:
         ...     return df.with_columns(
-        ...         pl.col("code").str.slice(0, len("CODE//")) +
-        ...         stage_cfg.local_code_mid + "//" + stage_cfg.global_code_end
+        ...         pl.col("code").str.slice(0, len("CODE//"))
+        ...         + stage_cfg.local_code_mid
+        ...         + "//"
+        ...         + stage_cfg.global_code_end
         ...     )
-        >>> stage_cfg = DictConfig({
-        ...     "global_code_end": "foo",
-        ...     "_match_revise": [
-        ...         {"_matcher": {"code": "CODE//TEMP_1"}, "local_code_mid": "bar"},
-        ...         {"_matcher": {"code": "CODE//TEMP_2"}, "local_code_mid": "baz"}
-        ...     ]
-        ... })
+        >>> stage_cfg = DictConfig(
+        ...     {
+        ...         "global_code_end": "foo",
+        ...         "_match_revise": [
+        ...             {"_matcher": {"code": "CODE//TEMP_1"}, "local_code_mid": "bar"},
+        ...             {"_matcher": {"code": "CODE//TEMP_2"}, "local_code_mid": "baz"},
+        ...         ],
+        ...     }
+        ... )
         >>> cfg = DictConfig({"stage_cfg": stage_cfg})
         >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
         >>> match_revise_fn(df.lazy()).collect()
@@ -190,13 +203,19 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
         │ 2          ┆ 1    ┆ 3           ┆ FINAL          │
         │ 2          ┆ 2    ┆ 5           ┆ CODE//bar//foo │
         └────────────┴──────┴─────────────┴────────────────┘
-        >>> stage_cfg = DictConfig({
-        ...     "global_code_end": "foo",
-        ...     "_match_revise": [
-        ...         {"_matcher": {"code": "CODE//TEMP_2"}, "local_code_mid": "bizz"},
-        ...         {"_matcher": {"code": "CODE//TEMP_1"}, "local_code_mid": "foo", "global_code_end": "bar"},
-        ...     ]
-        ... })
+        >>> stage_cfg = DictConfig(
+        ...     {
+        ...         "global_code_end": "foo",
+        ...         "_match_revise": [
+        ...             {"_matcher": {"code": "CODE//TEMP_2"}, "local_code_mid": "bizz"},
+        ...             {
+        ...                 "_matcher": {"code": "CODE//TEMP_1"},
+        ...                 "local_code_mid": "foo",
+        ...                 "global_code_end": "bar",
+        ...             },
+        ...         ],
+        ...     }
+        ... )
         >>> cfg = DictConfig({"stage_cfg": stage_cfg})
         >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
         >>> match_revise_fn(df.lazy()).collect()
@@ -213,9 +232,9 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
         │ 2          ┆ 1    ┆ 3           ┆ FINAL           │
         │ 2          ┆ 2    ┆ 5           ┆ CODE//foo//bar  │
         └────────────┴──────┴─────────────┴─────────────────┘
-        >>> stage_cfg = DictConfig({
-        ...     "global_code_end": "foo", "_match_revise": [{"_matcher": {"missing": "CODE//TEMP_2"}}]
-        ... })
+        >>> stage_cfg = DictConfig(
+        ...     {"global_code_end": "foo", "_match_revise": [{"_matcher": {"missing": "CODE//TEMP_2"}}]}
+        ... )
         >>> cfg = DictConfig({"stage_cfg": stage_cfg})
         >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
         >>> match_revise_fn(df.lazy()).collect()
@@ -234,11 +253,13 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
         ValueError: Invalid match and revise configuration...
 
         It does not accept invalid modes.
-        >>> stage_cfg = DictConfig({
-        ...     "global_code_end": "foo",
-        ...     "_match_revise_mode": "foobar",
-        ...     "_match_revise": [{"_matcher": {"code": "CODE//TEMP_2"}}]
-        ... })
+        >>> stage_cfg = DictConfig(
+        ...     {
+        ...         "global_code_end": "foo",
+        ...         "_match_revise_mode": "foobar",
+        ...         "_match_revise": [{"_matcher": {"code": "CODE//TEMP_2"}}],
+        ...     }
+        ... )
         >>> cfg = DictConfig({"stage_cfg": stage_cfg})
         >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
         Traceback (most recent call last):

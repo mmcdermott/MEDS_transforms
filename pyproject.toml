@@ -23,7 +23,7 @@ dependencies = [
 [tool.setuptools_scm]
 
 [project.optional-dependencies]
-dev = ["pre-commit<4"]
+dev = ["pre-commit<4", "ruff"]
 tests = ["pytest-cov"]
 local_parallelism = ["hydra-joblib-launcher"]
 slurm_parallelism = ["hydra-submitit-launcher"]
@@ -74,3 +74,52 @@ exclude_also = ["logger\\.debug", "except ImportError:"]
 
 [project.entry-points.pytest11]
 MEDS_transforms = "MEDS_transforms.pytest_plugin"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 110
+extend-exclude = ["docs/index.md"]
+
+# Enable linters
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "DTZ", # flake8-datetimez
+    "RUF", # Ruff-specific rules
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+    "N",   # pep8-naming
+]
+ignore = [
+    "E402",  # Module level import not at top of file
+    "E701",  # Multiple statements on one line
+    "E251",  # Unexpected spaces around keyword / parameter equals
+    "E226",  # Missing whitespace around arithmetic operator
+    "E302",  # Expected 2 blank lines
+    "E401",  # Multiple imports on one line
+    "E203",  # Whitespace before ':'
+    "N803",  # Argument name should be lowercase
+    "N806",  # Variable in function should be lowercase
+    "N999",  # Invalid module name "MEDS_transforms"
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]  # Unused imports in __init__ files
+"**/*.ipynb" = ["E501"]   # Line length in notebooks
+
+[tool.ruff.lint.isort]
+force-single-line = false
+known-third-party = ["wandb"]
+force-sort-within-sections = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+skip-magic-trailing-comma = false
+docstring-code-format = true

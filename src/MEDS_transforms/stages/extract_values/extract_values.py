@@ -1,11 +1,11 @@
 """Transformations for extracting numeric and/or categorical values from the MEDS dataset."""
 
-import logging
 from collections.abc import Callable
+import logging
 
-import polars as pl
 from meds import code_field, numeric_value_field, subject_id_field, time_field
 from omegaconf import DictConfig
+import polars as pl
 
 from ... import INFERRED_STAGE_KEYS
 from ...parser import cfg_to_expr
@@ -42,10 +42,14 @@ def extract_values(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFra
     Examples:
         >>> stage_cfg = {"numeric_value": "foo", "categorical_value": "bar"}
         >>> fn = extract_values(stage_cfg)
-        >>> df = pl.DataFrame({
-        ...     "subject_id": [1, 1, 1], "time": [1, 2, 3],
-        ...     "foo": ["1", "2", "3"], "bar": [1.0, 2.0, 4.0],
-        ... })
+        >>> df = pl.DataFrame(
+        ...     {
+        ...         "subject_id": [1, 1, 1],
+        ...         "time": [1, 2, 3],
+        ...         "foo": ["1", "2", "3"],
+        ...         "bar": [1.0, 2.0, 4.0],
+        ...     }
+        ... )
         >>> fn(df)
         shape: (3, 6)
         ┌────────────┬──────┬─────┬─────┬───────────────┬───────────────────┐
