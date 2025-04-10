@@ -31,10 +31,6 @@ def get_all_registered_stages() -> dict[str, importlib.metadata.EntryPoint]:
     this would be read dynamically across all installed packages in the python context.
 
     Examples:
-
-        First, we set up some fake entry-points, to show that the right entry points are selected and
-        returned:
-
         >>> fake_eps = {
         ...     "wrong_package.stages": [("A", "stage_a"), ("B", "stage_b")], # [(name, entry_point), ...]
         ...     "MEDS_transforms.stages": [("C", "stage_c"), ("D", "stage_d")],
@@ -51,7 +47,7 @@ def get_all_registered_stages() -> dict[str, importlib.metadata.EntryPoint]:
         ...     get_all_registered_stages()
         {'C': 'stage_c', 'D': 'stage_d'}
 
-        If there are duplicate stage names, we get an error:
+    If there are duplicate stage names, we get an error:
 
         >>> fake_eps["MEDS_transforms.stages"].append(("C", "stage_c_2"))
         >>> with patch("importlib.metadata.entry_points") as mock_entry_points:

@@ -160,17 +160,18 @@ class Stage:
             automatically based on the functions passed or can be manually overridden.
 
     Examples:
-
-    Most of the examples shown here are focused on more internal aspects of how stages work; for documentation
-    on how you will most likely use stages, see the documentation for the `Stage.register` function.
-
-    Stages come with tracked test cases and default configuration arguments. If no special parameters are set
-    on the command line, they won't be tracked:
-
         >>> def compute(cfg: DictConfig):
         ...     '''base fn docstring'''
         ...     return "compute"
         >>> stage = Stage(map_fn=compute)
+
+    At its base, a stage is a container for a function that can be used to run the stage. Most of the examples
+    shown here are focused on more internal aspects of how stages work; for documentation on how you will most
+    likely use stages, see the documentation for the `Stage.register` function.
+
+    Stages come with tracked test cases and default configuration arguments. If no special parameters are set
+    during construction, they will be empty:
+
         >>> print(stage.examples_dir)
         None
         >>> stage.test_cases
@@ -178,7 +179,7 @@ class Stage:
         >>> print(stage.default_config)
         {}
 
-    The test cases are inferred through the `examples_dir` attribute. This can be set manually:
+    This is because test cases are inferred through the `examples_dir` attribute. This can be set manually:
 
         >>> stage = Stage(map_fn=compute, examples_dir=Path("foo"))
         >>> print(stage.examples_dir)
@@ -230,8 +231,6 @@ class Stage:
             ...
         TypeError: Default configuration must be a dictionary, DictConfig, or path to a YAML file. Got
                    <class 'int'>: 42
-
-
 
     Proper set-up for test cases means the directory is or has any children that satisfy the
     `StageExample.is_example_dir` method.
@@ -994,10 +993,6 @@ class Stage:
             ValueError: If both `main_fn` and `map_fn` or `reduce_fn` are provided.
 
         Examples:
-
-            When used with only keyword arguments that fully define a function a stage set to mimic nothing is
-            returned directly, with the parameters set as defined by what kind of stage is being created.
-
             >>> def main(cfg: DictConfig):
             ...     '''base main docstring'''
             ...     return "main"
@@ -1019,8 +1014,11 @@ class Stage:
               Main function: main
               Mimic function: None
 
-            As it has no mimic function, if you try to call it directly, it will raise an error, and not act
-            like the main function.
+
+        This shows direct method usage: When used with only keyword arguments that fully define a function a
+        stage set to mimic nothing is returned directly, with the parameters set as defined by what kind of
+        stage is being created. As it has no mimic function, if you try to call it directly, it will raise an
+        error, and not act like the main function.
 
             >>> main({})
             'main'
@@ -1028,6 +1026,9 @@ class Stage:
             Traceback (most recent call last):
                 ...
             ValueError: Stage base has no function to mimic, so can't be called directly.
+
+        This logic applies regardless of what kind of stage you register; e.g., a map or mapreduce stage will
+        likewise have no mimic function when defined in this way:
 
             >>> print(Stage.register(map_fn=map_fn, is_metadata=False))
             Stage base:
@@ -1053,8 +1054,7 @@ class Stage:
               Main function: None
               Mimic function: None
 
-            If you call it with main and map functions or a main and a reduce function, it will raise an
-            error:
+        If you call it with main and map functions or a main and a reduce function, it will raise an error:
 
             >>> Stage.register(main_fn=main, map_fn=map_fn)
             Traceback (most recent call last):
@@ -1065,8 +1065,9 @@ class Stage:
                 ...
             ValueError: Only one of main_fn or map_fn/reduce_fn should be provided.
 
-            The `is_metadata` parameter is a bit special, in that you need to provide it if you are defining a
-            "main" stage; otherwise it can be omitted and inferred.
+        The `is_metadata` parameter is a bit special, in that you need to provide it if you are defining a
+        "main" stage; otherwise it can be omitted and inferred to be `True` if the stage is a mapreduce stage,
+        or `False` if it is a map stage.
 
             >>> print(Stage.register(map_fn=map_fn))
             Stage base:
@@ -1097,7 +1098,7 @@ class Stage:
             ValueError: Stage type is not set to MAP or MAPREDUCE, but is_metadata is not set. Please set
             is_metadata manually.
 
-            You can also use it as a decorator, either parametrized or not.
+        You can also use `Stage.register` as a decorator, either parametrized or not.
 
             >>> @Stage.register
             ... def map_fn(cfg: DictConfig, stage_cfg: DictConfig):
@@ -1108,8 +1109,8 @@ class Stage:
             ...     '''base main docstring'''
             ...     return "main"
 
-            The output of the decorator, which is stored in the variable of the name defined by the function,
-            will "mimic" the decorated function under normal usage:
+        The output of the decorator, which is stored in the variable of the name defined by the function, will
+        "mimic" the decorated function under normal usage:
 
             >>> map_fn.__name__
             'map_fn'
@@ -1124,7 +1125,7 @@ class Stage:
             >>> main({})
             'main'
 
-            ... but it is actually a stage object defined by the decorator:
+        ... but it is actually a stage object defined by the decorator:
 
             >>> print(map_fn)
             Stage base:
@@ -1147,7 +1148,7 @@ class Stage:
               Main function: main
               Mimic function: main
 
-            When used as a decorator, you can also parametrize the decorator with other parameters:
+        When used as a decorator, you can also parametrize the decorator with other parameters:
 
             >>> @Stage.register(stage_name="foo", stage_docstring="bar", is_metadata=False)
             ... def main(cfg: DictConfig):
@@ -1164,9 +1165,8 @@ class Stage:
               Main function: main
               Mimic function: main
 
-            The acceptable keyword arguments to the decorator are the same as those to the constructor, except
-            for `_calling_file` (which is automatically inferred and will be discussed more later). For
-            example:
+        The acceptable keyword arguments to the decorator are the same as those to the constructor, except for
+        `_calling_file` (which is automatically inferred and will be discussed more later). For example:
 
             >>> @Stage.register(
             ...     stage_name="foo",
@@ -1197,9 +1197,9 @@ class Stage:
               Main function: None
               Mimic function: foobar
 
-            The decorated function will be inferred to be a "main" function if it is named "main" and there is
-            no reduce function specified in the parametrized keyword arguments to the decorator. Otherwise, it
-            will be assumed to be a map function:
+        The decorated function will be inferred to be a "main" function if it is named "main" and there is no
+        reduce function specified in the parametrized keyword arguments to the decorator. Otherwise, it will
+        be assumed to be a map function:
 
             >>> @Stage.register
             ... def map_fn(cfg: DictConfig, stage_cfg: DictConfig):
@@ -1233,8 +1233,8 @@ class Stage:
               Main function: None
               Mimic function: main
 
-            You can't use it as a decorator while specifying either the main or map function in the keyword
-            arguments:
+        You can't use it as a decorator while specifying either the main or map function in the keyword
+        arguments:
 
             >>> @Stage.register(map_fn=map_fn)
             ... def reduce_fn(cfg: DictConfig, stage_cfg: DictConfig):
@@ -1245,8 +1245,8 @@ class Stage:
             ValueError: If a Stage is constructed via keyword arguments directly (including a `main_fn` or a
             `map_fn`), then it cannot be used as a decorator or otherwise called directly.
 
-            You also can't specify a positional argument and keyword arguments at the same time or multiple
-            positional arguments:
+        You also can't specify a positional argument and keyword arguments at the same time or multiple
+        positional arguments:
 
             >>> stage = Stage.register(main, stage_name="foo")
             Traceback (most recent call last):
@@ -1257,8 +1257,8 @@ class Stage:
                 ...
             ValueError: Stage.register can only be used with at most a single positional arg. Got 2
 
-            Though not recommended, you could theoretically use decorator mode directly to create a function
-            that would return a stage. This exposes some further error surfaces which are checked explicitly:
+        Though not recommended, you could theoretically use decorator mode directly to create a function that
+        would return a stage. This exposes some further error surfaces which are checked explicitly:
 
             >>> def main(cfg: DictConfig):
             ...     '''base main docstring'''
@@ -1286,8 +1286,8 @@ class Stage:
                 ...
             TypeError: First argument must be a function. Got <class 'str'>
 
-            The parameter `_calling_file` is used to infer the examples directory, and can't be set manually
-            in the function.
+        The parameter `_calling_file` is used to infer the examples directory, and can't be set manually in
+        the function.
 
             >>> Stage.register(_calling_file="foo")
             Traceback (most recent call last):
@@ -1295,10 +1295,10 @@ class Stage:
             ValueError: Cannot provide keyword arguments that are also automatically inferred. Got
             {'_calling_file'}
 
-            This is because this function sets the calling file to the location in the code where the
-            decorator is called, and from that the stage will try to infer the "stage directory" and the
-            associated default configuration file path and examples directory, if possible. We can demonstrate
-            how this works by patching out the inspect module to return a file path that we'll create here:
+        This is because this function sets the calling file to the location in the code where the decorator is
+        called, and from that the stage will try to infer the "stage directory" and the associated default
+        configuration file path and examples directory, if possible. We can demonstrate how this works by
+        patching out the inspect module to return a file path that we'll create here:
 
             >>> config = DictConfig({"arg1": {"option1": "foo"}, "arg2": [1, 2.3, None], "arg3": None})
             >>> with tempfile.TemporaryDirectory() as tmpdir:
@@ -1437,9 +1437,9 @@ class Stage:
             │         parent_codes: []
             │       subject_splits: None
 
-            If the example set-up is the same, but the stage name doesn't agree with the parent directory of
-            the calling file, then we get a normal stage with none of the extra information as the examples
-            directory and config.yaml file are assumed to be unrelated:
+        If the example set-up is the same, but the stage name doesn't agree with the parent directory of the
+        calling file, then we get a normal stage with none of the extra information as the examples directory
+        and config.yaml file are assumed to be unrelated:
 
             >>> config = DictConfig({"arg1": {"option1": "foo"}, "arg2": [1, 2.3, None], "arg3": None})
             >>> with tempfile.TemporaryDirectory() as tmpdir:
@@ -1513,9 +1513,9 @@ class Stage:
             -----------------
             {}
 
-            What about those warnings? To see the warnings in this test, we'll explicitly capture and print
-            logged warnings. These will normally only be visible in the logger output, but we'll capture and
-            print them here using the `print_warnings` context manager, defined in our `conftest.py` file.
+        What about those warnings? To see the warnings in this test, we'll explicitly capture and print logged
+        warnings. These will normally only be visible in the logger output, but we'll capture and print them
+        here using the `print_warnings` context manager, defined in our `conftest.py` file.
 
             >>> with print_warnings():
             ...     @Stage.register(is_metadata=True)

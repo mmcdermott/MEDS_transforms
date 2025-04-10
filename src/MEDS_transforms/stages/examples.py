@@ -302,9 +302,6 @@ class StageExample:
         ValueError: If neither want_data nor want_metadata is provided, or if both are provided.
 
     Examples:
-
-    At its simplest, a stage example can be created with just the stage name and the expected output data:
-
         >>> metadata_df = pl.DataFrame({"code": ["foo", "bar"], "description": ["Foo", "Bar"]})
         >>> example = StageExample(stage_name="example_stage", want_metadata=metadata_df)
         >>> print(example)
@@ -355,9 +352,9 @@ class StageExample:
     reflect the fact that a singleton example directory will have a relative path to root of "." and should be
     inferred to have a null scenario name.
 
-    >>> example = StageExample(stage_name="example_stage", scenario_name=".", want_metadata=metadata_df)
-    >>> print(example.scenario_name)
-    None
+        >>> example = StageExample(stage_name="example_stage", scenario_name=".", want_metadata=metadata_df)
+        >>> print(example.scenario_name)
+        None
 
     You can also create an example with a scenario name, stage configuration arguments, test kwargs, and
     output (want) data instead of metadata:
