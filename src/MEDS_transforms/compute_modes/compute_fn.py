@@ -15,7 +15,7 @@ from typing import Any, NotRequired, TypedDict
 import polars as pl
 from omegaconf import DictConfig
 
-from .types import DF_T
+from ..dataframe import DF_T
 
 COMPUTE_FN_T = Callable[[DF_T], DF_T]
 COMPUTE_FN_UNBOUND_T = Callable[..., DF_T]

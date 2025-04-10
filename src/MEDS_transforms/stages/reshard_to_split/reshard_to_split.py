@@ -14,9 +14,9 @@ import polars as pl
 from meds import subject_id_field, subject_splits_filepath, time_field
 from omegaconf import DictConfig
 
+from ...dataframe import write_df
 from ...mapreduce.rwlock import rwlock_wrap
 from ...mapreduce.shard_iteration import shard_iterator, shuffle_shards
-from ...utils import write_lazyframe
 from .. import Stage
 
 logger = logging.getLogger(__name__)
@@ -322,7 +322,7 @@ def main(cfg: DictConfig):
             cfg.stage_cfg.data_input_dir,
             out_fp,
             read_fn,
-            write_lazyframe,
+            write_df,
             compute_fn,
             do_overwrite=cfg.do_overwrite,
         )

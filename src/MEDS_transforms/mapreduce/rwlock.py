@@ -8,14 +8,12 @@ from pathlib import Path
 import pyarrow.parquet as pq
 from filelock import FileLock, Timeout
 
-from .compute_fn import COMPUTE_FN_T
-from .read_fn import READ_FN_T
-from .types import DF_T
+from ..compute_modes import COMPUTE_FN_T
+from ..dataframe import READ_FN_T, WRITE_FN_T
 
 logger = logging.getLogger(__name__)
 
 LOCK_TIME_FMT = "%Y-%m-%dT%H:%M:%S.%f"
-WRITE_FN_T = Callable[[DF_T, Path], None]
 FILE_CHECKER_T = Callable[[Path], bool]
 
 
@@ -77,12 +75,11 @@ def rwlock_wrap(
             intermediate steps. If `do_overwrite` is `False` and this file exists, the function will use the
             `read_fn` to read the file and return the dataframe directly.
         read_fn: Function that reads the dataframe from a file. This must take as input a Path object and
-            return a dataframe of (generic) type DF_T. Ideally, this read function can make use of lazy
+            return a dataframe. Ideally, this read function can make use of lazy
             loading to further accelerate unnecessary reads when resuming from intermediate cached steps.
-        write_fn: Function that writes the dataframe to a file. This must take as input a dataframe of
-            (generic) type DF_T and a Path object, and will write the dataframe to that file.
-        compute_fn: A function that transform the dataframe, which must take as input a dataframe of (generic)
-            type DF_T and return a dataframe of (generic) type DF_T.
+        write_fn: Function that writes the dataframe to a file. This must take as input a dataframe and a Path
+            object, and will write the dataframe to that file.
+        compute_fn: A function that transform the dataframe, which must take as input and return a dataframe.
         do_overwrite: If True, the output file will be overwritten if it already exists. This is `False` by
             default.
 

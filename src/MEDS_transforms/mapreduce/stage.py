@@ -1,7 +1,6 @@
 """Basic code for a mapreduce stage."""
 
 import logging
-from collections.abc import Callable
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -10,14 +9,17 @@ import polars as pl
 from meds import code_field, subject_id_field, subject_splits_filepath
 from omegaconf import DictConfig
 
-from ..utils import write_lazyframe
-from .compute_fn import ANY_COMPUTE_FN_T, COMPUTE_FN_T, bind_compute_fn
+from ..compute_modes import (
+    ANY_COMPUTE_FN_T,
+    COMPUTE_FN_T,
+    bind_compute_fn,
+    is_match_revise,
+    match_revise_fntr,
+)
+from ..dataframe import DF_T, READ_FN_T, WRITE_FN_T, read_and_filter_fntr, read_df, write_df
 from .mapper import map_over
-from .match_revise import is_match_revise, match_revise_fntr
-from .read_fn import read_and_filter_fntr
 from .reducer import REDUCE_FN_T, reduce_over
 from .shard_iteration import SHARD_ITR_FNTR_T, shard_iterator
-from .types import DF_T
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +27,8 @@ logger = logging.getLogger(__name__)
 def map_stage(
     cfg: DictConfig,
     map_fn: COMPUTE_FN_T,
-    read_fn: Callable[[Path], DF_T] = partial(pl.scan_parquet, glob=False),
-    write_fn: Callable[[DF_T, Path], None] = write_lazyframe,
+    read_fn: READ_FN_T = read_df,
+    write_fn: WRITE_FN_T = write_df,
     shard_iterator_fntr: SHARD_ITR_FNTR_T = shard_iterator,
 ) -> list[Path]:
     """Performs a mapping stage operation on shards produced by the shard iterator.
@@ -545,8 +547,8 @@ def mapreduce_stage(
     map_fn: ANY_COMPUTE_FN_T,
     reduce_fn: REDUCE_FN_T,
     merge_fn: REDUCE_FN_T | None = None,
-    read_fn: Callable[[Path], DF_T] = partial(pl.scan_parquet, glob=False),
-    write_fn: Callable[[DF_T, Path], None] = write_lazyframe,
+    read_fn: READ_FN_T = read_df,
+    write_fn: WRITE_FN_T = write_df,
     shard_iterator_fntr: SHARD_ITR_FNTR_T = shard_iterator,
 ):
     """Performs a map-stage over shards produced by the shard iterator, then reduces over those outputs.

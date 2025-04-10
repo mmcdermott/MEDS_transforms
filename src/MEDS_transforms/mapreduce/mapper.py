@@ -1,17 +1,12 @@
 """Basic utilities for parallelizable map operations on sharded MEDS datasets with caching and locking."""
 
 import logging
-from collections.abc import Callable
-from functools import partial
 from pathlib import Path
 
-import polars as pl
-
-from ..utils import write_lazyframe
-from .compute_fn import COMPUTE_FN_T
+from ..compute_modes import COMPUTE_FN_T
+from ..dataframe import READ_FN_T, WRITE_FN_T, read_df, write_df
 from .rwlock import rwlock_wrap
 from .shard_iteration import InOutFilePair
-from .types import DF_T
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +14,8 @@ logger = logging.getLogger(__name__)
 def map_over(
     shards: list[InOutFilePair],
     map_fn: COMPUTE_FN_T,
-    read_fn: Callable[[Path], DF_T] = partial(pl.scan_parquet, glob=False),
-    write_fn: Callable[[DF_T, Path], None] = write_lazyframe,
+    read_fn: READ_FN_T = read_df,
+    write_fn: WRITE_FN_T = write_df,
     do_overwrite: bool = False,
 ) -> list[Path]:
     """Performs a map operation over a list of input file paths, writing the outputs to output files.

@@ -19,7 +19,8 @@ from typing import Any, ClassVar
 import polars as pl
 from omegaconf import DictConfig, OmegaConf
 
-from ..mapreduce import ANY_COMPUTE_FN_T, map_stage, mapreduce_stage
+from ..compute_modes import ANY_COMPUTE_FN_T
+from ..mapreduce import map_stage, mapreduce_stage
 from .discovery import get_all_registered_stages
 from .examples import StageExample, StageExampleDict
 

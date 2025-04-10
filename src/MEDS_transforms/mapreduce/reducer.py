@@ -7,9 +7,7 @@ from typing import Protocol
 
 import polars.selectors as cs
 
-from .read_fn import READ_FN_T
-from .rwlock import WRITE_FN_T
-from .types import DF_T
+from ..dataframe import DF_T, READ_FN_T, WRITE_FN_T
 
 logger = logging.getLogger(__name__)
 

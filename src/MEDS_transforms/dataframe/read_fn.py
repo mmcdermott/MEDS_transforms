@@ -13,6 +13,12 @@ logger = logging.getLogger(__name__)
 READ_FN_T = Callable[[Path], DF_T]
 
 
+def read_df(in_fp: Path) -> DF_T:
+    """A generic helper to read a dataframe without accounting for globs."""
+
+    return pl.scan_parquet(in_fp, glob=False)
+
+
 def read_and_filter_fntr(filter_expr: pl.Expr, read_fn: READ_FN_T) -> READ_FN_T:
     """Create a function that reads a DataFrame from a file and filters it based on a given expression.
 
