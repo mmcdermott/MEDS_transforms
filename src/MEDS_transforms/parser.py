@@ -64,9 +64,7 @@ def is_matcher(matcher_cfg: dict[str, Any]) -> tuple[bool, str | None]:
     if not all(isinstance(k, str) for k in matcher_cfg):
         return False, f"Matcher configuration must be a dictionary with string keys. Got {matcher_cfg}"
     for k, cfg in matcher_cfg.items():
-        if isinstance(cfg, dict | DictConfig) and set(cfg.keys()) != {
-            "regex",
-        }:
+        if isinstance(cfg, dict | DictConfig) and list(cfg.keys()) != ["regex"]:
             return False, (
                 f"If the matcher spec is a dictionary, it must have only a 'regex' key. Got {cfg} for {k}"
             )
