@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
 from enum import Enum, auto
 from functools import partial
-import inspect
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NotRequired, TypedDict
 

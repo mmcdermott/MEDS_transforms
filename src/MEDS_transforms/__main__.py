@@ -1,6 +1,6 @@
-from importlib.resources import files
 import logging
 import sys
+from importlib.resources import files
 
 import hydra
 from hydra.core.config_store import ConfigStore

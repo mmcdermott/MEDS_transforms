@@ -1,10 +1,10 @@
 """A polars-to-polars transformation function for filtering subjects by sequence length."""
 
-from collections.abc import Callable
 import logging
+from collections.abc import Callable
 
-from omegaconf import DictConfig, ListConfig
 import polars as pl
+from omegaconf import DictConfig, ListConfig
 
 from .. import Stage
 

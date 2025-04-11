@@ -1,16 +1,16 @@
 """Test set-up and fixtures code."""
 
+import json
+import tempfile
 from contextlib import contextmanager
 from datetime import datetime
 from functools import partial
-import json
-import tempfile
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-from omegaconf import DictConfig
 import polars as pl
 import pytest
+from omegaconf import DictConfig
 
 from MEDS_transforms.utils import print_directory_contents
 
@@ -22,12 +22,12 @@ def print_warnings(caplog: pytest.LogCaptureFixture):
     This is useful in doctests, where you want to show printed outputs for documentation and testing purposes.
     """
 
-    N_current_records = len(caplog.records)
+    n_current_records = len(caplog.records)
 
     with caplog.at_level("WARNING"):
         yield
     # Print all captured warnings upon exit
-    for record in caplog.records[N_current_records:]:
+    for record in caplog.records[n_current_records:]:
         print(f"Warning: {record.getMessage()}")
 
 

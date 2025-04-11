@@ -1,13 +1,13 @@
 """Basic code for a mapreduce stage."""
 
+import logging
 from datetime import UTC, datetime
 from functools import partial
-import logging
 from pathlib import Path
 
+import polars as pl
 from meds import code_field, subject_id_field, subject_splits_filepath
 from omegaconf import DictConfig
-import polars as pl
 
 from ..compute_modes import (
     ANY_COMPUTE_FN_T,

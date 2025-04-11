@@ -1,8 +1,8 @@
 """Basic utilities for serialized reduce operations on sharded MEDS datasets with caching and locking."""
 
 import logging
-from pathlib import Path
 import time
+from pathlib import Path
 from typing import Protocol
 
 import polars.selectors as cs
