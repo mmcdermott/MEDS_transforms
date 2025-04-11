@@ -53,8 +53,12 @@ def is_matcher(matcher_cfg: dict[str, Any]) -> tuple[bool, str | None]:
         (False, "Matcher configuration must be a dictionary with string keys. Got {'foo': 'bar', 32: 'baz'}")
         >>> is_matcher({"foo": {"regex": "bar"}})
         (True, None)
+        >>> is_matcher({"foo": {"present": True}})
+        (True, None)
+        >>> is_matcher({"foo": {"present": 34}})
+        (False, "Matcher configuration for 'present' must have a boolean value. Got {'present': 34} for foo")
         >>> is_matcher({"foo": {"regex": "bar", "group_index": 0}})
-        (False, "If the matcher spec is a dictionary, it must have only a 'regex' key.
+        (False, "If the matcher spec is a dictionary, it must have only a 'regex' key or a 'present' key.
                  Got {'regex': 'bar', 'group_index': 0} for foo")
         >>> is_matcher({})
         (True, None)
@@ -64,10 +68,16 @@ def is_matcher(matcher_cfg: dict[str, Any]) -> tuple[bool, str | None]:
     if not all(isinstance(k, str) for k in matcher_cfg):
         return False, f"Matcher configuration must be a dictionary with string keys. Got {matcher_cfg}"
     for k, cfg in matcher_cfg.items():
-        if isinstance(cfg, dict | DictConfig) and list(cfg.keys()) != ["regex"]:
-            return False, (
-                f"If the matcher spec is a dictionary, it must have only a 'regex' key. Got {cfg} for {k}"
-            )
+        if isinstance(cfg, dict | DictConfig):
+            if len(cfg.keys()) > 1 or ("regex" not in cfg and "present" not in cfg):
+                return False, (
+                    "If the matcher spec is a dictionary, it must have only a 'regex' key or a 'present' "
+                    f"key. Got {cfg} for {k}"
+                )
+            elif next(iter(cfg.keys())) == "present" and not isinstance(next(iter(cfg.values())), bool):
+                return False, (
+                    f"Matcher configuration for 'present' must have a boolean value. Got {cfg} for {k}"
+                )
 
     return True, None
 
@@ -94,6 +104,16 @@ def matcher_to_expr(matcher_cfg: DictConfig | dict) -> tuple[pl.Expr, set[str]]:
         [(col("foo")) == ("bar")].all_horizontal([[(col("buzz")) == ("baz")]])
         >>> sorted(cols)
         ['buzz', 'foo']
+        >>> expr, cols = matcher_to_expr({"foo": {"present": False}})
+        >>> print(expr)
+        col("foo").is_null().all_horizontal()
+        >>> sorted(cols)
+        ['foo']
+        >>> expr, cols = matcher_to_expr({"foo": {"present": True}})
+        >>> print(expr)
+        col("foo").is_not_null().all_horizontal()
+        >>> sorted(cols)
+        ['foo']
         >>> expr, cols = matcher_to_expr(DictConfig({"foo": "bar", "buzz": "baz"}))
         >>> print(expr)
         [(col("foo")) == ("bar")].all_horizontal([[(col("buzz")) == ("baz")]])
@@ -115,7 +135,13 @@ def matcher_to_expr(matcher_cfg: DictConfig | dict) -> tuple[pl.Expr, set[str]]:
 
     all_exprs = []
     for k, v in matcher_cfg.items():
-        expr = pl.col(k).str.contains(v["regex"]) if isinstance(v, dict | DictConfig) else pl.col(k) == v
+        if isinstance(v, dict | DictConfig):
+            if "present" in v:
+                expr = pl.col(k).is_not_null() if v["present"] else pl.col(k).is_null()
+            else:
+                expr = pl.col(k).str.contains(v["regex"])
+        else:
+            expr = pl.col(k) == v
         all_exprs.append(expr)
 
     return pl.all_horizontal(all_exprs), set(matcher_cfg.keys())
