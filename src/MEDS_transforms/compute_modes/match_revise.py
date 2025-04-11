@@ -5,14 +5,14 @@ such that a given stage will run with the corresponding parameters on each of th
 dataframe that matches the given filter.
 """
 
+import logging
 from enum import StrEnum, auto
 from functools import wraps
-import logging
 
 import hydra
+import polars as pl
 from meds import subject_id_field
 from omegaconf import DictConfig, ListConfig
-import polars as pl
 
 from ..dataframe import DF_T
 from ..parser import is_matcher, matcher_to_expr

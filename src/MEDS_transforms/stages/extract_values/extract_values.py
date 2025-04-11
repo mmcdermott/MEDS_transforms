@@ -1,11 +1,11 @@
 """Transformations for extracting numeric and/or categorical values from the MEDS dataset."""
 
-from collections.abc import Callable
 import logging
+from collections.abc import Callable
 
+import polars as pl
 from meds import code_field, numeric_value_field, subject_id_field, time_field
 from omegaconf import DictConfig
-import polars as pl
 
 from ... import INFERRED_STAGE_KEYS
 from ...parser import cfg_to_expr

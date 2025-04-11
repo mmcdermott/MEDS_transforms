@@ -8,12 +8,12 @@ To do this effectively, this runner functionally takes a "meta configuration" fi
 """
 
 import logging
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 import hydra
-from omegaconf import DictConfig, OmegaConf
 import yaml
+from omegaconf import DictConfig, OmegaConf
 
 from .configs import RUNNER_CONFIG_YAML, PipelineConfig
 from .configs.utils import OmegaConfResolver

@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from contextlib import contextmanager
 import copy
-from enum import StrEnum
-from functools import partial, wraps
 import inspect
 import logging
 import os
-from pathlib import Path
 import sys
 import textwrap
-from typing import TYPE_CHECKING, Any, ClassVar
 import warnings
+from collections.abc import Callable
+from contextlib import contextmanager
+from enum import StrEnum
+from functools import partial, wraps
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from omegaconf import DictConfig, OmegaConf
 

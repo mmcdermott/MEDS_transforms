@@ -6,19 +6,19 @@ exposing examples for stages within this and derived packages programmatically f
 
 from __future__ import annotations
 
-from contextlib import contextmanager
-from dataclasses import dataclass, field
-from pathlib import Path
 import subprocess
 import tempfile
 import textwrap
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
+import polars as pl
 from meds import code_metadata_filepath
 from meds_testing_helpers.dataset import MEDSDataset
 from meds_testing_helpers.static_sample_data import SIMPLE_STATIC_SHARDED_BY_SPLIT
 from omegaconf import DictConfig, OmegaConf
-import polars as pl
 from polars.testing import assert_frame_equal
 from yaml import load as load_yaml
 

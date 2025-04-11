@@ -95,31 +95,9 @@ select = [
     "TCH", # flake8-type-checking
     "N",   # pep8-naming
 ]
-ignore = [
-    "E402",  # Module level import not at top of file
-    "E701",  # Multiple statements on one line
-    "E251",  # Unexpected spaces around keyword / parameter equals
-    "E226",  # Missing whitespace around arithmetic operator
-    "E302",  # Expected 2 blank lines
-    "E401",  # Multiple imports on one line
-    "E203",  # Whitespace before ':'
-    "N803",  # Argument name should be lowercase
-    "N806",  # Variable in function should be lowercase
-    "N999",  # Invalid module name "MEDS_transforms"
-]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Unused imports in __init__ files
-"**/*.ipynb" = ["E501"]   # Line length in notebooks
 
-[tool.ruff.lint.isort]
-force-single-line = false
-known-third-party = ["wandb"]
-force-sort-within-sections = true
-
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-line-ending = "auto"
-skip-magic-trailing-comma = false
-docstring-code-format = true
+[tool.ruff.lint.pep8-naming]
+extend-ignore-names = ["*MEDS*"]  # Ignore MEDS in variable names

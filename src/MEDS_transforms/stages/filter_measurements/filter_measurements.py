@@ -2,8 +2,8 @@
 
 from collections.abc import Callable
 
-from omegaconf import DictConfig
 import polars as pl
+from omegaconf import DictConfig
 
 from .. import Stage
 

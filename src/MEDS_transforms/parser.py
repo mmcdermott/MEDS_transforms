@@ -25,12 +25,12 @@ These types can be combined or filtered via two modes:
 
 from __future__ import annotations
 
-from enum import StrEnum
 import re
+from enum import StrEnum
 from typing import Annotated, Any
 
-from omegaconf import DictConfig, ListConfig, OmegaConf
 import polars as pl
+from omegaconf import DictConfig, ListConfig, OmegaConf
 
 
 def is_matcher(matcher_cfg: dict[str, Any]) -> tuple[bool, str | None]:
@@ -175,20 +175,20 @@ class ColExprType(StrEnum):
             (False, "Extract expressions must have only 'from', 'regex', and 'group_index' keys. Got ['ex']")
         """
 
-        MANDATORY_KEYS = {"from": str, "regex": str}
-        ALLOWED_KEYS = {**MANDATORY_KEYS, "group_index": Annotated[int, "non-negative integer"]}
+        mandatory_keys = {"from": str, "regex": str}
+        allowed_keys = {**mandatory_keys, "group_index": Annotated[int, "non-negative integer"]}
 
         if not isinstance(cfg, dict | DictConfig):
             return False, f"Extract expressions must be a dictionary. Got {cfg}"
-        if not set(MANDATORY_KEYS).issubset(set(cfg.keys())):
+        if not set(mandatory_keys).issubset(set(cfg.keys())):
             return False, f"Extract expressions must have a 'from' and 'regex' key. Got {list(cfg.keys())}"
-        if not set(ALLOWED_KEYS).issuperset(set(cfg.keys())):
+        if not set(allowed_keys).issuperset(set(cfg.keys())):
             return False, (
                 "Extract expressions must have only 'from', 'regex', and 'group_index' keys. "
-                f"Got {sorted(set(cfg.keys()) - set(ALLOWED_KEYS))}"
+                f"Got {sorted(set(cfg.keys()) - set(allowed_keys))}"
             )
 
-        for key, allowed_T in ALLOWED_KEYS.items():
+        for key, allowed_type in allowed_keys.items():
             if key not in cfg:
                 continue
             val = cfg[key]
@@ -199,8 +199,10 @@ class ColExprType(StrEnum):
                         f"Extract expressions must have a non-negative integer value for '{key}'. Got {val}"
                     )
             else:
-                if not isinstance(val, allowed_T):
-                    return False, f"Extract expressions must have a {allowed_T} value for '{key}'. Got {val}"
+                if not isinstance(val, allowed_type):
+                    return False, (
+                        f"Extract expressions must have a {allowed_type} value for '{key}'. Got {val}"
+                    )
 
         return True, None
 

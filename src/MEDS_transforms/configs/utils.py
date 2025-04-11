@@ -4,8 +4,8 @@
 2. A decorator to annotate functions as OmegaConf resolvers in the global namespace.
 """
 
-from collections.abc import Callable
 import dataclasses
+from collections.abc import Callable
 from functools import partial
 
 from hydra.core.config_store import ConfigStore

@@ -1,7 +1,7 @@
 """Functionality for reading input data shards."""
 
-from collections.abc import Callable
 import logging
+from collections.abc import Callable
 from pathlib import Path
 
 import polars as pl

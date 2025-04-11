@@ -1,14 +1,14 @@
 """Utilities for grouping and/or reducing MEDS cohort files by code to collect metadata properties."""
 
+import logging
 from collections.abc import Callable, Sequence
 from enum import StrEnum
-import logging
 from typing import NamedTuple
 
-from meds import subject_id_field
-from omegaconf import DictConfig, ListConfig, OmegaConf
 import polars as pl
 import polars.selectors as cs
+from meds import subject_id_field
+from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from .. import Stage
 
