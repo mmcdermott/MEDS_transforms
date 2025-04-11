@@ -24,7 +24,7 @@ RUNNER_SCRIPT = "MEDS_transform-pipeline"
 
 PIPELINE_YAML = """
 input_dir: {input_dir}
-cohort_dir: {cohort_dir}
+output_dir: {output_dir}
 
 description: "A test pipeline for the MEDS-transforms pipeline runner."
 
@@ -115,9 +115,9 @@ def test_pipeline_help():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         input_dir = Path(tmpdir) / "input"
-        cohort_dir = Path(tmpdir) / "cohort"
+        output_dir = Path(tmpdir) / "output"
 
-        pipeline_str = PIPELINE_YAML.format(input_dir=input_dir, cohort_dir=cohort_dir)
+        pipeline_str = PIPELINE_YAML.format(input_dir=input_dir, output_dir=output_dir)
 
         pipeline_fp = Path(tmpdir) / "pipeline.yaml"
         pipeline_fp.write_text(pipeline_str)

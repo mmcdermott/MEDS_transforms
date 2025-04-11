@@ -23,7 +23,7 @@ pip install MEDS-transforms
 
 ```yaml
 input_dir: $MEDS_ROOT
-cohort_dir: $PIPELINE_OUTPUT
+output_dir: $PIPELINE_OUTPUT
 
 description: Your special pipeline
 

@@ -184,7 +184,7 @@ class PipelineConfig:
         {'stages': ['filter_subjects'],
          'stage_cfg': {'min_events_per_subject': None, 'min_measurements_per_subject': None,
                        'data_input_dir': '${input_dir}/data', 'metadata_input_dir': '${input_dir}/metadata',
-                       'reducer_output_dir': None, 'train_only': False, 'output_dir': '${cohort_dir}/data'}}
+                       'reducer_output_dir': None, 'train_only': False, 'output_dir': '${output_dir}/data'}}
 
     The simplest pipeline, a "null" pipeline, with `PipelineConfig()` or
     `PipelineConfig.from_arg("__null__")`, will not have any stages or stage configurations. When you call
@@ -231,9 +231,9 @@ class PipelineConfig:
                     'occlude_outliers'],
          'stage_cfg': {'data_input_dir': '${input_dir}/data',
                        'metadata_input_dir': '${input_dir}/metadata',
-                       'output_dir': '${cohort_dir}/count_codes',
+                       'output_dir': '${output_dir}/count_codes',
                        'train_only': True,
-                       'reducer_output_dir': '${cohort_dir}/count_codes',
+                       'reducer_output_dir': '${output_dir}/count_codes',
                        'aggregations': ['code/n_subjects', 'code/n_occurrences']}}
         >>> runnable_stage = pipeline_cfg.register_for("filter_measurements")
         >>> print(runnable_stage.stage_name)
@@ -250,10 +250,10 @@ class PipelineConfig:
          'stage_cfg': {'min_subjects_per_code': 4,
                        'min_occurrences_per_code': 10,
                        'data_input_dir': '${input_dir}/data',
-                       'metadata_input_dir': '${cohort_dir}/count_codes',
+                       'metadata_input_dir': '${output_dir}/count_codes',
                        'reducer_output_dir': None,
                        'train_only': False,
-                       'output_dir': '${cohort_dir}/filter_measurements'}}
+                       'output_dir': '${output_dir}/filter_measurements'}}
 
     If you try to register a pipeline that includes an unregistered stage, an error will be raised:
 
@@ -432,7 +432,7 @@ class PipelineConfig:
         resolved_stage_configs = {}
 
         input_dir = Path("${input_dir}")
-        cohort_dir = Path("${cohort_dir}")
+        output_dir = Path("${output_dir}")
 
         for name, stage, config_overwrites in stage_objects:
             config = {**stage.default_config} if stage.default_config else {}
@@ -448,19 +448,19 @@ class PipelineConfig:
                 config["metadata_input_dir"] = prior_metadata_stage["reducer_output_dir"]
 
             if stage.is_metadata:
-                config["output_dir"] = str(cohort_dir / name)
+                config["output_dir"] = str(output_dir / name)
                 config["train_only"] = True
                 if name == last_metadata_stage_name:
-                    config["reducer_output_dir"] = str(cohort_dir / "metadata")
+                    config["reducer_output_dir"] = str(output_dir / "metadata")
                 else:
-                    config["reducer_output_dir"] = str(cohort_dir / name)
+                    config["reducer_output_dir"] = str(output_dir / name)
             else:
                 config["reducer_output_dir"] = None
                 config["train_only"] = False
                 if name == last_data_stage_name:
-                    config["output_dir"] = str(cohort_dir / "data")
+                    config["output_dir"] = str(output_dir / "data")
                 else:
-                    config["output_dir"] = str(cohort_dir / name)
+                    config["output_dir"] = str(output_dir / name)
 
             config.update({k: v for k, v in config_overwrites.items() if k != "_base_stage"})
             resolved_stage_configs[name] = OmegaConf.create(config)

@@ -5,7 +5,7 @@ stage_runner_fp: null
 _local_pipeline_config: ${oc.create:${load_yaml_file:${oc.select:pipeline_config_fp,null}}}
 _stage_runners: ${oc.create:${load_yaml_file:${stage_runner_fp}}}
 
-log_dir: "${_local_pipeline_config.cohort_dir}/.logs"
+log_dir: "${_local_pipeline_config.output_dir}/.logs"
 
 _pipeline_description: ${oc.select:_local_pipeline_config.description,"No description provided."}
 

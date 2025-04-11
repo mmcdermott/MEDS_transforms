@@ -430,9 +430,9 @@ def pipeline_tester(
 
         stage_examples[0].write_for_test(input_dir)
 
-        cohort_dir = test_root / "cohort"
+        output_dir = test_root / "output"
 
-        pipeline_yaml = pipeline_yaml.format(input_dir=input_dir, cohort_dir=cohort_dir)
+        pipeline_yaml = pipeline_yaml.format(input_dir=input_dir, output_dir=output_dir)
 
         pipeline_config_fp = test_root / "pipeline.yaml"
         pipeline_config_fp.write_text(pipeline_yaml)
@@ -480,20 +480,20 @@ def pipeline_tester(
             is_last_data_stage = last_data_stage[0] == name
             is_last_metadata_stage = last_metadata_stage[0] == name
 
-            stage_output_dir = cohort_dir / name
+            stage_output_dir = output_dir / name
 
             stage.df_check_kwargs = {"rtol": 5e-2, "atol": 1e-2, "check_dtypes": False}
 
             try:
                 if stage.want_data is not None:
                     if is_last_data_stage:
-                        stage.check_outputs(cohort_dir)
+                        stage.check_outputs(output_dir)
                     else:
                         stage.check_outputs(stage_output_dir, is_resolved_dir=True)
 
                 if stage.want_metadata is not None:
                     if is_last_metadata_stage:
-                        stage.check_outputs(cohort_dir)
+                        stage.check_outputs(output_dir)
                     else:
                         stage.check_outputs(stage_output_dir, is_resolved_dir=True)
             except AssertionError as e:

@@ -259,7 +259,7 @@ class TestEnv:
     """
 
     script: str
-    cohort_dir: Path
+    output_dir: Path
     test_dir: Path
     input_dir: Path
     config_yaml_fp: Path | None = None
@@ -268,7 +268,7 @@ class TestEnv:
         lines = [f"Test Environment in {self.test_dir}", "  - Files:"]
         lines.extend(pretty_list_directory(self.test_dir, prefix=_SPACE))
         lines.append(f"  - Input sub-directory: {self.input_dir.relative_to(self.test_dir)}")
-        lines.append(f"  - Cohort sub-directory: {self.cohort_dir.relative_to(self.test_dir)}")
+        lines.append(f"  - Output sub-directory: {self.output_dir.relative_to(self.test_dir)}")
 
         if self.config_yaml_fp:
             lines.append(f"  - Config yaml file: {self.config_yaml_fp.relative_to(self.test_dir)}")
@@ -464,7 +464,7 @@ class StageExample:
     To see the test code in action, though, we'll look at some lower layers of abstraction. First, we can set
     up and inspect the test environment with the `test_env` `contextmanager` property. This yields a `TestEnv`
     object, which has a nice readable `__str__` method, so we can print it to inspect it. Note that, upon
-    creation, the `cohort_dir` part of the test environment is non-existent, but input data and config yaml
+    creation, the `output_dir` part of the test environment is non-existent, but input data and config yaml
     files (if `do_use_config_yaml` is set to `True`) are created. The test environment is cleaned up when the
     context manager exits.
 
@@ -487,9 +487,9 @@ class StageExample:
                     ├── dataset.json
                     └── subject_splits.parquet
           - Input sub-directory: input
-          - Cohort sub-directory: cohort
+          - Output sub-directory: cohort
           - Script: MEDS_transform-stage __null__ example_stage
-                    input_dir=/tmp/tmp.../input cohort_dir=/tmp/tmp.../cohort
+                    input_dir=/tmp/tmp.../input output_dir=/tmp/tmp.../cohort
         >>> test_env.test_dir.is_dir()
         False
         >>> example = StageExample(
@@ -511,7 +511,7 @@ class StageExample:
                     ├── codes.parquet
                     └── dataset.json
           - Input sub-directory: input
-          - Cohort sub-directory: cohort
+          - Output sub-directory: cohort
           - Config yaml file: config.yaml
             │   stages:
             │   - example_stage:
@@ -521,10 +521,10 @@ class StageExample:
             │         - value3A
             │         - value3B
           - Script: MEDS_transform-stage /tmp/tmp.../config.yaml example_stage
-                    input_dir=/tmp/tmp.../input cohort_dir=/tmp/tmp.../cohort
+                    input_dir=/tmp/tmp.../input output_dir=/tmp/tmp.../cohort
 
     This test environment is used when we call the `test` method, which runs the stage, then checks to ensure
-    that the stage ran successfully and the outputs in the `cohort_dir` are as expected. If the test fails, an
+    that the stage ran successfully and the outputs in the `output_dir` are as expected. If the test fails, an
     error message including the string representation of the test environment and the command output is
     printed. To explore this, we'll make a fake run function that just returns a controllable return code and
     output.
@@ -558,9 +558,9 @@ class StageExample:
                     ├── dataset.json
                     └── subject_splits.parquet
           - Input sub-directory: input
-          - Cohort sub-directory: cohort
+          - Output sub-directory: cohort
           - Script: MEDS_transform-stage __null__ example_stage
-                    input_dir=/tmp/tmp.../input cohort_dir=/tmp/tmp.../cohort
+                    input_dir=/tmp/tmp.../input output_dir=/tmp/tmp.../cohort
         Stdout:
         <BLANKLINE>
         Stderr:
@@ -591,9 +591,9 @@ class StageExample:
                     ├── dataset.json
                     └── subject_splits.parquet
           - Input sub-directory: input
-          - Cohort sub-directory: cohort
+          - Output sub-directory: cohort
           - Script: MEDS_transform-stage __null__ example_stage
-                    input_dir=/tmp/tmp.../input cohort_dir=/tmp/tmp.../cohort
+                    input_dir=/tmp/tmp.../input output_dir=/tmp/tmp.../cohort
         Stdout:
         Success
         Stderr:
@@ -605,10 +605,10 @@ class StageExample:
 
         >>> example = StageExample(stage_name="example_stage", want_metadata=metadata_df)
         >>> with tempfile.TemporaryDirectory() as tmpdir:
-        ...     cohort_dir = Path(tmpdir)
-        ...     (cohort_dir / "metadata").mkdir()
-        ...     example.want_metadata.write_parquet(cohort_dir / code_metadata_filepath)
-        ...     example.check_outputs(cohort_dir)
+        ...     output_dir = Path(tmpdir)
+        ...     (output_dir / "metadata").mkdir()
+        ...     example.want_metadata.write_parquet(output_dir / code_metadata_filepath)
+        ...     example.check_outputs(output_dir)
         ...     print("No error was raised!")
         No error was raised!
 
@@ -618,20 +618,20 @@ class StageExample:
 
         >>> example = StageExample(stage_name="example_stage", want_metadata=metadata_df)
         >>> with tempfile.TemporaryDirectory() as tmpdir:
-        ...     cohort_dir = Path(tmpdir)
-        ...     (cohort_dir / "metadata").mkdir()
-        ...     example.check_outputs(cohort_dir)
+        ...     output_dir = Path(tmpdir)
+        ...     (output_dir / "metadata").mkdir()
+        ...     example.check_outputs(output_dir)
         Traceback (most recent call last):
             ...
         AssertionError: Expected metadata file metadata/codes.parquet in /tmp/tmp.... Got:
         tmp...
         └── metadata
         >>> with tempfile.TemporaryDirectory() as tmpdir:
-        ...     cohort_dir = Path(tmpdir)
-        ...     (cohort_dir / "metadata").mkdir()
+        ...     output_dir = Path(tmpdir)
+        ...     (output_dir / "metadata").mkdir()
         ...     wrong_metadata = pl.DataFrame({"code": ["f"], "description": [None]})
-        ...     wrong_metadata.write_parquet(cohort_dir / code_metadata_filepath)
-        ...     example.check_outputs(cohort_dir)
+        ...     wrong_metadata.write_parquet(output_dir / code_metadata_filepath)
+        ...     example.check_outputs(output_dir)
         Traceback (most recent call last):
             ...
         AssertionError: Want metadata:
@@ -663,16 +663,16 @@ class StageExample:
         >>> data = MEDSDataset(data_shards={"0": data_df}, dataset_metadata={})
         >>> example = StageExample(stage_name="with_scenario", want_data=data)
         >>> with tempfile.TemporaryDirectory() as tmpdir:
-        ...     cohort_dir = Path(tmpdir)
-        ...     _ = example.want_data.write(cohort_dir)
-        ...     example.check_outputs(cohort_dir)
+        ...     output_dir = Path(tmpdir)
+        ...     _ = example.want_data.write(output_dir)
+        ...     example.check_outputs(output_dir)
         ...     print("No error was raised!")
         No error was raised!
         >>> with tempfile.TemporaryDirectory() as tmpdir:
-        ...     cohort_dir = Path(tmpdir)
-        ...     (cohort_dir / "data").mkdir()
-        ...     (cohort_dir / "data" / "foo.json").write_text('{"foo": "bar"}')
-        ...     example.check_outputs(cohort_dir)
+        ...     output_dir = Path(tmpdir)
+        ...     (output_dir / "data").mkdir()
+        ...     (output_dir / "data" / "foo.json").write_text('{"foo": "bar"}')
+        ...     example.check_outputs(output_dir)
         Traceback (most recent call last):
             ...
         AssertionError: Expected data files in /tmp/tmp.../data/**.parquet, but none were found. Got:
@@ -687,17 +687,17 @@ class StageExample:
 
         >>> example = StageExample(stage_name="with_scenario", want_data=data)
         >>> with tempfile.TemporaryDirectory() as tmpdir:
-        ...     cohort_dir = Path(tmpdir)
-        ...     _ = example.want_data.write(cohort_dir)
-        ...     example.check_outputs(cohort_dir / "data", is_resolved_dir=True)
+        ...     output_dir = Path(tmpdir)
+        ...     _ = example.want_data.write(output_dir)
+        ...     example.check_outputs(output_dir / "data", is_resolved_dir=True)
         ...     print("No error was raised!")
         No error was raised!
         >>> example = StageExample(stage_name="example_stage", want_metadata=metadata_df)
         >>> with tempfile.TemporaryDirectory() as tmpdir:
-        ...     cohort_dir = Path(tmpdir)
-        ...     (cohort_dir / "metadata").mkdir()
-        ...     example.want_metadata.write_parquet(cohort_dir / code_metadata_filepath)
-        ...     example.check_outputs(cohort_dir / "metadata", is_resolved_dir=True)
+        ...     output_dir = Path(tmpdir)
+        ...     (output_dir / "metadata").mkdir()
+        ...     example.want_metadata.write_parquet(output_dir / code_metadata_filepath)
+        ...     example.check_outputs(output_dir / "metadata", is_resolved_dir=True)
         ...     print("No error was raised!")
         No error was raised!
 
@@ -706,9 +706,9 @@ class StageExample:
         >>> example = StageExample(stage_name="with_scenario", want_data=data)
         >>> wrong_data = MEDSDataset(data_shards={"1": data_df}, dataset_metadata={})
         >>> with tempfile.TemporaryDirectory() as tmpdir:
-        ...     cohort_dir = Path(tmpdir)
-        ...     _ = wrong_data.write(cohort_dir)
-        ...     example.check_outputs(cohort_dir)
+        ...     output_dir = Path(tmpdir)
+        ...     _ = wrong_data.write(output_dir)
+        ...     example.check_outputs(output_dir)
         Traceback (most recent call last):
             ...
         AssertionError: Want data:
@@ -771,9 +771,9 @@ class StageExample:
         ... )
         >>> wrong_data = MEDSDataset(data_shards={"0": wrong_data_df}, dataset_metadata={})
         >>> with tempfile.TemporaryDirectory() as tmpdir:
-        ...     cohort_dir = Path(tmpdir)
-        ...     _ = wrong_data.write(cohort_dir)
-        ...     example.check_outputs(cohort_dir)
+        ...     output_dir = Path(tmpdir)
+        ...     _ = wrong_data.write(output_dir)
+        ...     example.check_outputs(output_dir)
         Traceback (most recent call last):
             ...
         AssertionError: Want data:
@@ -943,33 +943,33 @@ class StageExample:
             shards[shard_name] = pl.read_parquet(fp)
         return shards
 
-    def __check_files(self, cohort_dir: Path, is_resolved_dir: bool = False) -> None:
-        if not cohort_dir.exists():
-            raise AssertionError(f"Expected cohort directory {cohort_dir} to exist, but it does not.")
+    def __check_files(self, output_dir: Path, is_resolved_dir: bool = False) -> None:
+        if not output_dir.exists():
+            raise AssertionError(f"Expected cohort directory {output_dir} to exist, but it does not.")
 
-        all_files_str = f"{cohort_dir.name}\n" + "\n".join(pretty_list_directory(cohort_dir))
+        all_files_str = f"{output_dir.name}\n" + "\n".join(pretty_list_directory(output_dir))
 
         if self.want_data is not None:
-            data_dir = cohort_dir if is_resolved_dir else cohort_dir / "data"
+            data_dir = output_dir if is_resolved_dir else output_dir / "data"
             if not self.__data_files(data_dir):
                 raise AssertionError(
-                    f"Expected data files in {cohort_dir}/data/**.parquet, but none were found. Got:\n"
+                    f"Expected data files in {output_dir}/data/**.parquet, but none were found. Got:\n"
                     f"{all_files_str}"
                 )
 
         if self.want_metadata is not None:
-            metadata_dir = cohort_dir if is_resolved_dir else cohort_dir / "metadata"
+            metadata_dir = output_dir if is_resolved_dir else output_dir / "metadata"
             metadata_fp = metadata_dir / "codes.parquet"
             if not metadata_fp.is_file():
                 raise AssertionError(
-                    f"Expected metadata file {code_metadata_filepath} in {cohort_dir}. Got:\n{all_files_str}"
+                    f"Expected metadata file {code_metadata_filepath} in {output_dir}. Got:\n{all_files_str}"
                 )
 
-    def check_outputs(self, cohort_dir: Path, is_resolved_dir: bool = False) -> None:
-        self.__check_files(cohort_dir, is_resolved_dir)
+    def check_outputs(self, output_dir: Path, is_resolved_dir: bool = False) -> None:
+        self.__check_files(output_dir, is_resolved_dir)
 
         if self.want_data is not None:
-            data_dir = cohort_dir if is_resolved_dir else cohort_dir / "data"
+            data_dir = output_dir if is_resolved_dir else output_dir / "data"
             got_data = MEDSDataset(data_shards=self.__data_shards(data_dir), dataset_metadata={})
 
             try:
@@ -987,7 +987,7 @@ class StageExample:
                 raise AssertionError(f"Want data:\n{self.want_data}\nGot data:\n{got_data}") from e
 
         if self.want_metadata is not None:
-            metadata_dir = cohort_dir if is_resolved_dir else cohort_dir / "metadata"
+            metadata_dir = output_dir if is_resolved_dir else output_dir / "metadata"
             metadata_fp = metadata_dir / "codes.parquet"
             got_metadata = pl.read_parquet(metadata_fp)
             try:
@@ -1025,7 +1025,7 @@ class StageExample:
 
             self.write_for_test(input_dir)
 
-            cohort_dir = test_dir / "cohort"
+            output_dir = test_dir / "cohort"
 
             if self.do_use_config_yaml:
                 cfg_yaml_fp = test_dir / "config.yaml"
@@ -1036,12 +1036,12 @@ class StageExample:
 
             script = (
                 f"MEDS_transform-stage {pipeline_cfg_yaml} {self.stage_name} "
-                f"{' '.join(self.cmd_args)} input_dir={input_dir} cohort_dir={cohort_dir}"
+                f"{' '.join(self.cmd_args)} input_dir={input_dir} output_dir={output_dir}"
             )
 
             yield TestEnv(
                 script=script,
-                cohort_dir=cohort_dir,
+                output_dir=output_dir,
                 test_dir=test_dir,
                 input_dir=input_dir,
                 config_yaml_fp=pipeline_cfg_yaml if self.do_use_config_yaml else None,
@@ -1077,7 +1077,7 @@ class StageExample:
                 raise AssertionError("\n".join(err_lines))
 
             try:
-                self.check_outputs(test_env.cohort_dir)
+                self.check_outputs(test_env.output_dir)
             except AssertionError as e:
                 raise AssertionError("\n".join(err_lines)) from e
 
