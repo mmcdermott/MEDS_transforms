@@ -5,10 +5,6 @@ site_author: Matthew McDermott
 
 nav:
   - Home: index.md
-  - "Pipeline Configuration": pipeline_configuration.md
-  - "Pre-processing Operations": preprocessing_operation_prototypes.md
-  - "Terminology": terminology.md
-  - "Tokenization & Tensorization": tokenization_tensorization.md
   - API: api/
   - Issues: https://github.com/mmcdermott/MEDS_transforms/issues
 
@@ -28,6 +24,7 @@ markdown_extensions:
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.superfences
+  - github-callouts
 
 extra_javascript:
   - javascripts/mathjax.js
@@ -44,3 +41,5 @@ plugins:
   - mkdocstrings
   - git-authors
   - git-revision-date-localized
+
+watch: [src, README.md]

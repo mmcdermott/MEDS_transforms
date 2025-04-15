@@ -8,7 +8,7 @@ dynamic = ["version"]
 authors = [
   { name="Matthew McDermott", email="mattmcdermott8@gmail.com" },
 ]
-description = "MEDS ETL and transformation functions leveraging a sharding-based parallelism model & polars."
+description = "A framework for compiling simple, mapreduce style pipelines over MEDS datasets."
 readme = "README.md"
 requires-python = ">=3.11"
 classifiers = [
@@ -17,49 +17,40 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-  "polars~=1.26", "pyarrow", "hydra-core", "numpy", "meds==0.3.3", "filelock",
+  "polars~=1.26.0", "pyarrow", "hydra-core", "numpy", "meds==0.3.3", "filelock", "pytest", "meds_testing_helpers~=0.2.6"
 ]
 
 [tool.setuptools_scm]
 
 [project.optional-dependencies]
-dev = ["pre-commit<4"]
-tests = ["pytest", "pytest-cov", "rootutils", "hydra-joblib-launcher", "meds_testing_helpers>=0.2.1"]
+dev = ["pre-commit<4", "ruff"]
+tests = ["pytest-cov"]
 local_parallelism = ["hydra-joblib-launcher"]
 slurm_parallelism = ["hydra-submitit-launcher"]
 docs = [
   "mkdocs==1.6.1", "mkdocs-material==9.6.7", "mkdocstrings[python,shell]==0.28.2", "mkdocs-gen-files==0.5.0",
   "mkdocs-literate-nav==0.6.1", "mkdocs-section-index==0.3.9", "mkdocs-git-authors-plugin==0.9.2",
-  "mkdocs-git-revision-date-localized-plugin==1.3.0"
+  "mkdocs-git-revision-date-localized-plugin==1.3.0", "markdown-callouts"
 ]
 
 [project.scripts]
-# MEDS_extract
-MEDS_extract-split_and_shard_subjects = "MEDS_transforms.extract.split_and_shard_subjects:main"
-MEDS_extract-shard_events = "MEDS_transforms.extract.shard_events:main"
-MEDS_extract-convert_to_sharded_events = "MEDS_transforms.extract.convert_to_sharded_events:main"
-MEDS_extract-merge_to_MEDS_cohort = "MEDS_transforms.extract.merge_to_MEDS_cohort:main"
-MEDS_extract-extract_code_metadata = "MEDS_transforms.extract.extract_code_metadata:main"
-MEDS_extract-finalize_MEDS_metadata = "MEDS_transforms.extract.finalize_MEDS_metadata:main"
-MEDS_extract-finalize_MEDS_data = "MEDS_transforms.extract.finalize_MEDS_data:main"
-
-# MEDS_transform
-## General
-MEDS_transform-aggregate_code_metadata = "MEDS_transforms.aggregate_code_metadata:main"
-MEDS_transform-fit_vocabulary_indices = "MEDS_transforms.fit_vocabulary_indices:main"
-MEDS_transform-reshard_to_split = "MEDS_transforms.reshard_to_split:main"
-## Filters
-MEDS_transform-filter_measurements = "MEDS_transforms.filters.filter_measurements:main"
-MEDS_transform-filter_subjects = "MEDS_transforms.filters.filter_subjects:main"
-## Transforms
-MEDS_transform-reorder_measurements = "MEDS_transforms.transforms.reorder_measurements:main"
-MEDS_transform-add_time_derived_measurements = "MEDS_transforms.transforms.add_time_derived_measurements:main"
-MEDS_transform-extract_values = "MEDS_transforms.transforms.extract_values:main"
-MEDS_transform-normalization = "MEDS_transforms.transforms.normalization:main"
-MEDS_transform-occlude_outliers = "MEDS_transforms.transforms.occlude_outliers:main"
+# Stages
+MEDS_transform-stage = "MEDS_transforms.__main__:run_stage"
 
 # Runner
-MEDS_transform-runner = "MEDS_transforms.runner:main"
+MEDS_transform-pipeline = "MEDS_transforms.runner:main"
+
+[project.entry-points."MEDS_transforms.stages"]
+aggregate_code_metadata = "MEDS_transforms.stages:aggregate_code_metadata"
+fit_vocabulary_indices = "MEDS_transforms.stages:fit_vocabulary_indices"
+reshard_to_split = "MEDS_transforms.stages:reshard_to_split"
+filter_measurements = "MEDS_transforms.stages:filter_measurements"
+filter_subjects = "MEDS_transforms.stages:filter_subjects"
+reorder_measurements = "MEDS_transforms.stages:reorder_measurements"
+add_time_derived_measurements = "MEDS_transforms.stages:add_time_derived_measurements"
+extract_values = "MEDS_transforms.stages:extract_values"
+normalization = "MEDS_transforms.stages:normalization"
+occlude_outliers = "MEDS_transforms.stages:occlude_outliers"
 
 [project.urls]
 Homepage = "https://github.com/mmcdermott/MEDS_transforms"
@@ -72,4 +63,41 @@ addopts = [
   "--ignore=docs",
   "--doctest-glob=*.md",
 ]
+python_classes = "!TestEnv"
 doctest_optionflags = ["NORMALIZE_WHITESPACE", "ELLIPSIS"]
+markers = [
+  "parallelized: mark test as parallelized, requiring hydra-joblib-launcher",
+]
+
+[tool.coverage.report]
+exclude_also = ["logger\\.debug", "except ImportError:", "if TYPE_CHECKING:"]
+
+[project.entry-points.pytest11]
+MEDS_transforms = "MEDS_transforms.pytest_plugin"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 110
+extend-exclude = ["docs/index.md"]
+
+# Enable linters
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "DTZ", # flake8-datetimez
+    "RUF", # Ruff-specific rules
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+    "N",   # pep8-naming
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]  # Unused imports in __init__ files
+
+[tool.ruff.lint.pep8-naming]
+extend-ignore-names = ["*MEDS*"]  # Ignore MEDS in variable names

@@ -1,0 +1,7 @@
+ordered_code_patterns:
+  - ADMISSION.*
+  - TEMP
+  - HR
+  - EYE_COLOR//B.*
+  - HEIGHT
+  - DISCHARGE.*

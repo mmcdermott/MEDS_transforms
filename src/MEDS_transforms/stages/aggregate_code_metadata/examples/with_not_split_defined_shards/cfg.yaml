@@ -1,0 +1,16 @@
+aggregations:
+  - code/n_occurrences
+  - code/n_subjects
+  - values/n_occurrences
+  - values/n_subjects
+  - values/sum
+  - values/sum_sqd
+  - values/n_ints
+  - values/min
+  - values/max
+  - name: values/quantiles
+    quantiles:
+      - 0.25
+      - 0.5
+      - 0.75
+do_summarize_over_all_codes: True

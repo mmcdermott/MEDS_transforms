@@ -1,7 +1,0 @@
-fit_normalization:
-  aggregations:
-    - "code/n_occurrences"
-    - "code/n_subjects"
-    - "values/n_occurrences"
-    - "values/sum"
-    - "values/sum_sqd"

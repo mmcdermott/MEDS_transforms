@@ -35,14 +35,28 @@ jobs:
       #----------------------------------------------
       - name: Run tests
         run: |
-          pytest src/ tests/ -v --doctest-modules --cov=src --junitxml=junit.xml -s
+          pytest -v --cov=src -m "not parallelized"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Install joblib
+        run: |
+          pip install hydra-joblib-launcher
+
+      - name: Run tests with joblib
+        run: |
+          pytest -v --cov=src tests/ -m "parallelized"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

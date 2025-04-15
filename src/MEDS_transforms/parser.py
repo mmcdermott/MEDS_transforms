@@ -5,18 +5,12 @@ This module contains two key concepts: column expressions and matchers.
 Matchers are used to specify conditionals over dataframes. They are expressed simply as dictionaries mapping
 column names to values. Exact equality is used to match the column values.
 
-Column expressions currently support the following types:
-  - COL (`'col'`): A column expression that extracts a specified column.
-  - STR (`'str'`): A column expression that is a string, with interpolation allowed to other column names via
-    python's f-string syntax.
-  - LITERAL (`'literal'`): A column expression that is a literal value regardless of type. No interpolation is
-    allowed here.
-
-Column expressions can be expressed either dictionary or via a shorthand string. If a structured dictionary,
-the dictionary has length 1 and the key is one of the column expression types and the value is the expression
-target (e.g., the column to load for `COL`, the string to interpolate with `{...}` escaped interpolation
-targets for `STR`, or the literal value for `LITERAL`). If a string, the string is interpreted as a `COL` if
-it has no interpolation targets, and as a `STR` otherwise.
+Column expressions currently support the types defined in the `ColExprType` enum. Column expressions can be
+expressed either dictionary or via a shorthand string. If a structured dictionary, the dictionary has length 1
+and the key is one of the column expression types and the value is the expression target (e.g., the column to
+load for `COL`, the string to interpolate with `{...}` escaped interpolation targets for `STR`, or the literal
+value for `LITERAL`). If a string, the string is interpreted as a `COL` if it has no interpolation targets,
+and as a `STR` otherwise.
 
 These types can be combined or filtered via two modes:
   - Coalescing: Multiple column expressions can be combined into a single expression where the first non-null
@@ -69,12 +63,12 @@ def is_matcher(matcher_cfg: dict[str, Any]) -> tuple[bool, str | None]:
         >>> is_matcher({})
         (True, None)
     """
-    if not isinstance(matcher_cfg, (dict, DictConfig)):
+    if not isinstance(matcher_cfg, dict | DictConfig):
         return False, f"Matcher configuration must be a dictionary. Got {matcher_cfg}"
-    if not all(isinstance(k, str) for k in matcher_cfg.keys()):
+    if not all(isinstance(k, str) for k in matcher_cfg):
         return False, f"Matcher configuration must be a dictionary with string keys. Got {matcher_cfg}"
     for k, cfg in matcher_cfg.items():
-        if isinstance(cfg, (dict, DictConfig)):
+        if isinstance(cfg, dict | DictConfig):
             if len(cfg.keys()) > 1 or ("regex" not in cfg and "present" not in cfg):
                 return False, (
                     "If the matcher spec is a dictionary, it must have only a 'regex' key or a 'present' "
@@ -141,12 +135,9 @@ def matcher_to_expr(matcher_cfg: DictConfig | dict) -> tuple[pl.Expr, set[str]]:
 
     all_exprs = []
     for k, v in matcher_cfg.items():
-        if isinstance(v, (dict, DictConfig)):
+        if isinstance(v, dict | DictConfig):
             if "present" in v:
-                if v["present"]:
-                    expr = pl.col(k).is_not_null()
-                else:
-                    expr = pl.col(k).is_null()
+                expr = pl.col(k).is_not_null() if v["present"] else pl.col(k).is_null()
             else:
                 expr = pl.col(k).str.contains(v["regex"])
         else:
@@ -162,13 +153,14 @@ STR_INTERPOLATION_REGEX = r"\{([^}]+)\}"
 class ColExprType(StrEnum):
     """Enumeration of the different types of column expressions that can be parsed.
 
-    Members:
-        COL: A column expression that extracts a specified column.
-        STR: A column expression that is a string, with interpolation allowed to other column names
+    Attributes:
+        COL ("col"): A column expression that extracts a specified column.
+        STR ("str"): A column expression that is a string, with interpolation allowed to other column names
             via python's f-string syntax.
-        LITERAL: A column expression that is a literal value regardless of type. No interpolation is allowed
-            here.
-        EXTRACT: A column expression that extracts a substring from a column using a regex pattern.
+        LITERAL ("literal"): A column expression that is a literal value regardless of type. No interpolation
+            is allowed here.
+        EXTRACT ("extract"): A column expression that extracts a substring from a column using a regex
+            pattern.
     """
 
     COL = "col"
@@ -177,7 +169,7 @@ class ColExprType(StrEnum):
     EXTRACT = "extract"
 
     @classmethod
-    def _is_valid_extract_cfg(cls, cfg: dict[Any, Any]) -> tuple[bool, str | None]:
+    def _is_valid_extract_cfg(cls, cfg: dict) -> tuple[bool, str | None]:
         """Checks if a dictionary is a valid extract configuration.
 
         Args:
@@ -185,8 +177,8 @@ class ColExprType(StrEnum):
                 expression."
 
         Returns:
-            bool: True if the input is a valid extract configuration, False otherwise.
-            str | None: The reason the input is invalid, if it is invalid.
+            `True` if the input is a valid extract configuration, `False` otherwise.
+            The reason the input is invalid, if it is invalid.
 
         Examples:
             >>> ColExprType._is_valid_extract_cfg({"from": "foo", "regex": "bar"})
@@ -209,20 +201,20 @@ class ColExprType(StrEnum):
             (False, "Extract expressions must have only 'from', 'regex', and 'group_index' keys. Got ['ex']")
         """
 
-        MANDATORY_KEYS = {"from": str, "regex": str}
-        ALLOWED_KEYS = {**MANDATORY_KEYS, "group_index": Annotated[int, "non-negative integer"]}
+        mandatory_keys = {"from": str, "regex": str}
+        allowed_keys = {**mandatory_keys, "group_index": Annotated[int, "non-negative integer"]}
 
-        if not isinstance(cfg, (dict, DictConfig)):
+        if not isinstance(cfg, dict | DictConfig):
             return False, f"Extract expressions must be a dictionary. Got {cfg}"
-        if not set(MANDATORY_KEYS).issubset(set(cfg.keys())):
+        if not set(mandatory_keys).issubset(set(cfg.keys())):
             return False, f"Extract expressions must have a 'from' and 'regex' key. Got {list(cfg.keys())}"
-        if not set(ALLOWED_KEYS).issuperset(set(cfg.keys())):
+        if not set(allowed_keys).issuperset(set(cfg.keys())):
             return False, (
                 "Extract expressions must have only 'from', 'regex', and 'group_index' keys. "
-                f"Got {sorted(list(set(cfg.keys()) - set(ALLOWED_KEYS)))}"
+                f"Got {sorted(set(cfg.keys()) - set(allowed_keys))}"
             )
 
-        for key, allowed_T in ALLOWED_KEYS.items():
+        for key, allowed_type in allowed_keys.items():
             if key not in cfg:
                 continue
             val = cfg[key]
@@ -233,8 +225,10 @@ class ColExprType(StrEnum):
                         f"Extract expressions must have a non-negative integer value for '{key}'. Got {val}"
                     )
             else:
-                if not isinstance(val, allowed_T):
-                    return False, f"Extract expressions must have a {allowed_T} value for '{key}'. Got {val}"
+                if not isinstance(val, allowed_type):
+                    return False, (
+                        f"Extract expressions must have a {allowed_type} value for '{key}'. Got {val}"
+                    )
 
         return True, None
 
@@ -269,7 +263,7 @@ class ColExprType(StrEnum):
             (False, "Column expressions must be a dictionary. Got [('col', 'foo')]")
         """
 
-        if not isinstance(expr_dict, (dict, DictConfig)):
+        if not isinstance(expr_dict, dict | DictConfig):
             return False, f"Column expressions must be a dictionary. Got {expr_dict}"
         if len(expr_dict) != 1:
             return False, f"Column expressions can only contain a single key-value pair. Got {expr_dict}"
@@ -371,7 +365,7 @@ def parse_col_expr(cfg: str | list | dict[str, str] | ListConfig | DictConfig) -
         {'col': 'foo'}
         >>> parse_col_expr("bar//{foo}")
         {'str': 'bar//{foo}'}
-        >>> parse_col_expr({'col': 'bar//{foo}'})
+        >>> parse_col_expr({"col": "bar//{foo}"})
         {'col': 'bar//{foo}'}
         >>> parse_col_expr({"literal": ["foo", "bar"]})
         {'literal': ['foo', 'bar']}
@@ -402,7 +396,7 @@ def parse_col_expr(cfg: str | list | dict[str, str] | ListConfig | DictConfig) -
                     simple-form conditional expression with a single key-value pair where the key is the
                     conditional value and the value is a valid matcher dict. Got a dictionary with 3 elements:
                     {'foo': 'bar', 'buzz': 'baz', 'fuzz': 'fizz'}
-        >>> parse_col_expr(('foo', 'bar'))
+        >>> parse_col_expr(("foo", "bar"))
         Traceback (most recent call last):
             ...
         ValueError: A simple column expression must be a string, list, or dictionary.
@@ -427,7 +421,7 @@ def parse_col_expr(cfg: str | list | dict[str, str] | ListConfig | DictConfig) -
             return {"str": cfg}
         case str():
             return {"col": cfg}
-        case list() | ListConfig() if all(isinstance(x, (str, dict, DictConfig)) for x in cfg):
+        case list() | ListConfig() if all(isinstance(x, str | dict | DictConfig) for x in cfg):
             return [parse_col_expr(x) for x in cfg]
         case list() | ListConfig():
             raise ValueError(
@@ -580,11 +574,7 @@ def cfg_to_expr(cfg: str | ListConfig | DictConfig) -> tuple[pl.Expr, set[str]]:
         set[str]: The set of input columns needed to form the returned expression.
 
     Examples:
-        >>> data = pl.DataFrame({
-        ...     "foo": ["a", "b", "c"],
-        ...     "bar": ["d", "e", "f"],
-        ...     "baz": [1,   2,   3]
-        ... })
+        >>> data = pl.DataFrame({"foo": ["a", "b", "c"], "bar": ["d", "e", "f"], "baz": [1, 2, 3]})
         >>> expr, cols = cfg_to_expr("foo")
         >>> data.select(expr.alias("out"))["out"].to_list()
         ['a', 'b', 'c']
@@ -611,8 +601,8 @@ def cfg_to_expr(cfg: str | ListConfig | DictConfig) -> tuple[pl.Expr, set[str]]:
         >>> sorted(cols)
         ['foo']
         >>> cfg = [
-        ...    {"matcher": {"baz": 2}, "output": {"str": "bar//{baz}"}},
-        ...    {"literal": "34.2"},
+        ...     {"matcher": {"baz": 2}, "output": {"str": "bar//{baz}"}},
+        ...     {"literal": "34.2"},
         ... ]
         >>> expr, cols = cfg_to_expr(cfg)
         >>> data.select(expr.alias("out"))["out"].to_list()
