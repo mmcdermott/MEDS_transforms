@@ -108,7 +108,7 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         ...             "MEDS_BIRTH//home",
         ...             "lab//A",
         ...             "lab//B",
-        ...             "dx//1"
+        ...             "dx//1",
         ...         ],
         ...     },
         ...     schema={"subject_id": pl.UInt32, "time": pl.Datetime, "code": pl.Utf8},
