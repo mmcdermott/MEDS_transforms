@@ -178,14 +178,19 @@ def add_time_derived_measurements(stage_cfg: DictConfig) -> Callable[[pl.LazyFra
             include the following keys:
                 - "age": The configuration for the age function.
                 - "time_of_day": The configuration for the time of day function.
+                - "timeline_tokens": The configuration for the timeline tokens function.
 
     Returns:
-        A function that adds all requested time-derived measurements to a DataFrame.
+        A function that adds all requested time-derived measurements to a DataFrame. A functor can be skipped
+        by setting its config to `None`.
 
     Raises:
         ValueError: If an unrecognized time-derived measurement is requested.
 
     Examples:
+        >>> fn = add_time_derived_measurements({"age": None}) # Does nothing as age is skipped.
+        >>> fn(3)
+        3
         >>> add_time_derived_measurements(DictConfig({"buzz": {}}))
         Traceback (most recent call last):
             ...
@@ -196,6 +201,10 @@ def add_time_derived_measurements(stage_cfg: DictConfig) -> Callable[[pl.LazyFra
     # We use the raw stages object as the induced `stage_cfg` has extra properties like the input and output
     # directories.
     for feature_name, feature_cfg in stage_cfg.items():
+        if feature_cfg is None:
+            logger.info(f"Skipping {feature_name} as it is None")
+            continue
+
         match feature_name:
             case "age":
                 map_fns.append(add_new_events_fntr(age_fntr(feature_cfg)))

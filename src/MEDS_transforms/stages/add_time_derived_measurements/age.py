@@ -21,8 +21,9 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
               None. This is used preferentially over the "DOB_regex" key if both are provided.
             - "DOB_regex": A regex pattern to match the date of birth event in the raw data. Defaults to
               "^MEDS_BIRTH(//.*)?"
-            - "age_code": The code for the age event in the output data.
+            - "age_code": The code for the age event in the output data. Defaults to "AGE".
             - "age_unit": The unit for the age event when converted to a numeric value in the output data.
+              Defaults to "years"
 
     Returns:
         A function that returns the to-be-added "age" events with the subject's age for all input events with
@@ -141,7 +142,7 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         ValueError: Either 'DOB_regex' or 'DOB_code' must be provided in the configuration.
     """
 
-    canonical_unit, seconds_in_unit = normalize_time_unit(cfg.age_unit)
+    canonical_unit, seconds_in_unit = normalize_time_unit(cfg.get("age_unit", "y"))
     microseconds_in_unit = int(1e6) * seconds_in_unit
 
     if cfg.get("DOB_code", None) is not None:
@@ -167,7 +168,7 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
             .select(
                 subject_id_field,
                 time_field,
-                pl.lit(cfg.age_code, dtype=code_dtype).alias(code_field),
+                pl.lit(cfg.get("age_code", "AGE"), dtype=code_dtype).alias(code_field),
                 age_expr.alias(numeric_value_field),
             )
             .drop_nulls(subset=[numeric_value_field])
