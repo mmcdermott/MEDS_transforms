@@ -97,6 +97,93 @@ def _check_and_get_bin_endpoints(schema: pl.Schema, col: str) -> pl.Expr:
     return pl.when(pl.col(col).is_not_null()).then(pl.concat_list(pl.col(col).struct.unnest()))
 
 
+def _get_val_bin_idx(bin_endpoints: pl.Expr) -> pl.Expr:
+    """Get the bin index for the numeric value, if both it and the bin endpoints are not null.
+
+    This is mostly separated out to enable more direct testing.
+
+    > [!WARNING]
+    > This will only work on a dataframe with a row index column named `__idx` and a numeric values column
+    > named `numeric_value`.
+
+    Args:
+        bin_endpoints: The bin endpoints as a polars list expression.
+
+    Returns:
+        A polars expression that returns the bin index for the numeric value, or null if either the numeric
+        value or the bin endpoints are null.
+
+    Examples:
+        >>> df = pl.DataFrame({
+        ...     "numeric_value": [
+        ...         -1.0, # Left of all endpoints
+        ...         3.0, # Right of all endpoints
+        ...         0.5, # In the middle of the first bin
+        ...         1.0, # A bin endpoint directly.
+        ...         None, # Null value
+        ...         0.25, # Different scale, different number of bins.
+        ...         1.0, # Null bin endpoints
+        ...         -1.0, # Before singleton endpoint
+        ...         1.0, # After singleton endpoint
+        ...         0.0, # Equals singleton endpoint
+        ...     ],
+        ...     "bin_endpoints": [
+        ...         [0.0, 1.0, 2.0],
+        ...         [0.0, 1.0, 2.0],
+        ...         [0.0, 1.0, 2.0],
+        ...         [0.0, 1.0, 2.0],
+        ...         [0.0, 1.0, 2.0],
+        ...         [0.0, 0.1, 0.2, 0.3],
+        ...         None,
+        ...         [0.0],
+        ...         [0.0],
+        ...         [0.0],
+        ...     ],
+        ... }).with_row_index("__idx")
+        >>> df
+        shape: (10, 3)
+        ┌───────┬───────────────┬───────────────────┐
+        │ __idx ┆ numeric_value ┆ bin_endpoints     │
+        │ ---   ┆ ---           ┆ ---               │
+        │ u32   ┆ f64           ┆ list[f64]         │
+        ╞═══════╪═══════════════╪═══════════════════╡
+        │ 0     ┆ -1.0          ┆ [0.0, 1.0, 2.0]   │
+        │ 1     ┆ 3.0           ┆ [0.0, 1.0, 2.0]   │
+        │ 2     ┆ 0.5           ┆ [0.0, 1.0, 2.0]   │
+        │ 3     ┆ 1.0           ┆ [0.0, 1.0, 2.0]   │
+        │ 4     ┆ null          ┆ [0.0, 1.0, 2.0]   │
+        │ 5     ┆ 0.25          ┆ [0.0, 0.1, … 0.3] │
+        │ 6     ┆ 1.0           ┆ null              │
+        │ 7     ┆ -1.0          ┆ [0.0]             │
+        │ 8     ┆ 1.0           ┆ [0.0]             │
+        │ 9     ┆ 0.0           ┆ [0.0]             │
+        └───────┴───────────────┴───────────────────┘
+        >>> df.with_columns(_get_val_bin_idx(pl.col("bin_endpoints")).alias("idx"))
+        shape: (10, 4)
+        ┌───────┬───────────────┬───────────────────┬──────┐
+        │ __idx ┆ numeric_value ┆ bin_endpoints     ┆ idx  │
+        │ ---   ┆ ---           ┆ ---               ┆ ---  │
+        │ u32   ┆ f64           ┆ list[f64]         ┆ u32  │
+        ╞═══════╪═══════════════╪═══════════════════╪══════╡
+        │ 0     ┆ -1.0          ┆ [0.0, 1.0, 2.0]   ┆ 0    │
+        │ 1     ┆ 3.0           ┆ [0.0, 1.0, 2.0]   ┆ 3    │
+        │ 2     ┆ 0.5           ┆ [0.0, 1.0, 2.0]   ┆ 1    │
+        │ 3     ┆ 1.0           ┆ [0.0, 1.0, 2.0]   ┆ 2    │
+        │ 4     ┆ null          ┆ [0.0, 1.0, 2.0]   ┆ null │
+        │ 5     ┆ 0.25          ┆ [0.0, 0.1, … 0.3] ┆ 3    │
+        │ 6     ┆ 1.0           ┆ null              ┆ null │
+        │ 7     ┆ -1.0          ┆ [0.0]             ┆ 0    │
+        │ 8     ┆ 1.0           ┆ [0.0]             ┆ 1    │
+        │ 9     ┆ 0.0           ┆ [0.0]             ┆ 1    │
+        └───────┴───────────────┴───────────────────┴──────┘
+    """
+
+    val_col = pl.col(numeric_value_field)
+    do_bin = bin_endpoints.is_not_null() & val_col.is_not_null()
+    idx_expr = bin_endpoints.list.explode().search_sorted(val_col, side="right").over("__idx")
+    return pl.when(do_bin).then(idx_expr)
+
+
 def get_code(bin_endpoints: pl.Expr, val_bin_idx: pl.Expr) -> pl.Expr:
     return pl.col(code_field)
 
@@ -184,7 +271,7 @@ def add_bin_to_code(
         │ 3          ┆ lab//D ┆ 1.2           ┆ null             │
         └────────────┴────────┴───────────────┴──────────────────┘
         >>> add_bin_to_code(df, ["values/quantiles"], "{code}//value_[{left},{right})")
-        shape: (6, 3)
+        shape: (7, 3)
         ┌────────────┬──────────────────────────┬───────────────┐
         │ subject_id ┆ code                     ┆ numeric_value │
         │ ---        ┆ ---                      ┆ ---           │
@@ -198,8 +285,8 @@ def add_bin_to_code(
         │ 2          ┆ dx//1                    ┆ null          │
         │ 3          ┆ lab//D                   ┆ 1.2           │
         └────────────┴──────────────────────────┴───────────────┘
-        >>> add_bin_to_code(df, ["values/quantiles"], "{code}//{bin})", do_drop_numeric_value=True)
-        shape: (6, 3)
+        >>> add_bin_to_code(df, ["values/quantiles"], "{code}//{bin}", do_drop_numeric_value=True)
+        shape: (7, 3)
         ┌────────────┬───────────┬───────────────┐
         │ subject_id ┆ code      ┆ numeric_value │
         │ ---        ┆ ---       ┆ ---           │
@@ -217,14 +304,13 @@ def add_bin_to_code(
 
     schema = df.collect_schema()
 
+    df = df.with_row_index("__idx")
+
     if numeric_value_field not in schema:
         raise ValueError(f"Dataframe does not contain the required column '{numeric_value_field}'.")
 
     bin_endpoints = pl.coalesce([_check_and_get_bin_endpoints(schema, col) for col in bin_with_columns])
-
-    val_col = pl.col(numeric_value_field)
-    do_bin = bin_endpoints.is_not_null() & val_col.is_not_null()
-    val_bin_idx = pl.when(do_bin).then(bin_endpoints.list.explode().search_sorted(val_col))
+    val_bin_idx = _get_val_bin_idx(bin_endpoints)
 
     stripped_code_name, bin_name_fmt_cols = _get_and_strip_format_fields(code_with_bin_name)
     bin_name_fmt_exprs = []
@@ -235,12 +321,13 @@ def add_bin_to_code(
 
     code_with_bin = pl.format(stripped_code_name, *bin_name_fmt_exprs)
 
+    do_bin = bin_endpoints.is_not_null() & pl.col(numeric_value_field).is_not_null()
     df = df.with_columns(pl.when(do_bin).then(code_with_bin).otherwise(pl.col(code_field)).alias(code_field))
 
     if do_drop_numeric_value:
         df = df.with_columns(pl.when(~do_bin).then(numeric_value_field).alias(numeric_value_field))
 
-    return df.drop(bin_with_columns)
+    return df.drop(*bin_with_columns, "__idx")
 
 
 @Stage.register
