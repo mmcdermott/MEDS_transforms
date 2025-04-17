@@ -17,7 +17,8 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-  "polars~=1.26.0", "pyarrow", "hydra-core", "numpy", "meds==0.3.3", "filelock", "pytest", "meds_testing_helpers~=0.2.6"
+  "polars~=1.26.0", "pyarrow", "hydra-core", "numpy", "meds==0.3.3", "filelock", "pytest",
+  "meds_testing_helpers~=0.2.7"
 ]
 
 [tool.setuptools_scm]
@@ -50,6 +51,7 @@ reorder_measurements = "MEDS_transforms.stages:reorder_measurements"
 add_time_derived_measurements = "MEDS_transforms.stages:add_time_derived_measurements"
 extract_values = "MEDS_transforms.stages:extract_values"
 normalization = "MEDS_transforms.stages:normalization"
+bin_numeric_values = "MEDS_transforms.stages:bin_numeric_values"
 occlude_outliers = "MEDS_transforms.stages:occlude_outliers"
 
 [project.urls]

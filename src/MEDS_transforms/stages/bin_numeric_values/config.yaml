@@ -1,0 +1,5 @@
+bin_with_columns:
+  - "values/quantiles"
+code_with_bin_name: "{code}//value_[{left},{right})"
+do_drop_numeric_value: False
+custom_bins: {}
