@@ -642,15 +642,15 @@ def bin_numeric_values_fntr(
 
     code_metadata = code_metadata.select(code_field, *code_modifiers, *bin_with_columns)
 
-    def fn(df: pl.LazyFrame) -> pl.LazyFrame:
-        if do_use_custom_bins:
-            numeric_dtype = df.collect_schema()[numeric_value_field]
-            new_struct_dtype = pl.Struct({f.name: numeric_dtype for f in struct_dtype.fields})
-            local_metadata = code_metadata.with_columns(pl.col("__custom_bins").cast(new_struct_dtype))
-        else:
-            local_metadata = code_metadata
+    join_cols = [code_field, *code_modifiers]
 
-        df = df.join(local_metadata, on=[code_field, *code_modifiers], how="left", maintain_order="left")
+    def fn(df: pl.LazyFrame) -> pl.LazyFrame:
+        numeric_dtype = df.collect_schema()[numeric_value_field]
+        for col in bin_with_columns:
+            new_struct_dtype = pl.Struct({f.name: numeric_dtype for f in code_metadata.schema[col].fields})
+            local_metadata = code_metadata.with_columns(pl.col(col).cast(new_struct_dtype))
+
+        df = df.join(local_metadata.lazy(), on=join_cols, how="left", maintain_order="left")
         return add_bin_to_code(df, bin_with_columns, code_with_bin_name, do_drop_numeric_value)
 
     return fn
