@@ -1,234 +1,314 @@
 """Convert numeric values into categorical code modifiers through pre-computed or specified bins."""
 
 import logging
+import re
+from collections.abc import Callable
 
 import polars as pl
+from meds import code_field, numeric_value_field
+from omegaconf import DictConfig
 
 from .. import Stage
 
 logger = logging.getLogger(__name__)
 
 
-def process_quantiles(df: pl.DataFrame) -> pl.DataFrame:
-    """Process quantiles in a DataFrame, using custom quantiles if available.
+def _get_and_strip_format_fields(s: str) -> tuple[str, list[str]]:
+    """Extracts the fields from a format string, in order.
 
     Args:
-        df: A Polars DataFrame containing columns for values/quantiles and optionally custom_quantiles
+        s: The format string to extract fields from.
 
     Returns:
-        A DataFrame with processed quantiles and updated code column
+        A list of field names extracted from the format string.
 
     Examples:
-    >>> import polars as pl
-    >>> df = pl.DataFrame({
-    ...     "code": ["lab//A", "lab//B", "lab//C", "lab//D"],
-    ...     "numeric_value": [-1.0, 2.0, None, 0.0],
-    ...     "values/quantiles": [
-    ...         {"values/quantile/0.2": 0, "values/quantile/0.4": 1,
-    ...          "values/quantile/0.6": 2, "values/quantile/0.8": 3},
-    ...         {"values/quantile/0.2": 0, "values/quantile/0.4": 1,
-    ...          "values/quantile/0.6": 2, "values/quantile/0.8": 3},
-    ...         {"values/quantile/0.2": 0, "values/quantile/0.4": 1,
-    ...          "values/quantile/0.6": 2, "values/quantile/0.8": 3},
-    ...         {"values/quantile/0.2": 0, "values/quantile/0.4": 1,
-    ...          "values/quantile/0.6": 2, "values/quantile/0.8": 3}
-    ...     ],
-    ...     "custom_quantiles": [None,
-    ...         {"values/quantile/0.5": 1.5},
-    ...         None,
-    ...         None
-    ...     ],
-    ...     "code/vocab_index": [0, 1, 2, 3],
-    ... })
-    >>> result = process_quantiles(df)
-    >>> result.select(["code", "numeric_value"])
-    shape: (4, 2)
-    ┌──────────────┬───────────────┐
-    │ code         ┆ numeric_value │
-    │ ---          ┆ ---           │
-    │ str          ┆ f64           │
-    ╞══════════════╪═══════════════╡
-    │ lab//A//_Q_1 ┆ -1.0          │
-    │ lab//B//_Q_2 ┆ 2.0           │
-    │ lab//C       ┆ null          │
-    │ lab//D//_Q_1 ┆ 0.0           │
-    └──────────────┴───────────────┘
-    >>> # Test with only custom quantiles
-    >>> df_custom = pl.DataFrame({
-    ...     "code": ["lab//A", "lab//A", "lab//A"],
-    ...     "numeric_value": [-0.5, 1.0, 4.0],
-    ...     "values/quantiles": [
-    ...         {"values/quantile/0.2": 0, "values/quantile/0.4": 1,
-    ...          "values/quantile/0.6": 2, "values/quantile/0.8": 3},
-    ...         {"values/quantile/0.2": 0, "values/quantile/0.4": 1,
-    ...          "values/quantile/0.6": 2, "values/quantile/0.8": 3},
-    ...         {"values/quantile/0.2": 0, "values/quantile/0.4": 1,
-    ...          "values/quantile/0.6": 2, "values/quantile/0.8": 3},
-    ...     ],
-    ...     "custom_quantiles": [
-    ...         None,
-    ...         None,
-    ...         None,
-    ...     ],
-    ...     "code/vocab_index": [0, 0, 0],
-    ... })
-    >>> result_custom = process_quantiles(df_custom)
-    >>> result_custom.select(["code", "numeric_value"])
-    shape: (3, 2)
-    ┌──────────────┬───────────────┐
-    │ code         ┆ numeric_value │
-    │ ---          ┆ ---           │
-    │ str          ┆ f64           │
-    ╞══════════════╪═══════════════╡
-    │ lab//A//_Q_1 ┆ -0.5          │
-    │ lab//A//_Q_2 ┆ 1.0           │
-    │ lab//A//_Q_5 ┆ 4.0           │
-    └──────────────┴───────────────┘
+        >>> _get_and_strip_format_fields("{code}//value_[{left},{right})")
+        ('{}//value_[{},{})', ['code', 'left', 'right'])
+        >>> _get_and_strip_format_fields("{code}")
+        ('{}', ['code'])
+        >>> _get_and_strip_format_fields("{code}{{{bin}}}")
+        ('{}{{{}}}', ['code', 'bin'])
+        >>> _get_and_strip_format_fields("code/bin")
+        ('code/bin', [])
+        >>> _get_and_strip_format_fields("")
+        ('', [])
     """
-    # Use custom_quantiles if available, otherwise use values/quantiles
-    df = df.with_columns(
-        effective_quantiles=pl.when(pl.col("custom_quantiles").is_not_null())
-        .then(pl.col("custom_quantiles"))
-        .otherwise(pl.col("values/quantiles"))
-    )
 
-    # Unnest the effective_quantiles and calculate the quantile
-    quantile_columns = pl.selectors.starts_with("values/quantile/")
-    df = df.unnest("effective_quantiles").with_columns(
-        quantile=pl.when(pl.col("numeric_value").is_not_null()).then(
-            pl.sum_horizontal(quantile_columns.lt(pl.col("numeric_value"))).add(1)
-        )
-    )
+    pattern = r"{([^{}:]*)(?::[^{}]*)?}"
+    return re.sub(pattern, "{}", s), re.findall(pattern, s)
 
-    # Create the new code with quantile information
-    code_quantile_concat = pl.concat_str(pl.col("code"), pl.lit("//_Q_"), pl.col("quantile"))
-    df = df.with_columns(
-        code=pl.when(pl.col("quantile").is_not_null()).then(code_quantile_concat).otherwise(pl.col("code"))
-    )
 
-    # Clean up intermediate columns
-    df = df.drop("quantile", "values/quantiles", "custom_quantiles", quantile_columns)
+def _check_and_get_bin_endpoints(schema: pl.Schema, col: str) -> pl.Expr:
+    """Checks and ensures the bin column is valid given the schema and returns the bin endpoints if so.
 
-    return df
+    Args:
+        schema: The schema of the dataframe.
+        col: The name of the bin column.
+
+    Returns:
+        The bin endpoints as a polars list expression.
+
+    Raises:
+        ValueError: If the bin column is not found in the schema or if it is not a struct type or if any field
+            within the struct does not match the numeric value type.
+
+    Examples:
+        >>> schema = {
+        ...     "numeric_value": pl.Float32,
+        ...     "A": pl.Struct([pl.Field("bin1", pl.Float32), pl.Field("bin2", pl.Float32)]),
+        ...     "B": pl.String,
+        ...     "C": pl.Struct([pl.Field("bin1", pl.Float32), pl.Field("bin2", pl.Int64)]),
+        ... }
+        >>> print(_check_and_get_bin_endpoints(schema, "A"))
+        .when(col("A").is_not_null()).then(col("A").multiple_fields().list.concat()).otherwise(null)
+        >>> _check_and_get_bin_endpoints(schema, "B")
+        Traceback (most recent call last):
+            ...
+        ValueError: bin_with_columns entry 'B' is not a struct type; got String.
+        >>> _check_and_get_bin_endpoints(schema, "C")
+        Traceback (most recent call last):
+            ...
+        ValueError: bin_with_columns entry 'C' has field 'bin2' with dtype Int64, which does not match the
+            numeric_value dtype Float32.
+        >>> _check_and_get_bin_endpoints(schema, "non_existent_col")
+        Traceback (most recent call last):
+            ...
+        ValueError: bin_with_columns entry 'non_existent_col' not found in the dataframe schema.
+    """
+
+    if col not in schema:
+        raise ValueError(f"bin_with_columns entry '{col}' not found in the dataframe schema.")
+
+    col_dtype = schema[col]
+
+    if not isinstance(col_dtype, pl.Struct):
+        raise ValueError(f"bin_with_columns entry '{col}' is not a struct type; got {col_dtype}.")
+
+    numeric_dtype = schema[numeric_value_field]
+
+    for field in col_dtype.fields:
+        if field.dtype != numeric_dtype:
+            raise ValueError(
+                f"bin_with_columns entry '{col}' has field '{field.name}' with dtype {field.dtype}, "
+                f"which does not match the numeric_value dtype {numeric_dtype}."
+            )
+
+    return pl.when(pl.col(col).is_not_null()).then(pl.concat_list(pl.col(col).struct.unnest()))
+
+
+def get_code(bin_endpoints: pl.Expr, val_bin_idx: pl.Expr) -> pl.Expr:
+    return pl.col(code_field)
+
+
+def get_bin(bin_endpoints: pl.Expr, val_bin_idx: pl.Expr) -> pl.Expr:
+    return val_bin_idx.cast(pl.String)
+
+
+def get_left(bin_endpoints: pl.Expr, val_bin_idx: pl.Expr) -> pl.Expr:
+    return bin_endpoints.list.get(val_bin_idx - 1, null_on_oob=True).cast(pl.String).fill_null("-inf")
+
+
+def get_right(bin_endpoints: pl.Expr, val_bin_idx: pl.Expr) -> pl.Expr:
+    return bin_endpoints.list.get(val_bin_idx, null_on_oob=True).cast(pl.String).fill_null("inf")
+
+
+BIN_NAME_FMT_EXPRS: dict[str, Callable[[pl.Expr, pl.Expr], pl.Expr]] = {
+    "code": get_code,
+    "bin": get_bin,
+    "left": get_left,
+    "right": get_right,
+}
+
+
+def add_bin_to_code(
+    df: pl.LazyFrame | pl.DataFrame,
+    bin_with_columns: list[str],
+    code_with_bin_name: str,
+    do_drop_numeric_value: bool = False,
+) -> pl.LazyFrame | pl.DataFrame:
+    """Converts numeric values into categorical code modifiers through a joined column of bin endpoints.
+
+    Args:
+        df: The dataframe to process. It should contain the following columns:
+            - `code`: The code to be modified.
+            - `numeric_value`: The numeric value to be binned.
+            - All columns specified in `bin_with_columns`, which contain the linked bin endpoints to use for
+              that particular measurement. Each column in `bin_with_columns` should contain a struct whose
+              values are all of the same dtype and contain the increasing list of bin endpoints.
+        code_with_bin_name: A string template for the code name with bin information. The template can
+            leverage the keys `{code}`, `{left}`, `{right}`, and `{bin}` to capture the original code name,
+            the left endpoint of the bin, the right endpoint of the bin, and the bin name.
+        do_drop_numeric_value: A boolean flag indicating whether to drop the numeric_value column after
+            binning. Default is `False`.
+
+    Returns:
+        A new dataframe with the codes modified to include bin information, according to the format specified.
+        Codes without numeric values or with no bin endpoints included in either `code_metadata` or
+        `custom_bins` are left unchanged. If `do_drop_numeric_value` is set to `True`, the returned DataFrame
+        will have all cases where numeric values are converted to bins dropped. The returned dataframe will
+        not have the columns contained in `bin_with_columns` in it.
+
+    Raises:
+        ValueError: If the dataframe does not contain the required columns or if the bin columns are not
+            present in the schema.
+
+    Examples:
+        >>> df = pl.DataFrame({
+        ...     "subject_id": [1, 1, 1, 2, 2, 2, 3],
+        ...     "code": ["lab//A", "lab//B", "lab//C", "lab//A", "lab//C", "dx//1", "lab//D"],
+        ...     "numeric_value": [-1.0, 2.0, None, 1.0, 1.0, None, 1.2],
+        ...     "values/quantiles": [
+        ...         {"values/quantile/0.25": 0., "values/quantile/0.5": 1., "values/quantile/0.75": 2.},
+        ...         {"values/quantile/0.25": -2., "values/quantile/0.5": 3., "values/quantile/0.75": 100.},
+        ...         {"values/quantile/0.25": 0.01, "values/quantile/0.5": 0.4, "values/quantile/0.75": 0.6},
+        ...         {"values/quantile/0.25": 0., "values/quantile/0.5": 1., "values/quantile/0.75": 2.},
+        ...         {"values/quantile/0.25": 0.01, "values/quantile/0.5": 0.4, "values/quantile/0.75": 0.6},
+        ...         None,
+        ...         None,
+        ...     ],
+        ... })
+        >>> df
+        shape: (7, 4)
+        ┌────────────┬────────┬───────────────┬──────────────────┐
+        │ subject_id ┆ code   ┆ numeric_value ┆ values/quantiles │
+        │ ---        ┆ ---    ┆ ---           ┆ ---              │
+        │ i64        ┆ str    ┆ f64           ┆ struct[3]        │
+        ╞════════════╪════════╪═══════════════╪══════════════════╡
+        │ 1          ┆ lab//A ┆ -1.0          ┆ {0.0,1.0,2.0}    │
+        │ 1          ┆ lab//B ┆ 2.0           ┆ {-2.0,3.0,100.0} │
+        │ 1          ┆ lab//C ┆ null          ┆ {0.01,0.4,0.6}   │
+        │ 2          ┆ lab//A ┆ 1.0           ┆ {0.0,1.0,2.0}    │
+        │ 2          ┆ lab//C ┆ 1.0           ┆ {0.01,0.4,0.6}   │
+        │ 2          ┆ dx//1  ┆ null          ┆ null             │
+        │ 3          ┆ lab//D ┆ 1.2           ┆ null             │
+        └────────────┴────────┴───────────────┴──────────────────┘
+        >>> add_bin_to_code(df, ["values/quantiles"], "{code}//value_[{left},{right})")
+        shape: (6, 3)
+        ┌────────────┬──────────────────────────┬───────────────┐
+        │ subject_id ┆ code                     ┆ numeric_value │
+        │ ---        ┆ ---                      ┆ ---           │
+        │ i64        ┆ str                      ┆ f64           │
+        ╞════════════╪══════════════════════════╪═══════════════╡
+        │ 1          ┆ lab//A//value_[-inf,0.0) ┆ -1.0          │
+        │ 1          ┆ lab//B//value_[-2.0,3.0) ┆ 2.0           │
+        │ 1          ┆ lab//C                   ┆ null          │
+        │ 2          ┆ lab//A//value_[1.0,2.0)  ┆ 1.0           │
+        │ 2          ┆ lab//C//value_[0.6,inf)  ┆ 1.0           │
+        │ 2          ┆ dx//1                    ┆ null          │
+        │ 3          ┆ lab//D                   ┆ 1.2           │
+        └────────────┴──────────────────────────┴───────────────┘
+        >>> add_bin_to_code(df, ["values/quantiles"], "{code}//{bin})", do_drop_numeric_value=True)
+        shape: (6, 3)
+        ┌────────────┬───────────┬───────────────┐
+        │ subject_id ┆ code      ┆ numeric_value │
+        │ ---        ┆ ---       ┆ ---           │
+        │ i64        ┆ str       ┆ f64           │
+        ╞════════════╪═══════════╪═══════════════╡
+        │ 1          ┆ lab//A//0 ┆ null          │
+        │ 1          ┆ lab//B//1 ┆ null          │
+        │ 1          ┆ lab//C    ┆ null          │
+        │ 2          ┆ lab//A//2 ┆ null          │
+        │ 2          ┆ lab//C//3 ┆ null          │
+        │ 2          ┆ dx//1     ┆ null          │
+        │ 3          ┆ lab//D    ┆ 1.2           │
+        └────────────┴───────────┴───────────────┘
+    """
+
+    schema = df.collect_schema()
+
+    if numeric_value_field not in schema:
+        raise ValueError(f"Dataframe does not contain the required column '{numeric_value_field}'.")
+
+    bin_endpoints = pl.coalesce([_check_and_get_bin_endpoints(schema, col) for col in bin_with_columns])
+
+    val_col = pl.col(numeric_value_field)
+    do_bin = bin_endpoints.is_not_null() & val_col.is_not_null()
+    val_bin_idx = pl.when(do_bin).then(bin_endpoints.list.explode().search_sorted(val_col))
+
+    stripped_code_name, bin_name_fmt_cols = _get_and_strip_format_fields(code_with_bin_name)
+    bin_name_fmt_exprs = []
+    for n in bin_name_fmt_cols:
+        if n not in BIN_NAME_FMT_EXPRS:
+            raise ValueError(f"Invalid bin name format field '{n}' in '{code_with_bin_name}'.")
+        bin_name_fmt_exprs.append(BIN_NAME_FMT_EXPRS[n](bin_endpoints, val_bin_idx))
+
+    code_with_bin = pl.format(stripped_code_name, *bin_name_fmt_exprs)
+
+    df = df.with_columns(pl.when(do_bin).then(code_with_bin).otherwise(pl.col(code_field)).alias(code_field))
+
+    if do_drop_numeric_value:
+        df = df.with_columns(pl.when(~do_bin).then(numeric_value_field).alias(numeric_value_field))
+
+    return df.drop(bin_with_columns)
 
 
 @Stage.register
 def bin_numeric_values_fntr(
-    stage_cfg,
+    stage_cfg: DictConfig,
     code_metadata: pl.DataFrame,
     code_modifiers: list[str] | None = None,
-) -> pl.LazyFrame:
-    """Converts the numeric values in a MEDS dataset to discrete quantiles that are added to the code name.
+) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
+    """Uses pre-computed value bin endpoints to add value range modifiers to code names.
+
+    Args:
+        stage_cfg: Configuration for the stage, including custom_bins and drop_numeric_value. The following
+            keys are used:
+                - `bin_with_columns`: A list of column names in `metadata/codes.parquet` to use for binning.
+                  These columns should contain a struct whose key names correspond to bin names and whose
+                  values capture the bin endpoints. The bin endpoints should correspond to the "right"
+                  endpoint (exclusive) of the bin. In this way, a struct with three key-value pairs implicitly
+                  creates four bins. E.g., the struct
+                  `{values/quantile/0.25: 99.9, values/quantile/0.5: 105.1, values/quantile/0.75: 113.4}`
+                  captures the bins `[-inf, 99.9)`, `[99.9, 105.1)`, `[105.1, 113.4)`, and `[113.4, inf)`. The
+                  struct should be in sorted order of bin endpoints from least to greatest. Default is a list
+                  with a single entry of `"values/quantiles"`, which captures the quantiles computed via the
+                  `aggregate_code_metadata` stage. If multiple columns are specified in this list, the first
+                  column that is non-null is used for each code.
+                - code_with_bin_name: A string template for the code name with bin information. The template
+                  can leverage the keys `{code}`, `{left}`, `{right}`, and `{bin}` to capture the original
+                  code name, the left endpoint of the bin, the right endpoint of the bin, and the bin name.
+                  Default is `{code}//value_[{left},{right})`.
+                - do_drop_numeric_value: A boolean flag indicating whether to drop the numeric_value column
+                  after binning. Default is `False`.
+                - custom_bins: A dictionary mapping code names to custom bin endpoints. The keys should be the
+                  code names and the values should be dictionaries with the same structure as the
+                  bin_with_columns. This allows for custom binning for specific codes. Default is an empty
+                  dictionary. Custom bins are used preferentially over entries in `bin_with_columns`.
+        code_metadata: A DataFrame containing the metadata for the codes, including the bin endpoints and
+            custom bins.
+        code_modifiers: A list of additional columns to use for joining against codes. These columns should be
+            present in both the raw data and the code metadata.
+
+    > [!WARNING]
+    > If `code_modifiers` are used, note that they do not change the structure of `custom_bins` -- that
+    > strategy still only joins by `code`. File a GitHub Issue if this does not work for you.
 
     Returns:
-        - A new DataFrame with the quantile values added to the code name.
-        - A new DataFrame with the metadata for the quantile codes.
-
-    Examples:
-    >>> from datetime import datetime
-    >>> MEDS_df = pl.DataFrame(
-    ...     {
-    ...         "subject_id": [1, 1, 1, 2, 2, 2, 3],
-    ...         "time": [
-    ...             datetime(2021, 1, 1),
-    ...             datetime(2021, 1, 1),
-    ...             datetime(2021, 1, 2),
-    ...             datetime(2022, 10, 2),
-    ...             datetime(2022, 10, 2),
-    ...             datetime(2022, 10, 2),
-    ...             datetime(2022, 10, 2),
-    ...         ],
-    ...         "code": ["lab//A", "lab//C", "dx//B", "lab//A", "dx//D", "lab//C", "lab//F"],
-    ...         "numeric_value": [1, 3, None, 3, None, None, None],
-    ...     },
-    ...     schema = {
-    ...         "subject_id": pl.UInt32,
-    ...         "time": pl.Datetime,
-    ...         "code": pl.Utf8,
-    ...         "numeric_value": pl.Float64,
-    ...    },
-    ... )
-    >>> code_metadata = pl.DataFrame(
-    ...     {
-    ...         "code": ["lab//A", "lab//C", "dx//B", "dx//E", "lab//F", "dx//D"],
-    ...         "values/quantiles": [ # [[-3,-1,1,3], [-3,-1,1,3], [], [-3,-1,1,3], [-3,-1,1,3], [-3,-1,1,3]],
-    ...             {"values/quantile/0.2": -3, "values/quantile/0.4": -1,
-    ...                 "values/quantile/0.6": 1, "values/quantile/0.8": 3},
-    ...             {"values/quantile/0.2": -3, "values/quantile/0.4": -1,
-    ...                 "values/quantile/0.6": 1, "values/quantile/0.8": 3},
-    ...             {"values/quantile/0.2": None, "values/quantile/0.4": None,
-    ...                 "values/quantile/0.6": None, "values/quantile/0.8": None},
-    ...             {"values/quantile/0.2": -3, "values/quantile/0.4": -1,
-    ...                 "values/quantile/0.6": 1, "values/quantile/0.8": 3},
-    ...             {"values/quantile/0.2": -3, "values/quantile/0.4": -1,
-    ...                 "values/quantile/0.6": 1, "values/quantile/0.8": 3},
-    ...             {"values/quantile/0.2": -3, "values/quantile/0.4": -1,
-    ...                 "values/quantile/0.6": 1, "values/quantile/0.8": 3},
-    ...         ],
-    ...     },
-    ...     schema = {
-    ...         "code": pl.Utf8,
-    ...         "values/quantiles": pl.Struct([
-    ...             pl.Field("values/quantile/0.2", pl.Float64),
-    ...             pl.Field("values/quantile/0.4", pl.Float64),
-    ...             pl.Field("values/quantile/0.6", pl.Float64),
-    ...             pl.Field("values/quantile/0.8", pl.Float64),
-    ...         ]), # pl.List(pl.Float64),
-    ...     },
-    ... )
-    >>> custom_quantiles = {"lab//C": {"values/quantile/0.5": 0}}
-    >>> fn = bin_numeric_values_fntr({"custom_quantiles": custom_quantiles}, code_metadata)
-    >>> fn(MEDS_df).sort("subject_id", "time", "code")
-    shape: (7, 4)
-    ┌────────────┬─────────────────────┬──────────────┬───────────────┐
-    │ subject_id ┆ time                ┆ code         ┆ numeric_value │
-    │ ---        ┆ ---                 ┆ ---          ┆ ---           │
-    │ u32        ┆ datetime[μs]        ┆ str          ┆ f64           │
-    ╞════════════╪═════════════════════╪══════════════╪═══════════════╡
-    │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//A//_Q_3 ┆ 1.0           │
-    │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//C//_Q_2 ┆ 3.0           │
-    │ 1          ┆ 2021-01-02 00:00:00 ┆ dx//B        ┆ null          │
-    │ 2          ┆ 2022-10-02 00:00:00 ┆ dx//D        ┆ null          │
-    │ 2          ┆ 2022-10-02 00:00:00 ┆ lab//A//_Q_4 ┆ 3.0           │
-    │ 2          ┆ 2022-10-02 00:00:00 ┆ lab//C       ┆ null          │
-    │ 3          ┆ 2022-10-02 00:00:00 ┆ lab//F       ┆ null          │
-    └────────────┴─────────────────────┴──────────────┴───────────────┘
-    >>> custom_quantiles = {"lab//A": {"values/quantile/0.5": 3}}
-    >>> fn = bin_numeric_values_fntr({"custom_quantiles": custom_quantiles}, code_metadata)
-    >>> fn(MEDS_df).sort("subject_id", "time", "code")
-    shape: (7, 4)
-    ┌────────────┬─────────────────────┬──────────────┬───────────────┐
-    │ subject_id ┆ time                ┆ code         ┆ numeric_value │
-    │ ---        ┆ ---                 ┆ ---          ┆ ---           │
-    │ u32        ┆ datetime[μs]        ┆ str          ┆ f64           │
-    ╞════════════╪═════════════════════╪══════════════╪═══════════════╡
-    │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//A//_Q_1 ┆ 1.0           │
-    │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//C//_Q_4 ┆ 3.0           │
-    │ 1          ┆ 2021-01-02 00:00:00 ┆ dx//B        ┆ null          │
-    │ 2          ┆ 2022-10-02 00:00:00 ┆ dx//D        ┆ null          │
-    │ 2          ┆ 2022-10-02 00:00:00 ┆ lab//A//_Q_1 ┆ 3.0           │
-    │ 2          ┆ 2022-10-02 00:00:00 ┆ lab//C       ┆ null          │
-    │ 3          ┆ 2022-10-02 00:00:00 ┆ lab//F       ┆ null          │
-    └────────────┴─────────────────────┴──────────────┴───────────────┘
+        A function that takes a dataframe and returns a new dataFrame with the codes modified to include bin
+        information, according to the format specified. Codes without numeric values or with no bin endpoints
+        included in either `code_metadata` or `custom_bins` are left unchanged. If `do_drop_numeric_value` is
+        set to `True`, the returned DataFrame will have all cases where numeric values are converted to bins
+        dropped.
     """
     if code_modifiers is None:
         code_modifiers = []
 
-    # Step 1: Add custom_quantiles column to code_metadata
-    custom_quantiles = stage_cfg.get("custom_quantiles", {})
+    # Step 1: Add custom_bins column to code_metadata
+    custom_bins = stage_cfg.get("custom_bins", {})
+    do_drop_numeric_value = stage_cfg.get("drop_numeric_value", False)
+    bin_with_columns = stage_cfg.get("bin_with_columns", ["values/quantiles"])
+    code_with_bin_name = stage_cfg.get("code_with_bin_name", "{code}//value_[{left},{right})")
 
-    if custom_quantiles:
-        custom_quantiles_series = pl.Series(
-            name="custom_quantiles",
-            values=[
-                custom_quantiles.get(code) if code is not None else None for code in code_metadata["code"]
-            ],
-        )
-        code_metadata = code_metadata.with_columns(custom_quantiles_series)
+    if custom_bins:
+        custom_bins = pl.Series([custom_bins.get(c, None) for c in code_metadata[code_field]])
+        code_metadata = code_metadata.with_columns(custom_bins.alias("__custom_bins"))
+        bin_with_columns = ["__custom_bins", *bin_with_columns]
+
+    code_metadata = code_metadata.select(code_field, *code_modifiers, *bin_with_columns)
 
     def fn(df: pl.LazyFrame) -> pl.LazyFrame:
-        return process_quantiles(
-            df.join(code_metadata, on=["code", *code_modifiers], how="left", maintain_order="left")
-        )
+        df = df.join(code_metadata, on=[code_field, *code_modifiers], how="left", maintain_order="left")
+        return add_bin_to_code(df, bin_with_columns, code_with_bin_name, do_drop_numeric_value)
 
     return fn
