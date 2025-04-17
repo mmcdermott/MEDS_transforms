@@ -7,6 +7,7 @@ from .examples import StageExample
 # isort: split
 from .add_time_derived_measurements import stage as add_time_derived_measurements
 from .aggregate_code_metadata import stage as aggregate_code_metadata
+from .bin_numeric_values import stage as bin_numeric_values
 from .extract_values import stage as extract_values
 from .filter_measurements import stage as filter_measurements
 from .filter_subjects import stage as filter_subjects

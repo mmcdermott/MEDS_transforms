@@ -1,2 +1,9 @@
 age:
   DOB_code: DOB
+  age_code: "AGE"
+  age_unit: "years"
+time_of_day:
+  time_of_day_code: "TIME_OF_DAY"
+  endpoints: [6, 12, 18, 24]
+timeline_tokens:
+  time_unit: "y"
