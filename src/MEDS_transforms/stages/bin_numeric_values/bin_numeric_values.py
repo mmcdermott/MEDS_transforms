@@ -342,6 +342,18 @@ def add_bin_to_code(
         │ 1          ┆ [0.4,0.6) ┆ 0.5           │
         │ 1          ┆ [0.0,1.0) ┆ 0.6           │
         └────────────┴───────────┴───────────────┘
+
+    Errors will be raised if the dataframe is missing the numeric value field or if an invalid code name
+    format string is provided (e.g., if it contains a field that is not in the list of valid fields).
+
+        >>> add_bin_to_code(df.drop("numeric_value"), ["bins_1", "bins_2"], "{code}//{invalid_field}")
+        Traceback (most recent call last):
+            ...
+        ValueError: Dataframe does not contain the required column 'numeric_value'.
+        >>> add_bin_to_code(df, ["bins_1", "bins_2"], "{code}//{invalid_field}")
+        Traceback (most recent call last):
+            ...
+        ValueError: Invalid bin name format field 'invalid_field' in '{code}//{invalid_field}'.
     """
 
     schema = df.collect_schema()
