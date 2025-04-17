@@ -241,8 +241,8 @@ def timeline_tokens_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFra
         out_measurements = []
 
         time = pl.col(time_field)
-        code_dtype = df.schema.get(code_field, pl.Utf8)
-        numeric_value_dtype = df.schema.get(numeric_value_field, pl.Float32)
+        code_dtype = df.collect_schema().get(code_field, pl.Utf8)
+        numeric_value_dtype = df.collect_schema().get(numeric_value_field, pl.Float32)
 
         if do_add_timeline_start:
             first_time = time.min().over(subject_id_field)

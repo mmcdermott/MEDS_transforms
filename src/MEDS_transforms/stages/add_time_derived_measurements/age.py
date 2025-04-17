@@ -18,9 +18,9 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
     Args:
         cfg: The configuration for the age function. This must contain the following mandatory keys:
             - "DOB_code": The code for the date of birth event in the raw data. A string literal. Defaults to
-              None.
-            - "DOB_regex": A regex pattern to match the date of birth event in the raw data. This is used
-              preferentially over the "DOB_code" key if both are provided. Defaults to "^MEDS_BIRTH(//.*)?"
+              None. This is used preferentially over the "DOB_regex" key if both are provided.
+            - "DOB_regex": A regex pattern to match the date of birth event in the raw data. Defaults to
+              "^MEDS_BIRTH(//.*)?"
             - "age_code": The code for the age event in the output data.
             - "age_unit": The unit for the age event when converted to a numeric value in the output data.
 
@@ -144,10 +144,10 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
     canonical_unit, seconds_in_unit = normalize_time_unit(cfg.age_unit)
     microseconds_in_unit = int(1e6) * seconds_in_unit
 
-    if "DOB_regex" in cfg:
-        is_dob = pl.col(code_field).str.contains(cfg.DOB_regex)
-    elif "DOB_code" in cfg:
+    if cfg.get("DOB_code", None) is not None:
         is_dob = pl.col(code_field).str.contains(cfg.DOB_code, literal=True)
+    elif cfg.get("DOB_regex", None) is not None:
+        is_dob = pl.col(code_field).str.contains(cfg.DOB_regex)
     else:
         raise ValueError("Either 'DOB_regex' or 'DOB_code' must be provided in the configuration.")
 
@@ -157,6 +157,8 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
     age_expr = age_expr.cast(pl.Float32, strict=False)
 
     def fn(df: pl.LazyFrame) -> pl.LazyFrame:
+        code_dtype = df.collect_schema().get(code_field, pl.Utf8)
+
         dobs = df.filter(is_dob).select(subject_id_field, pl.col(time_field).alias(dob_col))
         events = unique_events(df)
 
@@ -165,7 +167,7 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
             .select(
                 subject_id_field,
                 time_field,
-                pl.lit(cfg.age_code, dtype=df.schema[code_field]).alias(code_field),
+                pl.lit(cfg.age_code, dtype=code_dtype).alias(code_field),
                 age_expr.alias(numeric_value_field),
             )
             .drop_nulls(subset=[numeric_value_field])

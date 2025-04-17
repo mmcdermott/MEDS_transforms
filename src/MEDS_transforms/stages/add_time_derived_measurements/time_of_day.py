@@ -108,9 +108,10 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
 
     def fn(df: pl.LazyFrame) -> pl.LazyFrame:
         hour = pl.col(time_field).dt.hour()
+        code_dtype = df.collect_schema().get(code_field, pl.Utf8)
 
         def tod_code(start: int, end: int) -> str:
-            return pl.lit(f"{cfg.time_of_day_code}//[{start:02},{end:02})", dtype=df.schema[code_field])
+            return pl.lit(f"{cfg.time_of_day_code}//[{start:02},{end:02})", dtype=code_dtype)
 
         start, end = 0, cfg.endpoints[0]
         time_of_day = pl.when(hour < end).then(tod_code(start, end))
