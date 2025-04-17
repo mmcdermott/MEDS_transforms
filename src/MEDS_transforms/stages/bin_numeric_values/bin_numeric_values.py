@@ -646,11 +646,18 @@ def bin_numeric_values_fntr(
 
     def fn(df: pl.LazyFrame) -> pl.LazyFrame:
         numeric_dtype = df.collect_schema()[numeric_value_field]
+
+        cast_exprs = []
         for col in bin_with_columns:
             new_struct_dtype = pl.Struct({f.name: numeric_dtype for f in code_metadata.schema[col].fields})
-            local_metadata = code_metadata.with_columns(pl.col(col).cast(new_struct_dtype))
+            cast_exprs.append(pl.col(col).cast(new_struct_dtype))
 
-        df = df.join(local_metadata.lazy(), on=join_cols, how="left", maintain_order="left")
+        local_metadata = code_metadata.with_columns(*cast_exprs)
+
+        if isinstance(df, pl.LazyFrame):
+            local_metadata = local_metadata.lazy()
+
+        df = df.join(local_metadata, on=join_cols, how="left", maintain_order="left")
         return add_bin_to_code(df, bin_with_columns, code_with_bin_name, do_drop_numeric_value)
 
     return fn
