@@ -3,7 +3,6 @@
 import logging
 
 import polars as pl
-from omegaconf import DictConfig, OmegaConf
 
 from .. import Stage
 
@@ -113,63 +112,6 @@ def process_quantiles(df: pl.DataFrame) -> pl.DataFrame:
     return df
 
 
-def add_custom_quantiles_column(code_metadata: pl.DataFrame, custom_quantiles: dict) -> pl.DataFrame:
-    """Add a custom_quantiles column to code_metadata DataFrame based on provided dictionary.
-
-    Args:
-        code_metadata: A Polars DataFrame containing code information
-        custom_quantiles: A dictionary mapping codes to their custom quantile values
-
-    Returns:
-        A DataFrame with an added custom_quantiles column
-
-    Examples:
-    >>> import polars as pl
-    >>> code_metadata = pl.DataFrame({
-    ...     "code": ["lab//A", "lab//B", "lab//C"],
-    ... })
-    >>> custom_quantiles = {
-    ...     "lab//A": {"values/quantile/0.5": 1.5},
-    ...     "lab//B": {"values/quantile/0.5": 2.5}
-    ... }
-    >>> result = add_custom_quantiles_column(code_metadata, custom_quantiles)
-    >>> result
-    shape: (3, 2)
-    ┌────────┬──────────────────┐
-    │ code   ┆ custom_quantiles │
-    │ ---    ┆ ---              │
-    │ str    ┆ struct[1]        │
-    ╞════════╪══════════════════╡
-    │ lab//A ┆ {1.5}            │
-    │ lab//B ┆ {2.5}            │
-    │ lab//C ┆ null             │
-    └────────┴──────────────────┘
-    >>> # Test with empty custom_quantiles
-    >>> result = add_custom_quantiles_column(code_metadata, {})
-    >>> result
-    shape: (3, 2)
-    ┌────────┬──────────────────┐
-    │ code   ┆ custom_quantiles │
-    │ ---    ┆ ---              │
-    │ str    ┆ null             │
-    ╞════════╪══════════════════╡
-    │ lab//A ┆ null             │
-    │ lab//B ┆ null             │
-    │ lab//C ┆ null             │
-    └────────┴──────────────────┘
-    """
-    # Convert custom_quantiles dict to a Polars Series
-    if isinstance(custom_quantiles, DictConfig):
-        custom_quantiles = OmegaConf.to_container(custom_quantiles)
-    custom_quantiles_series = pl.Series(
-        name="custom_quantiles",
-        values=[custom_quantiles.get(code) if code is not None else None for code in code_metadata["code"]],
-    )
-
-    # Add the custom_quantiles column to code_metadata
-    return code_metadata.with_columns(custom_quantiles_series)
-
-
 @Stage.register
 def bin_numeric_values_fntr(
     stage_cfg,
@@ -269,12 +211,20 @@ def bin_numeric_values_fntr(
     │ 3          ┆ 2022-10-02 00:00:00 ┆ lab//F       ┆ null          │
     └────────────┴─────────────────────┴──────────────┴───────────────┘
     """
-    custom_quantiles = stage_cfg.get("custom_quantiles", {})
     if code_modifiers is None:
         code_modifiers = []
 
     # Step 1: Add custom_quantiles column to code_metadata
-    code_metadata = add_custom_quantiles_column(code_metadata, custom_quantiles)
+    custom_quantiles = stage_cfg.get("custom_quantiles", {})
+
+    if custom_quantiles:
+        custom_quantiles_series = pl.Series(
+            name="custom_quantiles",
+            values=[
+                custom_quantiles.get(code) if code is not None else None for code in code_metadata["code"]
+            ],
+        )
+        code_metadata = code_metadata.with_columns(custom_quantiles_series)
 
     def fn(df: pl.LazyFrame) -> pl.LazyFrame:
         return process_quantiles(
