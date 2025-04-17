@@ -6,7 +6,7 @@ from collections.abc import Callable
 
 import polars as pl
 from meds import code_field, numeric_value_field
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from .. import Stage
 
@@ -285,6 +285,9 @@ def add_bin_to_code(
         │ 2          ┆ dx//1                    ┆ null          │
         │ 3          ┆ lab//D                   ┆ 1.2           │
         └────────────┴──────────────────────────┴───────────────┘
+
+    You can change the format to use the bin index ('{bin}') as well:
+
         >>> add_bin_to_code(df, ["values/quantiles"], "{code}//{bin}", do_drop_numeric_value=True)
         shape: (7, 3)
         ┌────────────┬───────────┬───────────────┐
@@ -299,6 +302,45 @@ def add_bin_to_code(
         │ 2          ┆ lab//C//3 ┆ null          │
         │ 2          ┆ dx//1     ┆ null          │
         │ 3          ┆ lab//D    ┆ 1.2           │
+        └────────────┴───────────┴───────────────┘
+
+    You can also have multiple bin endpoint columns; in this case, the first non-null column is used. Note
+    that the names of the struct keys are ignored and the structs need not match in anything but value type.
+
+        >>> df = pl.DataFrame({
+        ...     "subject_id": [1, 1, 1, 1],
+        ...     "code": ["A", "B", "C", "D"],
+        ...     "numeric_value": [1.5, 2.5, 0.5, 0.6],
+        ...     "bins_1": [
+        ...         {"1": 0., "2": 1.}, None, None, {"1": 0., "2": 1.},
+        ...     ],
+        ...     "bins_2": [
+        ...         None, None, {"a": 0.01, "b": 0.4, "c": 0.6}, {"a": -0.5, "b": 0.5, "c": 1.5},
+        ...     ],
+        ... })
+        >>> df
+        shape: (4, 5)
+        ┌────────────┬──────┬───────────────┬───────────┬────────────────┐
+        │ subject_id ┆ code ┆ numeric_value ┆ bins_1    ┆ bins_2         │
+        │ ---        ┆ ---  ┆ ---           ┆ ---       ┆ ---            │
+        │ i64        ┆ str  ┆ f64           ┆ struct[2] ┆ struct[3]      │
+        ╞════════════╪══════╪═══════════════╪═══════════╪════════════════╡
+        │ 1          ┆ A    ┆ 1.5           ┆ {0.0,1.0} ┆ null           │
+        │ 1          ┆ B    ┆ 2.5           ┆ null      ┆ null           │
+        │ 1          ┆ C    ┆ 0.5           ┆ null      ┆ {0.01,0.4,0.6} │
+        │ 1          ┆ D    ┆ 0.6           ┆ {0.0,1.0} ┆ {-0.5,0.5,1.5} │
+        └────────────┴──────┴───────────────┴───────────┴────────────────┘
+        >>> add_bin_to_code(df, ["bins_1", "bins_2"], "[{left},{right})")
+        shape: (4, 3)
+        ┌────────────┬───────────┬───────────────┐
+        │ subject_id ┆ code      ┆ numeric_value │
+        │ ---        ┆ ---       ┆ ---           │
+        │ i64        ┆ str       ┆ f64           │
+        ╞════════════╪═══════════╪═══════════════╡
+        │ 1          ┆ [1.0,inf) ┆ 1.5           │
+        │ 1          ┆ B         ┆ 2.5           │
+        │ 1          ┆ [0.4,0.6) ┆ 0.5           │
+        │ 1          ┆ [0.0,1.0) ┆ 0.6           │
         └────────────┴───────────┴───────────────┘
     """
 
@@ -377,25 +419,238 @@ def bin_numeric_values_fntr(
         included in either `code_metadata` or `custom_bins` are left unchanged. If `do_drop_numeric_value` is
         set to `True`, the returned DataFrame will have all cases where numeric values are converted to bins
         dropped.
+
+    Examples:
+        >>> df = pl.DataFrame({
+        ...     "subject_id": [1, 1, 1, 2, 2, 2, 3],
+        ...     "code": ["lab//A", "lab//B", "lab//C", "lab//A", "lab//C", "dx//1", "lab//D"],
+        ...     "numeric_value": [-1.0, 2.0, None, 1.0, 1.0, None, 1.2],
+        ... })
+        >>> df
+        shape: (7, 3)
+        ┌────────────┬────────┬───────────────┐
+        │ subject_id ┆ code   ┆ numeric_value │
+        │ ---        ┆ ---    ┆ ---           │
+        │ i64        ┆ str    ┆ f64           │
+        ╞════════════╪════════╪═══════════════╡
+        │ 1          ┆ lab//A ┆ -1.0          │
+        │ 1          ┆ lab//B ┆ 2.0           │
+        │ 1          ┆ lab//C ┆ null          │
+        │ 2          ┆ lab//A ┆ 1.0           │
+        │ 2          ┆ lab//C ┆ 1.0           │
+        │ 2          ┆ dx//1  ┆ null          │
+        │ 3          ┆ lab//D ┆ 1.2           │
+        └────────────┴────────┴───────────────┘
+        >>> code_metadata = pl.DataFrame({
+        ...     "code": ["lab//A", "lab//B", "lab//C", "dx//1", "lab//D"],
+        ...     "values/quantiles": [
+        ...         {"values/quantile/0.25": 0., "values/quantile/0.5": 1., "values/quantile/0.75": 2.},
+        ...         {"values/quantile/0.25": -2., "values/quantile/0.5": 3., "values/quantile/0.75": 100.},
+        ...         {"values/quantile/0.25": 0.01, "values/quantile/0.5": 0.4, "values/quantile/0.75": 0.6},
+        ...         None,
+        ...         None,
+        ...     ],
+        ... })
+
+    If we run the functor from a default (empty) stage configuration, we get the following:
+
+        >>> fn = bin_numeric_values_fntr(DictConfig({}), code_metadata)
+        >>> fn(df)
+        shape: (7, 3)
+        ┌────────────┬──────────────────────────┬───────────────┐
+        │ subject_id ┆ code                     ┆ numeric_value │
+        │ ---        ┆ ---                      ┆ ---           │
+        │ i64        ┆ str                      ┆ f64           │
+        ╞════════════╪══════════════════════════╪═══════════════╡
+        │ 1          ┆ lab//A//value_[-inf,0.0) ┆ -1.0          │
+        │ 1          ┆ lab//B//value_[-2.0,3.0) ┆ 2.0           │
+        │ 1          ┆ lab//C                   ┆ null          │
+        │ 2          ┆ lab//A//value_[1.0,2.0)  ┆ 1.0           │
+        │ 2          ┆ lab//C//value_[0.6,inf)  ┆ 1.0           │
+        │ 2          ┆ dx//1                    ┆ null          │
+        │ 3          ┆ lab//D                   ┆ 1.2           │
+        └────────────┴──────────────────────────┴───────────────┘
+
+    We can use the stage configuration to change the format of the bin name...
+
+        >>> fn = bin_numeric_values_fntr(DictConfig({"code_with_bin_name": "{code}//{bin}"}), code_metadata)
+        >>> fn(df)
+        shape: (7, 3)
+        ┌────────────┬───────────┬───────────────┐
+        │ subject_id ┆ code      ┆ numeric_value │
+        │ ---        ┆ ---       ┆ ---           │
+        │ i64        ┆ str       ┆ f64           │
+        ╞════════════╪═══════════╪═══════════════╡
+        │ 1          ┆ lab//A//0 ┆ -1.0          │
+        │ 1          ┆ lab//B//1 ┆ 2.0           │
+        │ 1          ┆ lab//C    ┆ null          │
+        │ 2          ┆ lab//A//2 ┆ 1.0           │
+        │ 2          ┆ lab//C//3 ┆ 1.0           │
+        │ 2          ┆ dx//1     ┆ null          │
+        │ 3          ┆ lab//D    ┆ 1.2           │
+        └────────────┴───────────┴───────────────┘
+
+    Drop the numeric values we bin:
+
+        >>> fn = bin_numeric_values_fntr(DictConfig({"drop_numeric_value": True}), code_metadata)
+        >>> fn(df)
+        shape: (7, 3)
+        ┌────────────┬──────────────────────────┬───────────────┐
+        │ subject_id ┆ code                     ┆ numeric_value │
+        │ ---        ┆ ---                      ┆ ---           │
+        │ i64        ┆ str                      ┆ f64           │
+        ╞════════════╪══════════════════════════╪═══════════════╡
+        │ 1          ┆ lab//A//value_[-inf,0.0) ┆ null          │
+        │ 1          ┆ lab//B//value_[-2.0,3.0) ┆ null          │
+        │ 1          ┆ lab//C                   ┆ null          │
+        │ 2          ┆ lab//A//value_[1.0,2.0)  ┆ null          │
+        │ 2          ┆ lab//C//value_[0.6,inf)  ┆ null          │
+        │ 2          ┆ dx//1                    ┆ null          │
+        │ 3          ┆ lab//D                   ┆ 1.2           │
+        └────────────┴──────────────────────────┴───────────────┘
+
+    Add custom bin endpoints:
+
+        >>> fn = bin_numeric_values_fntr(DictConfig({"custom_bins": {"lab//D": {"foo": 1.0}}}), code_metadata)
+        >>> fn(df)
+        shape: (7, 3)
+        ┌────────────┬──────────────────────────┬───────────────┐
+        │ subject_id ┆ code                     ┆ numeric_value │
+        │ ---        ┆ ---                      ┆ ---           │
+        │ i64        ┆ str                      ┆ f64           │
+        ╞════════════╪══════════════════════════╪═══════════════╡
+        │ 1          ┆ lab//A//value_[-inf,0.0) ┆ -1.0          │
+        │ 1          ┆ lab//B//value_[-2.0,3.0) ┆ 2.0           │
+        │ 1          ┆ lab//C                   ┆ null          │
+        │ 2          ┆ lab//A//value_[1.0,2.0)  ┆ 1.0           │
+        │ 2          ┆ lab//C//value_[0.6,inf)  ┆ 1.0           │
+        │ 2          ┆ dx//1                    ┆ null          │
+        │ 3          ┆ lab//D//value_[1.0,inf)  ┆ 1.2           │
+        └────────────┴──────────────────────────┴───────────────┘
+
+    Use different bin columns (sourced from the code metadata)
+
+        >>> code_metadata = pl.DataFrame({
+        ...     "code": ["lab//A", "lab//B", "lab//C", "dx//1", "lab//D"],
+        ...     "bins_1": [
+        ...         {"values/quantile/0.25": 0., "values/quantile/0.5": 1., "values/quantile/0.75": 2.},
+        ...         None,
+        ...         {"values/quantile/0.25": 0.01, "values/quantile/0.5": 0.4, "values/quantile/0.75": 0.6},
+        ...         None,
+        ...         None,
+        ...     ],
+        ...     "bins_2": [
+        ...         {"values/quantile/0.25": -2., "values/quantile/0.5": 3., "values/quantile/0.75": 100.},
+        ...         {"values/quantile/0.25": -2., "values/quantile/0.5": 3., "values/quantile/0.75": 100.},
+        ...         None,
+        ...         None,
+        ...         None,
+        ...     ],
+        ... })
+        >>> fn = bin_numeric_values_fntr(
+        ...     DictConfig({"bin_with_columns": ["bins_1", "bins_2"]}), code_metadata
+        ... )
+        >>> fn(df)
+        shape: (7, 3)
+        ┌────────────┬──────────────────────────┬───────────────┐
+        │ subject_id ┆ code                     ┆ numeric_value │
+        │ ---        ┆ ---                      ┆ ---           │
+        │ i64        ┆ str                      ┆ f64           │
+        ╞════════════╪══════════════════════════╪═══════════════╡
+        │ 1          ┆ lab//A//value_[-inf,0.0) ┆ -1.0          │
+        │ 1          ┆ lab//B//value_[-2.0,3.0) ┆ 2.0           │
+        │ 1          ┆ lab//C                   ┆ null          │
+        │ 2          ┆ lab//A//value_[1.0,2.0)  ┆ 1.0           │
+        │ 2          ┆ lab//C//value_[0.6,inf)  ┆ 1.0           │
+        │ 2          ┆ dx//1                    ┆ null          │
+        │ 3          ┆ lab//D                   ┆ 1.2           │
+        └────────────┴──────────────────────────┴───────────────┘
+
+    We can also use code modifiers to join in a richer manner against the code metadata:
+
+        >>> df = pl.DataFrame({
+        ...     "subject_id": [1, 1, 1, 2, 2, 2, 3],
+        ...     "code": ["lab", "lab", "lab", "lab", "lab", "dx//1", "lab"],
+        ...     "unit": ["A", "B", "C", "A", "C", None, "D"],
+        ...     "numeric_value": [-1.0, 2.0, None, 1.0, 1.0, None, 1.2],
+        ... })
+        >>> df
+        shape: (7, 4)
+        ┌────────────┬───────┬──────┬───────────────┐
+        │ subject_id ┆ code  ┆ unit ┆ numeric_value │
+        │ ---        ┆ ---   ┆ ---  ┆ ---           │
+        │ i64        ┆ str   ┆ str  ┆ f64           │
+        ╞════════════╪═══════╪══════╪═══════════════╡
+        │ 1          ┆ lab   ┆ A    ┆ -1.0          │
+        │ 1          ┆ lab   ┆ B    ┆ 2.0           │
+        │ 1          ┆ lab   ┆ C    ┆ null          │
+        │ 2          ┆ lab   ┆ A    ┆ 1.0           │
+        │ 2          ┆ lab   ┆ C    ┆ 1.0           │
+        │ 2          ┆ dx//1 ┆ null ┆ null          │
+        │ 3          ┆ lab   ┆ D    ┆ 1.2           │
+        └────────────┴───────┴──────┴───────────────┘
+        >>> code_metadata = pl.DataFrame({
+        ...     "code": ["lab", "lab", "lab", "dx//1", "lab"],
+        ...     "unit": ["A", "B", "C", None, "D"],
+        ...     "values/quantiles": [
+        ...         {"values/quantile/0.25": 0., "values/quantile/0.5": 1., "values/quantile/0.75": 2.},
+        ...         {"values/quantile/0.25": -2., "values/quantile/0.5": 3., "values/quantile/0.75": 100.},
+        ...         {"values/quantile/0.25": 0.01, "values/quantile/0.5": 0.4, "values/quantile/0.75": 0.6},
+        ...         None,
+        ...         None,
+        ...     ],
+        ... })
+        >>> fn = bin_numeric_values_fntr(DictConfig({}), code_metadata, ["unit"])
+        >>> fn(df)
+        shape: (7, 4)
+        ┌────────────┬───────────────────────┬──────┬───────────────┐
+        │ subject_id ┆ code                  ┆ unit ┆ numeric_value │
+        │ ---        ┆ ---                   ┆ ---  ┆ ---           │
+        │ i64        ┆ str                   ┆ str  ┆ f64           │
+        ╞════════════╪═══════════════════════╪══════╪═══════════════╡
+        │ 1          ┆ lab//value_[-inf,0.0) ┆ A    ┆ -1.0          │
+        │ 1          ┆ lab//value_[-2.0,3.0) ┆ B    ┆ 2.0           │
+        │ 1          ┆ lab                   ┆ C    ┆ null          │
+        │ 2          ┆ lab//value_[1.0,2.0)  ┆ A    ┆ 1.0           │
+        │ 2          ┆ lab//value_[0.6,inf)  ┆ C    ┆ 1.0           │
+        │ 2          ┆ dx//1                 ┆ null ┆ null          │
+        │ 3          ┆ lab                   ┆ D    ┆ 1.2           │
+        └────────────┴───────────────────────┴──────┴───────────────┘
     """
     if code_modifiers is None:
         code_modifiers = []
 
     # Step 1: Add custom_bins column to code_metadata
     custom_bins = stage_cfg.get("custom_bins", {})
+
+    do_use_custom_bins = bool(custom_bins)
     do_drop_numeric_value = stage_cfg.get("drop_numeric_value", False)
     bin_with_columns = stage_cfg.get("bin_with_columns", ["values/quantiles"])
     code_with_bin_name = stage_cfg.get("code_with_bin_name", "{code}//value_[{left},{right})")
 
-    if custom_bins:
-        custom_bins = pl.Series([custom_bins.get(c, None) for c in code_metadata[code_field]])
-        code_metadata = code_metadata.with_columns(custom_bins.alias("__custom_bins"))
+    if do_use_custom_bins:
+        if isinstance(custom_bins, DictConfig):
+            custom_bins = OmegaConf.to_container(custom_bins)
+
+        struct_dtype = pl.Struct(dict.fromkeys(next(iter(custom_bins.values())).keys(), pl.Float32))
+        custom_bins_series = pl.Series(
+            [custom_bins.get(c, None) for c in code_metadata[code_field]],
+            dtype=struct_dtype,
+        )
+        code_metadata = code_metadata.with_columns(custom_bins_series.alias("__custom_bins"))
         bin_with_columns = ["__custom_bins", *bin_with_columns]
 
     code_metadata = code_metadata.select(code_field, *code_modifiers, *bin_with_columns)
 
     def fn(df: pl.LazyFrame) -> pl.LazyFrame:
-        df = df.join(code_metadata, on=[code_field, *code_modifiers], how="left", maintain_order="left")
+        if do_use_custom_bins:
+            numeric_dtype = df.collect_schema()[numeric_value_field]
+            new_struct_dtype = pl.Struct({f.name: numeric_dtype for f in struct_dtype.fields})
+            local_metadata = code_metadata.with_columns(pl.col("__custom_bins").cast(new_struct_dtype))
+        else:
+            local_metadata = code_metadata
+
+        df = df.join(local_metadata, on=[code_field, *code_modifiers], how="left", maintain_order="left")
         return add_bin_to_code(df, bin_with_columns, code_with_bin_name, do_drop_numeric_value)
 
     return fn
