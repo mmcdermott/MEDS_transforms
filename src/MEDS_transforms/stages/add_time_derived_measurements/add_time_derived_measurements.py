@@ -16,7 +16,10 @@ from .timeline_tokens import timeline_tokens_fntr
 logger = logging.getLogger(__name__)
 
 
-def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[[pl.DataFrame], pl.DataFrame]:
+def add_new_events_fntr(
+    fn: Callable[[pl.DataFrame], pl.DataFrame],
+    new_code_last_regex: str | None = None,
+) -> Callable[[pl.DataFrame], pl.DataFrame]:
     """Creates a "meta" functor that computes the input functor on a MEDS shard then combines both dataframes.
 
     Args:
@@ -76,7 +79,10 @@ def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[
         │ 1          ┆ 2021-01-01 00:00:00 ┆ AGE  ┆ 31.001347     │
         │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE  ┆ 35.004169     │
         └────────────┴─────────────────────┴──────┴───────────────┘
-        >>> # Now, we'll use the add_new_events functor to add these age events to the original DataFrame.
+
+    If we use the add_new_events_fntr on the age_fn, we'll get a function that computes and adds AGE events to
+    the beginning of each event row block for the subjects.
+
         >>> add_age_fn = add_new_events_fntr(age_fn)
         >>> add_age_fn(df)
         shape: (10, 4)
@@ -96,17 +102,69 @@ def add_new_events_fntr(fn: Callable[[pl.DataFrame], pl.DataFrame]) -> Callable[
         │ 3          ┆ 2022-01-01 00:00:00 ┆ lab//B ┆ null          │
         │ 3          ┆ 2022-01-01 00:00:00 ┆ dx//1  ┆ null          │
         └────────────┴─────────────────────┴────────┴───────────────┘
+
+    We can also specify that some new event codes should go at the end of the event row block, not the
+    beginning, via `new_code_last_regex`. This makes the most sense with the `timeline_tokens_fntr`, which
+    generates a few types of tokens:
+
+        >>> timeline_tokens_fn = timeline_tokens_fntr(DictConfig({"time_unit": "y"}))
+        >>> timeline_tokens_fn(df)
+        shape: (8, 4)
+        ┌────────────┬─────────────────────┬────────────────────────┬───────────────┐
+        │ subject_id ┆ time                ┆ code                   ┆ numeric_value │
+        │ ---        ┆ ---                 ┆ ---                    ┆ ---           │
+        │ u32        ┆ datetime[μs]        ┆ str                    ┆ f32           │
+        ╞════════════╪═════════════════════╪════════════════════════╪═══════════════╡
+        │ 1          ┆ 1990-01-01 00:00:00 ┆ TIMELINE//START        ┆ null          │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ TIMELINE//DELTA//years ┆ 31.001347     │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ TIMELINE//END          ┆ null          │
+        │ 2          ┆ 1988-01-02 00:00:00 ┆ TIMELINE//START        ┆ null          │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ TIMELINE//DELTA//years ┆ 35.004169     │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ TIMELINE//END          ┆ null          │
+        │ 3          ┆ 2022-01-01 00:00:00 ┆ TIMELINE//START        ┆ null          │
+        │ 3          ┆ 2022-01-01 00:00:00 ┆ TIMELINE//END          ┆ null          │
+        └────────────┴─────────────────────┴────────────────────────┴───────────────┘
+
+    We want to add the TIMELINE//START and TIMELINE//DELTA//* events to the beginning of the event row block,
+    but the TIMELINE//END event to the end of the event row block. We can use the `new_code_last_regex`
+    parameter to do this:
+
+        >>> add_timeline_tokens_fn = add_new_events_fntr(
+        ...     timeline_tokens_fn, new_code_last_regex="TIMELINE//END"
+        ... )
+        >>> add_timeline_tokens_fn(df)
+        shape: (16, 4)
+        ┌────────────┬─────────────────────┬────────────────────────┬───────────────┐
+        │ subject_id ┆ time                ┆ code                   ┆ numeric_value │
+        │ ---        ┆ ---                 ┆ ---                    ┆ ---           │
+        │ u32        ┆ datetime[μs]        ┆ str                    ┆ f32           │
+        ╞════════════╪═════════════════════╪════════════════════════╪═══════════════╡
+        │ 1          ┆ null                ┆ static                 ┆ null          │
+        │ 1          ┆ 1990-01-01 00:00:00 ┆ TIMELINE//START        ┆ null          │
+        │ 1          ┆ 1990-01-01 00:00:00 ┆ DOB                    ┆ null          │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ TIMELINE//DELTA//years ┆ 31.001347     │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//A                 ┆ null          │
+        │ …          ┆ …                   ┆ …                      ┆ …             │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ TIMELINE//END          ┆ null          │
+        │ 3          ┆ 2022-01-01 00:00:00 ┆ TIMELINE//START        ┆ null          │
+        │ 3          ┆ 2022-01-01 00:00:00 ┆ lab//B                 ┆ null          │
+        │ 3          ┆ 2022-01-01 00:00:00 ┆ dx//1                  ┆ null          │
+        │ 3          ┆ 2022-01-01 00:00:00 ┆ TIMELINE//END          ┆ null          │
+        └────────────┴─────────────────────┴────────────────────────┴───────────────┘
     """
 
     def out_fn(df: pl.DataFrame) -> pl.DataFrame:
         new_events = fn(df)
-        df = df.with_row_index("__idx")
-        new_events = new_events.with_columns(pl.lit(0, dtype=df.schema["__idx"]).alias("__idx"))
-        return (
-            pl.concat([df, new_events], how="diagonal")
-            .sort(by=[subject_id_field, time_field, "__idx"])
-            .drop("__idx")
-        )
+
+        if new_code_last_regex is not None:
+            new_events_last = new_events.filter(pl.col("code").str.contains(new_code_last_regex))
+            new_events_first = new_events.filter(~pl.col("code").str.contains(new_code_last_regex))
+
+            concat_df = pl.concat([new_events_first, df, new_events_last], how="diagonal")
+        else:
+            concat_df = pl.concat([new_events, df], how="diagonal")
+
+        return concat_df.sort(by=[subject_id_field, time_field], maintain_order=True)
 
     return out_fn
 
@@ -144,7 +202,9 @@ def add_time_derived_measurements(stage_cfg: DictConfig) -> Callable[[pl.LazyFra
             case "time_of_day":
                 map_fns.append(add_new_events_fntr(time_of_day_fntr(feature_cfg)))
             case "timeline_tokens":
-                map_fns.append(add_new_events_fntr(timeline_tokens_fntr(feature_cfg)))
+                timeline_end_code = feature_cfg.get("timeline_end_code", "TIMELINE//END")
+                kwargs = {"new_code_last_regex": timeline_end_code} if timeline_end_code is not None else {}
+                map_fns.append(add_new_events_fntr(timeline_tokens_fntr(feature_cfg), **kwargs))
             case str() if feature_name in INFERRED_STAGE_KEYS:
                 continue
             case _:
