@@ -719,7 +719,7 @@ class Stage:
                     **self.output_schema_updates,
                 )
             else:
-                examples_to_check.extend(example_dir.iterdir())
+                examples_to_check.extend(sorted(example_dir.iterdir()))
 
         return StageExampleDict(**test_cases)
 
