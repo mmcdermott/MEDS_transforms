@@ -4,7 +4,7 @@ import logging
 from collections.abc import Callable
 
 import polars as pl
-from meds import subject_id_field, time_field
+from meds import DataSchema
 from omegaconf import DictConfig, OmegaConf
 
 from ... import INFERRED_STAGE_KEYS
@@ -164,7 +164,7 @@ def add_new_events_fntr(
         else:
             concat_df = pl.concat([new_events, df], how="diagonal")
 
-        return concat_df.sort(by=[subject_id_field, time_field], maintain_order=True)
+        return concat_df.sort(by=[DataSchema.subject_id_name, DataSchema.time_name], maintain_order=True)
 
     return out_fn
 

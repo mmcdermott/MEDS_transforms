@@ -4,7 +4,7 @@ import logging
 from collections.abc import Callable
 
 import polars as pl
-from meds import code_field, numeric_value_field, subject_id_field, time_field
+from meds import DataSchema
 from omegaconf import DictConfig
 
 from ...compute_modes.compute_fn import identity_fn
@@ -240,47 +240,47 @@ def timeline_tokens_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFra
 
         out_measurements = []
 
-        time = pl.col(time_field)
-        code_dtype = df.collect_schema().get(code_field, pl.Utf8)
-        numeric_value_dtype = df.collect_schema().get(numeric_value_field, pl.Float32)
+        time = pl.col(DataSchema.time_name)
+        code_dtype = df.collect_schema().get(DataSchema.code_name, pl.Utf8)
+        numeric_value_dtype = df.collect_schema().get(DataSchema.numeric_value_name, pl.Float32)
 
         if do_add_timeline_start:
-            first_time = time.min().over(subject_id_field)
+            first_time = time.min().over(DataSchema.subject_id_name)
             timeline_start_code = pl.lit(timeline_start_token, dtype=code_dtype)
 
             out_measurements.append(
-                events.filter(pl.col(time_field) == first_time).with_columns(
-                    timeline_start_code.alias(code_field)
+                events.filter(pl.col(DataSchema.time_name) == first_time).with_columns(
+                    timeline_start_code.alias(DataSchema.code_name)
                 )
             )
 
         if do_add_time_delta:
             time_delta_code = pl.lit(time_delta_token, dtype=code_dtype)
 
-            time_delta = time.diff(null_behavior="ignore").over(subject_id_field)
+            time_delta = time.diff(null_behavior="ignore").over(DataSchema.subject_id_name)
             timeline_deltas_expr = (time_delta.dt.total_microseconds() / microseconds_in_unit).cast(
                 numeric_value_dtype
             )
 
             out_measurements.append(
                 events.with_columns(
-                    time_delta_code.alias(code_field),
-                    timeline_deltas_expr.alias(numeric_value_field),
-                ).filter(pl.col(numeric_value_field).is_not_null())
+                    time_delta_code.alias(DataSchema.code_name),
+                    timeline_deltas_expr.alias(DataSchema.numeric_value_name),
+                ).filter(pl.col(DataSchema.numeric_value_name).is_not_null())
             )
 
         if do_add_timeline_end:
-            last_time = time.max().over(subject_id_field)
+            last_time = time.max().over(DataSchema.subject_id_name)
             timeline_end_code = pl.lit(timeline_end_token, dtype=code_dtype)
 
             out_measurements.append(
-                events.filter(pl.col(time_field) == last_time).with_columns(
-                    timeline_end_code.alias(code_field)
+                events.filter(pl.col(DataSchema.time_name) == last_time).with_columns(
+                    timeline_end_code.alias(DataSchema.code_name)
                 )
             )
 
         return pl.concat(out_measurements, how="diagonal").sort(
-            by=[subject_id_field, time_field], maintain_order=True
+            by=[DataSchema.subject_id_name, DataSchema.time_name], maintain_order=True
         )
 
     return fn

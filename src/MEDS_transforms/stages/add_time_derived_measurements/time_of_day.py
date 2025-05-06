@@ -4,7 +4,7 @@ import logging
 from collections.abc import Callable
 
 import polars as pl
-from meds import code_field, time_field
+from meds import DataSchema
 from omegaconf import DictConfig
 
 from .utils import unique_events
@@ -107,8 +107,8 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         raise ValueError(f"All endpoints must be in sorted order. Got: {cfg.endpoints}")
 
     def fn(df: pl.LazyFrame) -> pl.LazyFrame:
-        hour = pl.col(time_field).dt.hour()
-        code_dtype = df.collect_schema().get(code_field, pl.Utf8)
+        hour = pl.col(DataSchema.time_name).dt.hour()
+        code_dtype = df.collect_schema().get(DataSchema.code_name, pl.Utf8)
 
         def tod_code(start: int, end: int) -> str:
             return pl.lit(f"{cfg.time_of_day_code}//[{start:02},{end:02})", dtype=code_dtype)
@@ -122,6 +122,6 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
             time_of_day = time_of_day.when((hour >= start) & (hour < end)).then(tod_code(start, end))
 
         time_of_day = time_of_day.when(hour >= end).then(tod_code(end, 24))
-        return unique_events(df).with_columns(time_of_day.alias(code_field))
+        return unique_events(df).with_columns(time_of_day.alias(DataSchema.code_name))
 
     return fn

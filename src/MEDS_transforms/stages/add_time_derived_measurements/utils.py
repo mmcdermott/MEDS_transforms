@@ -3,7 +3,7 @@
 import logging
 
 import polars as pl
-from meds import subject_id_field, time_field
+from meds import DataSchema
 
 logger = logging.getLogger(__name__)
 
@@ -126,4 +126,8 @@ def unique_events(df: pl.DataFrame | pl.LazyFrame) -> pl.DataFrame | pl.LazyFram
         └────────────┴─────────────────────┘
     """
 
-    return df.drop_nulls(subset=[time_field]).select(subject_id_field, time_field).unique(maintain_order=True)
+    return (
+        df.drop_nulls(subset=[DataSchema.time_name])
+        .select(DataSchema.subject_id_name, DataSchema.time_name)
+        .unique(maintain_order=True)
+    )

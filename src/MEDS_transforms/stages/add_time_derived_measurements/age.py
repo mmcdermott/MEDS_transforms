@@ -4,7 +4,7 @@ import logging
 from collections.abc import Callable
 
 import polars as pl
-from meds import code_field, numeric_value_field, subject_id_field, time_field
+from meds import DataSchema
 from omegaconf import DictConfig
 
 from .utils import normalize_time_unit, unique_events
@@ -146,33 +146,35 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
     microseconds_in_unit = int(1e6) * seconds_in_unit
 
     if cfg.get("DOB_code", None) is not None:
-        is_dob = pl.col(code_field).str.contains(cfg.DOB_code, literal=True)
+        is_dob = pl.col(DataSchema.code_name).str.contains(cfg.DOB_code, literal=True)
     elif cfg.get("DOB_regex", None) is not None:
-        is_dob = pl.col(code_field).str.contains(cfg.DOB_regex)
+        is_dob = pl.col(DataSchema.code_name).str.contains(cfg.DOB_regex)
     else:
         raise ValueError("Either 'DOB_regex' or 'DOB_code' must be provided in the configuration.")
 
     dob_col = "__dob"
 
-    age_expr = (pl.col(time_field) - pl.col(dob_col)).dt.total_microseconds() / microseconds_in_unit
+    age_expr = (pl.col(DataSchema.time_name) - pl.col(dob_col)).dt.total_microseconds() / microseconds_in_unit
     age_expr = age_expr.cast(pl.Float32, strict=False)
 
     def fn(df: pl.LazyFrame) -> pl.LazyFrame:
-        code_dtype = df.collect_schema().get(code_field, pl.Utf8)
+        code_dtype = df.collect_schema().get(DataSchema.code_name, pl.Utf8)
 
-        dobs = df.filter(is_dob).select(subject_id_field, pl.col(time_field).alias(dob_col))
+        dobs = df.filter(is_dob).select(
+            DataSchema.subject_id_name, pl.col(DataSchema.time_name).alias(dob_col)
+        )
         events = unique_events(df)
 
         return (
-            events.join(dobs, on=subject_id_field, how="inner", maintain_order="left")
+            events.join(dobs, on=DataSchema.subject_id_name, how="inner", maintain_order="left")
             .select(
-                subject_id_field,
-                time_field,
-                pl.lit(cfg.get("age_code", "AGE"), dtype=code_dtype).alias(code_field),
-                age_expr.alias(numeric_value_field),
+                DataSchema.subject_id_name,
+                DataSchema.time_name,
+                pl.lit(cfg.get("age_code", "AGE"), dtype=code_dtype).alias(DataSchema.code_name),
+                age_expr.alias(DataSchema.numeric_value_name),
             )
-            .drop_nulls(subset=[numeric_value_field])
-            .filter(pl.col(numeric_value_field) > 0)
+            .drop_nulls(subset=[DataSchema.numeric_value_name])
+            .filter(pl.col(DataSchema.numeric_value_name) > 0)
         )
 
     return fn

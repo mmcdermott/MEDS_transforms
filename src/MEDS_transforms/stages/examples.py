@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 import polars as pl
-from meds import code_metadata_filepath
+from meds import DatasetMetadataSchema, code_metadata_filepath
 from meds_testing_helpers.dataset import MEDSDataset
 from meds_testing_helpers.static_sample_data import SIMPLE_STATIC_SHARDED_BY_SPLIT
 from omegaconf import DictConfig, OmegaConf
@@ -364,7 +364,7 @@ class StageExample:
     output (want) data instead of metadata:
 
         >>> data_df = pl.DataFrame({"subject_id": [1], "time": [1], "code": ["A"], "numeric_value": [None]})
-        >>> data = MEDSDataset(data_shards={"0": data_df}, dataset_metadata={})
+        >>> data = MEDSDataset(data_shards={"0": data_df}, dataset_metadata=DatasetMetadataSchema())
         >>> example_data = StageExample(
         ...     stage_name="with_scenario",
         ...     scenario_name="example_scenario",
@@ -660,7 +660,7 @@ class StageExample:
         ...     {"subject_id": [1], "time": [datetime(2012, 12, 1)], "code": ["A"], "numeric_value": [None]},
         ...     schema_overrides={"numeric_value": pl.Float32},
         ... )
-        >>> data = MEDSDataset(data_shards={"0": data_df}, dataset_metadata={})
+        >>> data = MEDSDataset(data_shards={"0": data_df}, dataset_metadata=DatasetMetadataSchema())
         >>> example = StageExample(stage_name="with_scenario", want_data=data)
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     output_dir = Path(tmpdir)
@@ -704,7 +704,7 @@ class StageExample:
     Different errors are raised if the shards differ...
 
         >>> example = StageExample(stage_name="with_scenario", want_data=data)
-        >>> wrong_data = MEDSDataset(data_shards={"1": data_df}, dataset_metadata={})
+        >>> wrong_data = MEDSDataset(data_shards={"1": data_df}, dataset_metadata=DatasetMetadataSchema())
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     output_dir = Path(tmpdir)
         ...     _ = wrong_data.write(output_dir)
@@ -769,7 +769,9 @@ class StageExample:
         >>> wrong_data_df = pl.DataFrame(
         ...     {"subject_id": [1], "time": [datetime(2015, 12, 1)], "code": ["A"], "numeric_value": [None]},
         ... )
-        >>> wrong_data = MEDSDataset(data_shards={"0": wrong_data_df}, dataset_metadata={})
+        >>> wrong_data = MEDSDataset(
+        ...     data_shards={"0": wrong_data_df}, dataset_metadata=DatasetMetadataSchema()
+        ... )
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     output_dir = Path(tmpdir)
         ...     _ = wrong_data.write(output_dir)
@@ -970,7 +972,9 @@ class StageExample:
 
         if self.want_data is not None:
             data_dir = output_dir if is_resolved_dir else output_dir / "data"
-            got_data = MEDSDataset(data_shards=self.__data_shards(data_dir), dataset_metadata={})
+            got_data = MEDSDataset(
+                data_shards=self.__data_shards(data_dir), dataset_metadata=DatasetMetadataSchema()
+            )
 
             try:
                 assert got_data._pl_shards.keys() == self.want_data._pl_shards.keys(), (

@@ -18,8 +18,13 @@ classifiers = [
 ]
 dependencies = [
   "polars >= 1.26.0, <= 1.27.9",
-  "pyarrow", "hydra-core", "numpy", "meds==0.3.3", "filelock", "pytest",
-  "meds_testing_helpers~=0.2.7"
+  "pyarrow",
+  "hydra-core",
+  "numpy",
+  "meds~=0.4.0",
+  "filelock",
+  "pytest",
+  "meds_testing_helpers~=0.3.0"
 ]
 
 [tool.setuptools_scm]
