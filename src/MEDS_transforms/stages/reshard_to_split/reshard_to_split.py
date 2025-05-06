@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 import polars as pl
-from meds import subject_id_field, subject_splits_filepath, time_field
+from meds import DataSchema, SubjectSplitSchema, subject_splits_filepath
 from omegaconf import DictConfig
 
 from ...dataframe import read_and_filter_fntr, write_df
@@ -236,7 +236,7 @@ def make_new_shards_fn(df: pl.DataFrame, cfg: DictConfig, stage_cfg: DictConfig)
         splits_map[sp].append(pt_id)
 
     return shard_subjects(
-        subjects=df[subject_id_field].to_numpy(),
+        subjects=df[SubjectSplitSchema.subject_id_name].to_numpy(),
         n_subjects_per_shard=stage_cfg.n_subjects_per_shard,
         external_splits=splits_map,
         split_fracs_dict=None,
@@ -302,19 +302,23 @@ def main(cfg: DictConfig):
     for subshard_name, out_fp in new_shards_iter:
         subjects = new_sharded_splits[subshard_name]
 
-        read_df = read_and_filter_fntr(pl.col(subject_id_field).is_in(subjects))
+        read_df = read_and_filter_fntr(pl.col(DataSchema.subject_id_name).is_in(subjects))
 
         def read_fn(input_dir: Path) -> pl.LazyFrame:
             df = None
             logger.info(f"Reading shards for {subshard_name} (file names are in the input sharding scheme):")  # noqa: B023
             for in_fp, _ in orig_shards_iter:
                 logger.info(f"  - {in_fp.relative_to(input_dir).resolve()!s}")
-                df = read_df(in_fp) if df is None else df.merge_sorted(read_df(in_fp), key=subject_id_field)  # noqa: B023
+                if df is None:
+                    df = read_df(in_fp)  # noqa: B023
+                else:
+                    df = df.merge_sorted(read_df(in_fp), key=DataSchema.subject_id_name)  # noqa: B023
 
             return df
 
         def compute_fn(df: list[pl.DataFrame]) -> pl.LazyFrame:
-            return df.sort(by=[subject_id_field, time_field], maintain_order=True, multithreaded=False)
+            sort_cols = [DataSchema.subject_id_name, DataSchema.time_name]
+            return df.sort(by=sort_cols, maintain_order=True, multithreaded=False)
 
         logger.info(f"Merging sub-shards for {subshard_name} to {out_fp.resolve()!s}")
         rwlock_wrap(

@@ -11,7 +11,7 @@ from functools import wraps
 
 import hydra
 import polars as pl
-from meds import subject_id_field
+from meds import DataSchema
 from omegaconf import DictConfig, ListConfig
 
 from ..dataframe import DF_T
@@ -313,6 +313,8 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
             revision_parts.append(matchable_df.filter(pl.all_horizontal(final_part_filters)))
         else:
             revision_parts.append(matchable_df)
-        return pl.concat(revision_parts, how="vertical").sort([subject_id_field, "time"], maintain_order=True)
+        return pl.concat(revision_parts, how="vertical").sort(
+            [DataSchema.subject_id_name, DataSchema.time_name], maintain_order=True
+        )
 
     return match_revise_fn

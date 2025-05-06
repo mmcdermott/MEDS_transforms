@@ -5,7 +5,7 @@ import re
 from collections.abc import Callable
 
 import polars as pl
-from meds import code_field, numeric_value_field
+from meds import CodeMetadataSchema, DataSchema
 from omegaconf import DictConfig, OmegaConf
 
 from .. import Stage
@@ -85,7 +85,7 @@ def _check_and_get_bin_endpoints(schema: pl.Schema, col: str) -> pl.Expr:
     if not isinstance(col_dtype, pl.Struct):
         raise ValueError(f"bin_with_columns entry '{col}' is not a struct type; got {col_dtype}.")
 
-    numeric_dtype = schema[numeric_value_field]
+    numeric_dtype = schema[DataSchema.numeric_value_name]
 
     for field in col_dtype.fields:
         if field.dtype != numeric_dtype:
@@ -178,14 +178,14 @@ def _get_val_bin_idx(bin_endpoints: pl.Expr) -> pl.Expr:
         └───────┴───────────────┴───────────────────┴──────┘
     """
 
-    val_col = pl.col(numeric_value_field)
+    val_col = pl.col(DataSchema.numeric_value_name)
     do_bin = bin_endpoints.is_not_null() & val_col.is_not_null()
     idx_expr = bin_endpoints.list.explode().search_sorted(val_col, side="right").over("__idx")
     return pl.when(do_bin).then(idx_expr)
 
 
 def get_code(bin_endpoints: pl.Expr, val_bin_idx: pl.Expr) -> pl.Expr:
-    return pl.col(code_field)
+    return pl.col(DataSchema.code_name)
 
 
 def get_bin(bin_endpoints: pl.Expr, val_bin_idx: pl.Expr) -> pl.Expr:
@@ -360,8 +360,8 @@ def add_bin_to_code(
 
     df = df.with_row_index("__idx")
 
-    if numeric_value_field not in schema:
-        raise ValueError(f"Dataframe does not contain the required column '{numeric_value_field}'.")
+    if DataSchema.numeric_value_name not in schema:
+        raise ValueError(f"Dataframe does not contain the required column '{DataSchema.numeric_value_name}'.")
 
     bin_endpoints = pl.coalesce([_check_and_get_bin_endpoints(schema, col) for col in bin_with_columns])
     val_bin_idx = _get_val_bin_idx(bin_endpoints)
@@ -375,11 +375,15 @@ def add_bin_to_code(
 
     code_with_bin = pl.format(stripped_code_name, *bin_name_fmt_exprs)
 
-    do_bin = bin_endpoints.is_not_null() & pl.col(numeric_value_field).is_not_null()
-    df = df.with_columns(pl.when(do_bin).then(code_with_bin).otherwise(pl.col(code_field)).alias(code_field))
+    do_bin = bin_endpoints.is_not_null() & pl.col(DataSchema.numeric_value_name).is_not_null()
+    df = df.with_columns(
+        pl.when(do_bin).then(code_with_bin).otherwise(DataSchema.code_name).alias(DataSchema.code_name)
+    )
 
     if do_drop_numeric_value:
-        df = df.with_columns(pl.when(~do_bin).then(numeric_value_field).alias(numeric_value_field))
+        df = df.with_columns(
+            pl.when(~do_bin).then(DataSchema.numeric_value_name).alias(DataSchema.numeric_value_name)
+        )
 
     return df.drop(*bin_with_columns, "__idx")
 
@@ -646,18 +650,18 @@ def bin_numeric_values_fntr(
 
         struct_dtype = pl.Struct(dict.fromkeys(next(iter(custom_bins.values())).keys(), pl.Float32))
         custom_bins_series = pl.Series(
-            [custom_bins.get(c, None) for c in code_metadata[code_field]],
+            [custom_bins.get(c, None) for c in code_metadata[CodeMetadataSchema.code_name]],
             dtype=struct_dtype,
         )
         code_metadata = code_metadata.with_columns(custom_bins_series.alias("__custom_bins"))
         bin_with_columns = ["__custom_bins", *bin_with_columns]
 
-    code_metadata = code_metadata.select(code_field, *code_modifiers, *bin_with_columns)
+    join_cols = [CodeMetadataSchema.code_name, *code_modifiers]
 
-    join_cols = [code_field, *code_modifiers]
+    code_metadata = code_metadata.select(*join_cols, *bin_with_columns)
 
     def fn(df: pl.LazyFrame) -> pl.LazyFrame:
-        numeric_dtype = df.collect_schema()[numeric_value_field]
+        numeric_dtype = df.collect_schema()[DataSchema.numeric_value_name]
 
         cast_exprs = []
         for col in bin_with_columns:

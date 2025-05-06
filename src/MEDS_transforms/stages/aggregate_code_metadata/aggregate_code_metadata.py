@@ -7,7 +7,7 @@ from typing import NamedTuple
 
 import polars as pl
 import polars.selectors as cs
-from meds import subject_id_field
+from meds import DataSchema
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from .. import Stage
@@ -168,10 +168,12 @@ IS_INT: pl.Expr = VAL.round() == VAL
 PRESENT_VALS = VAL.filter(VAL_PRESENT)
 
 CODE_METADATA_AGGREGATIONS: dict[MetadataFn, MapReducePair] = {
-    MetadataFn.CODE_N_PATIENTS: MapReducePair(pl.col(subject_id_field).n_unique(), pl.sum_horizontal),
+    MetadataFn.CODE_N_PATIENTS: MapReducePair(
+        pl.col(DataSchema.subject_id_name).n_unique(), pl.sum_horizontal
+    ),
     MetadataFn.CODE_N_OCCURRENCES: MapReducePair(pl.len(), pl.sum_horizontal),
     MetadataFn.VALUES_N_PATIENTS: MapReducePair(
-        pl.col(subject_id_field).filter(VAL_PRESENT).n_unique(), pl.sum_horizontal
+        pl.col(DataSchema.subject_id_name).filter(VAL_PRESENT).n_unique(), pl.sum_horizontal
     ),
     MetadataFn.VALUES_N_OCCURRENCES: MapReducePair(PRESENT_VALS.len(), pl.sum_horizontal),
     MetadataFn.VALUES_N_INTS: MapReducePair(VAL.filter(VAL_PRESENT & IS_INT).len(), pl.sum_horizontal),

@@ -6,7 +6,7 @@ from functools import partial
 from pathlib import Path
 
 import polars as pl
-from meds import code_field, subject_id_field, subject_splits_filepath
+from meds import DataSchema, SubjectSplitSchema, subject_splits_filepath
 from omegaconf import DictConfig
 
 from ..compute_modes import (
@@ -469,12 +469,12 @@ def map_stage(
             logger.info(f"Processing train split only by filtering read dfs via {split_fp.resolve()!s}")
             train_subjects = (
                 pl.scan_parquet(split_fp)
-                .filter(pl.col("split") == "train")
-                .select(subject_id_field)
-                .collect()[subject_id_field]
+                .filter(pl.col(SubjectSplitSchema.split_name) == "train")
+                .select(SubjectSplitSchema.subject_id_name)
+                .collect()[SubjectSplitSchema.subject_id_name]
                 .to_list()
             )
-            read_fn = read_and_filter_fntr(pl.col("subject_id").is_in(train_subjects), read_fn)
+            read_fn = read_and_filter_fntr(pl.col(DataSchema.subject_id_name).is_in(train_subjects), read_fn)
         else:
             raise FileNotFoundError(
                 f"Train split requested, but shard prefixes can't be used and "
@@ -854,7 +854,7 @@ def mapreduce_stage(
     reduce_stage_out_fp = Path(cfg.stage_cfg.reducer_output_dir) / "codes.parquet"
 
     if merge_fn is None:
-        join_cols = [code_field, *cfg.get("code_modifier_cols", [])]
+        join_cols = [DataSchema.code_name, *cfg.get("code_modifier_cols", [])]
         merge_fn = partial(join_and_replace, join_cols=join_cols)
 
     reduce_fn = bind_compute_fn(cfg, cfg.stage_cfg, reduce_fn)

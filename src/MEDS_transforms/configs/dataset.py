@@ -7,14 +7,14 @@ import json
 import logging
 from pathlib import Path
 
-from meds import DatasetMetadata, dataset_metadata_filepath
+from meds import DatasetMetadataSchema, dataset_metadata_filepath
 
 from .utils import OmegaConfResolver, hydra_registered_dataclass
 
 logger = logging.getLogger(__name__)
 
 
-def get_dataset_metadata_from_root(root: str) -> DatasetMetadata:
+def get_dataset_metadata_from_root(root: str) -> DatasetMetadataSchema:
     """Get the dataset metadata from the MEDS root directory.
 
     Args:
@@ -27,14 +27,14 @@ def get_dataset_metadata_from_root(root: str) -> DatasetMetadata:
         FileNotFoundError: If the dataset metadata file is not found.
 
     Examples:
-        >>> metadata = DatasetMetadata(
+        >>> metadata = DatasetMetadataSchema(
         ...     dataset_name="example_dataset",
         ...     dataset_version="1.0.0",
         ... )
         >>> with tempfile.TemporaryDirectory() as MEDS_root:
         ...     metadata_fp = Path(MEDS_root) / dataset_metadata_filepath
         ...     metadata_fp.parent.mkdir(parents=True, exist_ok=False)
-        ...     _ = metadata_fp.write_text(json.dumps(metadata))
+        ...     _ = metadata_fp.write_text(json.dumps(metadata.to_dict()))
         ...     get_dataset_metadata_from_root(MEDS_root)
         {'dataset_name': 'example_dataset', 'dataset_version': '1.0.0'}
 
@@ -49,7 +49,7 @@ def get_dataset_metadata_from_root(root: str) -> DatasetMetadata:
     fp = Path(root) / dataset_metadata_filepath
     if not fp.exists():
         raise FileNotFoundError(f"Dataset metadata file not found at {fp}")
-    return DatasetMetadata(**json.loads(fp.read_text()))
+    return DatasetMetadataSchema(**json.loads(fp.read_text())).to_dict()
 
 
 @OmegaConfResolver
@@ -67,14 +67,14 @@ def get_dataset_name_from_root(root: str, default: str = "Unknown") -> str:
         DatasetMetadataNotFoundWarning: If the dataset metadata file is not found or is invalid.
 
     Examples:
-        >>> metadata = DatasetMetadata(
+        >>> metadata = DatasetMetadataSchema(
         ...     dataset_name="example_dataset",
         ...     dataset_version="1.0.0",
         ... )
         >>> with tempfile.TemporaryDirectory() as MEDS_root:
         ...     metadata_fp = Path(MEDS_root) / dataset_metadata_filepath
         ...     metadata_fp.parent.mkdir(parents=True, exist_ok=False)
-        ...     _ = metadata_fp.write_text(json.dumps(metadata))
+        ...     _ = metadata_fp.write_text(json.dumps(metadata.to_dict()))
         ...     get_dataset_name_from_root(MEDS_root)
         'example_dataset'
 
@@ -82,7 +82,7 @@ def get_dataset_name_from_root(root: str, default: str = "Unknown") -> str:
         logged, which we can catch and print with the `print_warnings` context manager (defined in our
         `conftest.py`):
 
-        >>> metadata = DatasetMetadata(
+        >>> metadata = DatasetMetadataSchema(
         ...     dataset_name="example_dataset",
         ...     dataset_version="1.0.0",
         ... )
@@ -122,14 +122,14 @@ def get_dataset_version_from_root(root: str, default: str = "Unknown") -> str:
         DatasetMetadataNotFoundWarning: If the dataset metadata file is not found or is invalid.
 
     Examples:
-        >>> metadata = DatasetMetadata(
+        >>> metadata = DatasetMetadataSchema(
         ...     dataset_name="example_dataset",
         ...     dataset_version="1.0.0",
         ... )
         >>> with tempfile.TemporaryDirectory() as MEDS_root:
         ...     metadata_fp = Path(MEDS_root) / dataset_metadata_filepath
         ...     metadata_fp.parent.mkdir(parents=True, exist_ok=False)
-        ...     _ = metadata_fp.write_text(json.dumps(metadata))
+        ...     _ = metadata_fp.write_text(json.dumps(metadata.to_dict()))
         ...     get_dataset_version_from_root(MEDS_root)
         '1.0.0'
 
@@ -137,7 +137,7 @@ def get_dataset_version_from_root(root: str, default: str = "Unknown") -> str:
         logged, which we can catch and print with the `print_warnings` context manager (defined in our
         `conftest.py`):
 
-        >>> metadata = DatasetMetadata(
+        >>> metadata = DatasetMetadataSchema(
         ...     dataset_name="example_dataset",
         ...     dataset_version="1.0.0",
         ... )

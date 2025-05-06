@@ -4,7 +4,7 @@ import logging
 from collections.abc import Callable
 
 import polars as pl
-from meds import code_field, numeric_value_field, subject_id_field, time_field
+from meds import DataSchema
 from omegaconf import DictConfig
 
 from ... import INFERRED_STAGE_KEYS
@@ -14,12 +14,12 @@ from .. import Stage
 logger = logging.getLogger(__name__)
 
 MANDATORY_TYPES = {
-    subject_id_field: pl.Int64,
-    time_field: pl.Datetime("us"),
-    code_field: pl.String,
-    numeric_value_field: pl.Float32,
+    DataSchema.subject_id_name: pl.Int64,
+    DataSchema.time_name: pl.Datetime("us"),
+    DataSchema.code_name: pl.String,
+    DataSchema.numeric_value_name: pl.Float32,
+    DataSchema.text_value_name: pl.String,
     "categorical_value": pl.String,
-    "text_value": pl.String,
 }
 
 
@@ -118,7 +118,7 @@ def extract_values(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFra
         match out_col_n:
             case str() if out_col_n in MANDATORY_TYPES:
                 expr = expr.cast(MANDATORY_TYPES[out_col_n])
-                if out_col_n in (subject_id_field, time_field):
+                if out_col_n in (DataSchema.subject_id_name, DataSchema.time_name):
                     logger.warning(f"You should almost CERTAINLY not be extracting {out_col_n} as a value.")
             case str():
                 pass
@@ -133,6 +133,7 @@ def extract_values(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFra
         if not need_cols.issubset(in_cols):
             raise ValueError(f"Missing columns: {sorted(need_cols - in_cols)}")
 
-        return df.with_columns(new_cols).sort(subject_id_field, "time", maintain_order=True)
+        sort_cols = [DataSchema.subject_id_name, DataSchema.time_name]
+        return df.with_columns(new_cols).sort(*sort_cols, maintain_order=True)
 
     return map_fn
