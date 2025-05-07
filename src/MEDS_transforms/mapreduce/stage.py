@@ -61,7 +61,7 @@ def map_stage(
 
     To see this data, let's inspect it, first on disk (which is merely the typical MEDS fashion):
 
-        >>> print_directory_contents(simple_static_MEDS)
+        >>> print_directory(simple_static_MEDS)
         ├── data
         │   ├── held_out
         │   │   └── 0.parquet
@@ -179,7 +179,7 @@ def map_stage(
         ...         test_cfg.stage_cfg.metadata_input_dir = str(in_MEDS_dir / "metadata")
         ...     out_fps = map_stage(cfg=test_cfg, **kwargs)
         ...     print("Output directory:")
-        ...     print_directory_contents(test_cfg.stage_cfg.output_dir)
+        ...     print_directory(test_cfg.stage_cfg.output_dir)
         ...     print("------------------")
         ...     print("Output files:")
         ...     print("------------------")
@@ -573,7 +573,7 @@ def mapreduce_stage(
 
     To see this data, let's inspect it, first on disk (which is merely the typical MEDS fashion):
 
-        >>> print_directory_contents(simple_static_MEDS)
+        >>> print_directory(simple_static_MEDS)
         ├── data
         │   ├── held_out
         │   │   └── 0.parquet
@@ -706,10 +706,10 @@ def mapreduce_stage(
         ...         test_cfg.worker = worker
         ...     mapreduce_stage(cfg=test_cfg, **kwargs)
         ...     print("Data output directory:")
-        ...     print_directory_contents(test_cfg.stage_cfg.output_dir)
+        ...     print_directory(test_cfg.stage_cfg.output_dir)
         ...     if test_cfg.stage_cfg.reducer_output_dir.exists():
         ...         print("Reducer output directory:")
-        ...         print_directory_contents(test_cfg.stage_cfg.reducer_output_dir)
+        ...         print_directory(test_cfg.stage_cfg.reducer_output_dir)
         ...     out_fp = test_cfg.stage_cfg.reducer_output_dir / "codes.parquet"
         ...     if out_fp.exists():
         ...         print("------------------")

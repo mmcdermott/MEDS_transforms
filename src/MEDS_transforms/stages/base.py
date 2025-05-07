@@ -1328,7 +1328,7 @@ class Stage:
             ...     # What does the directory structure look like?
             ...     print("Root directory:")
             ...     print("-----------------")
-            ...     print_directory_contents(tmpdir)
+            ...     print_directory(tmpdir)
             ...     # Mock out the inspect module to return the calling file we're constructing:
             ...     with patch("inspect.currentframe") as mock:
             ...         mock.return_value.f_back.f_code.co_filename = str(calling_file)
@@ -1471,7 +1471,7 @@ class Stage:
             ...     # What does the directory structure look like?
             ...     print("Root directory:")
             ...     print("-----------------")
-            ...     print_directory_contents(tmpdir)
+            ...     print_directory(tmpdir)
             ...     # Mock out the inspect module to return the calling file we're constructing:
             ...     with patch("inspect.currentframe") as mock:
             ...         mock.return_value.f_back.f_code.co_filename = str(calling_file)
