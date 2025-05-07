@@ -20,9 +20,8 @@ from meds_testing_helpers.dataset import MEDSDataset
 from meds_testing_helpers.static_sample_data import SIMPLE_STATIC_SHARDED_BY_SPLIT
 from omegaconf import DictConfig, OmegaConf
 from polars.testing import assert_frame_equal
+from pretty_print_directory import list_directory
 from yaml import load as load_yaml
-
-from ..utils import pretty_list_directory
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -266,7 +265,7 @@ class TestEnv:
 
     def __str__(self) -> str:
         lines = [f"Test Environment in {self.test_dir}", "  - Files:"]
-        lines.extend(pretty_list_directory(self.test_dir, prefix=_SPACE))
+        lines.extend(list_directory(self.test_dir, prefix=_SPACE))
         lines.append(f"  - Input sub-directory: {self.input_dir.relative_to(self.test_dir)}")
         lines.append(f"  - Output sub-directory: {self.output_dir.relative_to(self.test_dir)}")
 
@@ -949,7 +948,7 @@ class StageExample:
         if not output_dir.exists():
             raise AssertionError(f"Expected cohort directory {output_dir} to exist, but it does not.")
 
-        all_files_str = f"{output_dir.name}\n" + "\n".join(pretty_list_directory(output_dir))
+        all_files_str = f"{output_dir.name}\n" + "\n".join(list_directory(output_dir))
 
         if self.want_data is not None:
             data_dir = output_dir if is_resolved_dir else output_dir / "data"

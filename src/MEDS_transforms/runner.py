@@ -313,7 +313,7 @@ def main(cfg: DictConfig):
         ...     test_dir = Path(test_dir)
         ...     profile_main(test_dir)
         ...     print("Log contents:")
-        ...     print_directory_contents(test_dir / "logs")
+        ...     print_directory(test_dir / "logs")
         Running reshard_to_split
         Running count_codes
         Log contents:
@@ -331,7 +331,7 @@ def main(cfg: DictConfig):
         ...     global_done_file.touch()
         ...     profile_main(test_dir)
         ...     print("Log contents:")
-        ...     print_directory_contents(log_dir)
+        ...     print_directory(log_dir)
         Log contents:
         └── _all_stages.done
 
@@ -345,7 +345,7 @@ def main(cfg: DictConfig):
         ...     reshard_done_file.touch()
         ...     profile_main(test_dir)
         ...     print("Log contents:")
-        ...     print_directory_contents(log_dir)
+        ...     print_directory(log_dir)
         Running count_codes
         Log contents:
         ├── _all_stages.done
