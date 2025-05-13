@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     import polars as pl
 
     from ..compute_modes import ANY_COMPUTE_FN_T
+    from ..dataframe import READ_FN_T, WRITE_FN_T
 
 logger = logging.getLogger(__name__)
 
@@ -472,6 +473,9 @@ class Stage:
     reduce_fn: ANY_COMPUTE_FN_T | None = None
     main_fn: MAIN_FN_T | None = None
 
+    read_fn: READ_FN_T | None = None
+    write_fn: WRITE_FN_T | None = None
+
     output_schema_updates: dict[str, pl.DataType] | None = None
     is_metadata: bool | None = None
 
@@ -530,6 +534,8 @@ class Stage:
         main_fn: MAIN_FN_T | None = None,
         map_fn: ANY_COMPUTE_FN_T | None = None,
         reduce_fn: ANY_COMPUTE_FN_T | None = None,
+        read_fn: READ_FN_T | None = None,
+        write_fn: WRITE_FN_T | None = None,
         stage_name: str | None = None,
         stage_docstring: str | None = None,
         output_schema_updates: dict[str, pl.DataType] | None = None,
@@ -547,6 +553,15 @@ class Stage:
         self.main_fn = main_fn
         self.map_fn = map_fn
         self.reduce_fn = reduce_fn
+
+        self.read_fn = read_fn
+        self.write_fn = write_fn
+
+        if self.stage_type == StageType.MAIN and (self.read_fn is not None or self.write_fn is not None):
+            raise ValueError(
+                f"Stage type is {self.stage_type}, but read_fn or write_fn is set. This is only supported "
+                "in MAP and MAPREDUCE stages. Please set read_fn and write_fn to None."
+            )
 
         if is_metadata is None:
             if self.stage_type is StageType.MAPREDUCE:
@@ -818,12 +833,14 @@ class Stage:
 
                 @wraps(self.map_fn)
                 def main_fn(cfg: DictConfig):
-                    map_stage(cfg, self.map_fn)
+                    map_stage(cfg, self.map_fn, read_fn=self.read_fn, write_fn=self.write_fn)
 
             case StageType.MAPREDUCE:
 
                 def main_fn(cfg: DictConfig):
-                    mapreduce_stage(cfg, self.map_fn, self.reduce_fn)
+                    mapreduce_stage(
+                        cfg, self.map_fn, self.reduce_fn, read_fn=self.read_fn, write_fn=self.write_fn
+                    )
 
         main_fn.__name__ = self.stage_name
         main_fn.__doc__ = self.stage_docstring
@@ -1100,6 +1117,30 @@ class Stage:
                 ...
             ValueError: Stage type is not set to MAP or MAPREDUCE, but is_metadata is not set. Please set
             is_metadata manually.
+
+        Another set of special parameters are the `read_fn` and `write_fn` parameters. These can be used to
+        specialize the behavior of map and mapreduce stages, but cannot be set during on main stages:
+
+            >>> def write_fn(df: pl.DataFrame, fp: Path):
+            ...     df.write_parquet(fp)
+            >>> stage = Stage.register(map_fn=map_fn, write_fn=write_fn)
+            >>> print(stage.write_fn)
+            <function write_fn at ...>
+            >>> print(stage)
+            Stage base:
+              Type: map
+              is_metadata: False
+              Docstring:
+                | base map docstring
+              Map function: map_fn
+              Reduce function: None
+              Main function: None
+              Mimic function: None
+            >>> Stage.register(main_fn=main, write_fn=write_fn)
+            Traceback (most recent call last):
+                ...
+            ValueError: Stage type is main, but read_fn or write_fn is set. This is only supported in MAP
+                and MAPREDUCE stages. Please set read_fn and write_fn to None.
 
         You can also use `Stage.register` as a decorator, either parametrized or not.
 

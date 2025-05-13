@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 def map_stage(
     cfg: DictConfig,
     map_fn: COMPUTE_FN_T,
-    read_fn: READ_FN_T = read_df,
-    write_fn: WRITE_FN_T = write_df,
+    read_fn: READ_FN_T | None = None,
+    write_fn: WRITE_FN_T | None = None,
     shard_iterator_fntr: SHARD_ITR_FNTR_T = shard_iterator,
 ) -> list[Path]:
     """Performs a mapping stage operation on shards produced by the shard iterator.
@@ -455,6 +455,11 @@ def map_stage(
 
     start = datetime.now(tz=UTC)
 
+    if read_fn is None:
+        read_fn = read_df
+    if write_fn is None:
+        write_fn = write_df
+
     train_only = cfg.stage_cfg.get("train_only", False)
 
     shards, includes_only_train = shard_iterator_fntr(cfg)
@@ -543,8 +548,8 @@ def mapreduce_stage(
     map_fn: ANY_COMPUTE_FN_T,
     reduce_fn: REDUCE_FN_T,
     merge_fn: REDUCE_FN_T | None = None,
-    read_fn: READ_FN_T = read_df,
-    write_fn: WRITE_FN_T = write_df,
+    read_fn: READ_FN_T | None = None,
+    write_fn: WRITE_FN_T | None = None,
     shard_iterator_fntr: SHARD_ITR_FNTR_T = shard_iterator,
 ):
     """Performs a map-stage over shards produced by the shard iterator, then reduces over those outputs.
@@ -838,6 +843,11 @@ def mapreduce_stage(
             └── 0.parquet
         No reduced output found.
     """
+
+    if read_fn is None:
+        read_fn = read_df
+    if write_fn is None:
+        write_fn = write_df
 
     _out_fps = map_stage(
         cfg=cfg, map_fn=map_fn, read_fn=read_fn, write_fn=write_fn, shard_iterator_fntr=shard_iterator
