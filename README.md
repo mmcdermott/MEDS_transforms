@@ -1,3 +1,11 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="static/logo_dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="static/logo_light.svg">
+    <img width="200" height="200" alt="MEDS Logot" src="static/logo_light.svg">
+  </picture>
+</p>
+
 # MEDS Transforms: Build and run complex pipelines over MEDS datasets via simple parts
 
 [![PyPI - Version](https://img.shields.io/pypi/v/MEDS-transforms)](https://pypi.org/project/MEDS-transforms/)
