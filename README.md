@@ -20,6 +20,12 @@
 [![PRs](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/mmcdermott/MEDS_transforms/pulls)
 [![contributors](https://img.shields.io/github/contributors/mmcdermott/MEDS_transforms.svg)](https://github.com/mmcdermott/MEDS_transforms/graphs/contributors)
 
+MEDS-Transforms is a Python package for assembling complex data pre-processing workflows over MEDS datasets.
+To do this, you define a pipeline as a series of stages, each with its own arguments, then run the pipeline
+over your dataset. This allows the community to curate a library of shared stages for common operations, such
+as filtering, normalization, outlier detection, and more, which can be used to build novel pipelines for
+diverse use cases. Learn more below to see how MEDS-Transforms can help you build your data pipelines!
+
 ## 🚀 Quick Start
 
 ### 1. Install via `pip`:
@@ -66,6 +72,16 @@ stages:
   - fit_vocabulary_indices
   - normalization
 ```
+
+This pipeline will:
+
+1. Filter subjects to only those with at least 5 events (unique timestamps).
+2. Add codes and values for the subject's age and the time-of-day of each unique measurement.
+3. Fit statistics to recognize and occlude outliers over the numeric values.
+4. Remove numeric values that are more than 1 standard deviation away from the mean.
+5. Fit statistics to normalize the numeric values.
+6. Assign codes to unique vocabulary indices in preparation for modeling.
+7. Normalize the codes and numeric values to proper numeric form for modeling.
 
 Save your pipeline YAML file on disk at `$PIPELINE_YAML`.
 
@@ -218,7 +234,7 @@ my_stage = "my_package.my_stage:main"
 ##### Stage types
 
 MEDS-Transforms supports several different types of stages, which are listed in the
-[`StageType`](<>) `StrEnum`. These are:
+`StageType` `StrEnum`. These are:
 
 1. `MAP` stages, which apply an operation to each data shard in the input, and save the output to the same
     shard name in the output folder.
@@ -238,7 +254,7 @@ ensure your stages will be appropriately recognized in downstream usage.
 
 ##### Stage registration configuration
 
-Stages are registered via the [`Stage.register`](<>) method, which can be used as a function or a decorator.
+Stages are registered via the `Stage.register` method, which can be used as a function or a decorator.
 
 #### Defining your own pipelines
 
