@@ -90,7 +90,7 @@ Save your pipeline YAML file on disk at `$PIPELINE_YAML`.
 In the terminal, run
 
 ```bash
-MEDS_transform-pipeline pipeline_fp="$PIPELINE_YAML"
+MEDS_transform-pipeline pipeline_config_fp="$PIPELINE_YAML"
 ```
 
 After you do, you will see output files stored in `$PIPELINE_OUTPUT` with the results of each stage of the
