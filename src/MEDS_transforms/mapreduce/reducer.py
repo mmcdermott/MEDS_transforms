@@ -152,7 +152,7 @@ def reduce_over(
         ------------------
         Writing files with a delay of 0.5 seconds...
         Starting reduction...
-        Reduction completed in: ~1.5 seconds
+        Reduction completed in: ~1... seconds
         shape: (6, 2)
         ┌─────┬─────┐
         │ a   ┆ b   │
