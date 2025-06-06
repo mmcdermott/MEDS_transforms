@@ -3,12 +3,29 @@
 import logging
 import re
 from collections.abc import Callable
+from pathlib import Path
+import os
+from importlib.resources import files
 
 import polars as pl
 from meds import CodeMetadataSchema, DataSchema
 from omegaconf import DictConfig, OmegaConf
 
 from .. import Stage
+
+PKG_PFX = "pkg://"
+
+
+def resolve_pkg_path(pkg_path: str) -> Path:
+    parts = pkg_path[len(PKG_PFX) :].split(".")
+    pkg_name = parts[0]
+
+    suffix = parts[-1]
+    relative_path = Path(os.path.join(*parts[1:-1])).with_suffix(f".{suffix}")
+    try:
+        return files(pkg_name) / relative_path
+    except ModuleNotFoundError as e:
+        raise ValueError(f"Package '{pkg_name}' not found. Please check the package name.") from e
 
 logger = logging.getLogger(__name__)
 
@@ -420,6 +437,9 @@ def bin_numeric_values_fntr(
                   code names and the values should be dictionaries with the same structure as the
                   bin_with_columns. This allows for custom binning for specific codes. Default is an empty
                   dictionary. Custom bins are used preferentially over entries in `bin_with_columns`.
+                - custom_bins_filepath: Optional path to a YAML file containing custom bin endpoints. If provided,
+                  the YAML file should define the same dictionary structure as `custom_bins`. Entries loaded from
+                  this file are merged with any directly specified in `custom_bins`.
         code_metadata: A DataFrame containing the metadata for the codes, including the bin endpoints and
             custom bins.
         code_modifiers: A list of additional columns to use for joining against codes. These columns should be
@@ -638,6 +658,24 @@ def bin_numeric_values_fntr(
 
     # Step 1: Add custom_bins column to code_metadata
     custom_bins = stage_cfg.get("custom_bins", {})
+    custom_bins_fp = stage_cfg.get("custom_bins_filepath")
+
+    if isinstance(custom_bins, DictConfig):
+        custom_bins = OmegaConf.to_container(custom_bins)
+
+    if custom_bins_fp:
+        fp = Path(custom_bins_fp)
+        if custom_bins_fp.startswith(PKG_PFX):
+            fp = resolve_pkg_path(custom_bins_fp)
+        if not fp.is_file():
+            raise FileNotFoundError(f"custom_bins_filepath '{custom_bins_fp}' does not exist.")
+
+        file_bins = OmegaConf.load(fp)
+        if isinstance(file_bins, DictConfig):
+            file_bins = OmegaConf.to_container(file_bins)
+        if not isinstance(file_bins, dict):
+            raise TypeError("custom_bins_filepath must point to a YAML file with a dictionary")
+        custom_bins = {**file_bins, **custom_bins}
 
     do_use_custom_bins = bool(custom_bins)
     do_drop_numeric_value = stage_cfg.get("drop_numeric_value", False)
