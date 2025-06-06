@@ -4,28 +4,13 @@ import logging
 import re
 from collections.abc import Callable
 from pathlib import Path
-import os
-from importlib.resources import files
 
 import polars as pl
 from meds import CodeMetadataSchema, DataSchema
 from omegaconf import DictConfig, OmegaConf
 
+from ...utils import PKG_PFX, resolve_pkg_path
 from .. import Stage
-
-PKG_PFX = "pkg://"
-
-
-def resolve_pkg_path(pkg_path: str) -> Path:
-    parts = pkg_path[len(PKG_PFX) :].split(".")
-    pkg_name = parts[0]
-
-    suffix = parts[-1]
-    relative_path = Path(os.path.join(*parts[1:-1])).with_suffix(f".{suffix}")
-    try:
-        return files(pkg_name) / relative_path
-    except ModuleNotFoundError as e:
-        raise ValueError(f"Package '{pkg_name}' not found. Please check the package name.") from e
 
 logger = logging.getLogger(__name__)
 
@@ -437,9 +422,9 @@ def bin_numeric_values_fntr(
                   code names and the values should be dictionaries with the same structure as the
                   bin_with_columns. This allows for custom binning for specific codes. Default is an empty
                   dictionary. Custom bins are used preferentially over entries in `bin_with_columns`.
-                - custom_bins_filepath: Optional path to a YAML file containing custom bin endpoints. If provided,
-                  the YAML file should define the same dictionary structure as `custom_bins`. Entries loaded from
-                  this file are merged with any directly specified in `custom_bins`.
+                - custom_bins_filepath: Optional path to a YAML file containing custom bin endpoints. If
+                  provided, the file should define the same dictionary structure as ``custom_bins``.
+                  Entries loaded from this file are merged with any directly specified in ``custom_bins``.
         code_metadata: A DataFrame containing the metadata for the codes, including the bin endpoints and
             custom bins.
         code_modifiers: A list of additional columns to use for joining against codes. These columns should be
@@ -563,6 +548,41 @@ def bin_numeric_values_fntr(
         │ 2          ┆ dx//1                    ┆ null          │
         │ 3          ┆ lab//D//value_[1.0,inf)  ┆ 1.2           │
         └────────────┴──────────────────────────┴───────────────┘
+
+    Load custom bins from a YAML file on disk:
+
+        >>> import tempfile, yaml
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     bins_fp = Path(tmpdir) / "bins.yaml"
+        ...     yaml.safe_dump({"lab//D": {"foo": 1.0}}, bins_fp.open("w"))
+        ...     fn = bin_numeric_values_fntr(
+        ...         DictConfig({"custom_bins_filepath": str(bins_fp)}),
+        ...         code_metadata,
+        ...     )
+        ...     fn(df)
+        shape: (7, 3)
+        ┌────────────┬──────────────────────────┬───────────────┐
+        │ subject_id ┆ code                     ┆ numeric_value │
+        │ ---        ┆ ---                      ┆ ---           │
+        │ i64        ┆ str                      ┆ f64           │
+        ╞════════════╪══════════════════════════╪═══════════════╡
+        │ 1          ┆ lab//A//value_[-inf,0.0) ┆ -1.0          │
+        │ 1          ┆ lab//B//value_[-2.0,3.0) ┆ 2.0           │
+        │ 1          ┆ lab//C                   ┆ null          │
+        │ 2          ┆ lab//A//value_[1.0,2.0)  ┆ 1.0           │
+        │ 2          ┆ lab//C//value_[0.6,inf)  ┆ 1.0           │
+        │ 2          ┆ dx//1                    ┆ null          │
+        │ 3          ┆ lab//D//value_[1.0,inf)  ┆ 1.2           │
+        └────────────┴──────────────────────────┴───────────────┘
+
+    The path may also reference a resource using the ``pkg://`` scheme:
+
+        >>> fn = bin_numeric_values_fntr(
+        ...     DictConfig({
+        ...         "custom_bins_filepath": "pkg://MEDS_transforms.stages.bin_numeric_values.examples.custom_bins_fp.custom_bins.yaml"
+        ...     }),
+        ...     code_metadata,
+        ... )
 
     Use different bin columns (sourced from the code metadata)
 
