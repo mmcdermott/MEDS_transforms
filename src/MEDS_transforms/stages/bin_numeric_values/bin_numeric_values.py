@@ -575,15 +575,6 @@ def bin_numeric_values_fntr(
         │ 3          ┆ lab//D//value_[1.0,inf)  ┆ 1.2           │
         └────────────┴──────────────────────────┴───────────────┘
 
-    The path may also reference a resource using the ``pkg://`` scheme:
-
-        >>> fn = bin_numeric_values_fntr(
-        ...     DictConfig({
-        ...         "custom_bins_filepath": "pkg://MEDS_transforms.stages.bin_numeric_values.examples.custom_bins_fp.custom_bins.yaml"
-        ...     }),
-        ...     code_metadata,
-        ... )
-
     Use different bin columns (sourced from the code metadata)
 
         >>> code_metadata = pl.DataFrame({
