@@ -2,7 +2,7 @@
 
 import mkdocs_gen_files
 
-from MEDS_transforms.docgen import generate_stage_docs
+from MEDS_transforms.stages.docgen import generate_stage_docs
 
 nav = mkdocs_gen_files.Nav()
 for doc in generate_stage_docs("MEDS_transforms"):

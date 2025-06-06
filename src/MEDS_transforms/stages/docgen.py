@@ -1,4 +1,8 @@
-"""Generate Markdown documentation for registered stages."""
+"""Generate Markdown documentation for registered stages.
+
+This helper builds a ``StageDoc`` for each registered stage so it can be
+rendered in the documentation site.
+"""
 
 from __future__ import annotations
 
@@ -6,12 +10,19 @@ import inspect
 from dataclasses import dataclass
 from pathlib import Path
 
-from .stages import get_all_registered_stages
+from .discovery import get_all_registered_stages
 
 
 @dataclass
 class StageDoc:
-    """A generated documentation page for a stage."""
+    """Markdown documentation page for a stage.
+
+    Attributes:
+        stage_name: Name of the stage.
+        path: Relative path of the Markdown file.
+        content: Markdown contents to write.
+        edit_path: Optional repository path for MkDocs edit links.
+    """
 
     stage_name: str
     path: Path
@@ -20,15 +31,21 @@ class StageDoc:
 
 
 def generate_stage_docs(package: str, root: Path | None = None) -> list[StageDoc]:
-    """Return Markdown documentation pages for all stages in ``package``.
+    """Build documentation pages for all registered stages.
 
-    Parameters
-    ----------
-    package:
-        Package prefix used to filter stages from the registry.
-    root:
-        Repository root used for calculating relative edit paths. Defaults to
-        two directories above this file.
+    Args:
+        package: Package prefix used to filter stages from the registry.
+        root: Repository root for computing edit links. Defaults to two
+            directories above this file.
+
+    Returns:
+        A list of :class:`StageDoc` objects describing each page.
+
+    Examples:
+        >>> from MEDS_transforms.stages.docgen import generate_stage_docs
+        >>> docs = generate_stage_docs("MEDS_transforms")
+        >>> isinstance(docs[0], StageDoc)
+        True
     """
 
     root = Path(root) if root else Path(__file__).resolve().parents[1]
