@@ -575,6 +575,58 @@ def bin_numeric_values_fntr(
         │ 3          ┆ lab//D//value_[1.0,inf)  ┆ 1.2           │
         └────────────┴──────────────────────────┴───────────────┘
 
+    If the filepath does not exist or the YAML does not contain a dictionary,
+    errors will be raised:
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     fn = bin_numeric_values_fntr(
+        ...         DictConfig({"custom_bins_filepath": str(Path(tmpdir) / "missing.yaml")}),
+        ...         code_metadata,
+        ...     )
+        Traceback (most recent call last):
+            ...
+        FileNotFoundError: custom_bins_filepath '/tmp/tmp.../missing.yaml' does not exist.
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     bins_fp = Path(tmpdir) / "bins.yaml"
+        ...     yaml.safe_dump([1, 2], bins_fp.open("w"))
+        ...     bin_numeric_values_fntr(
+        ...         DictConfig({"custom_bins_filepath": str(bins_fp)}),
+        ...         code_metadata,
+        ...     )
+        Traceback (most recent call last):
+            ...
+        TypeError: custom_bins_filepath must point to a YAML file with a dictionary
+
+    Package paths can also be used when patched with ``resolve_pkg_path``:
+
+        >>> from unittest.mock import patch
+        >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as bins_yaml:
+        ...     bins_fp = Path(bins_yaml.name)
+        ...     yaml.safe_dump({"lab//D": {"foo": 1.0}}, bins_fp.open("w"))
+        ...     with patch(
+        ...         "MEDS_transforms.stages.bin_numeric_values.bin_numeric_values.resolve_pkg_path",
+        ...         return_value=bins_fp,
+        ...     ):
+        ...         fn = bin_numeric_values_fntr(
+        ...             DictConfig({"custom_bins_filepath": "pkg://fake_pkg.bins.yaml"}),
+        ...             code_metadata,
+        ...         )
+        ...         fn(df)
+        shape: (7, 3)
+        ┌────────────┬──────────────────────────┬───────────────┐
+        │ subject_id ┆ code                     ┆ numeric_value │
+        │ ---        ┆ ---                      ┆ ---           │
+        │ i64        ┆ str                      ┆ f64           │
+        ╞════════════╪══════════════════════════╪═══════════════╡
+        │ 1          ┆ lab//A//value_[-inf,0.0) ┆ -1.0          │
+        │ 1          ┆ lab//B//value_[-2.0,3.0) ┆ 2.0           │
+        │ 1          ┆ lab//C                   ┆ null          │
+        │ 2          ┆ lab//A//value_[1.0,2.0)  ┆ 1.0           │
+        │ 2          ┆ lab//C//value_[0.6,inf)  ┆ 1.0           │
+        │ 2          ┆ dx//1                    ┆ null          │
+        │ 3          ┆ lab//D//value_[1.0,inf)  ┆ 1.2           │
+        └────────────┴──────────────────────────┴───────────────┘
+
     Use different bin columns (sourced from the code metadata)
 
         >>> code_metadata = pl.DataFrame({
