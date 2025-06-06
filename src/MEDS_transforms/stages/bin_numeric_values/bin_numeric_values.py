@@ -3,11 +3,13 @@
 import logging
 import re
 from collections.abc import Callable
+from pathlib import Path
 
 import polars as pl
 from meds import CodeMetadataSchema, DataSchema
 from omegaconf import DictConfig, OmegaConf
 
+from ...utils import PKG_PFX, resolve_pkg_path
 from .. import Stage
 
 logger = logging.getLogger(__name__)
@@ -420,6 +422,9 @@ def bin_numeric_values_fntr(
                   code names and the values should be dictionaries with the same structure as the
                   bin_with_columns. This allows for custom binning for specific codes. Default is an empty
                   dictionary. Custom bins are used preferentially over entries in `bin_with_columns`.
+                - custom_bins_filepath: Optional path to a YAML file containing custom bin endpoints. If
+                  provided, the file should define the same dictionary structure as ``custom_bins``.
+                  Entries loaded from this file are merged with any directly specified in ``custom_bins``.
         code_metadata: A DataFrame containing the metadata for the codes, including the bin endpoints and
             custom bins.
         code_modifiers: A list of additional columns to use for joining against codes. These columns should be
@@ -544,6 +549,84 @@ def bin_numeric_values_fntr(
         │ 3          ┆ lab//D//value_[1.0,inf)  ┆ 1.2           │
         └────────────┴──────────────────────────┴───────────────┘
 
+    Load custom bins from a YAML file on disk:
+
+        >>> import tempfile, yaml
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     bins_fp = Path(tmpdir) / "bins.yaml"
+        ...     yaml.safe_dump({"lab//D": {"foo": 1.0}}, bins_fp.open("w"))
+        ...     fn = bin_numeric_values_fntr(
+        ...         DictConfig({"custom_bins_filepath": str(bins_fp)}),
+        ...         code_metadata,
+        ...     )
+        ...     fn(df)
+        shape: (7, 3)
+        ┌────────────┬──────────────────────────┬───────────────┐
+        │ subject_id ┆ code                     ┆ numeric_value │
+        │ ---        ┆ ---                      ┆ ---           │
+        │ i64        ┆ str                      ┆ f64           │
+        ╞════════════╪══════════════════════════╪═══════════════╡
+        │ 1          ┆ lab//A//value_[-inf,0.0) ┆ -1.0          │
+        │ 1          ┆ lab//B//value_[-2.0,3.0) ┆ 2.0           │
+        │ 1          ┆ lab//C                   ┆ null          │
+        │ 2          ┆ lab//A//value_[1.0,2.0)  ┆ 1.0           │
+        │ 2          ┆ lab//C//value_[0.6,inf)  ┆ 1.0           │
+        │ 2          ┆ dx//1                    ┆ null          │
+        │ 3          ┆ lab//D//value_[1.0,inf)  ┆ 1.2           │
+        └────────────┴──────────────────────────┴───────────────┘
+
+    If the filepath does not exist or the YAML does not contain a dictionary,
+    errors will be raised:
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     fn = bin_numeric_values_fntr(
+        ...         DictConfig({"custom_bins_filepath": str(Path(tmpdir) / "missing.yaml")}),
+        ...         code_metadata,
+        ...     )
+        Traceback (most recent call last):
+            ...
+        FileNotFoundError: custom_bins_filepath '/tmp/tmp.../missing.yaml' does not exist.
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     bins_fp = Path(tmpdir) / "bins.yaml"
+        ...     yaml.safe_dump([1, 2], bins_fp.open("w"))
+        ...     bin_numeric_values_fntr(
+        ...         DictConfig({"custom_bins_filepath": str(bins_fp)}),
+        ...         code_metadata,
+        ...     )
+        Traceback (most recent call last):
+            ...
+        TypeError: custom_bins_filepath must point to a YAML file with a dictionary
+
+    Package paths can also be used when patched with ``resolve_pkg_path``:
+
+        >>> from unittest.mock import patch
+        >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as bins_yaml:
+        ...     bins_fp = Path(bins_yaml.name)
+        ...     yaml.safe_dump({"lab//D": {"foo": 1.0}}, bins_fp.open("w"))
+        ...     with patch(
+        ...         "MEDS_transforms.stages.bin_numeric_values.bin_numeric_values.resolve_pkg_path",
+        ...         return_value=bins_fp,
+        ...     ):
+        ...         fn = bin_numeric_values_fntr(
+        ...             DictConfig({"custom_bins_filepath": "pkg://fake_pkg.bins.yaml"}),
+        ...             code_metadata,
+        ...         )
+        ...         fn(df)
+        shape: (7, 3)
+        ┌────────────┬──────────────────────────┬───────────────┐
+        │ subject_id ┆ code                     ┆ numeric_value │
+        │ ---        ┆ ---                      ┆ ---           │
+        │ i64        ┆ str                      ┆ f64           │
+        ╞════════════╪══════════════════════════╪═══════════════╡
+        │ 1          ┆ lab//A//value_[-inf,0.0) ┆ -1.0          │
+        │ 1          ┆ lab//B//value_[-2.0,3.0) ┆ 2.0           │
+        │ 1          ┆ lab//C                   ┆ null          │
+        │ 2          ┆ lab//A//value_[1.0,2.0)  ┆ 1.0           │
+        │ 2          ┆ lab//C//value_[0.6,inf)  ┆ 1.0           │
+        │ 2          ┆ dx//1                    ┆ null          │
+        │ 3          ┆ lab//D//value_[1.0,inf)  ┆ 1.2           │
+        └────────────┴──────────────────────────┴───────────────┘
+
     Use different bin columns (sourced from the code metadata)
 
         >>> code_metadata = pl.DataFrame({
@@ -638,6 +721,24 @@ def bin_numeric_values_fntr(
 
     # Step 1: Add custom_bins column to code_metadata
     custom_bins = stage_cfg.get("custom_bins", {})
+    custom_bins_fp = stage_cfg.get("custom_bins_filepath")
+
+    if isinstance(custom_bins, DictConfig):
+        custom_bins = OmegaConf.to_container(custom_bins)
+
+    if custom_bins_fp:
+        fp = Path(custom_bins_fp)
+        if custom_bins_fp.startswith(PKG_PFX):
+            fp = resolve_pkg_path(custom_bins_fp)
+        if not fp.is_file():
+            raise FileNotFoundError(f"custom_bins_filepath '{custom_bins_fp}' does not exist.")
+
+        file_bins = OmegaConf.load(fp)
+        if isinstance(file_bins, DictConfig):
+            file_bins = OmegaConf.to_container(file_bins)
+        if not isinstance(file_bins, dict):
+            raise TypeError("custom_bins_filepath must point to a YAML file with a dictionary")
+        custom_bins = {**file_bins, **custom_bins}
 
     do_use_custom_bins = bool(custom_bins)
     do_drop_numeric_value = stage_cfg.get("drop_numeric_value", False)
