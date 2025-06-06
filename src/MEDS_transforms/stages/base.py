@@ -636,6 +636,12 @@ class Stage:
         self.__stage_dir = possible_stage_dir
 
     @property
+    def stage_dir(self) -> Path | None:
+        """Directory containing this stage's files, if known."""
+
+        return self.__stage_dir
+
+    @property
     def examples_dir(self) -> Path | None:
         if self.__examples_dir is not None:
             return self.__examples_dir
@@ -909,6 +915,15 @@ class Stage:
                 module.__test__ = {fn.__name__: fn}
         except Exception as e:  # pragma: no cover
             warnings.warn(f"Failed to set doctest for {fn.__name__}: {e}", stacklevel=2)
+
+    @property
+    def source_file(self) -> Path | None:
+        """Best-effort file path to the stage definition."""
+
+        for fn in (self.mimic_fn, self.main_fn, self.map_fn, self.reduce_fn):
+            if fn is not None:
+                return Path(inspect.getfile(fn))
+        return None
 
     def __call__(self, *args, **kwargs):
         if self.mimic_fn is not None:
