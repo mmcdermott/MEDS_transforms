@@ -437,15 +437,12 @@ def pipeline_tester(
         pipeline_config_fp = test_root / "pipeline.yaml"
         pipeline_config_fp.write_text(pipeline_yaml)
 
-        command = [
-            "MEDS_transform-pipeline",
-            f"pipeline_config_fp={pipeline_config_fp}",
-        ]
+        command = ["MEDS_transform-pipeline", str(pipeline_config_fp)]
 
         if stage_runner_yaml is not None:
             stage_runner_fp = test_root / "stage_runner.yaml"
             stage_runner_fp.write_text(stage_runner_yaml)
-            command.append(f"stage_runner_fp={stage_runner_fp}")
+            command.append(str(stage_runner_fp))
 
         # 2. Run the pipeline
         out = run_fn(

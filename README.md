@@ -90,11 +90,20 @@ Save your pipeline YAML file on disk at `$PIPELINE_YAML`.
 In the terminal, run
 
 ```bash
-MEDS_transform-pipeline pipeline_config_fp="$PIPELINE_YAML"
+MEDS_transform-pipeline "$PIPELINE_YAML"
 ```
 
-After you do, you will see output files stored in `$PIPELINE_OUTPUT` with the results of each stage of the
-pipeline, stored in stage specific directories, and the global output in `$PIPELINE_OUTPUT/data` and
+The runner creates a `.logs` folder inside the pipeline's `output_dir` and marks stages as complete by
+placing `<stage>.done` files in that folder. A `_all_stages.done` file is written when the entire pipeline
+finishes. Re-running the command will skip any stages that already have corresponding `.done` files.
+
+You can optionally supply a *stage runner* YAML as a second argument to control how each stage is launched
+(for example, providing parallelization options or custom stage scripts). Any additional arguments are
+forwarded to the stage invocations using Hydra override syntax, allowing you to tweak stage parameters on
+the command line.
+
+After running, you will see output files stored in `$PIPELINE_OUTPUT` with the results of each stage of the
+pipeline in stage-specific directories, and the global output in `$PIPELINE_OUTPUT/data` and
 `$PIPELINE_OUTPUT/metadata` (for data and metadata outputs, respectively). That's it!
 
 ### 4. Do even more!
@@ -264,7 +273,7 @@ them by using the `pkg://` syntax in specifying the pipeline configuration file 
 path on disk. For example:
 
 ```bash
-MEDS_transform-pipeline pipeline_fp="pkg://my_package.my_pipeline.yaml"
+MEDS_transform-pipeline pkg://my_package.my_pipeline.yaml
 ```
 
 #### Meta-stage functionality
