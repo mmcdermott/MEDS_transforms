@@ -86,4 +86,3 @@ def generate_stage_docs(package: str, root: Path | None = None) -> list[StageDoc
 
 
 __all__ = ["StageDoc", "generate_stage_docs"]
-
