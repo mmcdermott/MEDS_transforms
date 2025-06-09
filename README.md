@@ -115,6 +115,7 @@ See any of the below projects to understand how to use MEDS-Transforms in differ
 
 1. [MEDS-Extract](https://github.com/mmcdermott/MEDS_extract/)
 2. [MEDS TorchData](https://meds-torch-data.readthedocs.io/en/latest/)
+3. [Simple Example Package](https://github.com/mmcdermott/MEDS_transforms/tree/main/examples/simple_example_pkg)
 
 > [!NOTE]
 > If your package uses MEDS-Transforms, please submit a PR to add it to this list!
@@ -279,6 +280,21 @@ the data with different criteria, etc.
 Given the critical importance of testing in the MEDS-Transforms library, we have built-in support for you to
 test your derived stages via a semi-automated, clear pipeline that will aid you in both writing tests and
 ensuring your stages are understandable to your users.
+
+### Example plugin package
+
+This repository includes a minimal example of a downstream package that depends
+on MEDS-Transforms. You can find it under
+[`examples/simple_example_pkg`](https://github.com/mmcdermott/MEDS_transforms/tree/main/examples/simple_example_pkg).
+The package registers an `identity_stage` via an entry point and ships a simple
+`identity_pipeline.yaml` that exercises the stage. After installing the package
+locally you can run the pipeline with
+
+```bash
+MEDS_transform-pipeline pipeline_fp="pkg://simple_example_pkg.pipelines/identity_pipeline.yaml"
+```
+
+See `tests/test_example_pkg.py` for an automated demonstration of this setup.
 
 ## Roadmap & Contributing
 
