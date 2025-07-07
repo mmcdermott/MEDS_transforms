@@ -916,15 +916,6 @@ class Stage:
         except Exception as e:  # pragma: no cover
             warnings.warn(f"Failed to set doctest for {fn.__name__}: {e}", stacklevel=2)
 
-    @property
-    def source_file(self) -> Path | None:
-        """Best-effort file path to the stage definition."""
-
-        for fn in (self.mimic_fn, self.main_fn, self.map_fn, self.reduce_fn):
-            if fn is not None:
-                return Path(inspect.getfile(fn))
-        return None
-
     def __call__(self, *args, **kwargs):
         if self.mimic_fn is not None:
             return self.mimic_fn(*args, **kwargs)

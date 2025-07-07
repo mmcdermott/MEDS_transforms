@@ -42,10 +42,18 @@ def generate_stage_docs(package: str, root: Path | None = None) -> list[StageDoc
         A list of :class:`StageDoc` objects describing each page.
 
     Examples:
-        >>> from MEDS_transforms.stages.docgen import generate_stage_docs
+        >>> import textwrap
         >>> docs = generate_stage_docs("MEDS_transforms")
-        >>> isinstance(docs[0], StageDoc)
-        True
+        >>> print(docs[0].stage_name)
+        add_time_derived_measurements
+        >>> print(textwrap.shorten(docs[0].content, width=50))
+        # `add_time_derived_measurements` Adds all [...]
+
+    It can also attempt to make docs for other packages; in this case, it will return None as there are no
+    stages in this fake package:
+
+        >>> generate_stage_docs("fake_package")
+        []
     """
 
     root = Path(root) if root else Path(__file__).resolve().parents[1]
@@ -78,7 +86,7 @@ def generate_stage_docs(package: str, root: Path | None = None) -> list[StageDoc
                 scenario_name = scenario or "default"
                 lines.extend(["", f"### {scenario_name}", "```", str(example), "```"])
 
-        edit_path = stage.source_file.relative_to(root) if stage.source_file else None
+        edit_path = stage.stage_dir.relative_to(root) if stage.stage_dir else None
 
         docs.append(StageDoc(stage_name, doc_path, "\n".join(lines), edit_path))
 
