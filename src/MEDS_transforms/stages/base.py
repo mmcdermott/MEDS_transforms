@@ -582,6 +582,7 @@ class Stage:
             self.is_metadata = is_metadata
 
         self.__infer_stage_dir(_calling_file)
+        self._calling_file = _calling_file
 
         self.examples_dir = examples_dir
         self.default_config = default_config

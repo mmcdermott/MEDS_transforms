@@ -274,3 +274,6 @@ considering. If you have an idea for a new feature, please open an issue to disc
 Contributions are very welcome; please follow the
 [MEDS Organization's Contribution
 Guide](https://github.com/Medical-Event-Data-Standard/.github/blob/main/CONTRIBUTING.md) if you submit a PR.
+
+Note that contributions undergo pre-commit checks (`pre-commit run --all`), tests (`pytest`), and
+documentation generation (check via `mkdocs serve`).

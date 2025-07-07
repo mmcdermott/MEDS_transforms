@@ -6,7 +6,6 @@ rendered in the documentation site.
 
 from __future__ import annotations
 
-import inspect
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -46,8 +45,10 @@ def generate_stage_docs(package: str, root: Path | None = None) -> list[StageDoc
         >>> docs = generate_stage_docs("MEDS_transforms")
         >>> print(docs[0].stage_name)
         add_time_derived_measurements
+        >>> print(docs[0].path)
+        add_time_derived_measurements
         >>> print(textwrap.shorten(docs[0].content, width=50))
-        # `add_time_derived_measurements` Adds all [...]
+        # `add_time_derived_measurements` ## [...]
 
     It can also attempt to make docs for other packages; in this case, it will return None as there are no
     stages in this fake package:
@@ -65,19 +66,9 @@ def generate_stage_docs(package: str, root: Path | None = None) -> list[StageDoc
             continue
 
         stage = entry_point.load()
-        doc_path = Path("stages") / stage_name / "index.md"
+        doc_path = stage_name
 
         lines = [f"# `{stage_name}`"]
-
-        doc = stage.stage_docstring
-        if doc:
-            lines.extend(["", inspect.cleandoc(doc)])
-
-        if stage.stage_dir is not None:
-            readme_path = stage.stage_dir / "README.md"
-            if readme_path.is_file():
-                rel = readme_path.relative_to(root).as_posix()
-                lines.extend(["", f'--8<-- "{rel}"'])
 
         if stage.test_cases:
             lines.append("")
