@@ -115,7 +115,6 @@ def run_stage(
     stage_runners_cfg: dict | DictConfig,
     pipeline_cfg: PipelineConfig,
     stage_name: str,
-    additional_args: list[str] | None = None,
     default_parallelization_cfg: dict | DictConfig | None = None,
     do_profile: bool = False,
     runner_fn: callable = subprocess.run,  # For dependency injection
@@ -126,8 +125,6 @@ def run_stage(
         pipeline_config_fp: Path to the pipeline configuration on disk.
         stage_runners_cfg: The dictionary of stage runner configurations.
         stage_name: The name of the stage to run.
-        additional_args: Additional command line arguments to forward to the
-            stage invocation.
         default_parallelization_cfg: Default parallelization configuration.
         do_profile: Whether to enable Hydra profiling for the stage.
         runner_fn: Function used to actually run the stage command. This is
@@ -254,9 +251,6 @@ def run_stage(
         multirun = parallelization_args.pop(0)
         command_parts = command_parts[:1] + [multirun] + command_parts[1:] + parallelization_args
 
-    if additional_args:
-        command_parts.extend(additional_args)
-
     if do_profile:
         command_parts.append("++hydra.callbacks.profiler._target_=hydra_profiler.profiler.ProfilerCallback")
 
@@ -283,15 +277,25 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="MEDS-Transforms Pipeline Runner")
     parser.add_argument("pipeline_config_fp")
     parser.add_argument("stage_runner_fp", nargs="?", default=None)
+    parser.add_argument(
+        "--do_profile",
+        default=False,
+        type=bool,
+        action=argparse.BooleanOptionalAction,
+        help="Enable Hydra profiling for the stages.",
+    )
     parser.add_argument("overrides", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
 
-    pipeline_config = PipelineConfig.from_arg(args.pipeline_config_fp)
+    pipeline_config = PipelineConfig.from_arg(args.pipeline_config_fp, args.overrides)
     stage_runners_cfg = load_yaml_file(args.stage_runner_fp)
 
     stages = [s.name for s in pipeline_config.parsed_stages]
     if not stages:
         raise ValueError("Pipeline configuration must specify at least one stage.")
+
+    if pipeline_config.additional_params is None or "output_dir" not in pipeline_config.additional_params:
+        raise ValueError("Pipeline configuration or override must specify an 'output_dir'")
 
     log_dir = Path(pipeline_config.additional_params["output_dir"]) / ".logs"
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -322,8 +326,8 @@ def main(argv: list[str] | None = None) -> int:
                 stage_runners_cfg,
                 pipeline_config,
                 stage,
-                additional_args=args.overrides,
                 default_parallelization_cfg=default_parallelization_cfg,
+                do_profile=args.do_profile,
             )
             done_file.touch()
 

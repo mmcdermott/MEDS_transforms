@@ -220,19 +220,22 @@ class PipelineConfig:
     additional_params: dict[str, Any] | DictConfig = dataclasses.field(default_factory=dict)
 
     @classmethod
-    def from_arg(cls, arg: str | Path) -> PipelineConfig:
+    def from_arg(cls, arg: str | Path, cfg_overrides: list[str] | None = None) -> PipelineConfig:
         """Construct a pipeline configuration object from a specified pipeline YAML file.
 
         Args:
             arg: The path to the pipeline YAML file on disk or in the
                 'pkg://<pkg_name>.<relative_path>' format. It can also be the sentinel `__null__` string,
                 which will return an empty PipelineConfig object.
+            cfg_overrides: A list of configuration overrides to apply to the pipeline configuration, in
+                dotlist format (e.g., `["key=value", "key2.subkey=value2"]`).
 
         Returns:
             A PipelineConfig object corresponding to the specified pipeline YAML file. Note that this object
             will not exactly match the passed file; rather, the stages and stage configurations will be pulled
             out separately and stored as direct attributes, and the rest of the parameters will be stored in
-            the `additional_params` attribute.
+            the `additional_params` attribute. Any configuration overrides will be applied to the additional
+            params attribute.
 
         Raises:
             TypeError: If the pipeline YAML path is not a string or Path object.
@@ -246,6 +249,10 @@ class PipelineConfig:
             ...     OmegaConf.save({"stages": ["stage1", "stage2"], "foobar": 3}, pipeline_yaml.name)
             ...     PipelineConfig.from_arg(pipeline_yaml.name)
             PipelineConfig(stages=['stage1', 'stage2'], additional_params={'foobar': 3})
+            >>> with tempfile.NamedTemporaryFile(suffix=".yaml") as pipeline_yaml:
+            ...     OmegaConf.save({"stages": ["stage1", "stage2"], "foobar": 3}, pipeline_yaml.name)
+            ...     PipelineConfig.from_arg(pipeline_yaml.name, ["foobar=5", "qux.baz=[6]"])
+            PipelineConfig(stages=['stage1', 'stage2'], additional_params={'foobar': 5, 'qux': {'baz': [6]}})
 
             To show the package path resolution, we can use the `pkg://` format, but for this test, we need to
             mock the package structure with unittest.mock.patch:
@@ -307,7 +314,12 @@ class PipelineConfig:
         as_dict_config = OmegaConf.load(pipeline_fp)
 
         stages = as_dict_config.pop("stages", None)
-        return cls(stages=stages, additional_params=as_dict_config)
+        additional_params = as_dict_config
+
+        if cfg_overrides:
+            additional_params = OmegaConf.merge(additional_params, OmegaConf.from_dotlist(cfg_overrides))
+
+        return cls(stages=stages, additional_params=additional_params)
 
     def __post_init__(self):
         if self.stages is not None and not isinstance(self.stages, list | ListConfig):

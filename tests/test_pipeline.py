@@ -130,3 +130,76 @@ def test_pipeline_runner_with_done_file():
         assert pipeline_log.exists(), "Pipeline log file does not exist."
         assert pipeline_log.is_file(), "Pipeline log is not a file."
         assert want_txt in pipeline_log.read_text(), "Pipeline log does not contain expected text."
+
+
+PIPELINE_YAML_NO_OUTPUT = """
+input_dir: {input_dir}
+output_dir: ???
+
+description: "A test pipeline for the MEDS-transforms pipeline runner."
+
+stages:
+  - filter_subjects:
+      min_events_per_subject: 5
+  - add_time_derived_measurements:
+      age:
+        DOB_code: "DOB"
+        age_code: "AGE"
+        age_unit: "years"
+      time_of_day:
+        time_of_day_code: "TIME_OF_DAY"
+        endpoints: [6, 12, 18, 24]
+  - fit_outlier_detection:
+      _base_stage: "aggregate_code_metadata"
+      aggregations:
+        - "values/n_occurrences"
+        - "values/sum"
+        - "values/sum_sqd"
+  - occlude_outliers:
+      stddev_cutoff: 1
+  - fit_normalization:
+      _base_stage: "aggregate_code_metadata"
+      aggregations:
+        - "code/n_occurrences"
+        - "code/n_subjects"
+        - "values/n_occurrences"
+        - "values/sum"
+        - "values/sum_sqd"
+  - fit_vocabulary_indices
+  - normalization
+"""
+
+
+def test_additional_pipeline_args():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        root = Path(temp_dir)
+        input_dir = root / "input"
+        output_dir = root / "output"
+        log_dir = output_dir / ".logs"
+
+        global_done_file = log_dir / "_all_stages.done"
+        global_done_file.parent.mkdir(parents=True, exist_ok=True)
+        global_done_file.touch()
+
+        pipeline_config = PIPELINE_YAML_NO_OUTPUT.format(input_dir=input_dir)
+
+        pipeline_config_path = root / "pipeline_config.yaml"
+        with open(pipeline_config_path, "w") as f:
+            f.write(pipeline_config)
+
+        cmd = f"{RUNNER_SCRIPT} {pipeline_config_path!s} output_dir={output_dir!s}"
+
+        # Run the pipeline
+        out = subprocess.run(cmd, shell=True, check=False, capture_output=True)
+
+        stdout = out.stdout.decode("utf-8")
+        stderr = out.stderr.decode("utf-8")
+
+        assert out.returncode == 0, f"Error running pipeline:\n{stdout}\n{stderr}"
+
+        want_txt = "All stages are already complete. Exiting."
+
+        pipeline_log = log_dir / "pipeline.log"
+        assert pipeline_log.exists(), "Pipeline log file does not exist."
+        assert pipeline_log.is_file(), "Pipeline log is not a file."
+        assert want_txt in pipeline_log.read_text(), "Pipeline log does not contain expected text."
