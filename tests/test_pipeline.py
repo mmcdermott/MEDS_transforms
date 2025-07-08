@@ -13,6 +13,8 @@ The stage configuration arguments will be as given in the yaml block below:
 """
 
 import subprocess
+import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -91,3 +93,40 @@ def test_pipeline_help():
     help_text = out.stdout.decode("utf-8")
     assert "usage:" in help_text.lower()
     assert "pipeline_config_fp" in help_text
+
+
+def test_pipeline_runner_with_done_file():
+    """Test that the pipeline runner does nothing when a global done file is present at the start."""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        root = Path(temp_dir)
+        input_dir = root / "input"
+        output_dir = root / "output"
+        log_dir = output_dir / ".logs"
+
+        global_done_file = log_dir / "_all_stages.done"
+        global_done_file.parent.mkdir(parents=True, exist_ok=True)
+        global_done_file.touch()
+
+        pipeline_config = PIPELINE_YAML.format(input_dir=input_dir, output_dir=output_dir)
+
+        pipeline_config_path = root / "pipeline_config.yaml"
+        with open(pipeline_config_path, "w") as f:
+            f.write(pipeline_config)
+
+        # Run the pipeline
+        out = subprocess.run(
+            f"{RUNNER_SCRIPT} {pipeline_config_path!s}", shell=True, check=False, capture_output=True
+        )
+
+        stdout = out.stdout.decode("utf-8")
+        stderr = out.stderr.decode("utf-8")
+
+        assert out.returncode == 0, f"Error running pipeline:\n{stdout}\n{stderr}"
+
+        want_txt = "All stages are already complete. Exiting."
+
+        pipeline_log = log_dir / "pipeline.log"
+        assert pipeline_log.exists(), "Pipeline log file does not exist."
+        assert pipeline_log.is_file(), "Pipeline log is not a file."
+        assert want_txt in pipeline_log.read_text(), "Pipeline log does not contain expected text."

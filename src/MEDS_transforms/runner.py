@@ -296,6 +296,8 @@ def main(argv: list[str] | None = None) -> int:
     log_dir = Path(pipeline_config.additional_params["output_dir"]) / ".logs"
     log_dir.mkdir(parents=True, exist_ok=True)
 
+    logging.basicConfig(filename=(log_dir / "pipeline.log"), level=logging.INFO)
+
     global_done_file = log_dir / "_all_stages.done"
     if global_done_file.exists():
         logger.info("All stages are already complete. Exiting.")
