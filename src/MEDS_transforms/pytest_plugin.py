@@ -442,7 +442,7 @@ def pipeline_tester(
         if stage_runner_yaml is not None:
             stage_runner_fp = test_root / "stage_runner.yaml"
             stage_runner_fp.write_text(stage_runner_yaml)
-            command.append(str(stage_runner_fp))
+            command.append(f"--stage_runner_fp={stage_runner_fp!s}")
 
         # 2. Run the pipeline
         out = run_fn(

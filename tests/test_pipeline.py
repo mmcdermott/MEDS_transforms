@@ -170,6 +170,32 @@ stages:
 """
 
 
+def test_errors_without_output_dir():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        root = Path(temp_dir)
+        input_dir = root / "input"
+
+        pipeline_config = PIPELINE_YAML_NO_OUTPUT.format(input_dir=input_dir)
+
+        pipeline_config_path = root / "pipeline_config.yaml"
+        with open(pipeline_config_path, "w") as f:
+            f.write(pipeline_config)
+
+        cmd = f"{RUNNER_SCRIPT} {pipeline_config_path!s}"
+
+        # Run the pipeline
+        out = subprocess.run(cmd, shell=True, check=False, capture_output=True)
+
+        stdout = out.stdout.decode("utf-8")
+        stderr = out.stderr.decode("utf-8")
+
+        assert out.returncode == 1, f"Pipeline should error but didn't!\n{stdout}\n{stderr}"
+
+        want_txt = "ValueError: Pipeline configuration or override must specify an 'output_dir'"
+
+        assert want_txt in stderr, "Pipeline did not error as expected with missing output_dir."
+
+
 def test_additional_pipeline_args():
     with tempfile.TemporaryDirectory() as temp_dir:
         root = Path(temp_dir)

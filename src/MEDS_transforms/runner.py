@@ -275,8 +275,16 @@ def main(argv: list[str] | None = None) -> int:
     """Run an entire pipeline based on command line arguments."""
 
     parser = argparse.ArgumentParser(description="MEDS-Transforms Pipeline Runner")
-    parser.add_argument("pipeline_config_fp")
-    parser.add_argument("stage_runner_fp", nargs="?", default=None)
+    parser.add_argument(
+        "pipeline_config_fp",
+        help="Path to the pipeline configuration file, either as a raw path or with pkg:// syntax.",
+    )
+    parser.add_argument(
+        "--stage_runner_fp",
+        type=str,
+        default=None,
+        help="Path to the stage runner configuration file. If not provided, no specialized runner is used.",
+    )
     parser.add_argument(
         "--do_profile",
         default=False,
