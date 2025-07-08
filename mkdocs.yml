@@ -5,6 +5,7 @@ site_author: Matthew McDermott
 
 nav:
   - Home: index.md
+  - Stages: stages/
   - API: api/
   - Issues: https://github.com/mmcdermott/MEDS_transforms/issues
 
@@ -35,6 +36,7 @@ plugins:
   - gen-files:
       scripts:
         - docs/gen_ref_pages.py
+        - docs/gen_stage_docs.py
   - literate-nav:
       nav_file: SUMMARY.md
   - section-index

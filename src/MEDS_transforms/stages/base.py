@@ -582,6 +582,7 @@ class Stage:
             self.is_metadata = is_metadata
 
         self.__infer_stage_dir(_calling_file)
+        self._calling_file = _calling_file
 
         self.examples_dir = examples_dir
         self.default_config = default_config
@@ -634,6 +635,12 @@ class Stage:
             return
 
         self.__stage_dir = possible_stage_dir
+
+    @property
+    def stage_dir(self) -> Path | None:
+        """Directory containing this stage's files, if known."""
+
+        return self.__stage_dir
 
     @property
     def examples_dir(self) -> Path | None:

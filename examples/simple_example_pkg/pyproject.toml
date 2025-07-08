@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "simple-example-pkg"
+version = "0.0.0"
+requires-python = ">=3.11"
+dependencies = ["MEDS-transforms"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["simple_example_pkg*"]
+
+[tool.setuptools.package-data]
+"simple_example_pkg" = ["**/*.yaml"]
+
+[project.entry-points."MEDS_transforms.stages"]
+identity_stage = "simple_example_pkg.stages.identity_stage.identity_stage:identity_stage"
