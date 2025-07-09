@@ -5,7 +5,7 @@ custom stages and uses built-in stages to run a larger pipeline. This example is
 files:
 
 ```python
->>> print_directory("examples", PrintConfig(ignore_regex=r"__pycache__|.egg-info"))
+>>> print_directory("example", PrintConfig(ignore_regex=r"__pycache__|.egg-info"))
 ├── README.md
 ├── data
 │   ├── data
