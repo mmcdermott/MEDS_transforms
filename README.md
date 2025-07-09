@@ -300,7 +300,14 @@ The package registers an `identity_stage` via an entry point and ships a simple
 locally you can run the pipeline with
 
 ```bash
-MEDS_transform-pipeline pipeline_fp="pkg://simple_example_pkg.pipelines/identity_pipeline.yaml"
+MEDS_transform-pipeline "pkg://simple_example_pkg.pipelines/identity_pipeline.yaml"
+```
+
+You can also provide a stage runner configuration to configure options like parallelization as well as
+pipeline specific overrides via this syntax (e.g., the output and input directories); for example:
+
+```bash
+MEDS_transform-pipeline "...pipeline.yaml" --stage_runner_fp "stage_runner.yaml" --overrides "input_dir=foo"
 ```
 
 See `tests/test_example_pkg.py` for an automated demonstration of this setup.

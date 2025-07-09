@@ -292,7 +292,9 @@ def main(argv: list[str] | None = None) -> int:
         action=argparse.BooleanOptionalAction,
         help="Enable Hydra profiling for the stages.",
     )
-    parser.add_argument("overrides", nargs=argparse.REMAINDER)
+    parser.add_argument(
+        "--overrides", nargs="*", default=[], help="Additional overrides for the pipeline configuration."
+    )
     args = parser.parse_args(argv)
 
     pipeline_config = PipelineConfig.from_arg(args.pipeline_config_fp, args.overrides)

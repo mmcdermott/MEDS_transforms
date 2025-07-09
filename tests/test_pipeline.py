@@ -267,7 +267,7 @@ def test_additional_pipeline_args():
         with open(pipeline_config_path, "w") as f:
             f.write(pipeline_config)
 
-        cmd = f"{RUNNER_SCRIPT} {pipeline_config_path!s} output_dir={output_dir!s}"
+        cmd = f"{RUNNER_SCRIPT} {pipeline_config_path!s} --overrides output_dir={output_dir!s}"
 
         # Run the pipeline
         out = subprocess.run(cmd, shell=True, check=False, capture_output=True)
