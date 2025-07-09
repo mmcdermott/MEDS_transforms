@@ -9,4 +9,4 @@ stages:
   - count_codes:
       _base_stage: "aggregate_code_metadata"
       aggregations:
-        - "codes/n_occurrences"
+        - "code/n_occurrences"

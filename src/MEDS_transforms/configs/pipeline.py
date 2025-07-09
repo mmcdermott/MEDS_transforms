@@ -353,22 +353,13 @@ class PipelineConfig:
         `PipelineConfig.from_arg`, it would match the original `PipelineConfig` object.
         """
 
-        merged = {}
+        merged = DictConfig({})
         if self.stages is not None:
             merged["stages"] = self.stages
         if self.additional_params:
-            try:
-                merged.update(self.additional_params)
-            except Exception as e:
-                raise ValueError(
-                    f"Failed to merge additional parameters into the pipeline configuration: {e}\n"
-                    "Merged:\n"
-                    f"{merged}\n"
-                    "Additional parameters:\n"
-                    f"{self.additional_params}\n"
-                ) from e
+            merged = OmegaConf.unsafe_merge(merged, self.additional_params)
 
-        return OmegaConf.create(merged)
+        return merged
 
     @property
     def parsed_stages(self) -> list[StageConfig]:
