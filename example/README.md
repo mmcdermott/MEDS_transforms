@@ -1,5 +1,9 @@
 # Simple MEDS-Transform Example Package
 
+> [!NOTE]
+> Note that the code blocks provided here will act as though they are run from the \_repository root
+> directory\_ (i.e., one directory above this one).
+
 In this directory, we show an example of using MEDS-Transform with an external package which defines both
 custom stages and uses built-in stages to run a larger pipeline. This example is split between the following
 files:
