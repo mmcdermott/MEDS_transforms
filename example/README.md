@@ -26,19 +26,18 @@ files:
 │   │   └── subject_splits.parquet
 │   └── source.yaml
 └── simple_example_pkg
+    ├── README.md
     ├── pyproject.toml
     └── src
         └── simple_example_pkg
             ├── __init__.py
-            ├── pipelines
-            │   └── identity_pipeline.yaml
-            └── stages
-                ├── __init__.py
-                └── identity_stage
-                    ├── __init__.py
-                    ├── examples
-                    │   └── out_data.yaml
-                    └── identity_stage.py
+            ├── drop_regex
+            │   ├── __init__.py
+            │   ├── drop_regex.py
+            │   └── examples
+            │       └── out_data.yaml
+            └── pipelines
+                └── example_pipeline.yaml
 
 ```
 
