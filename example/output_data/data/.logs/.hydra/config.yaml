@@ -1,0 +1,39 @@
+dataset:
+  root_dir: ???
+  name: ${oc:get_dataset_name_from_root:root_dir}
+  version: ${oc:get_dataset_version_from_root:root_dir}
+  code_modifiers: []
+input_dir: data
+output_dir: output_data
+_default_description: 'This is a MEDS pipeline ETL. Please set a more detailed description
+  at the top of your specific pipeline
+
+  configuration file.'
+log_dir: ${stage_cfg.output_dir}/.logs
+do_overwrite: false
+seed: 1
+worker: 0
+polling_time: 300
+stages:
+- drop_regex:
+    regex: ^H.*
+- count_codes:
+    _base_stage: aggregate_code_metadata
+    aggregations:
+    - code/n_occurrences
+stage: drop_regex
+etl_metadata:
+  pipeline_name: MEDS-Transforms Pipeline
+  dataset_name: ${dataset.name}
+  dataset_version: ${dataset.version}
+  package_name: ${get_package_name:}
+  package_version: ${get_package_version:}
+code_modifiers: null
+description: An example pipeline using a custom stage from a downstream package.
+stage_cfg:
+  regex: ^H.*
+  data_input_dir: ${input_dir}/data
+  metadata_input_dir: ${input_dir}/metadata
+  reducer_output_dir: null
+  train_only: false
+  output_dir: ${output_dir}/data

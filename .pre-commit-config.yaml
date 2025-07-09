@@ -1,7 +1,7 @@
 default_language_version:
   python: python3.12
 
-exclude: "docs/index.md|example/data/metadata|example/data/data"
+exclude: "docs/index.md|example/data/metadata|example/data/data|example/output_data"
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks

@@ -160,4 +160,21 @@ metadata/codes.parquet: |-
 
 ## Simple Example Package
 
-TODO
+To test the simple example package, we can pip install it, then run its tests and/or run a pipeline using it.
+
+```bash
+cd example/simple_example_pkg
+pip install --quiet -e .[tests]
+```
+
+To run tests: `pytest`.
+
+To run an example pipeline using the sample data:
+
+```bash
+cd ..
+MEDS_transform-pipeline pkg://simple_example_pkg.pipelines.example_pipeline.yaml --overrides \
+input_dir=data output_dir=output_data
+```
+
+The pipeline will then run and produce data identical to the data currently in the `output_data` folder.
