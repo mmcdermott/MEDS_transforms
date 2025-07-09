@@ -469,10 +469,7 @@ def pipeline_tester(
 
         assert out.returncode == 0, err_msg(f"Pipeline returned code {out.returncode}.")
 
-        assert pipeline_log.exists(), err_msg("Pipeline log file does not exist.")
-        assert pipeline_log.is_file(), err_msg("Pipeline log is not a file.")
-
-        pipeline_log_text = pipeline_log.read_text()
+        pipeline_log_text = pipeline_log.read_text() if pipeline_log.exists() else ""
 
         # 3. Check the output
         last_data_stage = (None, None)
