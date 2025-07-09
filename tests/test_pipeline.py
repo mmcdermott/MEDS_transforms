@@ -20,8 +20,6 @@ import pytest
 
 from MEDS_transforms.pytest_plugin import pipeline_tester
 
-RUNNER_SCRIPT = "MEDS_transform-pipeline"
-
 PIPELINE_YAML = """
 input_dir: {input_dir}
 output_dir: {output_dir}
@@ -143,7 +141,7 @@ def test_example_pipeline_parallel_pipeline_cfg():
 
 
 def test_pipeline_help():
-    out = subprocess.run(f"{RUNNER_SCRIPT} -h", shell=True, check=True, capture_output=True)
+    out = subprocess.run("MEDS_transform-pipeline -h", shell=True, check=True, capture_output=True)
     help_text = out.stdout.decode("utf-8")
     assert "usage:" in help_text.lower()
     assert "pipeline_config_fp" in help_text
@@ -170,7 +168,7 @@ def test_pipeline_runner_with_done_file():
 
         # Run the pipeline
         out = subprocess.run(
-            f"{RUNNER_SCRIPT} {pipeline_config_path!s}", shell=True, check=False, capture_output=True
+            f"MEDS_transform-pipeline {pipeline_config_path!s}", shell=True, check=False, capture_output=True
         )
 
         stdout = out.stdout.decode("utf-8")
@@ -235,7 +233,7 @@ def test_errors_without_output_dir():
         with open(pipeline_config_path, "w") as f:
             f.write(pipeline_config)
 
-        cmd = f"{RUNNER_SCRIPT} {pipeline_config_path!s}"
+        cmd = f"MEDS_transform-pipeline {pipeline_config_path!s}"
 
         # Run the pipeline
         out = subprocess.run(cmd, shell=True, check=False, capture_output=True)
@@ -267,7 +265,7 @@ def test_additional_pipeline_args():
         with open(pipeline_config_path, "w") as f:
             f.write(pipeline_config)
 
-        cmd = f"{RUNNER_SCRIPT} {pipeline_config_path!s} --overrides output_dir={output_dir!s}"
+        cmd = f"MEDS_transform-pipeline {pipeline_config_path!s} --overrides output_dir={output_dir!s}"
 
         # Run the pipeline
         out = subprocess.run(cmd, shell=True, check=False, capture_output=True)

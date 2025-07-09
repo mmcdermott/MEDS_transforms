@@ -115,6 +115,7 @@ def run_stage(
     stage_runners_cfg: dict | DictConfig,
     pipeline_cfg: PipelineConfig,
     stage_name: str,
+    cfg_overrides: list[str] | None = None,
     default_parallelization_cfg: dict | DictConfig | None = None,
     do_profile: bool = False,
     runner_fn: callable = subprocess.run,  # For dependency injection
@@ -243,6 +244,9 @@ def run_stage(
         f"stage={stage_name}",
     ]
 
+    if cfg_overrides:
+        command_parts.extend(cfg_overrides)
+
     parallelization_args = get_parallelization_args(
         stage_runner_config.get("parallelize", {}), default_parallelization_cfg
     )
@@ -343,6 +347,7 @@ def main(argv: list[str] | None = None) -> int:
                 stage_runners_cfg,
                 pipeline_config,
                 stage,
+                cfg_overrides=args.overrides,
                 default_parallelization_cfg=default_parallelization_cfg,
                 do_profile=args.do_profile,
             )

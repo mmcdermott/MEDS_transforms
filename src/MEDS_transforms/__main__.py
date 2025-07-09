@@ -49,10 +49,10 @@ def run_stage():
     pipeline_cfg = PipelineConfig.from_arg(sys.argv[1])
     stage_name = sys.argv[2]
 
+    sys.argv = sys.argv[2:]  # remove dispatcher arguments
+
     # Register the stage structured config and pipeline configuration
     stage = pipeline_cfg.register_for(stage_name)
-
-    sys.argv = sys.argv[2:]  # remove dispatcher arguments
 
     cs = ConfigStore.instance()
     cs.store(name="_main", node=OmegaConf.load(MAIN_CFG_PATH))

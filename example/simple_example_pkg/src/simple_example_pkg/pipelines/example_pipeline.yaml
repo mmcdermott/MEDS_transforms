@@ -1,9 +1,12 @@
-# prettier-ignore
-input_dir: {input_dir}
-# prettier-ignore
-output_dir: {output_dir}
+input_dir: ???
+output_dir: ???
 
 description: "An example pipeline using a custom stage from a downstream package."
 
 stages:
-  - identity_stage
+  - drop_regex:
+      regex: "^H.*"
+  - count_codes:
+      _base_stage: "aggregate_code_metadata"
+      aggregations:
+        - "codes/n_occurrences"

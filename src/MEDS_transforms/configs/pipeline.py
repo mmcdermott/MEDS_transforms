@@ -357,7 +357,17 @@ class PipelineConfig:
         if self.stages is not None:
             merged["stages"] = self.stages
         if self.additional_params:
-            merged.update(self.additional_params)
+            try:
+                merged.update(self.additional_params)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to merge additional parameters into the pipeline configuration: {e}\n"
+                    "Merged:\n"
+                    f"{merged}\n"
+                    "Additional parameters:\n"
+                    f"{self.additional_params}\n"
+                ) from e
+
         return OmegaConf.create(merged)
 
     @property

@@ -9,7 +9,7 @@ custom stages and uses built-in stages to run a larger pipeline. This example is
 files:
 
 ```python
->>> print_directory("example", PrintConfig(ignore_regex=r"__pycache__|.egg-info"))
+>>> print_directory("example", PrintConfig(ignore_regex=r"__pycache__|.egg-info|.pytest_cache"))
 ├── README.md
 ├── data
 │   ├── data
@@ -28,16 +28,21 @@ files:
 └── simple_example_pkg
     ├── README.md
     ├── pyproject.toml
-    └── src
-        └── simple_example_pkg
-            ├── __init__.py
-            ├── drop_regex
-            │   ├── __init__.py
-            │   ├── drop_regex.py
-            │   └── examples
-            │       └── out_data.yaml
-            └── pipelines
-                └── example_pipeline.yaml
+    ├── src
+    │   └── simple_example_pkg
+    │       ├── __init__.py
+    │       ├── drop_regex
+    │       │   ├── __init__.py
+    │       │   ├── config.yaml
+    │       │   ├── drop_regex.py
+    │       │   └── examples
+    │       │       ├── _test_cfg.yaml
+    │       │       ├── cfg.yaml
+    │       │       └── out_data.yaml
+    │       └── pipelines
+    │           └── example_pipeline.yaml
+    └── tests
+        └── test_registered_stages.py
 
 ```
 

@@ -70,6 +70,7 @@ addopts = [
   "--color=yes",
   "--doctest-modules",
   "--ignore=docs",
+  "--ignore=example/simple_example_pkg/tests",
   "--doctest-glob=*.md",
 ]
 python_classes = "!TestEnv"
