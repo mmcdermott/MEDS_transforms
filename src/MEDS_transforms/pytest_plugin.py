@@ -333,7 +333,7 @@ def pipeline_tester(
     stage_runner_yaml: str | None,
     stage_scenario_sequence: list[str],
     run_fn: Callable | None = subprocess.run,
-):
+) -> str:
     """Test the pipeline with the given YAML configuration and stage scenario sequence.
 
     Args:
@@ -353,6 +353,9 @@ def pipeline_tester(
     Raises:
         ValueError: If the pipeline YAML and stage scenario sequence do not match in length.
         AssertionError: If the pipeline fails to produce expected output for any stage.
+
+    Returns:
+        The main pipeline log text, which allows for global log checks in the pipeline.
 
     Examples:
         >>> pipeline_yaml = "stages: ['foo', 'bar']"
@@ -442,7 +445,7 @@ def pipeline_tester(
         if stage_runner_yaml is not None:
             stage_runner_fp = test_root / "stage_runner.yaml"
             stage_runner_fp.write_text(stage_runner_yaml)
-            command.append(f"--stage_runner_fp={stage_runner_fp!s}")
+            command.append(f"--stage_runner_fp {stage_runner_fp!s}")
 
         # 2. Run the pipeline
         out = run_fn(
@@ -450,6 +453,9 @@ def pipeline_tester(
             shell=False,
             capture_output=True,
         )
+
+        log_dir = output_dir / ".logs"
+        pipeline_log = log_dir / "pipeline.log"
 
         def err_msg(m: str) -> str:
             lines = [
@@ -462,6 +468,11 @@ def pipeline_tester(
             return "\n".join(lines)
 
         assert out.returncode == 0, err_msg(f"Pipeline returned code {out.returncode}.")
+
+        assert pipeline_log.exists(), err_msg("Pipeline log file does not exist.")
+        assert pipeline_log.is_file(), err_msg("Pipeline log is not a file.")
+
+        pipeline_log_text = pipeline_log.read_text()
 
         # 3. Check the output
         last_data_stage = (None, None)
@@ -495,3 +506,5 @@ def pipeline_tester(
                         stage.check_outputs(stage_output_dir, is_resolved_dir=True)
             except AssertionError as e:
                 raise AssertionError(f"Pipeline failed to produce expected output for stage '{name}'") from e
+
+    return pipeline_log_text

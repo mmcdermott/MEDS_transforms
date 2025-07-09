@@ -296,12 +296,6 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     pipeline_config = PipelineConfig.from_arg(args.pipeline_config_fp, args.overrides)
-    stage_runners_cfg = load_yaml_file(args.stage_runner_fp)
-
-    stages = [s.name for s in pipeline_config.parsed_stages]
-    if not stages:
-        raise ValueError("Pipeline configuration must specify at least one stage.")
-
     if pipeline_config.additional_params is None or "output_dir" not in pipeline_config.additional_params:
         raise ValueError("Pipeline configuration or override must specify an 'output_dir'")
 
@@ -310,16 +304,29 @@ def main(argv: list[str] | None = None) -> int:
 
     logging.basicConfig(filename=(log_dir / "pipeline.log"), level=logging.INFO)
 
+    logging.info("Running MEDS-Transforms Pipeline Runner with the following arguments:")
+    for arg_name, arg_value in vars(args).items():
+        logging.info(f"  {arg_name}: {arg_value}")
+
     global_done_file = log_dir / "_all_stages.done"
     if global_done_file.exists():
         logger.info("All stages are already complete. Exiting.")
         return 0
 
+    stages = [s.name for s in pipeline_config.parsed_stages]
+    if not stages:
+        raise ValueError("Pipeline configuration must specify at least one stage.")
+
+    stage_runners_cfg = load_yaml_file(args.stage_runner_fp)
+
     if "parallelize" in stage_runners_cfg:
+        logger.info("Parallelization configuration loaded from stage runner")
         default_parallelization_cfg = stage_runners_cfg["parallelize"]
     elif "parallelize" in pipeline_config.additional_params:
+        logger.info("Parallelization configuration loaded from pipeline config")
         default_parallelization_cfg = pipeline_config.additional_params["parallelize"]
     else:
+        logger.info("No parallelization configuration provided.")
         default_parallelization_cfg = None
 
     for stage in stages:

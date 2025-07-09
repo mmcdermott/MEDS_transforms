@@ -85,7 +85,11 @@ def test_example_pipeline():
 
 @pytest.mark.parallelized
 def test_example_pipeline_parallel_stage_runner():
-    pipeline_tester(PIPELINE_YAML, PARALLEL_STAGE_RUNNER_YAML, STAGE_SCENARIO_SEQUENCE)
+    log_out = pipeline_tester(PIPELINE_YAML, PARALLEL_STAGE_RUNNER_YAML, STAGE_SCENARIO_SEQUENCE)
+
+    assert "Parallelization configuration loaded from stage runner" in log_out, (
+        f"Expected parallelization message not found in log output:\n{log_out}"
+    )
 
 
 PIPELINE_YAML_PARALLEL = """
@@ -132,7 +136,10 @@ parallelize:
 
 @pytest.mark.parallelized
 def test_example_pipeline_parallel_pipeline_cfg():
-    pipeline_tester(PIPELINE_YAML_PARALLEL, None, STAGE_SCENARIO_SEQUENCE)
+    log_out = pipeline_tester(PIPELINE_YAML_PARALLEL, None, STAGE_SCENARIO_SEQUENCE)
+    assert "Parallelization configuration loaded from pipeline config" in log_out, (
+        f"Expected parallelization message not found in log output:\n{log_out}"
+    )
 
 
 def test_pipeline_help():
