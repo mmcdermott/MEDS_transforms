@@ -1,9 +1,0 @@
-# prettier-ignore
-input_dir: {input_dir}
-# prettier-ignore
-output_dir: {output_dir}
-
-description: "An example pipeline using a custom stage from a downstream package."
-
-stages:
-  - identity_stage

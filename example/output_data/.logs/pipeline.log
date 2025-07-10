@@ -1,0 +1,57 @@
+INFO:root:Running MEDS-Transforms Pipeline Runner with the following arguments:
+INFO:root:  pipeline_config_fp: pkg://simple_example_pkg.pipelines.example_pipeline.yaml
+INFO:root:  stage_runner_fp: None
+INFO:root:  do_profile: False
+INFO:root:  overrides: ['input_dir=data', 'output_dir=output_data']
+INFO:MEDS_transforms.runner:No parallelization configuration provided.
+INFO:MEDS_transforms.runner:Running stage: drop_regex
+INFO:MEDS_transforms.runner:Running command: MEDS_transform-stage pkg://simple_example_pkg.pipelines.example_pipeline.yaml drop_regex stage=drop_regex input_dir=data output_dir=output_data
+INFO:MEDS_transforms.runner:Command output:
+[2025-07-09 15:52:40,455][MEDS_transforms.mapreduce.shard_iteration][INFO] - Mapping computation over a maximum of 4 shards
+[2025-07-09 15:52:40,456][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/data/data/held_out/0.parquet into /home/mmd/Projects/MEDS_transforms/example/output_data/data/held_out/0.parquet
+[2025-07-09 15:52:40,456][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from data/data/held_out/0.parquet
+[2025-07-09 15:52:40,457][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2025-07-09 15:52:40,457][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to output_data/data/held_out/0.parquet
+[2025-07-09 15:52:40,463][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.006910
+[2025-07-09 15:52:40,463][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/data/data/tuning/0.parquet into /home/mmd/Projects/MEDS_transforms/example/output_data/data/tuning/0.parquet
+[2025-07-09 15:52:40,464][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from data/data/tuning/0.parquet
+[2025-07-09 15:52:40,464][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2025-07-09 15:52:40,464][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to output_data/data/tuning/0.parquet
+[2025-07-09 15:52:40,467][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.003126
+[2025-07-09 15:52:40,467][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/data/data/train/1.parquet into /home/mmd/Projects/MEDS_transforms/example/output_data/data/train/1.parquet
+[2025-07-09 15:52:40,467][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from data/data/train/1.parquet
+[2025-07-09 15:52:40,468][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2025-07-09 15:52:40,468][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to output_data/data/train/1.parquet
+[2025-07-09 15:52:40,470][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.003025
+[2025-07-09 15:52:40,471][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/data/data/train/0.parquet into /home/mmd/Projects/MEDS_transforms/example/output_data/data/train/0.parquet
+[2025-07-09 15:52:40,471][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from data/data/train/0.parquet
+[2025-07-09 15:52:40,472][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2025-07-09 15:52:40,472][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to output_data/data/train/0.parquet
+[2025-07-09 15:52:40,474][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.002805
+[2025-07-09 15:52:40,474][MEDS_transforms.mapreduce.stage][INFO] - Finished mapping in 0:00:00.021359
+
+INFO:MEDS_transforms.runner:Command error:
+
+INFO:MEDS_transforms.runner:Running stage: count_codes
+INFO:MEDS_transforms.runner:Running command: MEDS_transform-stage pkg://simple_example_pkg.pipelines.example_pipeline.yaml count_codes stage=count_codes input_dir=data output_dir=output_data
+INFO:MEDS_transforms.runner:Command output:
+[2025-07-09 15:52:41,171][MEDS_transforms.mapreduce.shard_iteration][INFO] - Mapping computation over a maximum of 2 shards
+[2025-07-09 15:52:41,171][MEDS_transforms.mapreduce.stage][INFO] - Processing train split only via shard prefix. Not filtering with /home/mmd/Projects/MEDS_transforms/example/data/metadata/subject_splits.parquet.
+[2025-07-09 15:52:41,172][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/output_data/data/train/1.parquet into /home/mmd/Projects/MEDS_transforms/example/output_data/count_codes/train/1.parquet
+[2025-07-09 15:52:41,172][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from output_data/data/train/1.parquet
+[2025-07-09 15:52:41,173][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2025-07-09 15:52:41,173][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to output_data/count_codes/train/1.parquet
+[2025-07-09 15:52:41,177][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.004850
+[2025-07-09 15:52:41,177][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/output_data/data/train/0.parquet into /home/mmd/Projects/MEDS_transforms/example/output_data/count_codes/train/0.parquet
+[2025-07-09 15:52:41,178][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from output_data/data/train/0.parquet
+[2025-07-09 15:52:41,178][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2025-07-09 15:52:41,178][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to output_data/count_codes/train/0.parquet
+[2025-07-09 15:52:41,180][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.001868
+[2025-07-09 15:52:41,180][MEDS_transforms.mapreduce.stage][INFO] - Finished mapping in 0:00:00.009469
+[2025-07-09 15:52:41,180][MEDS_transforms.mapreduce.stage][INFO] - Starting reduction process
+[2025-07-09 15:52:41,185][MEDS_transforms.mapreduce.stage][INFO] - Finished reduction in 0:00:00.004756
+
+INFO:MEDS_transforms.runner:Command error:
+/home/mmd/Projects/MEDS_transforms/src/MEDS_transforms/stages/aggregate_code_metadata/aggregate_code_metadata.py:772: PerformanceWarning: Determining the column names of a LazyFrame requires resolving its schema, which is a potentially expensive operation. Use `LazyFrame.collect_schema().names()` to get the column names without this warning.
+  if agg not in df.columns:
+

@@ -8,6 +8,9 @@ version = "0.0.0"
 requires-python = ">=3.11"
 dependencies = ["MEDS-transforms"]
 
+[project.optional-dependencies]
+tests = ["pytest", "pytest-cov"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["simple_example_pkg*"]
@@ -16,4 +19,12 @@ include = ["simple_example_pkg*"]
 "simple_example_pkg" = ["**/*.yaml"]
 
 [project.entry-points."MEDS_transforms.stages"]
-identity_stage = "simple_example_pkg.stages.identity_stage.identity_stage:identity_stage"
+drop_regex = "simple_example_pkg.drop_regex.drop_regex:drop_regex"
+
+[tool.pytest.ini_options] # Section (not contents) necessary for pytest to know which package we're testing.
+addopts = [
+  "--color=yes",
+  "--doctest-modules",
+  "--doctest-glob=*.md",
+]
+doctest_optionflags = ["NORMALIZE_WHITESPACE", "ELLIPSIS"]

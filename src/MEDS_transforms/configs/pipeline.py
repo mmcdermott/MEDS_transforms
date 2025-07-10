@@ -353,12 +353,13 @@ class PipelineConfig:
         `PipelineConfig.from_arg`, it would match the original `PipelineConfig` object.
         """
 
-        merged = {}
+        merged = DictConfig({})
         if self.stages is not None:
             merged["stages"] = self.stages
         if self.additional_params:
-            merged.update(self.additional_params)
-        return OmegaConf.create(merged)
+            merged = OmegaConf.unsafe_merge(merged, self.additional_params)
+
+        return merged
 
     @property
     def parsed_stages(self) -> list[StageConfig]:
