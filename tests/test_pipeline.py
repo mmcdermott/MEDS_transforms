@@ -20,8 +20,6 @@ import pytest
 
 from MEDS_transforms.pytest_plugin import pipeline_tester
 
-RUNNER_SCRIPT = "MEDS_transform-pipeline"
-
 PIPELINE_YAML = """
 input_dir: {input_dir}
 output_dir: {output_dir}
@@ -84,48 +82,202 @@ def test_example_pipeline():
 
 
 @pytest.mark.parallelized
-def test_example_pipeline_parallel():
-    pipeline_tester(PIPELINE_YAML, PARALLEL_STAGE_RUNNER_YAML, STAGE_SCENARIO_SEQUENCE)
+def test_example_pipeline_parallel_stage_runner():
+    log_out = pipeline_tester(PIPELINE_YAML, PARALLEL_STAGE_RUNNER_YAML, STAGE_SCENARIO_SEQUENCE)
+
+    assert "Parallelization configuration loaded from stage runner" in log_out, (
+        f"Expected parallelization message not found in log output:\n{log_out}"
+    )
 
 
-NO_ARGS_HELP_STR = """
-== MEDS-Transforms Pipeline Runner ==
-MEDS-Transforms Pipeline Runner is a command line tool for running entire MEDS-transform pipelines in a single
-command.
+PIPELINE_YAML_PARALLEL = """
+input_dir: {input_dir}
+output_dir: {output_dir}
 
-**MEDS-transforms Pipeline description:**
+description: "A test pipeline for the MEDS-transforms pipeline runner."
 
-No description provided.
+stages:
+  - filter_subjects:
+      min_events_per_subject: 5
+  - add_time_derived_measurements:
+      age:
+        DOB_code: "DOB"
+        age_code: "AGE"
+        age_unit: "years"
+      time_of_day:
+        time_of_day_code: "TIME_OF_DAY"
+        endpoints: [6, 12, 18, 24]
+  - fit_outlier_detection:
+      _base_stage: "aggregate_code_metadata"
+      aggregations:
+        - "values/n_occurrences"
+        - "values/sum"
+        - "values/sum_sqd"
+  - occlude_outliers:
+      stddev_cutoff: 1
+  - fit_normalization:
+      _base_stage: "aggregate_code_metadata"
+      aggregations:
+        - "code/n_occurrences"
+        - "code/n_subjects"
+        - "values/n_occurrences"
+        - "values/sum"
+        - "values/sum_sqd"
+  - fit_vocabulary_indices
+  - normalization
+
+parallelize:
+  n_workers: 2
+  launcher: "joblib"
 """
 
-WITH_CONFIG_HELP_STR = """
-== MEDS-Transforms Pipeline Runner ==
-MEDS-Transforms Pipeline Runner is a command line tool for running entire MEDS-transform pipelines in a single
-command.
 
-**MEDS-transforms Pipeline description:**
-
-A test pipeline for the MEDS-transforms pipeline runner.
-"""
+@pytest.mark.parallelized
+def test_example_pipeline_parallel_pipeline_cfg():
+    log_out = pipeline_tester(PIPELINE_YAML_PARALLEL, None, STAGE_SCENARIO_SEQUENCE)
+    assert "Parallelization configuration loaded from pipeline config" in log_out, (
+        f"Expected parallelization message not found in log output:\n{log_out}"
+    )
 
 
 def test_pipeline_help():
-    out = subprocess.run(f"{RUNNER_SCRIPT} -h", shell=True, check=True, capture_output=True)
-    assert NO_ARGS_HELP_STR.strip() == out.stdout.decode("utf-8").strip()
+    out = subprocess.run("MEDS_transform-pipeline -h", shell=True, check=True, capture_output=True)
+    help_text = out.stdout.decode("utf-8")
+    assert "usage:" in help_text.lower()
+    assert "pipeline_config_fp" in help_text
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        input_dir = Path(tmpdir) / "input"
-        output_dir = Path(tmpdir) / "output"
 
-        pipeline_str = PIPELINE_YAML.format(input_dir=input_dir, output_dir=output_dir)
+def test_pipeline_runner_with_done_file():
+    """Test that the pipeline runner does nothing when a global done file is present at the start."""
 
-        pipeline_fp = Path(tmpdir) / "pipeline.yaml"
-        pipeline_fp.write_text(pipeline_str)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        root = Path(temp_dir)
+        input_dir = root / "input"
+        output_dir = root / "output"
+        log_dir = output_dir / ".logs"
 
+        global_done_file = log_dir / "_all_stages.done"
+        global_done_file.parent.mkdir(parents=True, exist_ok=True)
+        global_done_file.touch()
+
+        pipeline_config = PIPELINE_YAML.format(input_dir=input_dir, output_dir=output_dir)
+
+        pipeline_config_path = root / "pipeline_config.yaml"
+        with open(pipeline_config_path, "w") as f:
+            f.write(pipeline_config)
+
+        # Run the pipeline
         out = subprocess.run(
-            f"{RUNNER_SCRIPT} -h pipeline_config_fp={pipeline_fp}",
-            shell=True,
-            check=True,
-            capture_output=True,
+            f"MEDS_transform-pipeline {pipeline_config_path!s}", shell=True, check=False, capture_output=True
         )
-        assert WITH_CONFIG_HELP_STR.strip() == out.stdout.decode("utf-8").strip()
+
+        stdout = out.stdout.decode("utf-8")
+        stderr = out.stderr.decode("utf-8")
+
+        assert out.returncode == 0, f"Error running pipeline:\n{stdout}\n{stderr}"
+
+        want_txt = "All stages are already complete. Exiting."
+
+        pipeline_log = log_dir / "pipeline.log"
+        assert pipeline_log.exists(), "Pipeline log file does not exist."
+        assert pipeline_log.is_file(), "Pipeline log is not a file."
+        assert want_txt in pipeline_log.read_text(), "Pipeline log does not contain expected text."
+
+
+PIPELINE_YAML_NO_OUTPUT = """
+input_dir: {input_dir}
+output_dir: ???
+
+description: "A test pipeline for the MEDS-transforms pipeline runner."
+
+stages:
+  - filter_subjects:
+      min_events_per_subject: 5
+  - add_time_derived_measurements:
+      age:
+        DOB_code: "DOB"
+        age_code: "AGE"
+        age_unit: "years"
+      time_of_day:
+        time_of_day_code: "TIME_OF_DAY"
+        endpoints: [6, 12, 18, 24]
+  - fit_outlier_detection:
+      _base_stage: "aggregate_code_metadata"
+      aggregations:
+        - "values/n_occurrences"
+        - "values/sum"
+        - "values/sum_sqd"
+  - occlude_outliers:
+      stddev_cutoff: 1
+  - fit_normalization:
+      _base_stage: "aggregate_code_metadata"
+      aggregations:
+        - "code/n_occurrences"
+        - "code/n_subjects"
+        - "values/n_occurrences"
+        - "values/sum"
+        - "values/sum_sqd"
+  - fit_vocabulary_indices
+  - normalization
+"""
+
+
+def test_errors_without_output_dir():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        root = Path(temp_dir)
+        input_dir = root / "input"
+
+        pipeline_config = PIPELINE_YAML_NO_OUTPUT.format(input_dir=input_dir)
+
+        pipeline_config_path = root / "pipeline_config.yaml"
+        with open(pipeline_config_path, "w") as f:
+            f.write(pipeline_config)
+
+        cmd = f"MEDS_transform-pipeline {pipeline_config_path!s}"
+
+        # Run the pipeline
+        out = subprocess.run(cmd, shell=True, check=False, capture_output=True)
+
+        stdout = out.stdout.decode("utf-8")
+        stderr = out.stderr.decode("utf-8")
+
+        assert out.returncode == 1, f"Pipeline should error but didn't!\n{stdout}\n{stderr}"
+
+        want_txt = "ValueError: Pipeline configuration or override must specify an 'output_dir'"
+
+        assert want_txt in stderr, "Pipeline did not error as expected with missing output_dir."
+
+
+def test_additional_pipeline_args():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        root = Path(temp_dir)
+        input_dir = root / "input"
+        output_dir = root / "output"
+        log_dir = output_dir / ".logs"
+
+        global_done_file = log_dir / "_all_stages.done"
+        global_done_file.parent.mkdir(parents=True, exist_ok=True)
+        global_done_file.touch()
+
+        pipeline_config = PIPELINE_YAML_NO_OUTPUT.format(input_dir=input_dir)
+
+        pipeline_config_path = root / "pipeline_config.yaml"
+        with open(pipeline_config_path, "w") as f:
+            f.write(pipeline_config)
+
+        cmd = f"MEDS_transform-pipeline {pipeline_config_path!s} --overrides output_dir={output_dir!s}"
+
+        # Run the pipeline
+        out = subprocess.run(cmd, shell=True, check=False, capture_output=True)
+
+        stdout = out.stdout.decode("utf-8")
+        stderr = out.stderr.decode("utf-8")
+
+        assert out.returncode == 0, f"Error running pipeline:\n{stdout}\n{stderr}"
+
+        want_txt = "All stages are already complete. Exiting."
+
+        pipeline_log = log_dir / "pipeline.log"
+        assert pipeline_log.exists(), "Pipeline log file does not exist."
+        assert pipeline_log.is_file(), "Pipeline log is not a file."
+        assert want_txt in pipeline_log.read_text(), "Pipeline log does not contain expected text."

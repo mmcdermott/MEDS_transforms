@@ -1,0 +1,15 @@
+[2025-07-09 15:52:41,171][MEDS_transforms.mapreduce.shard_iteration][INFO] - Mapping computation over a maximum of 2 shards
+[2025-07-09 15:52:41,171][MEDS_transforms.mapreduce.stage][INFO] - Processing train split only via shard prefix. Not filtering with /home/mmd/Projects/MEDS_transforms/example/data/metadata/subject_splits.parquet.
+[2025-07-09 15:52:41,172][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/output_data/data/train/1.parquet into /home/mmd/Projects/MEDS_transforms/example/output_data/count_codes/train/1.parquet
+[2025-07-09 15:52:41,172][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from output_data/data/train/1.parquet
+[2025-07-09 15:52:41,173][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2025-07-09 15:52:41,173][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to output_data/count_codes/train/1.parquet
+[2025-07-09 15:52:41,177][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.004850
+[2025-07-09 15:52:41,177][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/output_data/data/train/0.parquet into /home/mmd/Projects/MEDS_transforms/example/output_data/count_codes/train/0.parquet
+[2025-07-09 15:52:41,178][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from output_data/data/train/0.parquet
+[2025-07-09 15:52:41,178][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2025-07-09 15:52:41,178][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to output_data/count_codes/train/0.parquet
+[2025-07-09 15:52:41,180][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.001868
+[2025-07-09 15:52:41,180][MEDS_transforms.mapreduce.stage][INFO] - Finished mapping in 0:00:00.009469
+[2025-07-09 15:52:41,180][MEDS_transforms.mapreduce.stage][INFO] - Starting reduction process
+[2025-07-09 15:52:41,185][MEDS_transforms.mapreduce.stage][INFO] - Finished reduction in 0:00:00.004756

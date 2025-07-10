@@ -1,0 +1,22 @@
+[2025-07-09 15:52:40,455][MEDS_transforms.mapreduce.shard_iteration][INFO] - Mapping computation over a maximum of 4 shards
+[2025-07-09 15:52:40,456][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/data/data/held_out/0.parquet into /home/mmd/Projects/MEDS_transforms/example/output_data/data/held_out/0.parquet
+[2025-07-09 15:52:40,456][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from data/data/held_out/0.parquet
+[2025-07-09 15:52:40,457][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2025-07-09 15:52:40,457][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to output_data/data/held_out/0.parquet
+[2025-07-09 15:52:40,463][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.006910
+[2025-07-09 15:52:40,463][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/data/data/tuning/0.parquet into /home/mmd/Projects/MEDS_transforms/example/output_data/data/tuning/0.parquet
+[2025-07-09 15:52:40,464][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from data/data/tuning/0.parquet
+[2025-07-09 15:52:40,464][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2025-07-09 15:52:40,464][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to output_data/data/tuning/0.parquet
+[2025-07-09 15:52:40,467][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.003126
+[2025-07-09 15:52:40,467][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/data/data/train/1.parquet into /home/mmd/Projects/MEDS_transforms/example/output_data/data/train/1.parquet
+[2025-07-09 15:52:40,467][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from data/data/train/1.parquet
+[2025-07-09 15:52:40,468][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2025-07-09 15:52:40,468][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to output_data/data/train/1.parquet
+[2025-07-09 15:52:40,470][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.003025
+[2025-07-09 15:52:40,471][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/data/data/train/0.parquet into /home/mmd/Projects/MEDS_transforms/example/output_data/data/train/0.parquet
+[2025-07-09 15:52:40,471][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from data/data/train/0.parquet
+[2025-07-09 15:52:40,472][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2025-07-09 15:52:40,472][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to output_data/data/train/0.parquet
+[2025-07-09 15:52:40,474][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.002805
+[2025-07-09 15:52:40,474][MEDS_transforms.mapreduce.stage][INFO] - Finished mapping in 0:00:00.021359

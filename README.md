@@ -90,11 +90,20 @@ Save your pipeline YAML file on disk at `$PIPELINE_YAML`.
 In the terminal, run
 
 ```bash
-MEDS_transform-pipeline pipeline_config_fp="$PIPELINE_YAML"
+MEDS_transform-pipeline "$PIPELINE_YAML"
 ```
 
-After you do, you will see output files stored in `$PIPELINE_OUTPUT` with the results of each stage of the
-pipeline, stored in stage specific directories, and the global output in `$PIPELINE_OUTPUT/data` and
+The runner creates a `.logs` folder inside the pipeline's `output_dir` and marks stages as complete by
+placing `<stage>.done` files in that folder. A `_all_stages.done` file is written when the entire pipeline
+finishes. Re-running the command will skip any stages that already have corresponding `.done` files.
+
+You can optionally supply a *stage runner* YAML as a second argument to control how each stage is launched
+(for example, providing parallelization options or custom stage scripts). Any additional arguments are
+forwarded to the stage invocations using Hydra override syntax, allowing you to tweak stage parameters on
+the command line.
+
+After running, you will see output files stored in `$PIPELINE_OUTPUT` with the results of each stage of the
+pipeline in stage-specific directories, and the global output in `$PIPELINE_OUTPUT/data` and
 `$PIPELINE_OUTPUT/metadata` (for data and metadata outputs, respectively). That's it!
 
 ### 4. Do even more!
@@ -265,7 +274,7 @@ them by using the `pkg://` syntax in specifying the pipeline configuration file 
 path on disk. For example:
 
 ```bash
-MEDS_transform-pipeline pipeline_fp="pkg://my_package.my_pipeline.yaml"
+MEDS_transform-pipeline pkg://my_package.my_pipeline.yaml
 ```
 
 #### Meta-stage functionality
@@ -291,7 +300,14 @@ The package registers an `identity_stage` via an entry point and ships a simple
 locally you can run the pipeline with
 
 ```bash
-MEDS_transform-pipeline pipeline_fp="pkg://simple_example_pkg.pipelines/identity_pipeline.yaml"
+MEDS_transform-pipeline "pkg://simple_example_pkg.pipelines/identity_pipeline.yaml"
+```
+
+You can also provide a stage runner configuration to configure options like parallelization as well as
+pipeline specific overrides via this syntax (e.g., the output and input directories); for example:
+
+```bash
+MEDS_transform-pipeline "...pipeline.yaml" --stage_runner_fp "stage_runner.yaml" --overrides "input_dir=foo"
 ```
 
 See `tests/test_example_pkg.py` for an automated demonstration of this setup.
@@ -314,3 +330,6 @@ considering. If you have an idea for a new feature, please open an issue to disc
 Contributions are very welcome; please follow the
 [MEDS Organization's Contribution
 Guide](https://github.com/Medical-Event-Data-Standard/.github/blob/main/CONTRIBUTING.md) if you submit a PR.
+
+Note that contributions undergo pre-commit checks (`pre-commit run --all`), tests (`pytest`), and
+documentation generation (check via `mkdocs serve`).
