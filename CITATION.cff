@@ -1,0 +1,49 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: MEDS-Transforms
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - family-names: McDermott
+    given-names: Matthew
+    email: mattmcdermott8@gmail.com
+    orcid: 'https://orcid.org/0000-0001-6048-9707'
+  - given-names: Pawel
+    family-names: Renc
+    orcid: 'https://orcid.org/0000-0002-0487-7454'
+  - given-names: Nassim
+    family-names: Oufattole
+    orcid: 'https://orcid.org/0009-0002-9559-6216'
+  - given-names: Robin
+    family-names: van de Water
+    orcid: 'https://orcid.org/0000-0002-2895-4872'
+  - given-names: Patrick
+    family-names: Rockenschaub
+    orcid: 'https://orcid.org/0000-0002-6499-7933'
+  - given-names: Ryan
+    family-names: King
+  - given-names: Simon
+    family-names: Lee
+    orcid: 'https://orcid.org/0000-0002-3324-9772'
+  - given-names: Chao
+    family-names: Pang
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.17535783
+repository-code: 'https://github.com/mmcdermott/MEDS_transforms'
+abstract: >-
+  MEDS-Transforms is a Python package for assembling complex
+  data pre-processing workflows over MEDS datasets. To do
+  this, you define a pipeline as a series of stages, each
+  with its own arguments, then run the pipeline over your
+  dataset. This allows the community to curate a library of
+  shared stages for common operations, such as filtering,
+  normalization, outlier detection, and more, which can be
+  used to build novel pipelines for diverse use cases. Learn
+  more below to see how MEDS-Transforms can help you build
+  your data pipelines!
+license: MIT

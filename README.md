@@ -19,6 +19,7 @@
 [![license](https://img.shields.io/badge/License-MIT-green.svg?labelColor=gray)](https://github.com/mmcdermott/MEDS_transforms#license)
 [![PRs](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/mmcdermott/MEDS_transforms/pulls)
 [![contributors](https://img.shields.io/github/contributors/mmcdermott/MEDS_transforms.svg)](https://github.com/mmcdermott/MEDS_transforms/graphs/contributors)
+[![DOI](https://zenodo.org/badge/802131189.svg)](https://doi.org/10.5281/zenodo.17535783)
 
 MEDS-Transforms is a Python package for assembling complex data pre-processing workflows over MEDS datasets.
 To do this, you define a pipeline as a series of stages, each with its own arguments, then run the pipeline
