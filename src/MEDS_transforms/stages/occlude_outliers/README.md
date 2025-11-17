@@ -10,7 +10,7 @@ metadata/codes.parquet: |-
   ADMISSION//ORTHOPEDIC,1,1,0,,,,
   ADMISSION//PULMONARY,1,1,0,,,,
   DISCHARGE,4,4,0,,,,
-  DOB,4,4,0,,,,
+  MEDS_BIRTH,4,4,0,,,,
   EYE_COLOR//BLUE,1,1,0,,,"Blue Eyes. Less common than brown.",
   EYE_COLOR//BROWN,1,1,0,,,"Brown Eyes. The most common eye color.",
   EYE_COLOR//HAZEL,2,2,0,,,"Hazel eyes. These are uncommon",

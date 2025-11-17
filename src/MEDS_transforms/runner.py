@@ -253,7 +253,7 @@ def run_stage(
 
     if parallelization_args:
         multirun = parallelization_args.pop(0)
-        command_parts = command_parts[:1] + [multirun] + command_parts[1:] + parallelization_args
+        command_parts = [*command_parts[:1], multirun, *command_parts[1:], *parallelization_args]
 
     if do_profile:
         command_parts.append("++hydra.callbacks.profiler._target_=hydra_profiler.profiler.ProfilerCallback")

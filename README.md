@@ -13,7 +13,7 @@
 [![MEDS v0.4](https://img.shields.io/badge/MEDS-0.4-blue)](https://medical-event-data-standard.github.io/)
 [![Documentation Status](https://readthedocs.org/projects/meds-transforms/badge/?version=latest)](https://meds-transforms.readthedocs.io/en/latest/?badge=latest)
 [![codecov](https://codecov.io/gh/mmcdermott/MEDS_transforms/graph/badge.svg?token=5RORKQOZF9)](https://codecov.io/gh/mmcdermott/MEDS_transforms)
-[![tests](https://github.com/mmcdermott/MEDS_transforms/actions/workflows/tests.yaml/badge.svg)](https://github.com/mmcdermott/MEDS_transforms/actions/workflows/tests.yml)
+[![tests](https://github.com/mmcdermott/MEDS_transforms/actions/workflows/tests.yaml/badge.svg)](https://github.com/mmcdermott/MEDS_transforms/actions/workflows/tests.yaml)
 [![code-quality](https://github.com/mmcdermott/MEDS_transforms/actions/workflows/code-quality-main.yaml/badge.svg)](https://github.com/mmcdermott/MEDS_transforms/actions/workflows/code-quality-main.yaml)
 [![hydra](https://img.shields.io/badge/Config-Hydra_1.3-89b8cd)](https://hydra.cc/)
 [![license](https://img.shields.io/badge/License-MIT-green.svg?labelColor=gray)](https://github.com/mmcdermott/MEDS_transforms#license)

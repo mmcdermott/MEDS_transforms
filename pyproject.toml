@@ -28,11 +28,12 @@ dependencies = [
   "pretty-print-directory>=0.1.3",
 ]
 
+[dependency-groups]
+dev = ["pre-commit<4", "ruff", "pytest-cov", "pip"]
+
 [tool.setuptools_scm]
 
 [project.optional-dependencies]
-dev = ["pre-commit<4", "ruff"]
-tests = ["pytest-cov"]
 local_parallelism = ["hydra-joblib-launcher"]
 slurm_parallelism = ["hydra-submitit-launcher"]
 docs = [

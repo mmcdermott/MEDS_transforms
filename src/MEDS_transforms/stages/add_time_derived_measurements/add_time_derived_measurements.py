@@ -44,30 +44,32 @@ def add_new_events_fntr(
         ...             datetime(2022, 1, 1),
         ...             datetime(2022, 1, 1),
         ...         ],
-        ...         "code": ["static", "DOB", "lab//A", "lab//B", "DOB", "lab//A", "lab//B", "dx//1"],
+        ...         "code": [
+        ...             "static", "MEDS_BIRTH", "lab//A", "lab//B", "MEDS_BIRTH", "lab//A", "lab//B", "dx//1"
+        ...         ],
         ...     },
         ...     schema={"subject_id": pl.UInt32, "time": pl.Datetime, "code": pl.Utf8},
         ... )
         >>> df
         shape: (8, 3)
-        ┌────────────┬─────────────────────┬────────┐
-        │ subject_id ┆ time                ┆ code   │
-        │ ---        ┆ ---                 ┆ ---    │
-        │ u32        ┆ datetime[μs]        ┆ str    │
-        ╞════════════╪═════════════════════╪════════╡
-        │ 1          ┆ null                ┆ static │
-        │ 1          ┆ 1990-01-01 00:00:00 ┆ DOB    │
-        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//A │
-        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//B │
-        │ 2          ┆ 1988-01-02 00:00:00 ┆ DOB    │
-        │ 2          ┆ 2023-01-03 00:00:00 ┆ lab//A │
-        │ 3          ┆ 2022-01-01 00:00:00 ┆ lab//B │
-        │ 3          ┆ 2022-01-01 00:00:00 ┆ dx//1  │
-        └────────────┴─────────────────────┴────────┘
+        ┌────────────┬─────────────────────┬────────────┐
+        │ subject_id ┆ time                ┆ code       │
+        │ ---        ┆ ---                 ┆ ---        │
+        │ u32        ┆ datetime[μs]        ┆ str        │
+        ╞════════════╪═════════════════════╪════════════╡
+        │ 1          ┆ null                ┆ static     │
+        │ 1          ┆ 1990-01-01 00:00:00 ┆ MEDS_BIRTH │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//A     │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//B     │
+        │ 2          ┆ 1988-01-02 00:00:00 ┆ MEDS_BIRTH │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ lab//A     │
+        │ 3          ┆ 2022-01-01 00:00:00 ┆ lab//B     │
+        │ 3          ┆ 2022-01-01 00:00:00 ┆ dx//1      │
+        └────────────┴─────────────────────┴────────────┘
 
     As an example, we'll use the `age_fntr` defined in this module:
 
-        >>> age_cfg = DictConfig({"DOB_code": "DOB", "age_code": "AGE", "age_unit": "years"})
+        >>> age_cfg = DictConfig({"DOB_code": "MEDS_BIRTH", "age_code": "AGE", "age_unit": "years"})
         >>> age_fn = age_fntr(age_cfg)
         >>> age_fn(df)
         shape: (2, 4)
@@ -86,22 +88,22 @@ def add_new_events_fntr(
         >>> add_age_fn = add_new_events_fntr(age_fn)
         >>> add_age_fn(df)
         shape: (10, 4)
-        ┌────────────┬─────────────────────┬────────┬───────────────┐
-        │ subject_id ┆ time                ┆ code   ┆ numeric_value │
-        │ ---        ┆ ---                 ┆ ---    ┆ ---           │
-        │ u32        ┆ datetime[μs]        ┆ str    ┆ f32           │
-        ╞════════════╪═════════════════════╪════════╪═══════════════╡
-        │ 1          ┆ null                ┆ static ┆ null          │
-        │ 1          ┆ 1990-01-01 00:00:00 ┆ DOB    ┆ null          │
-        │ 1          ┆ 2021-01-01 00:00:00 ┆ AGE    ┆ 31.001347     │
-        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//A ┆ null          │
-        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//B ┆ null          │
-        │ 2          ┆ 1988-01-02 00:00:00 ┆ DOB    ┆ null          │
-        │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE    ┆ 35.004169     │
-        │ 2          ┆ 2023-01-03 00:00:00 ┆ lab//A ┆ null          │
-        │ 3          ┆ 2022-01-01 00:00:00 ┆ lab//B ┆ null          │
-        │ 3          ┆ 2022-01-01 00:00:00 ┆ dx//1  ┆ null          │
-        └────────────┴─────────────────────┴────────┴───────────────┘
+        ┌────────────┬─────────────────────┬────────────┬───────────────┐
+        │ subject_id ┆ time                ┆ code       ┆ numeric_value │
+        │ ---        ┆ ---                 ┆ ---        ┆ ---           │
+        │ u32        ┆ datetime[μs]        ┆ str        ┆ f32           │
+        ╞════════════╪═════════════════════╪════════════╪═══════════════╡
+        │ 1          ┆ null                ┆ static     ┆ null          │
+        │ 1          ┆ 1990-01-01 00:00:00 ┆ MEDS_BIRTH ┆ null          │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ AGE        ┆ 31.001347     │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//A     ┆ null          │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//B     ┆ null          │
+        │ 2          ┆ 1988-01-02 00:00:00 ┆ MEDS_BIRTH ┆ null          │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ AGE        ┆ 35.004169     │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ lab//A     ┆ null          │
+        │ 3          ┆ 2022-01-01 00:00:00 ┆ lab//B     ┆ null          │
+        │ 3          ┆ 2022-01-01 00:00:00 ┆ dx//1      ┆ null          │
+        └────────────┴─────────────────────┴────────────┴───────────────┘
 
     We can also specify that some new event codes should go at the end of the event row block, not the
     beginning, via `new_code_last_regex`. This makes the most sense with the `timeline_tokens_fntr`, which
@@ -141,7 +143,7 @@ def add_new_events_fntr(
         ╞════════════╪═════════════════════╪════════════════════════╪═══════════════╡
         │ 1          ┆ null                ┆ static                 ┆ null          │
         │ 1          ┆ 1990-01-01 00:00:00 ┆ TIMELINE//START        ┆ null          │
-        │ 1          ┆ 1990-01-01 00:00:00 ┆ DOB                    ┆ null          │
+        │ 1          ┆ 1990-01-01 00:00:00 ┆ MEDS_BIRTH             ┆ null          │
         │ 1          ┆ 2021-01-01 00:00:00 ┆ TIMELINE//DELTA//years ┆ 31.001347     │
         │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//A                 ┆ null          │
         │ …          ┆ …                   ┆ …                      ┆ …             │
