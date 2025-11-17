@@ -38,26 +38,28 @@ def time_of_day_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         ...             datetime(2022, 1, 1, 18, 0),
         ...             datetime(2022, 1, 1, 18, 0),
         ...         ],
-        ...         "code": ["static", "DOB", "lab//A", "lab//B", "DOB", "lab//A", "lab//B", "dx//1"],
+        ...         "code": [
+        ...             "static", "MEDS_BIRTH", "lab//A", "lab//B", "MEDS_BIRTH", "lab//A", "lab//B", "dx//1"
+        ...         ],
         ...     },
         ...     schema={"subject_id": pl.UInt32, "time": pl.Datetime, "code": pl.Utf8},
         ... )
         >>> df
         shape: (8, 3)
-        ┌────────────┬─────────────────────┬────────┐
-        │ subject_id ┆ time                ┆ code   │
-        │ ---        ┆ ---                 ┆ ---    │
-        │ u32        ┆ datetime[μs]        ┆ str    │
-        ╞════════════╪═════════════════════╪════════╡
-        │ 1          ┆ null                ┆ static │
-        │ 1          ┆ 1990-01-01 01:00:00 ┆ DOB    │
-        │ 1          ┆ 2021-01-01 12:00:00 ┆ lab//A │
-        │ 1          ┆ 2021-01-02 23:59:00 ┆ lab//B │
-        │ 2          ┆ 1988-01-02 06:00:00 ┆ DOB    │
-        │ 2          ┆ 2023-01-03 12:00:00 ┆ lab//A │
-        │ 3          ┆ 2022-01-01 18:00:00 ┆ lab//B │
-        │ 3          ┆ 2022-01-01 18:00:00 ┆ dx//1  │
-        └────────────┴─────────────────────┴────────┘
+        ┌────────────┬─────────────────────┬────────────┐
+        │ subject_id ┆ time                ┆ code       │
+        │ ---        ┆ ---                 ┆ ---        │
+        │ u32        ┆ datetime[μs]        ┆ str        │
+        ╞════════════╪═════════════════════╪════════════╡
+        │ 1          ┆ null                ┆ static     │
+        │ 1          ┆ 1990-01-01 01:00:00 ┆ MEDS_BIRTH │
+        │ 1          ┆ 2021-01-01 12:00:00 ┆ lab//A     │
+        │ 1          ┆ 2021-01-02 23:59:00 ┆ lab//B     │
+        │ 2          ┆ 1988-01-02 06:00:00 ┆ MEDS_BIRTH │
+        │ 2          ┆ 2023-01-03 12:00:00 ┆ lab//A     │
+        │ 3          ┆ 2022-01-01 18:00:00 ┆ lab//B     │
+        │ 3          ┆ 2022-01-01 18:00:00 ┆ dx//1      │
+        └────────────┴─────────────────────┴────────────┘
         >>> time_of_day_cfg = DictConfig({"time_of_day_code": "time_of_day", "endpoints": [6, 12, 18]})
         >>> time_of_day_fn = time_of_day_fntr(time_of_day_cfg)
         >>> time_of_day_fn(df)

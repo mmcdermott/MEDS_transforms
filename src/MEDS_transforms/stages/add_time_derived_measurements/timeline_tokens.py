@@ -60,27 +60,29 @@ def timeline_tokens_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFra
         ...             None,
         ...             None,
         ...         ],
-        ...         "code": ["static", "DOB", "lab//A", "lab//B", "rx", "DOB", "lab//A", "foo", "bar"],
+        ...         "code": [
+        ...             "static", "MEDS_BIRTH", "lab//A", "lab//B", "rx", "MEDS_BIRTH", "lab//A", "foo", "bar"
+        ...         ],
         ...     },
         ...     schema={"subject_id": pl.UInt32, "time": pl.Datetime, "code": pl.Utf8},
         ... )
         >>> df
         shape: (9, 3)
-        ┌────────────┬─────────────────────┬────────┐
-        │ subject_id ┆ time                ┆ code   │
-        │ ---        ┆ ---                 ┆ ---    │
-        │ u32        ┆ datetime[μs]        ┆ str    │
-        ╞════════════╪═════════════════════╪════════╡
-        │ 1          ┆ null                ┆ static │
-        │ 1          ┆ 1990-01-01 00:00:00 ┆ DOB    │
-        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//A │
-        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//B │
-        │ 1          ┆ 2021-01-02 00:00:00 ┆ rx     │
-        │ 2          ┆ 1988-01-02 00:00:00 ┆ DOB    │
-        │ 2          ┆ 2023-01-03 00:00:00 ┆ lab//A │
-        │ 3          ┆ null                ┆ foo    │
-        │ 3          ┆ null                ┆ bar    │
-        └────────────┴─────────────────────┴────────┘
+        ┌────────────┬─────────────────────┬────────────┐
+        │ subject_id ┆ time                ┆ code       │
+        │ ---        ┆ ---                 ┆ ---        │
+        │ u32        ┆ datetime[μs]        ┆ str        │
+        ╞════════════╪═════════════════════╪════════════╡
+        │ 1          ┆ null                ┆ static     │
+        │ 1          ┆ 1990-01-01 00:00:00 ┆ MEDS_BIRTH │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//A     │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//B     │
+        │ 1          ┆ 2021-01-02 00:00:00 ┆ rx         │
+        │ 2          ┆ 1988-01-02 00:00:00 ┆ MEDS_BIRTH │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ lab//A     │
+        │ 3          ┆ null                ┆ foo        │
+        │ 3          ┆ null                ┆ bar        │
+        └────────────┴─────────────────────┴────────────┘
 
     If we simply provide a time unit, we get start, end, and delta tokens in the specified unit. Note the
     output column name depends on the normalized time unit.
@@ -195,21 +197,21 @@ def timeline_tokens_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFra
         >>> timeline_tokens_fn = timeline_tokens_fntr(cfg)
         >>> timeline_tokens_fn(df)
         shape: (9, 3)
-        ┌────────────┬─────────────────────┬────────┐
-        │ subject_id ┆ time                ┆ code   │
-        │ ---        ┆ ---                 ┆ ---    │
-        │ u32        ┆ datetime[μs]        ┆ str    │
-        ╞════════════╪═════════════════════╪════════╡
-        │ 1          ┆ null                ┆ static │
-        │ 1          ┆ 1990-01-01 00:00:00 ┆ DOB    │
-        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//A │
-        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//B │
-        │ 1          ┆ 2021-01-02 00:00:00 ┆ rx     │
-        │ 2          ┆ 1988-01-02 00:00:00 ┆ DOB    │
-        │ 2          ┆ 2023-01-03 00:00:00 ┆ lab//A │
-        │ 3          ┆ null                ┆ foo    │
-        │ 3          ┆ null                ┆ bar    │
-        └────────────┴─────────────────────┴────────┘
+        ┌────────────┬─────────────────────┬────────────┐
+        │ subject_id ┆ time                ┆ code       │
+        │ ---        ┆ ---                 ┆ ---        │
+        │ u32        ┆ datetime[μs]        ┆ str        │
+        ╞════════════╪═════════════════════╪════════════╡
+        │ 1          ┆ null                ┆ static     │
+        │ 1          ┆ 1990-01-01 00:00:00 ┆ MEDS_BIRTH │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//A     │
+        │ 1          ┆ 2021-01-01 00:00:00 ┆ lab//B     │
+        │ 1          ┆ 2021-01-02 00:00:00 ┆ rx         │
+        │ 2          ┆ 1988-01-02 00:00:00 ┆ MEDS_BIRTH │
+        │ 2          ┆ 2023-01-03 00:00:00 ┆ lab//A     │
+        │ 3          ┆ null                ┆ foo        │
+        │ 3          ┆ null                ┆ bar        │
+        └────────────┴─────────────────────┴────────────┘
         >>> timeline_tokens_fn("foobar") # This won't raise an error as this is truly an identity function.
         'foobar'
     """

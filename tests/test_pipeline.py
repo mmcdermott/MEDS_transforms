@@ -31,7 +31,7 @@ stages:
       min_events_per_subject: 5
   - add_time_derived_measurements:
       age:
-        DOB_code: "DOB"
+        DOB_code: "MEDS_BIRTH"
         age_code: "AGE"
         age_unit: "years"
       time_of_day:
@@ -101,7 +101,7 @@ stages:
       min_events_per_subject: 5
   - add_time_derived_measurements:
       age:
-        DOB_code: "DOB"
+        DOB_code: "MEDS_BIRTH"
         age_code: "AGE"
         age_unit: "years"
       time_of_day:
@@ -195,7 +195,7 @@ stages:
       min_events_per_subject: 5
   - add_time_derived_measurements:
       age:
-        DOB_code: "DOB"
+        DOB_code: "MEDS_BIRTH"
         age_code: "AGE"
         age_unit: "years"
       time_of_day:

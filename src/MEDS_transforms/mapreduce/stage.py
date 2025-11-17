@@ -89,7 +89,7 @@ def map_stage(
         ╞════════════╪═════════════════════╪═══════════════════════╪═══════════════╡
         │ 1500733    ┆ null                ┆ EYE_COLOR//BROWN      ┆ null          │
         │ 1500733    ┆ null                ┆ HEIGHT                ┆ 158.601318    │
-        │ 1500733    ┆ 1986-07-20 00:00:00 ┆ DOB                   ┆ null          │
+        │ 1500733    ┆ 1986-07-20 00:00:00 ┆ MEDS_BIRTH            ┆ null          │
         │ 1500733    ┆ 2010-06-03 14:54:38 ┆ ADMISSION//ORTHOPEDIC ┆ null          │
         │ 1500733    ┆ 2010-06-03 14:54:38 ┆ HR                    ┆ 91.400002     │
         │ …          ┆ …                   ┆ …                     ┆ …             │
@@ -108,7 +108,7 @@ def map_stage(
         ╞════════════╪═════════════════════╪════════════════════╪═══════════════╡
         │ 239684     ┆ null                ┆ EYE_COLOR//BROWN   ┆ null          │
         │ 239684     ┆ null                ┆ HEIGHT             ┆ 175.271118    │
-        │ 239684     ┆ 1980-12-28 00:00:00 ┆ DOB                ┆ null          │
+        │ 239684     ┆ 1980-12-28 00:00:00 ┆ MEDS_BIRTH         ┆ null          │
         │ 239684     ┆ 2010-05-11 17:41:51 ┆ ADMISSION//CARDIAC ┆ null          │
         │ 239684     ┆ 2010-05-11 17:41:51 ┆ HR                 ┆ 102.599998    │
         │ …          ┆ …                   ┆ …                  ┆ …             │
@@ -127,11 +127,11 @@ def map_stage(
         ╞════════════╪═════════════════════╪═══════════════════════╪═══════════════╡
         │ 68729      ┆ null                ┆ EYE_COLOR//HAZEL      ┆ null          │
         │ 68729      ┆ null                ┆ HEIGHT                ┆ 160.395309    │
-        │ 68729      ┆ 1978-03-09 00:00:00 ┆ DOB                   ┆ null          │
+        │ 68729      ┆ 1978-03-09 00:00:00 ┆ MEDS_BIRTH            ┆ null          │
         │ 68729      ┆ 2010-05-26 02:30:56 ┆ ADMISSION//PULMONARY  ┆ null          │
         │ 68729      ┆ 2010-05-26 02:30:56 ┆ HR                    ┆ 86.0          │
         │ …          ┆ …                   ┆ …                     ┆ …             │
-        │ 814703     ┆ 1976-03-28 00:00:00 ┆ DOB                   ┆ null          │
+        │ 814703     ┆ 1976-03-28 00:00:00 ┆ MEDS_BIRTH            ┆ null          │
         │ 814703     ┆ 2010-02-05 05:55:39 ┆ ADMISSION//ORTHOPEDIC ┆ null          │
         │ 814703     ┆ 2010-02-05 05:55:39 ┆ HR                    ┆ 170.199997    │
         │ 814703     ┆ 2010-02-05 05:55:39 ┆ TEMP                  ┆ 100.099998    │
@@ -146,7 +146,7 @@ def map_stage(
         ╞════════════╪═════════════════════╪══════════════════════╪═══════════════╡
         │ 754281     ┆ null                ┆ EYE_COLOR//BROWN     ┆ null          │
         │ 754281     ┆ null                ┆ HEIGHT               ┆ 166.22261     │
-        │ 754281     ┆ 1988-12-19 00:00:00 ┆ DOB                  ┆ null          │
+        │ 754281     ┆ 1988-12-19 00:00:00 ┆ MEDS_BIRTH           ┆ null          │
         │ 754281     ┆ 2010-01-03 06:27:59 ┆ ADMISSION//PULMONARY ┆ null          │
         │ 754281     ┆ 2010-01-03 06:27:59 ┆ HR                   ┆ 142.0         │
         │ 754281     ┆ 2010-01-03 06:27:59 ┆ TEMP                 ┆ 99.800003     │
@@ -235,7 +235,7 @@ def map_stage(
         ╞═══════════════════════╪═══════╡
         │ EYE_COLOR//BROWN      ┆ 1     │
         │ HEIGHT                ┆ 1     │
-        │ DOB                   ┆ 1     │
+        │ MEDS_BIRTH            ┆ 1     │
         │ ADMISSION//ORTHOPEDIC ┆ 1     │
         │ HR                    ┆ 3     │
         │ TEMP                  ┆ 3     │
@@ -250,7 +250,7 @@ def map_stage(
         ╞══════════════════════╪═══════╡
         │ EYE_COLOR//BROWN     ┆ 1     │
         │ HEIGHT               ┆ 1     │
-        │ DOB                  ┆ 1     │
+        │ MEDS_BIRTH           ┆ 1     │
         │ ADMISSION//PULMONARY ┆ 1     │
         │ HR                   ┆ 1     │
         │ TEMP                 ┆ 1     │
@@ -265,7 +265,7 @@ def map_stage(
         ╞═══════════════════════╪═══════╡
         │ EYE_COLOR//HAZEL      ┆ 2     │
         │ HEIGHT                ┆ 2     │
-        │ DOB                   ┆ 2     │
+        │ MEDS_BIRTH            ┆ 2     │
         │ ADMISSION//PULMONARY  ┆ 1     │
         │ HR                    ┆ 2     │
         │ TEMP                  ┆ 2     │
@@ -281,7 +281,7 @@ def map_stage(
         ╞════════════════════╪═══════╡
         │ EYE_COLOR//BROWN   ┆ 1     │
         │ HEIGHT             ┆ 2     │
-        │ DOB                ┆ 2     │
+        │ MEDS_BIRTH         ┆ 2     │
         │ ADMISSION//CARDIAC ┆ 2     │
         │ HR                 ┆ 10    │
         │ TEMP               ┆ 10    │
@@ -312,7 +312,7 @@ def map_stage(
         ╞═══════════════════════╪═══════╡
         │ EYE_COLOR//HAZEL      ┆ 2     │
         │ HEIGHT                ┆ 2     │
-        │ DOB                   ┆ 2     │
+        │ MEDS_BIRTH            ┆ 2     │
         │ ADMISSION//PULMONARY  ┆ 1     │
         │ HR                    ┆ 2     │
         │ TEMP                  ┆ 2     │
@@ -328,7 +328,7 @@ def map_stage(
         ╞════════════════════╪═══════╡
         │ EYE_COLOR//BROWN   ┆ 1     │
         │ HEIGHT             ┆ 2     │
-        │ DOB                ┆ 2     │
+        │ MEDS_BIRTH         ┆ 2     │
         │ ADMISSION//CARDIAC ┆ 2     │
         │ HR                 ┆ 10    │
         │ TEMP               ┆ 10    │
@@ -374,7 +374,7 @@ def map_stage(
         ╞═══════════════════════╪═══════╡
         │ EYE_COLOR//HAZEL      ┆ 2     │
         │ HEIGHT                ┆ 2     │
-        │ DOB                   ┆ 2     │
+        │ MEDS_BIRTH            ┆ 2     │
         │ ADMISSION//PULMONARY  ┆ 1     │
         │ HR                    ┆ 2     │
         │ TEMP                  ┆ 2     │
@@ -406,7 +406,7 @@ def map_stage(
         ╞════════════════════╪═══════╡
         │ EYE_COLOR//BROWN   ┆ 1     │
         │ HEIGHT             ┆ 2     │
-        │ DOB                ┆ 2     │
+        │ MEDS_BIRTH         ┆ 2     │
         │ ADMISSION//CARDIAC ┆ 2     │
         │ HR                 ┆ 10    │
         │ TEMP               ┆ 10    │
@@ -606,7 +606,7 @@ def mapreduce_stage(
         ╞════════════╪═════════════════════╪═══════════════════════╪═══════════════╡
         │ 1500733    ┆ null                ┆ EYE_COLOR//BROWN      ┆ null          │
         │ 1500733    ┆ null                ┆ HEIGHT                ┆ 158.601318    │
-        │ 1500733    ┆ 1986-07-20 00:00:00 ┆ DOB                   ┆ null          │
+        │ 1500733    ┆ 1986-07-20 00:00:00 ┆ MEDS_BIRTH            ┆ null          │
         │ 1500733    ┆ 2010-06-03 14:54:38 ┆ ADMISSION//ORTHOPEDIC ┆ null          │
         │ 1500733    ┆ 2010-06-03 14:54:38 ┆ HR                    ┆ 91.400002     │
         │ …          ┆ …                   ┆ …                     ┆ …             │
@@ -625,7 +625,7 @@ def mapreduce_stage(
         ╞════════════╪═════════════════════╪════════════════════╪═══════════════╡
         │ 239684     ┆ null                ┆ EYE_COLOR//BROWN   ┆ null          │
         │ 239684     ┆ null                ┆ HEIGHT             ┆ 175.271118    │
-        │ 239684     ┆ 1980-12-28 00:00:00 ┆ DOB                ┆ null          │
+        │ 239684     ┆ 1980-12-28 00:00:00 ┆ MEDS_BIRTH         ┆ null          │
         │ 239684     ┆ 2010-05-11 17:41:51 ┆ ADMISSION//CARDIAC ┆ null          │
         │ 239684     ┆ 2010-05-11 17:41:51 ┆ HR                 ┆ 102.599998    │
         │ …          ┆ …                   ┆ …                  ┆ …             │
@@ -644,11 +644,11 @@ def mapreduce_stage(
         ╞════════════╪═════════════════════╪═══════════════════════╪═══════════════╡
         │ 68729      ┆ null                ┆ EYE_COLOR//HAZEL      ┆ null          │
         │ 68729      ┆ null                ┆ HEIGHT                ┆ 160.395309    │
-        │ 68729      ┆ 1978-03-09 00:00:00 ┆ DOB                   ┆ null          │
+        │ 68729      ┆ 1978-03-09 00:00:00 ┆ MEDS_BIRTH            ┆ null          │
         │ 68729      ┆ 2010-05-26 02:30:56 ┆ ADMISSION//PULMONARY  ┆ null          │
         │ 68729      ┆ 2010-05-26 02:30:56 ┆ HR                    ┆ 86.0          │
         │ …          ┆ …                   ┆ …                     ┆ …             │
-        │ 814703     ┆ 1976-03-28 00:00:00 ┆ DOB                   ┆ null          │
+        │ 814703     ┆ 1976-03-28 00:00:00 ┆ MEDS_BIRTH            ┆ null          │
         │ 814703     ┆ 2010-02-05 05:55:39 ┆ ADMISSION//ORTHOPEDIC ┆ null          │
         │ 814703     ┆ 2010-02-05 05:55:39 ┆ HR                    ┆ 170.199997    │
         │ 814703     ┆ 2010-02-05 05:55:39 ┆ TEMP                  ┆ 100.099998    │
@@ -663,7 +663,7 @@ def mapreduce_stage(
         ╞════════════╪═════════════════════╪══════════════════════╪═══════════════╡
         │ 754281     ┆ null                ┆ EYE_COLOR//BROWN     ┆ null          │
         │ 754281     ┆ null                ┆ HEIGHT               ┆ 166.22261     │
-        │ 754281     ┆ 1988-12-19 00:00:00 ┆ DOB                  ┆ null          │
+        │ 754281     ┆ 1988-12-19 00:00:00 ┆ MEDS_BIRTH           ┆ null          │
         │ 754281     ┆ 2010-01-03 06:27:59 ┆ ADMISSION//PULMONARY ┆ null          │
         │ 754281     ┆ 2010-01-03 06:27:59 ┆ HR                   ┆ 142.0         │
         │ 754281     ┆ 2010-01-03 06:27:59 ┆ TEMP                 ┆ 99.800003     │
@@ -780,7 +780,7 @@ def mapreduce_stage(
         ╞═══════════════════════╪═══════╪═════════════════════════════════╪══════════════════╡
         │ EYE_COLOR//BROWN      ┆ 3     ┆ Brown Eyes. The most common ey… ┆ null             │
         │ HEIGHT                ┆ 6     ┆ null                            ┆ null             │
-        │ DOB                   ┆ 6     ┆ null                            ┆ null             │
+        │ MEDS_BIRTH            ┆ 6     ┆ null                            ┆ null             │
         │ ADMISSION//ORTHOPEDIC ┆ 2     ┆ null                            ┆ null             │
         │ HR                    ┆ 16    ┆ Heart Rate                      ┆ ["LOINC/8867-4"] │
         │ …                     ┆ …     ┆ …                               ┆ …                │
@@ -816,7 +816,7 @@ def mapreduce_stage(
         ╞═══════════════════════╪═══════╪═════════════════════════════════╪══════════════════╡
         │ EYE_COLOR//HAZEL      ┆ 2     ┆ Hazel eyes. These are uncommon  ┆ null             │
         │ HEIGHT                ┆ 4     ┆ null                            ┆ null             │
-        │ DOB                   ┆ 4     ┆ null                            ┆ null             │
+        │ MEDS_BIRTH            ┆ 4     ┆ null                            ┆ null             │
         │ ADMISSION//PULMONARY  ┆ 1     ┆ null                            ┆ null             │
         │ HR                    ┆ 12    ┆ Heart Rate                      ┆ ["LOINC/8867-4"] │
         │ …                     ┆ …     ┆ …                               ┆ …                │

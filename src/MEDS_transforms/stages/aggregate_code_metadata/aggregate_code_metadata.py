@@ -766,10 +766,11 @@ def reducer_fntr(
         renamed_dfs = []
         for i, df in enumerate(dfs):
             agg_selectors = []
+            df_columns = set(df.collect_schema().names())
             for agg in aggregations:
                 if isinstance(agg, dict | DictConfig):
                     agg = agg["name"]
-                if agg not in df.columns:
+                if agg not in df_columns:
                     raise KeyError(f"Column {agg} not found in DataFrame {i} for reduction.")
                 agg_selectors.append(pl.col(agg).alias(f"{agg}/shard_{i}"))
 

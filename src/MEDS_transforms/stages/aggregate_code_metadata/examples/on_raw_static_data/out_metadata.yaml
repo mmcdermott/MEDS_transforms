@@ -72,20 +72,6 @@ metadata/codes.parquet:
     description: null
     parent_codes: null
 
-  - code: "DOB"
-    code/n_occurrences: 4
-    code/n_subjects: 4
-    values/n_occurrences: 0
-    values/n_subjects: 0
-    values/sum: 0
-    values/sum_sqd: 0
-    values/n_ints: 0
-    values/min: null
-    values/max: null
-    values/quantiles: null
-    description: null
-    parent_codes: null
-
   - code: "EYE_COLOR//BLUE"
     code/n_occurrences: 1
     code/n_subjects: 1
@@ -161,6 +147,20 @@ metadata/codes.parquet:
       values/quantile/0.75: 113.4
     description: "Heart Rate"
     parent_codes: ["LOINC/8867-4"]
+
+  - code: "MEDS_BIRTH"
+    code/n_occurrences: 4
+    code/n_subjects: 4
+    values/n_occurrences: 0
+    values/n_subjects: 0
+    values/sum: 0
+    values/sum_sqd: 0
+    values/n_ints: 0
+    values/min: null
+    values/max: null
+    values/quantiles: null
+    description: null
+    parent_codes: null
 
   - code: "TEMP"
     code/n_occurrences: 12

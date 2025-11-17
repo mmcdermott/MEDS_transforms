@@ -142,7 +142,7 @@ def age_fntr(cfg: DictConfig) -> Callable[[pl.DataFrame], pl.DataFrame]:
         ValueError: Either 'DOB_regex' or 'DOB_code' must be provided in the configuration.
     """
 
-    canonical_unit, seconds_in_unit = normalize_time_unit(cfg.get("age_unit", "y"))
+    _, seconds_in_unit = normalize_time_unit(cfg.get("age_unit", "y"))
     microseconds_in_unit = int(1e6) * seconds_in_unit
 
     if cfg.get("DOB_code", None) is not None:

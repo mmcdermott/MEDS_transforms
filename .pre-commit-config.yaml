@@ -5,7 +5,7 @@ exclude: "docs/index.md|example/data/metadata|example/data/data|example/output_d
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       # list of supported hooks: https://pre-commit.com/hooks.html
       - id: trailing-whitespace
@@ -22,7 +22,7 @@ repos:
 
   # python code formatting, linting, and import sorting using ruff
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.5
+    rev: v0.14.5
     hooks:
       # Run the formatter
       - id: ruff-format
@@ -32,7 +32,7 @@ repos:
 
   # python docstring formatting
   - repo: https://github.com/myint/docformatter
-    rev: v1.7.5
+    rev: v1.7.7
     hooks:
       - id: docformatter
         args: [--in-place, --wrap-summaries=110, --wrap-descriptions=110]
@@ -47,7 +47,7 @@ repos:
 
   # shell scripts linter
   - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: v0.10.0.1
+    rev: v0.11.0.1
     hooks:
       - id: shellcheck
 
@@ -63,7 +63,6 @@ repos:
           - mdformat-gfm-alerts
           - mdformat-tables
           - mdformat_frontmatter
-          - mdformat-black
           - mdformat-config
           - mdformat-mkdocs
           - mdformat-toc
@@ -79,7 +78,7 @@ repos:
 
   # jupyter notebook cell output clearing
   - repo: https://github.com/kynan/nbstripout
-    rev: 0.8.1
+    rev: 0.8.2
     hooks:
       - id: nbstripout
 
