@@ -1,0 +1,11 @@
+_match_revise:
+  - _matcher: # No filter for static measurements
+      time:
+        present: False
+  - _matcher: # No filter for birth, death, admission, discharge, registration, or time intervals.
+      code:
+        regex: "MEDS_DEATH.*|MEDS_BIRTH.*|.*ADMISSION.*|.*DISCHARGE.*"
+  - _matcher:
+      time:
+        present: True
+    min_occurrences_per_code: 10
