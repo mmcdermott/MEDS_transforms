@@ -169,7 +169,4 @@ def rwlock_wrap(
         return True
     finally:
         lock.release()
-        try:
-            lock_fp.unlink()
-        except FileNotFoundError:  # pragma: no cover
-            logger.warning(f"Lock file {lock_fp} was not found, though was successfully released. Returning")
+        lock_fp.unlink(missing_ok=True)
