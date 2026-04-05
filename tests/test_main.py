@@ -1,7 +1,23 @@
 import re
 import subprocess
+from unittest.mock import patch
 
 SCRIPT_TEMPLATE = "MEDS_transform-stage {pipeline} {stage_name}"
+
+
+def test_print_help_stage(capsys):
+    from MEDS_transforms.__main__ import print_help_stage
+
+    with patch(
+        "MEDS_transforms.__main__.get_all_registered_stages",
+        return_value={"bar_stage": None, "foo_stage": None},
+    ):
+        print_help_stage()
+
+    captured = capsys.readouterr()
+    assert "Available stages:" in captured.out
+    assert "  - bar_stage" in captured.out
+    assert "  - foo_stage" in captured.out
 
 
 def test_stage_entry_point_help():

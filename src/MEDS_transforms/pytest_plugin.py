@@ -12,20 +12,25 @@ Pytest Plugin Capabilities:
       may be logged by MEDS testing helpers upon partial initialization of dataset examples.
 """
 
+from __future__ import annotations
+
 import logging
 import subprocess
 import tempfile
 import tomllib
-from collections.abc import Callable
 from contextlib import contextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from omegaconf import OmegaConf
 
 from . import __package_name__
-from .configs.stage import StageConfig
-from .stages import StageExample, get_all_registered_stages
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from .stages.examples import StageExample
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +151,8 @@ def pytest_configure(config: pytest.Config):
     Now, if we call the function with the fake config and stages, we should get the expected output. This
     simulates reading the command line options and setting up the config object.
 
-        >>> with patch("MEDS_transforms.pytest_plugin.get_all_registered_stages", return_value=mock_stages):
+        >>> _P = "MEDS_transforms.stages.discovery.get_all_registered_stages"
+        >>> with patch(_P, return_value=mock_stages):
         ...     pytest_configure(config)
         >>> list(config.allowed_stages.keys())
         ['stage_1_1', 'stage_2_1']
@@ -157,7 +163,7 @@ def pytest_configure(config: pytest.Config):
 
         >>> CLI_options["test_stages_for_package"] = ["package1"]
         >>> CLI_options["test_stage"] = []
-        >>> with patch("MEDS_transforms.pytest_plugin.get_all_registered_stages", return_value=mock_stages):
+        >>> with patch(_P, return_value=mock_stages):
         ...     pytest_configure(config)
         >>> list(config.allowed_stages.keys())
         ['stage_1_1', 'stage_1_2']
@@ -167,7 +173,7 @@ def pytest_configure(config: pytest.Config):
     What if we request a stage not in the package?
 
         >>> CLI_options["test_stage"] = ["stage_1_1", "stage_2_1", "invalid_stage"]
-        >>> with patch("MEDS_transforms.pytest_plugin.get_all_registered_stages", return_value=mock_stages):
+        >>> with patch(_P, return_value=mock_stages):
         ...     pytest_configure(config)
         Traceback (most recent call last):
             ...
@@ -178,7 +184,7 @@ def pytest_configure(config: pytest.Config):
 
         >>> CLI_options["test_stages_for_package"] = []
         >>> CLI_options["test_stage"] = []
-        >>> with patch("MEDS_transforms.pytest_plugin.get_all_registered_stages", return_value=mock_stages):
+        >>> with patch(_P, return_value=mock_stages):
         ...     with patch("MEDS_transforms.pytest_plugin._auto_detect_package", return_value=None):
         ...         pytest_configure(config)
         >>> list(config.allowed_stages.keys())
@@ -197,6 +203,8 @@ def pytest_configure(config: pytest.Config):
         packages_to_test = []
 
     stages = config.getoption("test_stage")
+
+    from .stages.discovery import get_all_registered_stages
 
     registered_stages = get_all_registered_stages()
 
@@ -398,6 +406,9 @@ def pipeline_tester(
             ...
         AssertionError: Pipeline failed to produce expected output for stage 'filter_subjects'
     """
+
+    from .configs.stage import StageConfig
+    from .stages.discovery import get_all_registered_stages
 
     pipeline_stages = [StageConfig.from_arg(s).name for s in OmegaConf.create(pipeline_yaml).stages]
 
