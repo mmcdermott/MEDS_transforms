@@ -275,7 +275,7 @@ def run_stage(
         )
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     """Run an entire pipeline based on command line arguments."""
 
     parser = argparse.ArgumentParser(description="MEDS-Transforms Pipeline Runner")

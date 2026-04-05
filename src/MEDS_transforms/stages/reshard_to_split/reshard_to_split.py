@@ -262,7 +262,7 @@ def write_json(d: dict, fp: Path) -> None:
 
 
 @Stage.register(is_metadata=False)
-def main(cfg: DictConfig):
+def main(cfg: DictConfig):  # pragma: no cover
     """Re-shard a MEDS cohort to in a manner that subdivides subject splits."""
 
     output_dir = Path(cfg.stage_cfg.output_dir)

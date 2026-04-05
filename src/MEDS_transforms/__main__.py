@@ -33,7 +33,7 @@ def print_help_stage():
         print(f"  - {name}")
 
 
-def run_stage():
+def run_stage():  # pragma: no cover
     """Run a stage based on command line arguments."""
 
     if len(sys.argv) < 2:
