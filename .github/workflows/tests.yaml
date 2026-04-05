@@ -27,12 +27,7 @@ jobs:
 
       - name: Run tests
         run: |
-          uv run pytest -v --cov=src -m "not parallelized"
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4.0.1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          uv run pytest -v --cov=src --cov-report=xml:coverage-main.xml -m "not parallelized"
 
       - name: Install joblib
         run: |
@@ -40,9 +35,10 @@ jobs:
 
       - name: Run tests with joblib
         run: |
-          uv run pytest -v --cov=src tests/ -m "parallelized"
+          uv run pytest -v --cov=src --cov-report=xml:coverage-parallel.xml -m "parallelized"
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4.0.1
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage-main.xml,coverage-parallel.xml
