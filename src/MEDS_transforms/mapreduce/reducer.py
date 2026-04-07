@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 from typing import Protocol
 
-import polars.selectors as cs
+import polars as pl
 
 from ..dataframe import DF_T, READ_FN_T, WRITE_FN_T
 
@@ -96,7 +96,7 @@ def reduce_over(
         ┌─────┬─────┐
         │ a   ┆ b   │
         │ --- ┆ --- │
-        │ i64 ┆ i64 │
+        │ i8  ┆ i8  │
         ╞═════╪═════╡
         │ -1  ┆ -3  │
         │ -2  ┆ -4  │
@@ -207,10 +207,14 @@ def reduce_over(
         logger.info("Waiting to begin reduction for all files to be written...")
         time.sleep(polling_time)
 
-    reduced = reduce_fn(*[read_fn(fp) for fp in in_fps]).with_columns(cs.numeric().shrink_dtype().name.keep())
+    reduced = reduce_fn(*[read_fn(fp) for fp in in_fps])
 
     if merge_fp is not None and merge_fp.is_file():
         reduced = merge_fn(reduced, read_fn(merge_fp))
+
+    if isinstance(reduced, pl.LazyFrame):
+        reduced = reduced.collect()
+    reduced = reduced.with_columns(s.shrink_dtype() for s in reduced if s.dtype.is_numeric())
 
     out_fp.parent.mkdir(parents=True, exist_ok=True)
     write_fn(reduced, out_fp)
