@@ -644,7 +644,7 @@ requires-dist = [
     { name = "mkdocs-literate-nav", marker = "extra == 'docs'", specifier = "==0.6.1" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = "==9.6.7" },
     { name = "mkdocs-section-index", marker = "extra == 'docs'", specifier = "==0.3.9" },
-    { name = "mkdocstrings", extras = ["python", "shell"], marker = "extra == 'docs'", specifier = "==0.28.2" },
+    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = "==0.28.2" },
     { name = "numpy" },
     { name = "polars", specifier = ">=1.35,<2" },
     { name = "pretty-print-directory", specifier = ">=0.1.3" },

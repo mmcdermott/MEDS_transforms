@@ -156,14 +156,14 @@ stages" which can be used within the community to build novel, complex pipelines
 Each stage of a pipeline should be simple, testable, and (where possible) interoperable with other stages.
 This helps the community ensure correctness of pipelines and develop new tools in an efficient, reliable
 manner. It also helps researchers break down complex operations into simpler conceptual pieces. See the
-[documentation on MEDS-Transforms Stages](<>) for more details on how to define your own stages!
+[documentation on MEDS-Transforms Stages](https://mmcdermott.github.io/MEDS_transforms/stages/) for more details on how to define your own stages!
 
 #### Pipelines should be Defined via Readable, Comprehensive Configuration Files
 
 Complex pipelines should also be communicable to other researchers, so that we can easily reproduce others'
 results, understand their work, and iterate on it. This is best enabled when pipelines can be defined by
 clear, simple configuration files over this shared library of stages. MEDS-Transforms realizes this with our
-pipeline configuration specification, shown above. See [the full pipeline configuration documentation](<>) for
+pipeline configuration specification, shown above. See [the full pipeline configuration documentation](https://mmcdermott.github.io/MEDS_transforms/api/MEDS_transforms/) for
 more details.
 
 #### Pipelines should Scale with Compute Resources to Arbitrary Dataset Sizes
@@ -171,7 +171,7 @@ more details.
 Just as the MEDS format is designed to enable easy scaling of datasets through sharding, MEDS-Transforms is
 built around a mapreduce paradigm to enable easy scaling of pipelines to arbitrary dataset sizes by
 parallelizing operations across the input datasets' shards. Check out
-[the mapreduce helpers](<>) MEDS-Transforms exposes for your use in downstream pipelines.
+[the mapreduce helpers](https://mmcdermott.github.io/MEDS_transforms/api/MEDS_transforms/mapreduce/) MEDS-Transforms exposes for your use in downstream pipelines.
 
 #### Data is the Interface
 
