@@ -6,6 +6,8 @@
   </picture>
 </p>
 
+<!-- --8<-- [start:content] -->
+
 # MEDS Transforms: Build and run complex pipelines over MEDS datasets via simple parts
 
 [![PyPI - Version](https://img.shields.io/pypi/v/MEDS-transforms)](https://pypi.org/project/MEDS-transforms/)
@@ -334,3 +336,5 @@ Guide](https://github.com/Medical-Event-Data-Standard/.github/blob/main/CONTRIBU
 
 Note that contributions undergo pre-commit checks (`pre-commit run --all`), tests (`pytest`), and
 documentation generation (check via `mkdocs serve`).
+
+<!-- --8<-- [end:content] -->
