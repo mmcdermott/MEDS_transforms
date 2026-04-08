@@ -6,13 +6,24 @@ rendered in the documentation site.
 
 from __future__ import annotations
 
+import re
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from omegaconf import OmegaConf
 
+if TYPE_CHECKING:
+    import polars as pl
+
 from .discovery import get_all_registered_stages
+
+_GOOGLE_DOCSTRING_SECTIONS = re.compile(
+    r"^(Args|Returns|Raises|Yields|Examples|Attributes|Note|Notes|References|Todo|See Also"
+    r"|Warnings?|\\.\\.)\s*:",
+    re.MULTILINE,
+)
 
 
 @dataclass
@@ -32,11 +43,81 @@ class StageDoc:
     edit_path: Path | None = None
 
 
-def _format_example(example) -> str:
-    """Format a single :class:`StageExample` as Markdown.
+def _extract_description(docstring: str) -> str:
+    """Return only the leading description from a Google-style docstring.
 
-    Renders each part of the example (configuration, input data, expected output) as its own labelled, fenced
-    block so the documentation is easy to scan.
+    Strips Args, Returns, Examples, etc. sections so the rendered page shows a clean prose description rather
+    than raw docstring syntax.
+    """
+
+    text = textwrap.dedent(docstring).strip()
+    match = _GOOGLE_DOCSTRING_SECTIONS.search(text)
+    if match:
+        text = text[: match.start()].strip()
+    return text
+
+
+def _df_to_markdown(df: pl.DataFrame, max_rows: int = 20) -> str:
+    """Render a Polars DataFrame as a Markdown table.
+
+    Truncates to *max_rows* to keep examples readable.
+    """
+
+    if df.height > max_rows:
+        df = df.head(max_rows)
+        truncated = True
+    else:
+        truncated = False
+
+    header = "| " + " | ".join(f"**{c}**" for c in df.columns) + " |"
+    sep = "| " + " | ".join("---" for _ in df.columns) + " |"
+    rows = []
+    for row in df.iter_rows():
+        cells = []
+        for val in row:
+            if val is None:
+                cells.append("*null*")
+            elif isinstance(val, list):
+                cells.append(str(val))
+            else:
+                cells.append(str(val))
+        rows.append("| " + " | ".join(cells) + " |")
+
+    lines = [header, sep, *rows]
+    if truncated:
+        lines.append("")
+        lines.append(f"*... truncated to {max_rows} rows*")
+    return "\n".join(lines)
+
+
+def _format_dataset(dataset, label: str) -> list[str]:
+    """Render a MEDSDataset as labelled Markdown sections with tables."""
+
+    lines: list[str] = [f"**{label}:**", ""]
+
+    shards = dataset._pl_shards
+    if len(shards) == 1:
+        shard_name, df = next(iter(shards.items()))
+        lines.append(f"*Shard `{shard_name}`:*")
+        lines.append("")
+        lines.append(_df_to_markdown(df))
+        lines.append("")
+    else:
+        for shard_name, df in shards.items():
+            lines.append(f"<details><summary>Shard <code>{shard_name}</code> ({df.height} rows)</summary>")
+            lines.append("")
+            lines.append(_df_to_markdown(df))
+            lines.append("")
+            lines.append("</details>")
+            lines.append("")
+
+    return lines
+
+
+def _format_example(stage_name: str, example) -> str:
+    """Format a single :class:`StageExample` as structured Markdown.
+
+    Renders configuration as YAML, data as Markdown tables, and includes a sample CLI invocation.
     """
 
     lines: list[str] = []
@@ -49,39 +130,45 @@ def _format_example(example) -> str:
     if example.do_use_config_yaml:
         lines.extend(["> This example uses the stage's `config.yaml` file.", ""])
 
-    # Input data
+    # Input data as tables
     if example.in_data is not None:
-        lines.extend(["**Input data:**", "", "```", str(example.in_data), "```", ""])
+        lines.extend(_format_dataset(example.in_data, "Input data"))
 
-    # Expected output data
+    # Expected output data as tables
     if example.want_data is not None:
-        lines.extend(["**Expected output data:**", "", "```", str(example.want_data), "```", ""])
+        lines.extend(_format_dataset(example.want_data, "Expected output data"))
 
-    # Expected output metadata
+    # Expected output metadata as a table
     if example.want_metadata is not None:
-        lines.extend(["**Expected output metadata:**", "", "```", str(example.want_metadata), "```", ""])
+        lines.extend(["**Expected output metadata:**", ""])
+        lines.append(_df_to_markdown(example.want_metadata))
+        lines.append("")
+
+    # CLI usage hint
+    cfg_parts = [
+        f"stage_cfg.{k}={v}" for k, v in (example.stage_cfg or {}).items() if not isinstance(v, dict)
+    ]
+    cmd = f"MEDS_transform-stage <pipeline.yaml> {stage_name}"
+    if cfg_parts:
+        cmd += " " + " ".join(cfg_parts)
+    cmd += " input_dir=<input> output_dir=<output>"
+    lines.extend(["**Run this stage:**", "", "```bash", cmd, "```", ""])
 
     return "\n".join(lines)
 
 
 def _build_stage_content(stage_name: str, stage) -> str:
-    """Build Markdown content for a single stage.
-
-    Args:
-        stage_name: The registered name of the stage.
-        stage: The loaded :class:`Stage` object.
-
-    Returns:
-        A Markdown string documenting the stage.
-    """
+    """Build Markdown content for a single stage."""
 
     lines = [f"# `{stage_name}`"]
 
-    # Description from docstring
+    # Description from docstring (prose only, no Args/Returns/Examples)
     docstring = stage.stage_docstring
     if docstring:
-        lines.append("")
-        lines.append(textwrap.dedent(docstring).strip())
+        description = _extract_description(docstring)
+        if description:
+            lines.append("")
+            lines.append(description)
 
     # Stage metadata table
     lines.append("")
@@ -106,6 +193,18 @@ def _build_stage_content(stage_name: str, stage) -> str:
         for col, dtype in stage.output_schema_updates.items():
             lines.append(f"| `{col}` | `{dtype}` |")
 
+    # CLI usage
+    lines.extend(
+        [
+            "",
+            "## Usage",
+            "",
+            "```bash",
+            f"MEDS_transform-stage <pipeline.yaml> {stage_name} input_dir=<input> output_dir=<output>",
+            "```",
+        ]
+    )
+
     # Examples / test cases
     if stage.test_cases:
         lines.append("")
@@ -113,7 +212,7 @@ def _build_stage_content(stage_name: str, stage) -> str:
         for scenario, example in stage.test_cases.items():
             scenario_name = scenario or "default"
             lines.extend(["", f"### {scenario_name}", ""])
-            lines.append(_format_example(example))
+            lines.append(_format_example(stage_name, example))
 
     return "\n".join(lines)
 
