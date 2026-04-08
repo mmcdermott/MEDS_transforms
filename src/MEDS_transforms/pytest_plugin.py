@@ -498,7 +498,7 @@ def pipeline_tester(
 
             stage_output_dir = output_dir / name
 
-            stage.df_check_kwargs = {"rtol": 5e-2, "atol": 1e-2, "check_dtypes": False}
+            stage.df_check_kwargs = {"rel_tol": 5e-2, "abs_tol": 1e-2, "check_dtypes": False}
 
             try:
                 if stage.want_data is not None:

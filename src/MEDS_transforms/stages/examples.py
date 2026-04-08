@@ -852,7 +852,7 @@ class StageExample:
             self.scenario_name = None
 
         if self.df_check_kwargs is None:
-            self.df_check_kwargs = {"rtol": 1e-3, "atol": 1e-5}
+            self.df_check_kwargs = {"rel_tol": 1e-3, "abs_tol": 1e-5}
 
     @classmethod
     def is_example_dir(cls, path: Path) -> bool:
@@ -994,7 +994,9 @@ class StageExample:
             metadata_fp = metadata_dir / "codes.parquet"
             got_metadata = pl.read_parquet(metadata_fp)
             try:
-                assert_frame_equal(self.want_metadata, got_metadata, **self.df_check_kwargs)
+                assert_frame_equal(
+                    self.want_metadata, got_metadata, check_row_order=False, **self.df_check_kwargs
+                )
             except AssertionError as e:
                 pl.Config.set_tbl_rows(-1)
                 raise AssertionError(

@@ -95,10 +95,10 @@ class MapReducePair(NamedTuple):
     """
 
     mapper: pl.Expr
-    reducer: Callable[[pl.Expr | Sequence[pl.Expr] | cs._selector_proxy_], pl.Expr]
+    reducer: Callable[[pl.Expr | Sequence[pl.Expr] | cs.Selector], pl.Expr]
 
 
-def quantile_reducer(cols: cs._selector_proxy_, quantiles: list[float]) -> pl.Expr:
+def quantile_reducer(cols: cs.Selector, quantiles: list[float]) -> pl.Expr:
     """Calculates the specified quantiles for the combined set of all numerical values in `cols`.
 
     Args:
@@ -159,7 +159,10 @@ def quantile_reducer(cols: cs._selector_proxy_, quantiles: list[float]) -> pl.Ex
 
     quantiles_struct = {f"values/quantile/{q}": vals.quantile(q) for q in quantiles}
 
-    return pl.struct(**quantiles_struct).alias(MetadataFn.VALUES_QUANTILES)
+    result = pl.struct(**quantiles_struct)
+    # When all quantile values are null (no numeric data), return null instead of {null, null, ...}
+    any_non_null = pl.any_horizontal(*(vals.quantile(q).is_not_null() for q in quantiles))
+    return pl.when(any_non_null).then(result).otherwise(pl.lit(None)).alias(MetadataFn.VALUES_QUANTILES)
 
 
 VAL = pl.col("numeric_value")

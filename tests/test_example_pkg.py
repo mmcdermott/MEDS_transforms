@@ -90,7 +90,7 @@ def test_simple_example_pipeline():
             if fp.suffix == ".parquet":
                 want_df = pl.read_parquet(want_fp)
                 got_df = pl.read_parquet(fp)
-                assert_frame_equal(want_df, got_df)
+                assert_frame_equal(want_df, got_df, check_row_order=False)
             elif fp.suffix == ".json":
                 assert want_fp.read_text() == fp.read_text(), (
                     f"Expected metadata file {want_fp} does not match got {fp}."

@@ -17,7 +17,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-  "polars~=1.30.0",
+  "polars>=1.35,<2",
   "pyarrow",
   "hydra-core",
   "numpy",
