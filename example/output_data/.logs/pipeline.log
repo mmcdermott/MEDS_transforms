@@ -1,0 +1,55 @@
+INFO:root:Running MEDS-Transforms Pipeline Runner with the following arguments:
+INFO:root:  pipeline_config_fp: pkg://simple_example_pkg.pipelines.example_pipeline.yaml
+INFO:root:  stage_runner_fp: None
+INFO:root:  do_profile: False
+INFO:root:  overrides: ['input_dir=example/data', 'output_dir=/tmp/tmp0f99nbwj']
+INFO:MEDS_transforms.runner:No parallelization configuration provided.
+INFO:MEDS_transforms.runner:Running stage: drop_regex
+INFO:MEDS_transforms.runner:Running command: MEDS_transform-stage pkg://simple_example_pkg.pipelines.example_pipeline.yaml drop_regex stage=drop_regex input_dir=example/data output_dir=/tmp/tmp0f99nbwj
+INFO:MEDS_transforms.runner:Command output:
+[2026-04-07 21:52:18,143][MEDS_transforms.mapreduce.shard_iteration][INFO] - Mapping computation over a maximum of 4 shards
+[2026-04-07 21:52:18,144][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/data/data/held_out/0.parquet into /tmp/tmp0f99nbwj/data/held_out/0.parquet
+[2026-04-07 21:52:18,144][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from example/data/data/held_out/0.parquet
+[2026-04-07 21:52:18,144][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2026-04-07 21:52:18,144][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to /tmp/tmp0f99nbwj/data/held_out/0.parquet
+[2026-04-07 21:52:18,149][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.004643
+[2026-04-07 21:52:18,149][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/data/data/tuning/0.parquet into /tmp/tmp0f99nbwj/data/tuning/0.parquet
+[2026-04-07 21:52:18,149][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from example/data/data/tuning/0.parquet
+[2026-04-07 21:52:18,149][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2026-04-07 21:52:18,149][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to /tmp/tmp0f99nbwj/data/tuning/0.parquet
+[2026-04-07 21:52:18,151][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.002312
+[2026-04-07 21:52:18,152][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/data/data/train/1.parquet into /tmp/tmp0f99nbwj/data/train/1.parquet
+[2026-04-07 21:52:18,152][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from example/data/data/train/1.parquet
+[2026-04-07 21:52:18,152][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2026-04-07 21:52:18,152][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to /tmp/tmp0f99nbwj/data/train/1.parquet
+[2026-04-07 21:52:18,154][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.002050
+[2026-04-07 21:52:18,154][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/data/data/train/0.parquet into /tmp/tmp0f99nbwj/data/train/0.parquet
+[2026-04-07 21:52:18,154][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from example/data/data/train/0.parquet
+[2026-04-07 21:52:18,154][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2026-04-07 21:52:18,154][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to /tmp/tmp0f99nbwj/data/train/0.parquet
+[2026-04-07 21:52:18,155][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.001075
+[2026-04-07 21:52:18,155][MEDS_transforms.mapreduce.stage][INFO] - Finished mapping in 0:00:00.012633
+
+INFO:MEDS_transforms.runner:Command error:
+
+INFO:MEDS_transforms.runner:Running stage: count_codes
+INFO:MEDS_transforms.runner:Running command: MEDS_transform-stage pkg://simple_example_pkg.pipelines.example_pipeline.yaml count_codes stage=count_codes input_dir=example/data output_dir=/tmp/tmp0f99nbwj
+INFO:MEDS_transforms.runner:Command output:
+[2026-04-07 21:52:18,542][MEDS_transforms.mapreduce.shard_iteration][INFO] - Mapping computation over a maximum of 2 shards
+[2026-04-07 21:52:18,542][MEDS_transforms.mapreduce.stage][INFO] - Processing train split only via shard prefix. Not filtering with /home/mmd/Projects/MEDS_transforms/example/data/metadata/subject_splits.parquet.
+[2026-04-07 21:52:18,542][MEDS_transforms.mapreduce.mapper][INFO] - Processing /tmp/tmp0f99nbwj/data/train/1.parquet into /tmp/tmp0f99nbwj/count_codes/train/1.parquet
+[2026-04-07 21:52:18,543][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from /tmp/tmp0f99nbwj/data/train/1.parquet
+[2026-04-07 21:52:18,543][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2026-04-07 21:52:18,543][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to /tmp/tmp0f99nbwj/count_codes/train/1.parquet
+[2026-04-07 21:52:18,547][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.004318
+[2026-04-07 21:52:18,547][MEDS_transforms.mapreduce.mapper][INFO] - Processing /tmp/tmp0f99nbwj/data/train/0.parquet into /tmp/tmp0f99nbwj/count_codes/train/0.parquet
+[2026-04-07 21:52:18,547][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from /tmp/tmp0f99nbwj/data/train/0.parquet
+[2026-04-07 21:52:18,547][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2026-04-07 21:52:18,547][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to /tmp/tmp0f99nbwj/count_codes/train/0.parquet
+[2026-04-07 21:52:18,549][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.001428
+[2026-04-07 21:52:18,549][MEDS_transforms.mapreduce.stage][INFO] - Finished mapping in 0:00:00.007385
+[2026-04-07 21:52:18,549][MEDS_transforms.mapreduce.stage][INFO] - Starting reduction process
+[2026-04-07 21:52:18,552][MEDS_transforms.mapreduce.stage][INFO] - Finished reduction in 0:00:00.003400
+
+INFO:MEDS_transforms.runner:Command error:
+

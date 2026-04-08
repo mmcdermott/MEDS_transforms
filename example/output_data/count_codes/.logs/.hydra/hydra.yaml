@@ -105,13 +105,13 @@ hydra:
     hydra:
     - hydra.mode=RUN
     task:
-    - stage=drop_regex
+    - stage=count_codes
     - input_dir=example/data
     - output_dir=/tmp/tmp0f99nbwj
   job:
     name: ${stage}_${worker}_${now:%Y-%m-%d_%H-%M-%S}
     chdir: null
-    override_dirname: input_dir=example/data,output_dir=/tmp/tmp0f99nbwj,stage=drop_regex
+    override_dirname: input_dir=example/data,output_dir=/tmp/tmp0f99nbwj,stage=count_codes
     id: ???
     num: ???
     config_name: _main
@@ -130,13 +130,13 @@ hydra:
     - path: hydra.conf
       schema: pkg
       provider: hydra
-    - path: simple_example_pkg.drop_regex
+    - path: MEDS_transforms.stages
       schema: pkg
       provider: main
     - path: ''
       schema: structured
       provider: schema
-    output_dir: /tmp/tmp0f99nbwj/data/.logs
+    output_dir: /tmp/tmp0f99nbwj/count_codes/.logs
     choices:
       dataset: _base_dataset
       hydra/env: default
