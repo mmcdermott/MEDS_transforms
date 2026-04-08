@@ -25,6 +25,7 @@ markdown_extensions:
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.superfences
+  - md_in_html
   - github-callouts
 
 extra_javascript:

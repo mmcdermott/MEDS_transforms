@@ -104,7 +104,9 @@ def _format_dataset(dataset, label: str) -> list[str]:
         lines.append("")
     else:
         for shard_name, df in shards.items():
-            lines.append(f"<details><summary>Shard <code>{shard_name}</code> ({df.height} rows)</summary>")
+            lines.append(
+                f'<details markdown="1"><summary>Shard <code>{shard_name}</code> ({df.height} rows)</summary>'
+            )
             lines.append("")
             lines.append(_df_to_markdown(df))
             lines.append("")
