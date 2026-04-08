@@ -284,8 +284,7 @@ class StageExample:
     This is used in the automated stage testing infrastructure both for testing the built-in MEDS transforms
     stages and for downstream package stages.
 
-    Eventually, it may be used for documenting stages as well -- if this would be useful to you, please file a
-    GitHub issue to request it so we can track interest.
+    These examples are also used to generate stage documentation pages automatically.
 
     Attributes:
         stage_name: The name of the stage.

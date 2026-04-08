@@ -44,4 +44,4 @@ plugins:
   - git-authors
   - git-revision-date-localized
 
-watch: [src, README.md]
+watch: [src, docs, README.md]
