@@ -43,6 +43,24 @@ class StageDoc:
     edit_path: Path | None = None
 
 
+def _read_readme(directory: Path | None) -> str | None:
+    """Read a README.md from *directory*, stripping any leading ``#`` heading.
+
+    The leading heading is removed because the README content is embedded under an existing section heading in
+    the generated page.
+    """
+
+    if directory is None:
+        return None
+    readme = directory / "README.md"
+    if not readme.is_file():
+        return None
+    text = readme.read_text().strip()
+    # Strip a leading ATX heading (e.g. "# Title\n\n...") to avoid duplicate/conflicting headings.
+    text = re.sub(r"^#[^\n]*\n+", "", text).strip()
+    return text or None
+
+
 def _extract_description(docstring: str) -> str:
     """Return only the leading description from a Google-style docstring.
 
@@ -116,13 +134,18 @@ def _format_dataset(dataset, label: str) -> list[str]:
     return lines
 
 
-def _format_example(stage_name: str, example) -> str:
+def _format_example(stage_name: str, example, example_dir: Path | None = None) -> str:
     """Format a single :class:`StageExample` as structured Markdown.
 
     Renders configuration as YAML, data as Markdown tables, and includes a sample CLI invocation.
     """
 
     lines: list[str] = []
+
+    # Per-example description from README.md in the example directory
+    example_readme = _read_readme(example_dir)
+    if example_readme:
+        lines.extend([example_readme, ""])
 
     # Stage configuration
     if example.stage_cfg:
@@ -172,6 +195,11 @@ def _build_stage_content(stage_name: str, stage) -> str:
             lines.append("")
             lines.append(description)
 
+    # Stage-level README (from the stage directory itself)
+    stage_readme = _read_readme(stage.stage_dir)
+    if stage_readme:
+        lines.extend(["", stage_readme])
+
     # Stage metadata table
     lines.append("")
     lines.append("## Details")
@@ -211,10 +239,17 @@ def _build_stage_content(stage_name: str, stage) -> str:
     if stage.test_cases:
         lines.append("")
         lines.append("## Examples")
+
+        # Examples-level README (overview of all examples)
+        examples_readme = _read_readme(stage.examples_dir)
+        if examples_readme:
+            lines.extend(["", examples_readme])
+
         for scenario, example in stage.test_cases.items():
             scenario_name = scenario or "default"
+            example_dir = stage.examples_dir / scenario if stage.examples_dir and scenario else None
             lines.extend(["", f"### {scenario_name}", ""])
-            lines.append(_format_example(stage_name, example))
+            lines.append(_format_example(stage_name, example, example_dir))
 
     return "\n".join(lines)
 

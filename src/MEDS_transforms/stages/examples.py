@@ -871,7 +871,6 @@ class StageExample:
         want_data_fp = example_dir / "out_data.yaml"
         want_metadata_fp = example_dir / "out_metadata.yaml"
         test_cfg_fp = example_dir / "_test_cfg.yaml"
-
         want_data = None
         want_metadata = None
         if want_data_fp.is_file():
