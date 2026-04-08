@@ -9,7 +9,7 @@ custom stages and uses built-in stages to run a larger pipeline. This example is
 files:
 
 ```python
->>> print_directory("example", PrintConfig(ignore_regex=r"__pycache__|.egg-info|.pytest_cache"))
+>>> print_directory("example", PrintConfig(ignore_regex=r"__pycache__|.egg-info|.pytest_cache")) # doctest: +ELLIPSIS
 ├── README.md
 ├── data
 │   ├── data
@@ -37,7 +37,7 @@ files:
 │   │   │   │   ├── config.yaml
 │   │   │   │   ├── hydra.yaml
 │   │   │   │   └── overrides.yaml
-│   │   │   └── count_codes_0_2025-07-09_15-52-41.log
+│   │   │   └── count_codes_0_...log
 │   │   └── train
 │   │       ├── 0.parquet
 │   │       └── 1.parquet
@@ -47,7 +47,7 @@ files:
 │   │   │   │   ├── config.yaml
 │   │   │   │   ├── hydra.yaml
 │   │   │   │   └── overrides.yaml
-│   │   │   └── drop_regex_0_2025-07-09_15-52-40.log
+│   │   │   └── drop_regex_0_...log
 │   │   ├── held_out
 │   │   │   └── 0.parquet
 │   │   ├── train

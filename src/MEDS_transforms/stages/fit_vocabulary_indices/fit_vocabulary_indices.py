@@ -187,11 +187,12 @@ def lexicographic_indices(code_metadata: pl.DataFrame, code_modifiers: list[str]
 
     sort_cols = ["code", *code_modifiers]
 
-    return code_metadata.with_columns(
-        (pl.arg_sort_by(pl.arg_sort_by(sort_cols, descending=False, nulls_last=False)) + 1)
-        .shrink_dtype()
-        .alias("code/vocab_index")
+    result = code_metadata.with_columns(
+        (pl.arg_sort_by(pl.arg_sort_by(sort_cols, descending=False, nulls_last=False)) + 1).alias(
+            "code/vocab_index"
+        )
     )
+    return result.with_columns(result["code/vocab_index"].shrink_dtype())
 
 
 VocabularyOrdering_METHODS: dict[VocabularyOrdering, INDEX_ASSIGNMENT_FN] = {

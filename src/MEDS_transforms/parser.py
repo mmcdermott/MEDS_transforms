@@ -309,7 +309,7 @@ class ColExprType(StrEnum):
             col("foo") {'foo'}
             >>> expr, cols = ColExprType.to_pl_expr(ColExprType.STR, "bar//{foo}//{baz}")
             >>> print(expr)
-            "bar//".str.concat_horizontal([col("foo"), "//", col("baz")])
+            col("foo").str.format([col("baz")])
             >>> sorted(cols)
             ['baz', 'foo']
             >>> expr, cols = ColExprType.to_pl_expr(ColExprType.LITERAL, ListConfig(["foo", "bar"]))
@@ -481,7 +481,7 @@ def structured_expr_to_pl(cfg: dict | list[dict] | ListConfig | DictConfig) -> t
     Examples:
         >>> expr, cols = structured_expr_to_pl([{"col": "foo"}, {"str": "bar//{baz}"}, {"literal": "fizz"}])
         >>> print(expr)
-        col("foo").coalesce(["bar//".str.concat_horizontal([col("baz")]), "fizz"])
+        col("foo").coalesce([col("baz").str.format(), "fizz"])
         >>> sorted(cols)
         ['baz', 'foo']
         >>> expr, cols = structured_expr_to_pl({"output": {"literal": "foo"}, "matcher": {"bar": "baz"}})

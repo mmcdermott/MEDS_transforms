@@ -3,8 +3,8 @@ dataset:
   name: ${oc:get_dataset_name_from_root:root_dir}
   version: ${oc:get_dataset_version_from_root:root_dir}
   code_modifiers: []
-input_dir: data
-output_dir: output_data
+input_dir: example/data
+output_dir: /tmp/tmp0f99nbwj
 _default_description: 'This is a MEDS pipeline ETL. Please set a more detailed description
   at the top of your specific pipeline
 

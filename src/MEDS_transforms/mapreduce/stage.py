@@ -720,7 +720,7 @@ def mapreduce_stage(
         ...         print("------------------")
         ...         print("Reduced Output:")
         ...         print("------------------")
-        ...         print(pl.read_parquet(out_fp))
+        ...         print(pl.read_parquet(out_fp).sort("code"))
         ...     else:
         ...         print("No reduced output found.")
 
@@ -778,17 +778,17 @@ def mapreduce_stage(
         │ ---                   ┆ ---   ┆ ---                             ┆ ---              │
         │ str                   ┆ u8    ┆ str                             ┆ list[str]        │
         ╞═══════════════════════╪═══════╪═════════════════════════════════╪══════════════════╡
-        │ EYE_COLOR//BROWN      ┆ 3     ┆ Brown Eyes. The most common ey… ┆ null             │
-        │ HEIGHT                ┆ 6     ┆ null                            ┆ null             │
-        │ MEDS_BIRTH            ┆ 6     ┆ null                            ┆ null             │
-        │ ADMISSION//ORTHOPEDIC ┆ 2     ┆ null                            ┆ null             │
-        │ HR                    ┆ 16    ┆ Heart Rate                      ┆ ["LOINC/8867-4"] │
-        │ …                     ┆ …     ┆ …                               ┆ …                │
-        │ DISCHARGE             ┆ 6     ┆ null                            ┆ null             │
-        │ ADMISSION//PULMONARY  ┆ 2     ┆ null                            ┆ null             │
-        │ EYE_COLOR//HAZEL      ┆ 2     ┆ Hazel eyes. These are uncommon  ┆ null             │
         │ ADMISSION//CARDIAC    ┆ 2     ┆ null                            ┆ null             │
+        │ ADMISSION//ORTHOPEDIC ┆ 2     ┆ null                            ┆ null             │
+        │ ADMISSION//PULMONARY  ┆ 2     ┆ null                            ┆ null             │
+        │ DISCHARGE             ┆ 6     ┆ null                            ┆ null             │
         │ EYE_COLOR//BLUE       ┆ 1     ┆ Blue Eyes. Less common than br… ┆ null             │
+        │ …                     ┆ …     ┆ …                               ┆ …                │
+        │ EYE_COLOR//HAZEL      ┆ 2     ┆ Hazel eyes. These are uncommon  ┆ null             │
+        │ HEIGHT                ┆ 6     ┆ null                            ┆ null             │
+        │ HR                    ┆ 16    ┆ Heart Rate                      ┆ ["LOINC/8867-4"] │
+        │ MEDS_BIRTH            ┆ 6     ┆ null                            ┆ null             │
+        │ TEMP                  ┆ 16    ┆ Body Temperature                ┆ ["LOINC/8310-5"] │
         └───────────────────────┴───────┴─────────────────────────────────┴──────────────────┘
 
     If we set `train_only` to `True`, we can see that the held-out and tuning splits are not included in the
@@ -814,17 +814,17 @@ def mapreduce_stage(
         │ ---                   ┆ ---   ┆ ---                             ┆ ---              │
         │ str                   ┆ u8    ┆ str                             ┆ list[str]        │
         ╞═══════════════════════╪═══════╪═════════════════════════════════╪══════════════════╡
+        │ ADMISSION//CARDIAC    ┆ 2     ┆ null                            ┆ null             │
+        │ ADMISSION//ORTHOPEDIC ┆ 1     ┆ null                            ┆ null             │
+        │ ADMISSION//PULMONARY  ┆ 1     ┆ null                            ┆ null             │
+        │ DISCHARGE             ┆ 4     ┆ null                            ┆ null             │
+        │ EYE_COLOR//BLUE       ┆ 1     ┆ Blue Eyes. Less common than br… ┆ null             │
+        │ …                     ┆ …     ┆ …                               ┆ …                │
         │ EYE_COLOR//HAZEL      ┆ 2     ┆ Hazel eyes. These are uncommon  ┆ null             │
         │ HEIGHT                ┆ 4     ┆ null                            ┆ null             │
-        │ MEDS_BIRTH            ┆ 4     ┆ null                            ┆ null             │
-        │ ADMISSION//PULMONARY  ┆ 1     ┆ null                            ┆ null             │
         │ HR                    ┆ 12    ┆ Heart Rate                      ┆ ["LOINC/8867-4"] │
-        │ …                     ┆ …     ┆ …                               ┆ …                │
-        │ DISCHARGE             ┆ 4     ┆ null                            ┆ null             │
-        │ ADMISSION//ORTHOPEDIC ┆ 1     ┆ null                            ┆ null             │
-        │ EYE_COLOR//BROWN      ┆ 1     ┆ Brown Eyes. The most common ey… ┆ null             │
-        │ ADMISSION//CARDIAC    ┆ 2     ┆ null                            ┆ null             │
-        │ EYE_COLOR//BLUE       ┆ 1     ┆ Blue Eyes. Less common than br… ┆ null             │
+        │ MEDS_BIRTH            ┆ 4     ┆ null                            ┆ null             │
+        │ TEMP                  ┆ 12    ┆ Body Temperature                ┆ ["LOINC/8310-5"] │
         └───────────────────────┴───────┴─────────────────────────────────┴──────────────────┘
 
     Lastly, note that mapreduce is special in that the reduction happens only in one worker -- so if the
