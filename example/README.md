@@ -26,6 +26,21 @@ files:
 │   │   └── subject_splits.parquet
 │   └── source.yaml
 ├── output_data
+│   ├── .logs
+│   │   ├── _all_stages.done
+│   │   ├── count_codes.done
+│   │   ├── drop_regex.done
+│   │   └── pipeline.log
+│   ├── count_codes
+│   │   ├── .logs
+│   │   │   ├── .hydra
+│   │   │   │   ├── config.yaml
+│   │   │   │   ├── hydra.yaml
+│   │   │   │   └── overrides.yaml
+│   │   │   └── count_codes_0_...log
+│   │   └── train
+│   │       ├── 0.parquet
+│   │       └── 1.parquet
 │   ├── data
 │   │   ├── .logs
 │   │   │   ├── .hydra

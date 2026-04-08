@@ -161,8 +161,8 @@ def quantile_reducer(cols: cs.Selector, quantiles: list[float]) -> pl.Expr:
 
     result = pl.struct(**quantiles_struct)
     # When all quantile values are null (no numeric data), return null instead of {null, null, ...}
-    any_non_null = pl.any_horizontal(*(vals.quantile(q).is_not_null() for q in quantiles))
-    return pl.when(any_non_null).then(result).otherwise(pl.lit(None)).alias(MetadataFn.VALUES_QUANTILES)
+    has_values = vals.count() > 0
+    return pl.when(has_values).then(result).otherwise(pl.lit(None)).alias(MetadataFn.VALUES_QUANTILES)
 
 
 VAL = pl.col("numeric_value")
