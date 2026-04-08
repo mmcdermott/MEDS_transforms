@@ -9,14 +9,57 @@ custom stages and uses built-in stages to run a larger pipeline. This example is
 files:
 
 ```python
->>> print_directory("example", PrintConfig(ignore_regex=r"__pycache__|.egg-info|.pytest_cache")) # doctest: +SKIP
+>>> print_directory("example", PrintConfig(ignore_regex=r"__pycache__|.egg-info|.pytest_cache")) # doctest: +ELLIPSIS
 ├── README.md
 ├── data
-│   ├── ...
+│   ├── data
+│   │   ├── held_out
+│   │   │   └── 0.parquet
+│   │   ├── train
+│   │   │   ├── 0.parquet
+│   │   │   └── 1.parquet
+│   │   └── tuning
+│   │       └── 0.parquet
+│   ├── metadata
+│   │   ├── codes.parquet
+│   │   ├── dataset.json
+│   │   └── subject_splits.parquet
+│   └── source.yaml
 ├── output_data
-│   ├── ...
+│   ├── data
+│   │   ├── .logs
+│   │   │   ├── .hydra
+│   │   │   │   ├── config.yaml
+│   │   │   │   ├── hydra.yaml
+│   │   │   │   └── overrides.yaml
+│   │   │   └── drop_regex_0_...log
+│   │   ├── held_out
+│   │   │   └── 0.parquet
+│   │   ├── train
+│   │   │   ├── 0.parquet
+│   │   │   └── 1.parquet
+│   │   └── tuning
+│   │       └── 0.parquet
+│   └── metadata
+│       └── codes.parquet
 └── simple_example_pkg
-    ├── ...
+    ├── README.md
+    ├── pyproject.toml
+    ├── src
+    │   └── simple_example_pkg
+    │       ├── __init__.py
+    │       ├── drop_regex
+    │       │   ├── __init__.py
+    │       │   ├── config.yaml
+    │       │   ├── drop_regex.py
+    │       │   └── examples
+    │       │       ├── _test_cfg.yaml
+    │       │       ├── cfg.yaml
+    │       │       └── out_data.yaml
+    │       └── pipelines
+    │           └── example_pipeline.yaml
+    └── tests
+        └── test_registered_stages.py
 
 ```
 
