@@ -48,6 +48,19 @@ def _read_readme(directory: Path | None) -> str | None:
 
     The leading heading is removed because the README content is embedded under an existing section heading in
     the generated page.
+
+    Examples:
+        >>> _read_readme(None) is None
+        True
+        >>> import tempfile
+        >>> from pathlib import Path
+        >>> with tempfile.TemporaryDirectory() as d:
+        ...     _ = (Path(d) / "README.md").write_text("# Title\\n\\nBody text.\\n")
+        ...     _read_readme(Path(d))
+        'Body text.'
+        >>> with tempfile.TemporaryDirectory() as d:
+        ...     _read_readme(Path(d)) is None
+        True
     """
 
     if directory is None:
@@ -66,6 +79,12 @@ def _extract_description(docstring: str) -> str:
 
     Strips Args, Returns, Examples, etc. sections so the rendered page shows a clean prose description rather
     than raw docstring syntax.
+
+    Examples:
+        >>> _extract_description("Does something useful.\\n\\nArgs:\\n    x: an int")
+        'Does something useful.'
+        >>> _extract_description("No sections here.")
+        'No sections here.'
     """
 
     text = textwrap.dedent(docstring).strip()
@@ -79,6 +98,21 @@ def _df_to_markdown(df: pl.DataFrame, max_rows: int = 20) -> str:
     """Render a Polars DataFrame as a Markdown table.
 
     Truncates to *max_rows* to keep examples readable.
+
+    Examples:
+        >>> import polars as pl
+        >>> print(_df_to_markdown(pl.DataFrame({"a": [1, None], "b": ["x", "y"]})))
+        | **a** | **b** |
+        | --- | --- |
+        | 1 | x |
+        | *null* | y |
+        >>> print(_df_to_markdown(pl.DataFrame({"v": [1, 2, 3]}), max_rows=2))
+        | **v** |
+        | --- |
+        | 1 |
+        | 2 |
+        <BLANKLINE>
+        *... truncated to 2 rows*
     """
 
     if df.height > max_rows:
@@ -109,7 +143,23 @@ def _df_to_markdown(df: pl.DataFrame, max_rows: int = 20) -> str:
 
 
 def _format_dataset(dataset, label: str) -> list[str]:
-    """Render a MEDSDataset as labelled Markdown sections with tables."""
+    """Render a MEDSDataset as labelled Markdown sections with tables.
+
+    Examples:
+        >>> from types import SimpleNamespace
+        >>> import polars as pl
+        >>> ds = SimpleNamespace(_pl_shards={"0": pl.DataFrame({"x": [1]})})
+        >>> lines = _format_dataset(ds, "Test")
+        >>> print("\\n".join(lines))
+        **Test:**
+        <BLANKLINE>
+        *Shard `0`:*
+        <BLANKLINE>
+        | **x** |
+        | --- |
+        | 1 |
+        <BLANKLINE>
+    """
 
     lines: list[str] = [f"**{label}:**", ""]
 
