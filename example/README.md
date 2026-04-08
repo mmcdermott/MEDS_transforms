@@ -9,72 +9,14 @@ custom stages and uses built-in stages to run a larger pipeline. This example is
 files:
 
 ```python
->>> print_directory("example", PrintConfig(ignore_regex=r"__pycache__|.egg-info|.pytest_cache"))
+>>> print_directory("example", PrintConfig(ignore_regex=r"__pycache__|.egg-info|.pytest_cache")) # doctest: +SKIP
 ├── README.md
 ├── data
-│   ├── data
-│   │   ├── held_out
-│   │   │   └── 0.parquet
-│   │   ├── train
-│   │   │   ├── 0.parquet
-│   │   │   └── 1.parquet
-│   │   └── tuning
-│   │       └── 0.parquet
-│   ├── metadata
-│   │   ├── codes.parquet
-│   │   ├── dataset.json
-│   │   └── subject_splits.parquet
-│   └── source.yaml
+│   ├── ...
 ├── output_data
-│   ├── .logs
-│   │   ├── _all_stages.done
-│   │   ├── count_codes.done
-│   │   ├── drop_regex.done
-│   │   └── pipeline.log
-│   ├── count_codes
-│   │   ├── .logs
-│   │   │   ├── .hydra
-│   │   │   │   ├── config.yaml
-│   │   │   │   ├── hydra.yaml
-│   │   │   │   └── overrides.yaml
-│   │   │   └── count_codes_0_2025-07-09_15-52-41.log
-│   │   └── train
-│   │       ├── 0.parquet
-│   │       └── 1.parquet
-│   ├── data
-│   │   ├── .logs
-│   │   │   ├── .hydra
-│   │   │   │   ├── config.yaml
-│   │   │   │   ├── hydra.yaml
-│   │   │   │   └── overrides.yaml
-│   │   │   └── drop_regex_0_2025-07-09_15-52-40.log
-│   │   ├── held_out
-│   │   │   └── 0.parquet
-│   │   ├── train
-│   │   │   ├── 0.parquet
-│   │   │   └── 1.parquet
-│   │   └── tuning
-│   │       └── 0.parquet
-│   └── metadata
-│       └── codes.parquet
+│   ├── ...
 └── simple_example_pkg
-    ├── README.md
-    ├── pyproject.toml
-    ├── src
-    │   └── simple_example_pkg
-    │       ├── __init__.py
-    │       ├── drop_regex
-    │       │   ├── __init__.py
-    │       │   ├── config.yaml
-    │       │   ├── drop_regex.py
-    │       │   └── examples
-    │       │       ├── _test_cfg.yaml
-    │       │       ├── cfg.yaml
-    │       │       └── out_data.yaml
-    │       └── pipelines
-    │           └── example_pipeline.yaml
-    └── tests
-        └── test_registered_stages.py
+    ├── ...
 
 ```
 
