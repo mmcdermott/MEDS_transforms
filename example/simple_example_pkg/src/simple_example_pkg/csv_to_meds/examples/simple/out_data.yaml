@@ -1,0 +1,11 @@
+data/train/0.parquet: |-
+  subject_id,time,code,numeric_value
+  239684,,EYE_COLOR//BROWN,
+  239684,,HEIGHT,175.3
+  239684,"05/11/2010, 00:00:00",HR,112.6
+
+data/train/1.parquet: |-
+  subject_id,time,code,numeric_value
+  1195293,,EYE_COLOR//BLUE,
+  1195293,,HEIGHT,164.7
+  1195293,"06/20/2010, 00:00:00",HR,109.0

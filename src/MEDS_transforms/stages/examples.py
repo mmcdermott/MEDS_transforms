@@ -838,6 +838,7 @@ class StageExample:
     in_data: MEDSDataset | Path | None = None
     pipeline_cfg: dict = field(default_factory=dict)
     do_use_config_yaml: bool = False
+    test_is_disabled: bool = False
     df_check_kwargs: dict | None = None
 
     BASE_PACKAGE: ClassVar[str] = "__null__"
@@ -1091,6 +1092,11 @@ class StageExample:
         Raises:
             AssertionError: If the test fails.
         """
+
+        if self.test_is_disabled:
+            import pytest
+
+            pytest.skip(f"Test disabled for {self.full_name}")
 
         with self.test_env as test_env:
             command_out = run_fn(test_env.script, shell=True, capture_output=True)
