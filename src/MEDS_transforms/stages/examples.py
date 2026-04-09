@@ -923,14 +923,8 @@ class StageExample:
         if self.in_data is None:
             in_data = MEDSDataset.from_yaml(SIMPLE_STATIC_SHARDED_BY_SPLIT)
             in_data.write(input_dir)
-            return
         else:
             self.in_data.write(input_dir)
-            self.in_data._pl_code_metadata.write_parquet(input_dir / code_metadata_filepath)
-            for k, v in self.in_data._pl_shards.items():
-                fp = input_dir / "data" / f"{k}.parquet"
-                fp.parent.mkdir(parents=True, exist_ok=True)
-                v.write_parquet(fp)
 
     def __data_files(self, data_dir: Path) -> list[Path]:
         return list((data_dir).rglob("*.parquet"))
