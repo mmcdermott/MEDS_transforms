@@ -106,3 +106,71 @@ def test_str_with_generic_input():
         result = str(example)
         assert "in_data:" in result
         assert "in.yaml" in result
+
+
+def test_pipeline_cfg_from_dir():
+    """from_dir should load pipeline_cfg.yaml when present."""
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        _write_out_data_yaml(tmp)
+
+        pipeline_cfg_fp = tmp / "pipeline_cfg.yaml"
+        pipeline_cfg_fp.write_text(yaml.dump({"event_conversion_config_fp": "/path/to/config.yaml"}))
+
+        example = StageExample.from_dir("test_stage", "with_pipeline_cfg", tmp)
+
+        assert example.pipeline_cfg == {"event_conversion_config_fp": "/path/to/config.yaml"}
+        assert example.do_use_config_yaml is True
+
+
+def test_pipeline_cfg_merged_into_cmd_pipeline_cfg():
+    """pipeline_cfg keys should appear in cmd_pipeline_cfg alongside stage config."""
+    want_data = MEDSDataset.from_yaml(SIMPLE_STATIC_SHARDED_BY_SPLIT)
+
+    example = StageExample(
+        stage_name="test_stage",
+        want_data=want_data,
+        stage_cfg={"min_events": 5},
+        pipeline_cfg={"event_conversion_config_fp": "/path/to/config.yaml"},
+    )
+
+    cfg = example.cmd_pipeline_cfg
+    assert cfg is not None
+    assert cfg.event_conversion_config_fp == "/path/to/config.yaml"
+    assert cfg.stages == [{"test_stage": {"min_events": 5}}]
+
+
+def test_pipeline_cfg_forces_config_yaml_mode():
+    """Setting pipeline_cfg should automatically enable do_use_config_yaml."""
+    want_data = MEDSDataset.from_yaml(SIMPLE_STATIC_SHARDED_BY_SPLIT)
+
+    example = StageExample(
+        stage_name="test",
+        want_data=want_data,
+        pipeline_cfg={"some_key": "some_value"},
+    )
+    assert example.do_use_config_yaml is True
+
+
+def test_pipeline_cfg_absent_no_change():
+    """Without pipeline_cfg, behavior is unchanged."""
+    want_data = MEDSDataset.from_yaml(SIMPLE_STATIC_SHARDED_BY_SPLIT)
+
+    example = StageExample(stage_name="test", want_data=want_data)
+    assert example.pipeline_cfg == {}
+    assert example.do_use_config_yaml is False
+    assert example.cmd_pipeline_cfg is None
+
+
+def test_pipeline_cfg_in_str():
+    """__str__ should display pipeline_cfg when present."""
+    want_data = MEDSDataset.from_yaml(SIMPLE_STATIC_SHARDED_BY_SPLIT)
+
+    example = StageExample(
+        stage_name="test",
+        want_data=want_data,
+        pipeline_cfg={"event_conversion_config_fp": "/path/to/config.yaml"},
+    )
+    result = str(example)
+    assert "pipeline_cfg:" in result
+    assert "event_conversion_config_fp" in result
