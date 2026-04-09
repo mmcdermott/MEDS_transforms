@@ -835,7 +835,7 @@ class StageExample:
     stage_cfg: dict = field(default_factory=dict)
     want_data: MEDSDataset | None = None
     want_metadata: pl.DataFrame | None = None
-    in_data: MEDSDataset | None = None
+    in_data: MEDSDataset | Path | None = None
     do_use_config_yaml: bool = False
     df_check_kwargs: dict | None = None
 
@@ -878,7 +878,12 @@ class StageExample:
         if want_metadata_fp.is_file():
             want_metadata = read_metadata_only(want_metadata_fp, **schema_updates)
 
-        in_data = MEDSDataset.from_yaml(in_fp) if in_fp.is_file() else None
+        in_data = None
+        if in_fp.is_file():
+            try:
+                in_data = MEDSDataset.from_yaml(in_fp)
+            except ValueError:
+                in_data = in_fp
         stage_cfg = OmegaConf.to_container(OmegaConf.load(stage_cfg_fp)) if stage_cfg_fp.is_file() else {}
         test_kwargs = OmegaConf.to_container(OmegaConf.load(test_cfg_fp)) if test_cfg_fp.is_file() else {}
 
@@ -923,6 +928,10 @@ class StageExample:
         if self.in_data is None:
             in_data = MEDSDataset.from_yaml(SIMPLE_STATIC_SHARDED_BY_SPLIT)
             in_data.write(input_dir)
+        elif isinstance(self.in_data, Path):
+            from yaml_to_disk import yaml_disk
+
+            yaml_disk(self.in_data, root_dir=input_dir)
         else:
             self.in_data.write(input_dir)
 
