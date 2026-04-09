@@ -271,7 +271,8 @@ def run_stage(
 
     if command_out.returncode != 0:
         raise ValueError(
-            f"Stage {stage_name} failed via {full_cmd} with return code {command_out.returncode}."
+            f"Stage {stage_name} failed via {full_cmd} with return code {command_out.returncode}.\n"
+            f"Stdout:\n{stdout}\nStderr:\n{stderr}"
         )
 
 
