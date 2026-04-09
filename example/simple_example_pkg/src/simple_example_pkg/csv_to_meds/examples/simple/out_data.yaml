@@ -1,0 +1,9 @@
+data/train/0.parquet: |-
+  subject_id,time,code,numeric_value
+  239684,,HR,112.6
+  239684,,temp,95.5
+
+data/train/1.parquet: |-
+  subject_id,time,code,numeric_value
+  1195293,,HR,109.0
+  1195293,,temp,100.0

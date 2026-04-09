@@ -4,9 +4,9 @@
 > Note that the code blocks provided here will act as though they are run from the \_repository root
 > directory\_ (i.e., one directory above this one).
 
-In this directory, we show an example of using MEDS-Transform with an external package which defines both
-custom stages and uses built-in stages to run a larger pipeline. This example is split between the following
-files:
+In this directory, we show an example of using MEDS-Transform with an external package which defines custom
+stages (including one with non-MEDS input) and uses built-in stages to run a larger pipeline. This example is
+split between the following files:
 
 ```python
 >>> print_directory("example", PrintConfig(ignore_regex=r"__pycache__|.egg-info|.pytest_cache")) # doctest: +ELLIPSIS
@@ -63,6 +63,15 @@ files:
     ├── src
     │   └── simple_example_pkg
     │       ├── __init__.py
+    │       ├── csv_to_meds
+    │       │   ├── __init__.py
+    │       │   ├── config.yaml
+    │       │   ├── csv_to_meds.py
+    │       │   └── examples
+    │       │       └── simple
+    │       │           ├── _test_cfg.yaml
+    │       │           ├── in.yaml
+    │       │           └── out_data.yaml
     │       ├── drop_regex
     │       │   ├── __init__.py
     │       │   ├── config.yaml
