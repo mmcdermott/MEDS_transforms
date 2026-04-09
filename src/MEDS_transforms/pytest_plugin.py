@@ -398,6 +398,8 @@ def pipeline_tester(
         <BLANKLINE>
         Stderr:
         Failure
+        Pipeline log:
+        <no log file>
 
     If we run and succeed, it will still throw an error as the stage will fail to validate its expected files.
 
@@ -469,12 +471,15 @@ def pipeline_tester(
         pipeline_log = log_dir / "pipeline.log"
 
         def err_msg(m: str) -> str:
+            log_text = pipeline_log.read_text() if pipeline_log.exists() else "<no log file>"
             lines = [
                 f"Pipeline failed with error: {m}",
                 "Stdout:",
                 out.stdout.decode("utf-8"),
                 "Stderr:",
                 out.stderr.decode("utf-8"),
+                "Pipeline log:",
+                log_text,
             ]
             return "\n".join(lines)
 

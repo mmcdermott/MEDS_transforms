@@ -2,9 +2,11 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="static/logo_dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="static/logo_light.svg">
-    <img width="520" height="200" alt="MEDS Logot" src="static/logo_light.svg">
+    <img width="520" height="200" alt="MEDS Logo" src="static/logo_light.svg">
   </picture>
 </p>
+
+<!-- --8<-- [start:content] -->
 
 # MEDS Transforms: Build and run complex pipelines over MEDS datasets via simple parts
 
@@ -334,3 +336,5 @@ Guide](https://github.com/Medical-Event-Data-Standard/.github/blob/main/CONTRIBU
 
 Note that contributions undergo pre-commit checks (`pre-commit run --all`), tests (`pytest`), and
 documentation generation (check via `mkdocs serve`).
+
+<!-- --8<-- [end:content] -->
