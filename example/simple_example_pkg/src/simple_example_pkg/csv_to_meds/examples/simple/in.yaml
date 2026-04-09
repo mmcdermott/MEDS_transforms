@@ -1,0 +1,8 @@
+raw/vitals.csv: |-
+  subject_id,HR,temp
+  239684,112.6,95.5
+  1195293,109.0,100.0
+
+metadata/.shards.json:
+  train/0: [239684]
+  train/1: [1195293]

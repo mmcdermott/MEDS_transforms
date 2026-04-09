@@ -20,6 +20,7 @@ include = ["simple_example_pkg*"]
 
 [project.entry-points."MEDS_transforms.stages"]
 drop_regex = "simple_example_pkg.drop_regex.drop_regex:drop_regex"
+csv_to_meds = "simple_example_pkg.csv_to_meds.csv_to_meds:main"
 
 [tool.pytest.ini_options] # Section (not contents) necessary for pytest to know which package we're testing.
 addopts = [
