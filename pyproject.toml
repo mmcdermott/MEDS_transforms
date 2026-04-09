@@ -26,6 +26,7 @@ dependencies = [
   "pytest",
   "meds_testing_helpers~=0.3.0",
   "pretty-print-directory>=0.1.3",
+  "yaml_to_disk",
 ]
 
 [dependency-groups]
