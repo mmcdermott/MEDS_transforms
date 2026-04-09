@@ -986,6 +986,14 @@ class StageExample:
             metadata_fp = metadata_dir / "codes.parquet"
             got_metadata = pl.read_parquet(metadata_fp)
             try:
+                # Align column order before comparison since parquet writers (PyArrow vs Polars)
+                # may produce different column orderings for the same data.
+                shared_cols = [c for c in self.want_metadata.columns if c in got_metadata.columns]
+                want_only = set(self.want_metadata.columns) - set(shared_cols)
+                got_only = set(got_metadata.columns) - set(shared_cols)
+                if want_only or got_only:
+                    raise AssertionError(f"Column mismatch: want-only={want_only}, got-only={got_only}")
+                got_metadata = got_metadata.select(self.want_metadata.columns)
                 assert_frame_equal(
                     self.want_metadata, got_metadata, check_row_order=False, **self.df_check_kwargs
                 )
