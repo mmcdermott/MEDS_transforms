@@ -652,6 +652,21 @@ class StageExample:
         │ f    ┆ null        │
         └──────┴─────────────┘
 
+    If the metadata has entirely different columns, we get a column mismatch error:
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     output_dir = Path(tmpdir)
+        ...     (output_dir / "metadata").mkdir()
+        ...     wrong_cols = pl.DataFrame({"code": ["f"], "extra_col": [1]})
+        ...     wrong_cols.write_parquet(output_dir / code_metadata_filepath)
+        ...     example.check_outputs(output_dir)
+        Traceback (most recent call last):
+            ...
+        AssertionError: Want metadata:
+        ...
+        Got metadata:
+        ...
+
     Similar assertion cases are used for data comparisons
 
         >>> data_df = pl.DataFrame(
@@ -835,7 +850,8 @@ class StageExample:
     stage_cfg: dict = field(default_factory=dict)
     want_data: MEDSDataset | None = None
     want_metadata: pl.DataFrame | None = None
-    in_data: MEDSDataset | None = None
+    in_data: MEDSDataset | Path | None = None
+    pipeline_cfg: dict = field(default_factory=dict)
     do_use_config_yaml: bool = False
     df_check_kwargs: dict | None = None
 
@@ -849,6 +865,9 @@ class StageExample:
 
         if self.scenario_name == ".":
             self.scenario_name = None
+
+        if self.pipeline_cfg:
+            self.do_use_config_yaml = True
 
         if self.df_check_kwargs is None:
             self.df_check_kwargs = {"rel_tol": 1e-3, "abs_tol": 1e-5}
@@ -871,6 +890,7 @@ class StageExample:
         want_data_fp = example_dir / "out_data.yaml"
         want_metadata_fp = example_dir / "out_metadata.yaml"
         test_cfg_fp = example_dir / "_test_cfg.yaml"
+        pipeline_cfg_fp = example_dir / "pipeline_cfg.yaml"
         want_data = None
         want_metadata = None
         if want_data_fp.is_file():
@@ -878,9 +898,17 @@ class StageExample:
         if want_metadata_fp.is_file():
             want_metadata = read_metadata_only(want_metadata_fp, **schema_updates)
 
-        in_data = MEDSDataset.from_yaml(in_fp) if in_fp.is_file() else None
+        in_data = None
+        if in_fp.is_file():
+            try:
+                in_data = MEDSDataset.from_yaml(in_fp)
+            except ValueError:
+                in_data = in_fp
         stage_cfg = OmegaConf.to_container(OmegaConf.load(stage_cfg_fp)) if stage_cfg_fp.is_file() else {}
         test_kwargs = OmegaConf.to_container(OmegaConf.load(test_cfg_fp)) if test_cfg_fp.is_file() else {}
+        pipeline_cfg = (
+            OmegaConf.to_container(OmegaConf.load(pipeline_cfg_fp)) if pipeline_cfg_fp.is_file() else {}
+        )
 
         return cls(
             stage_name=stage_name,
@@ -889,6 +917,7 @@ class StageExample:
             want_metadata=want_metadata,
             stage_cfg=stage_cfg,
             in_data=in_data,
+            pipeline_cfg=pipeline_cfg,
             **test_kwargs,
         )
 
@@ -903,6 +932,9 @@ class StageExample:
             f"StageExample [{self.full_name}]",
             f"  stage_cfg: {self.stage_cfg}",
         ]
+
+        if self.pipeline_cfg:
+            lines.append(f"  pipeline_cfg: {self.pipeline_cfg}")
 
         if self.do_use_config_yaml:
             lines.append(f"  do_use_config_yaml: {self.do_use_config_yaml}")
@@ -923,14 +955,12 @@ class StageExample:
         if self.in_data is None:
             in_data = MEDSDataset.from_yaml(SIMPLE_STATIC_SHARDED_BY_SPLIT)
             in_data.write(input_dir)
-            return
+        elif isinstance(self.in_data, Path):
+            from yaml_to_disk import yaml_disk
+
+            yaml_disk(self.in_data, root_dir=input_dir)
         else:
             self.in_data.write(input_dir)
-            self.in_data._pl_code_metadata.write_parquet(input_dir / code_metadata_filepath)
-            for k, v in self.in_data._pl_shards.items():
-                fp = input_dir / "data" / f"{k}.parquet"
-                fp.parent.mkdir(parents=True, exist_ok=True)
-                v.write_parquet(fp)
 
     def __data_files(self, data_dir: Path) -> list[Path]:
         return list((data_dir).rglob("*.parquet"))
@@ -992,6 +1022,14 @@ class StageExample:
             metadata_fp = metadata_dir / "codes.parquet"
             got_metadata = pl.read_parquet(metadata_fp)
             try:
+                # Align column order before comparison since parquet writers (PyArrow vs Polars)
+                # may produce different column orderings for the same data.
+                shared_cols = [c for c in self.want_metadata.columns if c in got_metadata.columns]
+                want_only = set(self.want_metadata.columns) - set(shared_cols)
+                got_only = set(got_metadata.columns) - set(shared_cols)
+                if want_only or got_only:
+                    raise AssertionError(f"Column mismatch: want-only={want_only}, got-only={got_only}")
+                got_metadata = got_metadata.select(self.want_metadata.columns)
                 assert_frame_equal(
                     self.want_metadata, got_metadata, check_row_order=False, **self.df_check_kwargs
                 )
@@ -1006,7 +1044,8 @@ class StageExample:
         if not self.do_use_config_yaml:
             return None
 
-        return OmegaConf.create({"stages": [{self.stage_name: self.stage_cfg}]})
+        cfg = {**self.pipeline_cfg, "stages": [{self.stage_name: self.stage_cfg}]}
+        return OmegaConf.create(cfg)
 
     @property
     def cmd_args(self) -> list[str]:

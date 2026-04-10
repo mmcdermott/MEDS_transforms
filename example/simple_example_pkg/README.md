@@ -9,6 +9,25 @@ shards and outputs a new data shard containing the result of the transformation 
 an example of its operation in the [`drop_regex/examples/`](src/simple_example_pkg/drop-regex/examples)
 directory, following the stage testing / examples pattern that MEDS-Transforms supports.
 
+## Stage: `csv_to_meds`
+
+This stage, defined in the [`csv_to_meds/`](src/simple_example_pkg/csv_to_meds) directory, demonstrates how
+to build a stage that takes **non-MEDS input** -- raw CSV files and a JSON shard map -- and converts them into
+MEDS-formatted parquet output. This is the pattern used by packages like
+[MEDS-Extract](https://github.com/mmcdermott/MEDS_extract), whose stages operate on raw source data rather
+than pre-existing MEDS datasets.
+
+Because the standard map/reduce stage types expect MEDS-formatted input shards, this stage is registered as a
+**MAIN** stage (the function is named `main`), which gives it the full Hydra config and complete control over
+its own I/O. It reads CSVs from the input directory, pivots measurement columns into MEDS `(code, numeric_value)` pairs, and writes parquet shards according to the shard map.
+
+The stage's [example](src/simple_example_pkg/csv_to_meds/examples/simple) uses a non-MEDS `in.yaml` that
+contains raw CSV files and a JSON shard map instead of MEDS-formatted data. This exercises the `yaml_to_disk`
+fallback in the `StageExample` framework -- when `in.yaml` cannot be parsed as a `MEDSDataset`, the framework
+stores the raw file path and uses `yaml_to_disk` to write the files to the test input directory. This means
+the same example infrastructure used for MEDS stages (automated testing, documentation generation) also works
+for non-MEDS input stages.
+
 ## Pipeline: `example_pipeline`
 
 This package also provides a pipeline configuration file, which is located in the

@@ -1,4 +1,5 @@
 import importlib
+import importlib.metadata
 import subprocess
 import sys
 import tempfile
@@ -6,18 +7,49 @@ from io import StringIO
 from pathlib import Path
 
 import polars as pl
+import pytest
 from polars.testing import assert_frame_equal
 from pretty_print_directory import print_directory
 
+from MEDS_transforms.stages.discovery import get_all_registered_stages
 
-def test_simple_example_pipeline():
+PKG_NAME = "simple-example-pkg"
+
+
+def _install_example_pkg():
     examples_dir = Path(__file__).resolve().parents[1] / "example"
     pkg_dir = examples_dir / "simple_example_pkg"
     subprocess.run([sys.executable, "-m", "pip", "install", "-e", str(pkg_dir)], check=True)
-
-    sys.path.insert(0, str(pkg_dir / "src"))
     importlib.invalidate_caches()
+    sys.path.insert(0, str(pkg_dir / "src"))
 
+
+def _get_example_stage_scenarios() -> list[tuple[str, str]]:
+    """Returns (stage_name, scenario_name) pairs for all stages registered by the example package."""
+    _install_example_pkg()
+    registered_stages = get_all_registered_stages()
+    scenarios = []
+    for name, ep in registered_stages.items():
+        if ep.dist.metadata["Name"] == PKG_NAME:
+            stage = ep.load()
+            for scenario_name in stage.test_cases:
+                scenarios.append((name, scenario_name))
+    return scenarios
+
+
+@pytest.mark.parametrize("stage_name,scenario_name", _get_example_stage_scenarios())
+def test_example_stage(stage_name: str, scenario_name: str):
+    """Test each registered stage in the example package via StageExample.test()."""
+    registered_stages = get_all_registered_stages()
+    stage = registered_stages[stage_name].load()
+    example = stage.test_cases[scenario_name]
+    example.test()
+
+
+def test_simple_example_pipeline():
+    _install_example_pkg()
+
+    examples_dir = Path(__file__).resolve().parents[1] / "example"
     input_dir = examples_dir / "data"
     regression_target = examples_dir / "output_data"
 

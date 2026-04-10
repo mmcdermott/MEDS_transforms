@@ -207,7 +207,10 @@ def _format_example(stage_name: str, example, example_dir: Path | None = None) -
 
     # Input data as tables
     if example.in_data is not None:
-        lines.extend(_format_dataset(example.in_data, "Input data"))
+        if isinstance(example.in_data, Path):
+            lines.extend(["**Input files:**", "", "```yaml", example.in_data.read_text().strip(), "```", ""])
+        else:
+            lines.extend(_format_dataset(example.in_data, "Input data"))
 
     # Expected output data as tables
     if example.want_data is not None:
