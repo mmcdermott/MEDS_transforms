@@ -147,7 +147,7 @@ def matcher_to_expr(matcher_cfg: DictConfig | dict) -> tuple[pl.Expr, set[str]]:
     return pl.all_horizontal(all_exprs), set(matcher_cfg.keys())
 
 
-STR_INTERPOLATION_REGEX = r"\{([^}]+)\}"
+STR_INTERPOLATION_REGEX = r"\{([^{}]+)\}"
 
 
 class ColExprType(StrEnum):
@@ -312,6 +312,11 @@ class ColExprType(StrEnum):
             col("foo").str.format([col("baz")])
             >>> sorted(cols)
             ['baz', 'foo']
+            >>> expr, cols = ColExprType.to_pl_expr(ColExprType.STR, "{code}//dict_{{}}")
+            >>> print(expr)
+            col("code").str.format()
+            >>> sorted(cols)
+            ['code']
             >>> expr, cols = ColExprType.to_pl_expr(ColExprType.LITERAL, ListConfig(["foo", "bar"]))
             >>> print(expr)
             ["foo", "bar"]
