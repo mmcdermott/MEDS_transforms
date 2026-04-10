@@ -652,6 +652,21 @@ class StageExample:
         │ f    ┆ null        │
         └──────┴─────────────┘
 
+    If the metadata has entirely different columns, we get a column mismatch error:
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     output_dir = Path(tmpdir)
+        ...     (output_dir / "metadata").mkdir()
+        ...     wrong_cols = pl.DataFrame({"code": ["f"], "extra_col": [1]})
+        ...     wrong_cols.write_parquet(output_dir / code_metadata_filepath)
+        ...     example.check_outputs(output_dir)
+        Traceback (most recent call last):
+            ...
+        AssertionError: Want metadata:
+        ...
+        Got metadata:
+        ...
+
     Similar assertion cases are used for data comparisons
 
         >>> data_df = pl.DataFrame(
