@@ -65,10 +65,10 @@ split between the following files:
     │       ├── __init__.py
     │       ├── export_code_summary
     │       │   ├── __init__.py
-    │       │   ├── export_code_summary.py
-    │       │   └── examples
-    │       │       ├── README.md
-    │       │       └── out_data.yaml
+    │       │   ├── examples
+    │       │   │   ├── README.md
+    │       │   │   └── out_data.yaml
+    │       │   └── export_code_summary.py
     │       ├── csv_to_meds
     │       │   ├── __init__.py
     │       │   ├── config.yaml
