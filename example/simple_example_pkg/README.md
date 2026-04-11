@@ -28,23 +28,24 @@ stores the raw file path and uses `yaml_to_disk` to write the files to the test 
 the same example infrastructure used for MEDS stages (automated testing, documentation generation) also works
 for non-MEDS input stages.
 
-## Stage: `add_sequence_number`
+## Stage: `export_code_summary`
 
 This stage, defined in the
-[`add_sequence_number/`](src/simple_example_pkg/add_sequence_number) directory, demonstrates how to use a
-**custom `StageExample` subclass** via the `example_class` parameter on `Stage.register`. This is useful for
-downstream packages whose stages produce output columns beyond the standard MEDS schema, or that need custom
-output validation logic.
+[`export_code_summary/`](src/simple_example_pkg/export_code_summary) directory, demonstrates how to use a
+**custom `StageExample` subclass** via the `example_class` parameter on `Stage.register`.
 
-The stage adds a `seq_num` column (a per-subject event counter) to each shard. Its expected output
-(`out_data.yaml`) intentionally omits this extra column. Under the default `StageExample`, this would cause a
-column mismatch error during testing. Instead, the stage registers with
-`example_class=ExtraColumnsStageExample`, a subclass that overrides `check_outputs` to select only the
-expected columns before comparison, tolerating any extra columns in the actual output.
+The stage reads a MEDS dataset and writes a `code_summary.json` file containing code frequency counts. Because
+the output is JSON (not MEDS-format parquet), the default `StageExample.check_outputs` -- which expects
+`data/*.parquet` or `metadata/codes.parquet` -- fundamentally cannot validate it.
 
-This pattern is useful for any downstream package that needs to customize how test examples validate stage
-output -- for example, tolerating extra columns, using non-MEDS output formats, or applying domain-specific
-comparison logic.
+By registering with `example_class=JsonOutputStageExample`, the stage uses a subclass that:
+
+- Overrides `from_dir` to treat `out_data.yaml` as a `yaml_to_disk` file path (not a MEDS dataset)
+- Overrides `check_outputs` to expand the expected YAML into a temp directory and compare JSON files against
+    the actual output
+
+This pattern is useful for any downstream package whose stages produce non-MEDS output formats (JSON, CSV,
+custom reports, etc.) and need custom validation logic in their test examples.
 
 ## Pipeline: `example_pipeline`
 
