@@ -63,6 +63,12 @@ split between the following files:
     ├── src
     │   └── simple_example_pkg
     │       ├── __init__.py
+    │       ├── add_sequence_number
+    │       │   ├── __init__.py
+    │       │   ├── add_sequence_number.py
+    │       │   └── examples
+    │       │       ├── in.yaml
+    │       │       └── out_data.yaml
     │       ├── csv_to_meds
     │       │   ├── __init__.py
     │       │   ├── config.yaml
