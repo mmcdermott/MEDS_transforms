@@ -9,6 +9,7 @@ To do this effectively, this runner functionally takes a "meta configuration" fi
 
 import argparse
 import logging
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -161,6 +162,17 @@ def run_stage(
         ...     runner_fn=fake_shell_succeed,
         ... )
         MEDS_transform-stage pipeline_config.yaml reshard_to_split stage=reshard_to_split
+
+        Paths with spaces are properly quoted:
+
+        >>> run_stage(
+        ...     "/path/to/my pipeline/config.yaml",
+        ...     stage_runners,
+        ...     pipeline_cfg,
+        ...     "reshard_to_split",
+        ...     runner_fn=fake_shell_succeed,
+        ... )
+        MEDS_transform-stage '/path/to/my pipeline/config.yaml' reshard_to_split stage=reshard_to_split
         >>> run_stage(
         ...     "pipeline_config.yaml",
         ...     stage_runners,
@@ -237,7 +249,7 @@ def run_stage(
     elif "_base_stage" in stage_runner_config:
         raise ValueError("Put _base_stage args is in your pipeline config")
     else:
-        script = f"MEDS_transform-stage {pipeline_config_fp} {stage_name}"
+        script = f"MEDS_transform-stage {shlex.quote(str(pipeline_config_fp))} {stage_name}"
 
     command_parts = [
         script,
