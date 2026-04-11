@@ -542,6 +542,7 @@ class Stage:
         examples_dir: Path | None = None,
         default_config: dict[str, Any] | DictConfig | Path | str | None = None,
         is_metadata: bool | None = None,
+        example_class: type[StageExample] | None = None,
         _calling_file: Path | None = None,
     ) -> MAIN_FN_T:
         """Wraps or returns a function that can serve as the main function for a stage."""
@@ -605,6 +606,8 @@ class Stage:
             self.output_schema_updates = {}
         else:
             self.output_schema_updates = copy.deepcopy(output_schema_updates)
+
+        self.example_class = example_class if example_class is not None else StageExample
 
     def __infer_stage_dir(self, stage_definition_file: Path | None) -> Path | None:
         """Infers a possible stage directory based on the calling file.
@@ -732,9 +735,9 @@ class Stage:
             if not example_dir.is_dir():
                 continue
 
-            if StageExample.is_example_dir(example_dir):
+            if self.example_class.is_example_dir(example_dir):
                 scenario_name = example_dir.relative_to(self.examples_dir).as_posix()
-                test_cases[scenario_name] = StageExample.from_dir(
+                test_cases[scenario_name] = self.example_class.from_dir(
                     stage_name=self.stage_name,
                     scenario_name=scenario_name,
                     example_dir=example_dir,
