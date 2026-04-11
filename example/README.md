@@ -67,6 +67,7 @@ split between the following files:
     │       │   ├── __init__.py
     │       │   ├── add_sequence_number.py
     │       │   └── examples
+    │       │       ├── README.md
     │       │       ├── in.yaml
     │       │       └── out_data.yaml
     │       ├── csv_to_meds
