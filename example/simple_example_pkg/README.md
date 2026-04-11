@@ -28,6 +28,24 @@ stores the raw file path and uses `yaml_to_disk` to write the files to the test 
 the same example infrastructure used for MEDS stages (automated testing, documentation generation) also works
 for non-MEDS input stages.
 
+## Stage: `add_sequence_number`
+
+This stage, defined in the
+[`add_sequence_number/`](src/simple_example_pkg/add_sequence_number) directory, demonstrates how to use a
+**custom `StageExample` subclass** via the `example_class` parameter on `Stage.register`. This is useful for
+downstream packages whose stages produce output columns beyond the standard MEDS schema, or that need custom
+output validation logic.
+
+The stage adds a `seq_num` column (a per-subject event counter) to each shard. Its expected output
+(`out_data.yaml`) intentionally omits this extra column. Under the default `StageExample`, this would cause a
+column mismatch error during testing. Instead, the stage registers with
+`example_class=ExtraColumnsStageExample`, a subclass that overrides `check_outputs` to select only the
+expected columns before comparison, tolerating any extra columns in the actual output.
+
+This pattern is useful for any downstream package that needs to customize how test examples validate stage
+output -- for example, tolerating extra columns, using non-MEDS output formats, or applying domain-specific
+comparison logic.
+
 ## Pipeline: `example_pipeline`
 
 This package also provides a pipeline configuration file, which is located in the
