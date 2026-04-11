@@ -28,6 +28,25 @@ stores the raw file path and uses `yaml_to_disk` to write the files to the test 
 the same example infrastructure used for MEDS stages (automated testing, documentation generation) also works
 for non-MEDS input stages.
 
+## Stage: `export_code_summary`
+
+This stage, defined in the
+[`export_code_summary/`](src/simple_example_pkg/export_code_summary) directory, demonstrates how to use a
+**custom `StageExample` subclass** via the `example_class` parameter on `Stage.register`.
+
+The stage reads a MEDS dataset and writes a `code_summary.json` file containing code frequency counts. Because
+the output is JSON (not MEDS-format parquet), the default `StageExample.check_outputs` -- which expects
+`data/*.parquet` or `metadata/codes.parquet` -- fundamentally cannot validate it.
+
+By registering with `example_class=JsonOutputStageExample`, the stage uses a subclass that:
+
+- Overrides `from_dir` to treat `out_data.yaml` as a `yaml_to_disk` file path (not a MEDS dataset)
+- Overrides `check_outputs` to expand the expected YAML into a temp directory and compare JSON files against
+    the actual output
+
+This pattern is useful for any downstream package whose stages produce non-MEDS output formats (JSON, CSV,
+custom reports, etc.) and need custom validation logic in their test examples.
+
 ## Pipeline: `example_pipeline`
 
 This package also provides a pipeline configuration file, which is located in the
