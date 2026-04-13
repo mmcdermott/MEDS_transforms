@@ -7,11 +7,13 @@ overrides ``check_outputs`` to compare JSON files instead.
 """
 
 import json
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
 import polars as pl
 from omegaconf import DictConfig
+from yaml_to_disk import yaml_disk
 
 from MEDS_transforms.stages import Stage
 from MEDS_transforms.stages.examples import StageExample
@@ -22,12 +24,10 @@ class JsonOutputStageExample(StageExample):
     """A StageExample subclass that validates JSON file output instead of MEDS parquet.
 
     This is useful for stages that produce non-MEDS output formats. The expected output is
-    specified in ``out_data.yaml`` as a yaml_to_disk structure containing JSON files, and
-    validation compares those JSON files against the actual stage output.
+    specified in ``out_data.yaml`` as a ``yaml_to_disk`` specification containing the expected
+    files; ``check_outputs`` materializes it with ``yaml_disk`` and compares against actual output.
 
     Examples:
-        >>> import tempfile
-        >>> from pathlib import Path
         >>> with tempfile.TemporaryDirectory() as tmpdir:
         ...     yaml_fp = Path(tmpdir) / "out_data.yaml"
         ...     _ = yaml_fp.write_text("code_summary.json:\\n  A: 3\\n  B: 1\\n")
@@ -35,8 +35,7 @@ class JsonOutputStageExample(StageExample):
         ...     actual_dir.mkdir(parents=True)
         ...     _ = (actual_dir / "code_summary.json").write_text('{"A": 3, "B": 1}')
         ...     example = JsonOutputStageExample(
-        ...         stage_name="test", scenario_name="s",
-        ...         want_data=yaml_fp, want_metadata=None,
+        ...         stage_name="test", scenario_name="s", want_data=yaml_fp,
         ...     )
         ...     example.check_outputs(actual_dir.parent)
 
@@ -49,8 +48,7 @@ class JsonOutputStageExample(StageExample):
         ...     actual_dir.mkdir(parents=True)
         ...     _ = (actual_dir / "code_summary.json").write_text('{"A": 5}')
         ...     example = JsonOutputStageExample(
-        ...         stage_name="test", scenario_name="s",
-        ...         want_data=yaml_fp, want_metadata=None,
+        ...         stage_name="test", scenario_name="s", want_data=yaml_fp,
         ...     )
         ...     example.check_outputs(actual_dir.parent)
         Traceback (most recent call last):
@@ -58,73 +56,50 @@ class JsonOutputStageExample(StageExample):
         AssertionError: JSON mismatch in code_summary.json...
     """
 
-    # Override to accept Path (directory of expected JSON files) instead of MEDSDataset
     want_data: Path | None = None
-
-    def __post_init__(self):
-        if self.want_data is None and self.want_metadata is None:
-            raise ValueError("Either want_data or want_metadata must be provided.")
-        if self.df_check_kwargs is None:
-            self.df_check_kwargs = {"rel_tol": 1e-3, "abs_tol": 1e-5}
 
     @classmethod
     def from_dir(cls, stage_name, scenario_name, example_dir, **schema_updates):
-        """Parse example directory, treating out_data.yaml as a yaml_to_disk path for JSON output."""
-        want_data_fp = example_dir / "out_data.yaml"
-        in_fp = example_dir / "in.yaml"
-
-        want_data = want_data_fp if want_data_fp.is_file() else None
-        in_data = None
-        if in_fp.is_file():
-            from MEDS_transforms.stages.examples import MEDSDataset
-
-            try:
-                in_data = MEDSDataset.from_yaml(in_fp)
-            except ValueError:
-                in_data = in_fp
-
+        """Parse the example directory, treating ``out_data.yaml`` as a ``yaml_to_disk`` spec."""
         return cls(
             stage_name=stage_name,
             scenario_name=scenario_name,
-            want_data=want_data,
-            in_data=in_data,
+            want_data=example_dir / "out_data.yaml",
         )
 
     def check_outputs(self, output_dir, is_resolved_dir=False):
-        """Compare expected JSON output against actual output directory.
+        """Compare expected files (materialized via ``yaml_disk``) against the actual output dir.
 
-        Loads expected output from the yaml_to_disk specification and compares against actual files. JSON
-        files are compared as parsed objects (order-independent); other files are compared as strings.
+        JSON files are compared as parsed objects (order-independent); other files are compared as text.
         """
         if self.want_data is None:
             return
 
         data_dir = output_dir if is_resolved_dir else output_dir / "data"
 
-        import yaml
+        with tempfile.TemporaryDirectory() as expected_root:
+            expected_root = Path(expected_root)
+            yaml_disk(self.want_data, root_dir=expected_root)
 
-        with open(self.want_data) as f:
-            expected_files = yaml.safe_load(f)
+            for expected_fp in sorted(expected_root.rglob("*")):
+                if not expected_fp.is_file():
+                    continue
+                rel = expected_fp.relative_to(expected_root)
+                actual_fp = data_dir / rel
+                assert actual_fp.is_file(), f"Expected output file {rel} not found in {data_dir}"
 
-        for rel_path, expected_content in expected_files.items():
-            actual_fp = data_dir / rel_path
-            assert actual_fp.is_file(), f"Expected output file {rel_path} not found in {output_dir}"
-
-            actual_text = actual_fp.read_text().strip()
-
-            if rel_path.endswith(".json"):
-                expected_obj = (
-                    json.loads(expected_content) if isinstance(expected_content, str) else expected_content
-                )
-                actual_obj = json.loads(actual_text)
-                assert expected_obj == actual_obj, (
-                    f"JSON mismatch in {rel_path}:\n  Expected: {expected_obj}\n  Got: {actual_obj}"
-                )
-            else:
-                expected_text = str(expected_content).strip()
-                assert expected_text == actual_text, (
-                    f"Content mismatch in {rel_path}:\n  Expected: {expected_text}\n  Got: {actual_text}"
-                )
+                if expected_fp.suffix == ".json":
+                    expected_obj = json.loads(expected_fp.read_text())
+                    actual_obj = json.loads(actual_fp.read_text())
+                    assert expected_obj == actual_obj, (
+                        f"JSON mismatch in {rel}:\n  Expected: {expected_obj}\n  Got: {actual_obj}"
+                    )
+                else:
+                    expected_text = expected_fp.read_text().strip()
+                    actual_text = actual_fp.read_text().strip()
+                    assert expected_text == actual_text, (
+                        f"Content mismatch in {rel}:\n  Expected: {expected_text}\n  Got: {actual_text}"
+                    )
 
 
 @Stage.register(is_metadata=False, example_class=JsonOutputStageExample)

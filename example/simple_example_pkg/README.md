@@ -40,9 +40,9 @@ the output is JSON (not MEDS-format parquet), the default `StageExample.check_ou
 
 By registering with `example_class=JsonOutputStageExample`, the stage uses a subclass that:
 
-- Overrides `from_dir` to treat `out_data.yaml` as a `yaml_to_disk` file path (not a MEDS dataset)
-- Overrides `check_outputs` to expand the expected YAML into a temp directory and compare JSON files against
-    the actual output
+- Overrides `from_dir` to treat `out_data.yaml` as a `yaml_to_disk` specification (not a MEDS dataset)
+- Overrides `check_outputs` to materialize that spec into a temp directory with `yaml_disk` and
+    compare each expected file against the actual output (JSON files as parsed objects, others as text)
 
 This pattern is useful for any downstream package whose stages produce non-MEDS output formats (JSON, CSV,
 custom reports, etc.) and need custom validation logic in their test examples.
