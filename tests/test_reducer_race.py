@@ -14,7 +14,6 @@ import time
 from pathlib import Path
 
 import polars as pl
-import pytest
 
 from MEDS_transforms.mapreduce.reducer import reduce_over
 
@@ -35,16 +34,12 @@ def _reduce_fn(*dfs: pl.DataFrame) -> pl.DataFrame:
     return pl.concat(dfs, how="vertical")
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Reducer race condition: `reduce_over` treats `fp.is_file()` as 'ready', "
-        "but the mapper's parquet write is non-atomic. See issue #373."
-    ),
-    strict=True,
-    raises=pl.exceptions.ComputeError,
-)
-def test_reduce_over_races_partial_parquet_write() -> None:
-    """Reducer should wait for valid parquet, not just file existence."""
+def test_reduce_over_waits_for_complete_parquet() -> None:
+    """Reducer should wait for valid parquet, not just file existence.
+
+    Currently fails with ``polars.exceptions.ComputeError`` because ``reduce_over``
+    polls ``fp.is_file()`` and reads the mapper's partial parquet file.
+    """
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         in_fps = [tmp / f"in_{i}.parquet" for i in range(2)]
@@ -68,3 +63,7 @@ def test_reduce_over_races_partial_parquet_write() -> None:
             )
         finally:
             slow_writer.join()
+
+        result = pl.read_parquet(out_fp).sort("a")
+        expected = pl.concat([df0, df1], how="vertical").sort("a")
+        assert result.equals(expected), f"Reducer output differs:\n{result}\nvs expected:\n{expected}"
