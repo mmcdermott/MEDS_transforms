@@ -15,19 +15,32 @@ from pathlib import Path
 
 import polars as pl
 
+from MEDS_transforms.dataframe import read_df, write_df
 from MEDS_transforms.mapreduce.reducer import reduce_over
 
+# Window during which the reducer must observe the empty-but-existing parquet
+# file, after which the writer finishes and the race would no longer reproduce.
+_RACE_WINDOW_SECONDS = 0.3
 
-def _slow_mapper_write(df: pl.DataFrame, fp: Path, pre_write_delay: float) -> None:
-    """Simulate a mapper whose parquet write is not atomic: create the file,
-    hold for `pre_write_delay` seconds, then actually write the content.
 
-    This models the real behavior of `df.write_parquet(fp)` where the file exists
-    on disk before the parquet footer is flushed.
+def _publish_before_complete_write(
+    df: pl.DataFrame,
+    fp: Path,
+    touched: threading.Event,
+    race_window: float,
+) -> None:
+    """Simulate a publish-before-complete-write interleaving.
+
+    Creates ``fp`` (so ``is_file()`` returns True), signals ``touched``, then
+    holds ``race_window`` seconds before writing real parquet content. This is
+    a synthetic interleaving, not a literal model of ``df.write_parquet``, but
+    it exposes the same contract violation: the reducer treats file existence
+    as publication.
     """
     fp.touch()
-    time.sleep(pre_write_delay)
-    df.write_parquet(fp)
+    touched.set()
+    time.sleep(race_window)
+    write_df(df, fp)
 
 
 def _reduce_fn(*dfs: pl.DataFrame) -> pl.DataFrame:
@@ -38,7 +51,7 @@ def test_reduce_over_waits_for_complete_parquet() -> None:
     """Reducer should wait for valid parquet, not just file existence.
 
     Currently fails with ``polars.exceptions.ComputeError`` because ``reduce_over``
-    polls ``fp.is_file()`` and reads the mapper's partial parquet file.
+    polls ``fp.is_file()`` and reads the partial parquet file.
     """
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
@@ -48,22 +61,28 @@ def test_reduce_over_waits_for_complete_parquet() -> None:
         df0 = pl.DataFrame({"a": [1, 2], "b": [3, 4]})
         df1 = pl.DataFrame({"a": [5, 6], "b": [7, 8]})
 
-        df0.write_parquet(in_fps[0])
-        slow_writer = threading.Thread(target=_slow_mapper_write, args=(df1, in_fps[1], 0.3))
+        write_df(df0, in_fps[0])
+
+        touched = threading.Event()
+        slow_writer = threading.Thread(
+            target=_publish_before_complete_write,
+            args=(df1, in_fps[1], touched, _RACE_WINDOW_SECONDS),
+        )
         slow_writer.start()
         try:
-            time.sleep(0.02)  # let the touch() land
+            # Explicit handshake: proceed only once the partial file exists.
+            assert touched.wait(timeout=5.0), "writer thread never created the partial file"
             reduce_over(
                 in_fps=in_fps,
                 out_fp=out_fp,
-                read_fn=pl.read_parquet,
-                write_fn=pl.DataFrame.write_parquet,
+                read_fn=read_df,
+                write_fn=write_df,
                 reduce_fn=_reduce_fn,
                 polling_time=0.005,
             )
         finally:
             slow_writer.join()
 
-        result = pl.read_parquet(out_fp).sort("a")
+        result = read_df(out_fp).sort("a")
         expected = pl.concat([df0, df1], how="vertical").sort("a")
         assert result.equals(expected), f"Reducer output differs:\n{result}\nvs expected:\n{expected}"
