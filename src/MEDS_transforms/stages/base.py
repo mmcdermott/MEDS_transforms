@@ -478,6 +478,10 @@ class Stage:
 
     output_schema_updates: dict[str, pl.DataType] | None = None
     is_metadata: bool | None = None
+    # When True, this stage assumes ``metadata/codes.parquet`` is up-to-date relative to its data
+    # input. The pipeline runner emits a warning at load time if the stage is reached without an
+    # intervening metadata-writing stage. See #117, #116, #118, #200.
+    requires_fresh_metadata: bool = False
 
     __mimic_fn: Callable | None = None
     __stage_docstring: str | None = None
@@ -542,6 +546,7 @@ class Stage:
         examples_dir: Path | None = None,
         default_config: dict[str, Any] | DictConfig | Path | str | None = None,
         is_metadata: bool | None = None,
+        requires_fresh_metadata: bool = False,
         example_class: type[StageExample] | None = None,
         _calling_file: Path | None = None,
     ) -> MAIN_FN_T:
@@ -606,6 +611,8 @@ class Stage:
             self.output_schema_updates = {}
         else:
             self.output_schema_updates = copy.deepcopy(output_schema_updates)
+
+        self.requires_fresh_metadata = requires_fresh_metadata
 
         self.example_class = example_class if example_class is not None else StageExample
 

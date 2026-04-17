@@ -8,7 +8,7 @@ from omegaconf import DictConfig
 from .. import Stage
 
 
-@Stage.register
+@Stage.register(requires_fresh_metadata=True)
 def filter_measurements(
     stage_cfg: DictConfig, code_metadata: pl.LazyFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
