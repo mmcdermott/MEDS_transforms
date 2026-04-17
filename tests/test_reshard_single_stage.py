@@ -24,19 +24,19 @@ def _write_dataset(input_dir: Path) -> None:
     base_time = datetime(2020, 1, 1, tzinfo=UTC)
 
     def _write(path: Path, subjects: list[int]) -> None:
-        # Use a real timestamp column so reshard_to_split's sort by DataSchema.time_name
-        # hits a well-typed column, matching production MEDS data.
+        # Use real timestamps with the MEDS schema's time dtype so reshard_to_split's sort by
+        # DataSchema.time_name hits a well-typed column that matches production MEDS data.
         rows = [
             {
-                "subject_id": s,
-                "time": base_time.replace(day=1 + i),
-                "code": "A",
-                "numeric_value": None,
+                DataSchema.subject_id_name: s,
+                DataSchema.time_name: base_time.replace(day=1 + i),
+                DataSchema.code_name: "A",
+                DataSchema.numeric_value_name: None,
             }
             for s in subjects
             for i in range(2)
         ]
-        (pl.DataFrame(rows, schema_overrides={DataSchema.time_name: pl.Datetime("us")}).write_parquet(path))
+        pl.DataFrame(rows, schema_overrides={DataSchema.time_name: pl.Datetime("us")}).write_parquet(path)
 
     _write(input_dir / "data" / "train" / "0.parquet", [1, 2, 3, 4])
     _write(input_dir / "data" / "tuning" / "0.parquet", [5, 6])
@@ -44,7 +44,7 @@ def _write_dataset(input_dir: Path) -> None:
 
     splits = pl.DataFrame(
         {
-            "subject_id": [1, 2, 3, 4, 5, 6, 7],
+            DataSchema.subject_id_name: [1, 2, 3, 4, 5, 6, 7],
             "split": ["train"] * 4 + ["tuning"] * 2 + ["held_out"],
         }
     )
@@ -101,4 +101,5 @@ def test_reshard_to_split_runs_as_only_stage() -> None:
             shard_fp = output_dir / "data" / f"{shard_name}.parquet"
             df = pl.read_parquet(shard_fp)
             assert df.height > 0, f"empty shard: {shard_fp}"
-            assert set(df["subject_id"].unique().to_list()) == set(assignment[shard_name])
+            subject_ids = df[DataSchema.subject_id_name].unique().to_list()
+            assert set(subject_ids) == set(assignment[shard_name])
