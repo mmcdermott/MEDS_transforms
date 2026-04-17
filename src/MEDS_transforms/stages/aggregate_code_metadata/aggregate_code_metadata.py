@@ -328,6 +328,16 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
           aggregations:
             - name: values/quantiles
               quantiles: [0.25, 0.5, 0.75]
+        >>> cfg = DictConfig({"aggregations": [{"name": "values/quantiles", "quantiles": ["oops"]}]})
+        >>> validate_args_and_get_code_cols(cfg, None)
+        Traceback (most recent call last):
+            ...
+        ValueError: Aggregation 'values/quantiles' has an invalid 'quantiles' value: each entry must
+        be a number; got str ('oops').
+        Example:
+          aggregations:
+            - name: values/quantiles
+              quantiles: [0.25, 0.5, 0.75]
         >>> valid_cfg = DictConfig({"aggregations": ["code/n_subjects", {"name": "values/n_ints"}]})
         >>> validate_args_and_get_code_cols(valid_cfg, 33)
         Traceback (most recent call last):
