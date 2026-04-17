@@ -112,3 +112,24 @@ def test_reduce_over_times_out_on_permanently_invalid_input() -> None:
                 polling_time=0.01,
                 max_poll_time=0.3,
             )
+
+
+def test_reduce_over_rejects_max_poll_time_not_larger_than_polling_time() -> None:
+    """``max_poll_time`` must exceed ``polling_time`` to avoid spurious timeouts on the first poll."""
+    import pytest
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        in_fps = [tmp / "a.parquet"]
+        out_fp = tmp / "out.parquet"
+
+        with pytest.raises(ValueError, match="must be greater than"):
+            reduce_over(
+                in_fps=in_fps,
+                out_fp=out_fp,
+                read_fn=read_df,
+                write_fn=write_df,
+                reduce_fn=_reduce_fn,
+                polling_time=1.0,
+                max_poll_time=1.0,
+            )
