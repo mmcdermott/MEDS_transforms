@@ -170,11 +170,26 @@ VAL_PRESENT: pl.Expr = VAL.is_not_null() & VAL.is_not_nan()
 IS_INT: pl.Expr = VAL.round() == VAL
 PRESENT_VALS = VAL.filter(VAL_PRESENT)
 
-#: Aggregations that must be declared in object form with a specific required sub-key because their
-#: reducer takes parameters beyond the column selector. Maps aggregation name to the required extra
-#: key. Used by :func:`validate_args_and_get_code_cols` to raise a targeted error (issue #164).
-AGGREGATIONS_REQUIRING_OBJECT_FORM: dict[str, str] = {
-    MetadataFn.VALUES_QUANTILES.value: "quantiles",
+
+class _ObjectFormRequirement(NamedTuple):
+    """Schema for an aggregation whose reducer takes parameters beyond the column selector.
+
+    Attributes:
+        required_key: The name of the extra field the aggregation object must carry.
+        example_value: A syntactically valid example value for the required field (shown in errors).
+    """
+
+    required_key: str
+    example_value: str
+
+
+#: Aggregations that must be declared in object form. Maps aggregation name to its required-key
+#: contract. Used by :func:`validate_args_and_get_code_cols` to raise a targeted error (issue #164).
+#: Extend this dict when adding new parametrised aggregations.
+AGGREGATIONS_REQUIRING_OBJECT_FORM: dict[str, _ObjectFormRequirement] = {
+    MetadataFn.VALUES_QUANTILES.value: _ObjectFormRequirement(
+        required_key="quantiles", example_value="[0.25, 0.5, 0.75]"
+    ),
 }
 
 
@@ -230,6 +245,13 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
             code/n_subjects, code/n_occurrences, values/n_subjects, values/n_occurrences, values/n_ints,
             values/sum, values/sum_sqd, values/min, values/max, values/quantiles
 
+        Aggregation objects must carry an explicit ``name`` field:
+
+        >>> validate_args_and_get_code_cols(DictConfig({"aggregations": [{"quantiles": [0.5]}]}), None)
+        Traceback (most recent call last):
+            ...
+        ValueError: Aggregation object is missing a 'name' field. Got: {'quantiles': [0.5]}.
+
         Aggregations such as ``values/quantiles`` require the object form with a specific field. The
         validator raises an actionable error pointing at the missing key:
 
@@ -275,8 +297,10 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
     aggregations = stage_cfg.aggregations
     for agg in aggregations:
         if isinstance(agg, dict | DictConfig):
-            agg_name = agg.get("name", None)
             agg_obj = agg
+            if "name" not in agg_obj or agg_obj.get("name") in (None, ""):
+                raise ValueError(f"Aggregation object is missing a 'name' field. Got: {dict(agg_obj)}.")
+            agg_name = agg_obj["name"]
         else:
             agg_name = agg
             agg_obj = None
@@ -286,22 +310,22 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
                 f"are: {', '.join([fn.value for fn in MetadataFn])}"
             )
         if agg_name in AGGREGATIONS_REQUIRING_OBJECT_FORM:
-            required_key = AGGREGATIONS_REQUIRING_OBJECT_FORM[agg_name]
+            required = AGGREGATIONS_REQUIRING_OBJECT_FORM[agg_name]
             if agg_obj is None:
                 raise ValueError(
-                    f"Aggregation '{agg_name}' requires object form with a '{required_key}' field. "
-                    f"Got it as a plain string.\nExample:\n"
+                    f"Aggregation '{agg_name}' requires object form with a '{required.required_key}' "
+                    f"field. Got it as a plain string.\nExample:\n"
                     f"  aggregations:\n"
                     f"    - name: {agg_name}\n"
-                    f"      {required_key}: [0.25, 0.5, 0.75]"
+                    f"      {required.required_key}: {required.example_value}"
                 )
-            if required_key not in agg_obj:
+            if required.required_key not in agg_obj:
                 raise ValueError(
-                    f"Aggregation '{agg_name}' is missing the required '{required_key}' field. "
-                    f"Got: {dict(agg_obj)}.\nExample:\n"
+                    f"Aggregation '{agg_name}' is missing the required '{required.required_key}' "
+                    f"field. Got: {dict(agg_obj)}.\nExample:\n"
                     f"  aggregations:\n"
                     f"    - name: {agg_name}\n"
-                    f"      {required_key}: [0.25, 0.5, 0.75]"
+                    f"      {required.required_key}: {required.example_value}"
                 )
 
     match code_modifiers:
