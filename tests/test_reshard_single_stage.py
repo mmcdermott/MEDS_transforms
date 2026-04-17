@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import subprocess
 import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 
 import polars as pl
-from meds import subject_splits_filepath
+from meds import DataSchema, subject_splits_filepath
 
 
 def _write_dataset(input_dir: Path) -> None:
@@ -20,16 +21,22 @@ def _write_dataset(input_dir: Path) -> None:
     (input_dir / "data" / "held_out").mkdir(parents=True, exist_ok=True)
     (input_dir / "metadata").mkdir(parents=True, exist_ok=True)
 
+    base_time = datetime(2020, 1, 1, tzinfo=UTC)
+
     def _write(path: Path, subjects: list[int]) -> None:
-        n = len(subjects) * 2
-        pl.DataFrame(
+        # Use a real timestamp column so reshard_to_split's sort by DataSchema.time_name
+        # hits a well-typed column, matching production MEDS data.
+        rows = [
             {
-                "subject_id": [s for s in subjects for _ in range(2)],
-                "time": [None] * n,
-                "code": ["A"] * n,
-                "numeric_value": [None] * n,
+                "subject_id": s,
+                "time": base_time.replace(day=1 + i),
+                "code": "A",
+                "numeric_value": None,
             }
-        ).write_parquet(path)
+            for s in subjects
+            for i in range(2)
+        ]
+        (pl.DataFrame(rows, schema_overrides={DataSchema.time_name: pl.Datetime("us")}).write_parquet(path))
 
     _write(input_dir / "data" / "train" / "0.parquet", [1, 2, 3, 4])
     _write(input_dir / "data" / "tuning" / "0.parquet", [5, 6])
@@ -82,9 +89,12 @@ def test_reshard_to_split_runs_as_only_stage() -> None:
         assignment = json.loads(shards_json.read_text())
         assert set(assignment.keys()) == {"train/0", "train/1", "tuning/0", "held_out/0"}
         # 4 train subjects split 2-2, 2 tuning in one shard, 1 held_out in one shard.
-        assert sorted(assignment["train/0"] + assignment["train/1"]) == [1, 2, 3, 4]
-        assert assignment["tuning/0"] == [5, 6]
-        assert assignment["held_out/0"] == [7]
+        # Compare as sets: the stage computes shard membership from parquet reads, so within-shard
+        # ordering is an implementation detail that shouldn't gate the regression test.
+        assert set(assignment["train/0"] + assignment["train/1"]) == {1, 2, 3, 4}
+        assert len(assignment["train/0"]) == 2 and len(assignment["train/1"]) == 2
+        assert set(assignment["tuning/0"]) == {5, 6}
+        assert set(assignment["held_out/0"]) == {7}
 
         # Every produced shard should be a valid parquet readable by polars.
         for shard_name in assignment:
