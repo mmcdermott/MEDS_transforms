@@ -7,8 +7,7 @@ Kept as a small, dependency-light module so ``runner.main()`` can format its
 from __future__ import annotations
 
 #: Pipeline-level configuration keys consumed by the runner rather than individual stages. Surfaced
-#: in CLI help so users know what is accepted via ``--overrides`` or at the top level of a pipeline
-#: YAML.
+#: in CLI help so users know what is accepted in a pipeline YAML and via Hydra-style CLI overrides.
 PIPELINE_CONFIG_KEYS: dict[str, str] = {
     "input_dir": "Root MEDS directory to read from (contains `data/` and `metadata/`).",
     "output_dir": "Root directory to write stage outputs into.",
@@ -29,8 +28,14 @@ def pipeline_keys_help_block() -> str:
         True
         >>> "parallelize.n_workers" in block
         True
+        >>> "MEDS_transform-pipeline" in block
+        True
     """
-    lines = ["Pipeline-level configuration keys (settable via pipeline YAML or `--overrides`):"]
+    header = (
+        "Pipeline-level configuration keys (settable in the pipeline YAML; `--overrides` is "
+        "accepted by `MEDS_transform-pipeline`):"
+    )
+    lines = [header]
     width = max(len(k) for k in PIPELINE_CONFIG_KEYS)
     for key, desc in PIPELINE_CONFIG_KEYS.items():
         lines.append(f"  {key.ljust(width)}  {desc}")
