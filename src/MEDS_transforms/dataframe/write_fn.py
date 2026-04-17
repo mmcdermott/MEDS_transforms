@@ -12,8 +12,8 @@ WRITE_FN_T = Callable[[DF_T, Path], None]
 def write_df(df: DF_T, out_fp: Path) -> None:
     """Atomically write a dataframe, either lazy or eager, to a parquet file.
 
-    Content is staged at ``<out_fp>.tmp`` and then ``os.replace``\\d onto
-    ``out_fp`` so concurrent readers never observe a partial parquet file at
+    Content is staged at ``<out_fp>.tmp`` and then moved into place with
+    ``os.replace`` so concurrent readers never observe a partial parquet file at
     the final path. The rename is atomic on POSIX and Windows as long as
     ``out_fp`` and its staging path share a filesystem.
     """

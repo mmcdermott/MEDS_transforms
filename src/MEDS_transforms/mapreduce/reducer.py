@@ -29,6 +29,7 @@ def reduce_over(
     merge_fn: REDUCE_FN_T | None = None,
     do_overwrite: bool = False,
     polling_time: float = 0.1,
+    max_poll_time: float = 300.0,
 ):
     """Performs a reduction operation on a list of input file paths, with optional merging to existing data.
 
@@ -36,6 +37,9 @@ def reduce_over(
         in_fps: List of input file paths containing data over which the reduction should be performed.
         out_fp: Output file path where the reduced data will be saved.
         polling_time: Time in seconds to wait between checks for file readiness.
+        max_poll_time: Maximum total time in seconds to wait for input files to become readable. Raises
+            ``TimeoutError`` if any input file exists but stays invalid past this deadline — guards
+            against hangs when a mapper is permanently stuck or produced a corrupt file.
         read_fn: Function to read data from the input file paths.
         write_fn: Function to write the reduced data to the output file path.
         reduce_fn: Function to perform the reduction operation on the data. It should take two dataframe
@@ -46,6 +50,7 @@ def reduce_over(
 
     Raises:
         FileExistsError: If the output file already exists.
+        TimeoutError: If input files remain unreadable after ``max_poll_time`` seconds.
 
     Examples:
         >>> def reduce_fn(*dfs: pl.DataFrame) -> pl.DataFrame:
@@ -204,7 +209,24 @@ def reduce_over(
     if out_fp.is_file() and not do_overwrite:
         raise FileExistsError(f"Output file already exists: {out_fp.resolve()!s}")
 
-    while not all(default_file_checker(fp) for fp in in_fps):
+    deadline = time.monotonic() + max_poll_time
+    while True:
+        ready = [default_file_checker(fp) for fp in in_fps]
+        if all(ready):
+            break
+        if time.monotonic() >= deadline:
+            stuck = [fp for fp, is_ready in zip(in_fps, ready, strict=True) if not is_ready and fp.exists()]
+            missing = [
+                fp for fp, is_ready in zip(in_fps, ready, strict=True) if not is_ready and not fp.exists()
+            ]
+            parts = []
+            if stuck:
+                parts.append(f"present but unreadable: {', '.join(str(fp) for fp in stuck)}")
+            if missing:
+                parts.append(f"missing: {', '.join(str(fp) for fp in missing)}")
+            raise TimeoutError(
+                f"Timed out after {max_poll_time}s waiting for reduction inputs — " + "; ".join(parts)
+            )
         logger.info("Waiting to begin reduction for all files to be written...")
         time.sleep(polling_time)
 

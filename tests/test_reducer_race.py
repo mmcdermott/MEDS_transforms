@@ -88,3 +88,27 @@ def test_reduce_over_waits_for_complete_parquet() -> None:
         result = read_df(out_fp).collect().sort("a")
         expected = pl.concat([df0, df1], how="vertical").sort("a")
         assert_frame_equal(result, expected)
+
+
+def test_reduce_over_times_out_on_permanently_invalid_input() -> None:
+    """A permanently invalid (empty) parquet should time out, not hang forever."""
+    import pytest
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        in_fps = [tmp / "ok.parquet", tmp / "broken.parquet"]
+        out_fp = tmp / "out.parquet"
+
+        write_df(pl.DataFrame({"a": [1]}), in_fps[0])
+        in_fps[1].touch()  # exists but invalid parquet, never fixed
+
+        with pytest.raises(TimeoutError, match="Timed out"):
+            reduce_over(
+                in_fps=in_fps,
+                out_fp=out_fp,
+                read_fn=read_df,
+                write_fn=write_df,
+                reduce_fn=_reduce_fn,
+                polling_time=0.01,
+                max_poll_time=0.3,
+            )
