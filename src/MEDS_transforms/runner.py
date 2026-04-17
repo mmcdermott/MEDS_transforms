@@ -25,6 +25,60 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Override keys whose root is consumed by the pipeline runner and must not be forwarded to inner
+# ``MEDS_transform-stage`` invocations. Forwarding pipeline-only keys makes Hydra reject the inner
+# command because the stage's structured config does not declare them. See issue #371.
+PIPELINE_ONLY_OVERRIDE_ROOTS: frozenset[str] = frozenset({"parallelize", "stages", "description"})
+
+
+def _override_root_key(override: str) -> str:
+    """Extract the root config key targeted by a Hydra-style CLI override string.
+
+    Strips any leading Hydra prefix operators (``+``, ``++``, ``~``) and returns the segment before
+    the first ``.`` or ``=``.
+
+    Examples:
+        >>> _override_root_key("parallelize.n_workers=2")
+        'parallelize'
+        >>> _override_root_key("+parallelize.launcher=joblib")
+        'parallelize'
+        >>> _override_root_key("++parallelize.launcher_params.foo=bar")
+        'parallelize'
+        >>> _override_root_key("~parallelize.n_workers")
+        'parallelize'
+        >>> _override_root_key("do_overwrite=True")
+        'do_overwrite'
+        >>> _override_root_key("stage_cfg.min_events_per_subject=5")
+        'stage_cfg'
+    """
+    stripped = override.lstrip("+~")
+    if "=" in stripped:
+        stripped = stripped.split("=", 1)[0]
+    return stripped.split(".", 1)[0]
+
+
+def _stage_forwardable_overrides(cfg_overrides: list[str] | None) -> list[str]:
+    """Return the subset of ``cfg_overrides`` that is safe to forward to a stage subprocess.
+
+    Pipeline-only keys (``parallelize``, ``stages``, ``description``) are consumed by the outer
+    runner and would be rejected by the stage's strict Hydra struct. See issue #371.
+
+    Examples:
+        >>> _stage_forwardable_overrides(None)
+        []
+        >>> _stage_forwardable_overrides([])
+        []
+        >>> _stage_forwardable_overrides(["parallelize.n_workers=2", "do_overwrite=True"])
+        ['do_overwrite=True']
+        >>> _stage_forwardable_overrides(["+parallelize.launcher=joblib", "stage_cfg.x=1"])
+        ['stage_cfg.x=1']
+        >>> _stage_forwardable_overrides(["stages=[a,b]", "description=hello", "ok=true"])
+        ['ok=true']
+    """
+    if not cfg_overrides:
+        return []
+    return [o for o in cfg_overrides if _override_root_key(o) not in PIPELINE_ONLY_OVERRIDE_ROOTS]
+
 
 def get_parallelization_args(
     parallelization_cfg: dict | DictConfig | None, default_parallelization_cfg: dict | DictConfig
@@ -207,6 +261,25 @@ def run_stage(
             ...
         ValueError: Stage reorder_measurements failed via ...
 
+        Pipeline-only overrides (``parallelize.*``, ``stages``, ``description``) are stripped before
+        the stage command is assembled so the stage's strict Hydra struct does not reject them:
+
+        >>> stage_runners["reorder_measurements"].pop("parallelize", None)
+        {'n_workers': 2}
+        >>> run_stage(
+        ...     "pipeline_config.yaml",
+        ...     stage_runners,
+        ...     pipeline_cfg,
+        ...     "reorder_measurements",
+        ...     cfg_overrides=[
+        ...         "parallelize.n_workers=4",
+        ...         "+parallelize.launcher=joblib",
+        ...         "do_overwrite=True",
+        ...     ],
+        ...     runner_fn=fake_shell_succeed,
+        ... )
+        baz_script stage=reorder_measurements do_overwrite=True
+
         Improper configurations also raise errors:
 
         >>> bad_runners = {"reshard_to_split": {"_base_stage": "belongs in the stage"}}
@@ -244,8 +317,9 @@ def run_stage(
         f"stage={stage_name}",
     ]
 
-    if cfg_overrides:
-        command_parts.extend(cfg_overrides)
+    stage_overrides = _stage_forwardable_overrides(cfg_overrides)
+    if stage_overrides:
+        command_parts.extend(stage_overrides)
 
     parallelization_args = get_parallelization_args(
         stage_runner_config.get("parallelize", {}), default_parallelization_cfg
