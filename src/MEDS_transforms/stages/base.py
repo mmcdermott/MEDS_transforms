@@ -478,10 +478,16 @@ class Stage:
 
     output_schema_updates: dict[str, pl.DataType] | None = None
     is_metadata: bool | None = None
-    # When True, this stage assumes ``metadata/codes.parquet`` is up-to-date relative to its data
-    # input. The pipeline runner emits a warning at load time if the stage is reached without an
-    # intervening metadata-writing stage. See #117, #116, #118, #200.
+    # When True, this stage expects ``metadata/codes.parquet`` to be current for the data it reads.
+    # The pipeline runner may emit a load-time warning if no earlier stage in the pipeline declares
+    # ``refreshes_codes_metadata=True``. That check does not guarantee the metadata was refreshed
+    # from this stage's actual input data; it catches the common misconfiguration of omitting an
+    # aggregation stage entirely. See #117, #116, #118, #200.
     requires_fresh_metadata: bool = False
+    # When True, this stage (re)computes ``metadata/codes.parquet`` from the data that feeds it.
+    # Only ``aggregate_code_metadata``-style mapreduce stages should set this — metadata stages that
+    # merely decorate an existing codes.parquet (e.g. ``fit_vocabulary_indices``) leave it False.
+    refreshes_codes_metadata: bool = False
 
     __mimic_fn: Callable | None = None
     __stage_docstring: str | None = None
@@ -547,6 +553,7 @@ class Stage:
         default_config: dict[str, Any] | DictConfig | Path | str | None = None,
         is_metadata: bool | None = None,
         requires_fresh_metadata: bool = False,
+        refreshes_codes_metadata: bool = False,
         example_class: type[StageExample] | None = None,
         _calling_file: Path | None = None,
     ) -> MAIN_FN_T:
@@ -613,6 +620,7 @@ class Stage:
             self.output_schema_updates = copy.deepcopy(output_schema_updates)
 
         self.requires_fresh_metadata = requires_fresh_metadata
+        self.refreshes_codes_metadata = refreshes_codes_metadata
 
         self.example_class = example_class if example_class is not None else StageExample
 

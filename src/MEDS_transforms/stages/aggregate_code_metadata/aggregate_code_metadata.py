@@ -809,5 +809,8 @@ AGGREGATION_SCHEMA_UPDATES = {
 
 
 stage = Stage.register(
-    map_fn=mapper_fntr, reduce_fn=reducer_fntr, output_schema_updates=AGGREGATION_SCHEMA_UPDATES
+    map_fn=mapper_fntr,
+    reduce_fn=reducer_fntr,
+    output_schema_updates=AGGREGATION_SCHEMA_UPDATES,
+    refreshes_codes_metadata=True,
 )
