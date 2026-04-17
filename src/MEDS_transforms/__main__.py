@@ -16,31 +16,10 @@ HELP_STRS = {"--help", "-h", "help", "h"}
 MAIN_CFG_PATH = files(__package_name__) / "configs" / "_main.yaml"
 
 
-#: Pipeline-level configuration keys consumed by the runner rather than individual stages. Surfaced
-#: in CLI help so users know what is accepted via ``--overrides`` or at the top level of a pipeline
-#: YAML.
-PIPELINE_CONFIG_KEYS: dict[str, str] = {
-    "input_dir": "Root MEDS directory to read from (contains `data/` and `metadata/`).",
-    "output_dir": "Root directory to write stage outputs into.",
-    "stages": "List of stage configs defining the pipeline (see each stage's docs).",
-    "description": "Optional free-text pipeline description.",
-    "parallelize.n_workers": "Number of parallel workers to launch per stage (default 1).",
-    "parallelize.launcher": "Hydra launcher to use (e.g. 'joblib', 'slurm').",
-    "parallelize.launcher_params": "Launcher-specific keyword arguments forwarded to Hydra.",
-}
-
-
-def _pipeline_keys_help_block() -> str:
-    """Return a stable help-text block listing pipeline-level config keys."""
-    lines = ["Pipeline-level configuration keys (settable via pipeline YAML or `--overrides`):"]
-    width = max(len(k) for k in PIPELINE_CONFIG_KEYS)
-    for key, desc in PIPELINE_CONFIG_KEYS.items():
-        lines.append(f"  {key.ljust(width)}  {desc}")
-    return "\n".join(lines)
-
-
 def print_help_stage():
     """Print help for all stages."""
+
+    from ._cli_help import pipeline_keys_help_block
 
     all_stage_names = list(get_all_registered_stages().keys())
 
@@ -55,7 +34,7 @@ def print_help_stage():
     for name in sorted(all_stage_names):
         print(f"  - {name}")
     print()
-    print(_pipeline_keys_help_block())
+    print(pipeline_keys_help_block())
 
 
 def run_stage():  # pragma: no cover

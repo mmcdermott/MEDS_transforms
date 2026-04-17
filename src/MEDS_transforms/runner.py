@@ -279,12 +279,11 @@ def run_stage(
 def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     """Run an entire pipeline based on command line arguments."""
 
-    # Lazy import to avoid a cycle if __main__ imports runner.
-    from .__main__ import _pipeline_keys_help_block
+    from ._cli_help import pipeline_keys_help_block
 
     parser = argparse.ArgumentParser(
         description="MEDS-Transforms Pipeline Runner",
-        epilog=_pipeline_keys_help_block(),
+        epilog=pipeline_keys_help_block(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
