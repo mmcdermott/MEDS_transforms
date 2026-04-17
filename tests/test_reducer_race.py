@@ -96,7 +96,7 @@ def test_reduce_over_times_out_on_permanently_invalid_input(tmp_path: Path) -> N
     write_df(pl.DataFrame({"a": [1]}), in_fps[0])
     in_fps[1].touch()  # exists but invalid parquet, never fixed
 
-    with pytest.raises(TimeoutError, match="Timed out"):
+    with pytest.raises(TimeoutError, match=r"present but unreadable.*broken\.parquet") as excinfo:
         reduce_over(
             in_fps=in_fps,
             out_fp=out_fp,
@@ -106,6 +106,30 @@ def test_reduce_over_times_out_on_permanently_invalid_input(tmp_path: Path) -> N
             polling_time=0.01,
             max_poll_time=0.3,
         )
+    # The "missing" branch should NOT fire here — the file exists (just isn't valid parquet).
+    assert "missing:" not in str(excinfo.value)
+
+
+def test_reduce_over_times_out_on_missing_input(tmp_path: Path) -> None:
+    """An input path that never appears should time out with a ``missing:`` message."""
+    in_fps = [tmp_path / "ok.parquet", tmp_path / "never_created.parquet"]
+    out_fp = tmp_path / "out.parquet"
+
+    write_df(pl.DataFrame({"a": [1]}), in_fps[0])
+    # Deliberately do not create in_fps[1].
+
+    with pytest.raises(TimeoutError, match=r"missing:.*never_created\.parquet") as excinfo:
+        reduce_over(
+            in_fps=in_fps,
+            out_fp=out_fp,
+            read_fn=read_df,
+            write_fn=write_df,
+            reduce_fn=_reduce_fn,
+            polling_time=0.01,
+            max_poll_time=0.3,
+        )
+    # The "present but unreadable" branch should NOT fire here — the file never existed.
+    assert "present but unreadable" not in str(excinfo.value)
 
 
 def test_reduce_over_rejects_max_poll_time_not_larger_than_polling_time(tmp_path: Path) -> None:
