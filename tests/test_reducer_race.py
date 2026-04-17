@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 
 import polars as pl
+from polars.testing import assert_frame_equal
 
 from MEDS_transforms.dataframe import read_df, write_df
 from MEDS_transforms.mapreduce.reducer import reduce_over
@@ -83,6 +84,7 @@ def test_reduce_over_waits_for_complete_parquet() -> None:
         finally:
             slow_writer.join()
 
-        result = read_df(out_fp).sort("a")
+        # ``read_df`` returns a LazyFrame; collect before comparing.
+        result = read_df(out_fp).collect().sort("a")
         expected = pl.concat([df0, df1], how="vertical").sort("a")
-        assert result.equals(expected), f"Reducer output differs:\n{result}\nvs expected:\n{expected}"
+        assert_frame_equal(result, expected)
