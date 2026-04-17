@@ -727,23 +727,38 @@ class Stage:
                     f"{type(default_config)}: {default_config}"
                 )
 
-    def _resolve_output_schema_updates(self, example_dir: Path | None = None) -> dict[str, pl.DataType]:
-        """Resolve ``output_schema_updates`` against an optional example directory.
+    def _resolve_output_schema_updates(
+        self,
+        example_dir: Path | None = None,
+        *,
+        stage_cfg: dict | None = None,
+    ) -> dict[str, pl.DataType]:
+        """Resolve ``output_schema_updates`` against an optional example or pre-parsed config.
 
-        If ``output_schema_updates`` is a callable, it is called with the example's parsed
-        ``cfg.yaml`` (or ``None`` when there is none) and expected to return a dict. Otherwise the
-        dict is returned as-is.
+        If ``output_schema_updates`` is a callable, it is called with a ``stage_cfg`` dict and
+        expected to return a dict. Resolution order for that dict:
+
+        1. Explicit ``stage_cfg`` argument (lets callers parse ``cfg.yaml`` once and share).
+        2. ``example_dir / "cfg.yaml"`` if ``example_dir`` is given and the file exists.
+        3. ``self.default_config`` (so ``Stage.__str__`` / ``docgen`` reflect the stage's default
+           behavior even when no example is in scope).
+        4. ``None`` as a last resort.
+
+        If ``output_schema_updates`` is a plain dict (or None), it is returned unchanged.
         """
         if self.output_schema_updates is None:
             return {}
         if not callable(self.output_schema_updates):
             return dict(self.output_schema_updates)
-        stage_cfg: dict | None = None
-        if example_dir is not None:
+
+        resolved_cfg: dict | None = stage_cfg
+        if resolved_cfg is None and example_dir is not None:
             stage_cfg_fp = example_dir / "cfg.yaml"
             if stage_cfg_fp.is_file():
-                stage_cfg = OmegaConf.to_container(OmegaConf.load(stage_cfg_fp))
-        return dict(self.output_schema_updates(stage_cfg))
+                resolved_cfg = OmegaConf.to_container(OmegaConf.load(stage_cfg_fp))
+        if resolved_cfg is None and self.default_config:
+            resolved_cfg = OmegaConf.to_container(self.default_config, resolve=False)
+        return dict(self.output_schema_updates(resolved_cfg))
 
     @property
     def test_cases(self) -> dict[str, StageExample]:
@@ -761,11 +776,17 @@ class Stage:
 
             if self.example_class.is_example_dir(example_dir):
                 scenario_name = example_dir.relative_to(self.examples_dir).as_posix()
-                schema_updates = self._resolve_output_schema_updates(example_dir)
+                # Parse cfg.yaml once per example so both the schema resolver and from_dir reuse it.
+                stage_cfg_fp = example_dir / "cfg.yaml"
+                parsed_stage_cfg: dict | None = (
+                    OmegaConf.to_container(OmegaConf.load(stage_cfg_fp)) if stage_cfg_fp.is_file() else None
+                )
+                schema_updates = self._resolve_output_schema_updates(stage_cfg=parsed_stage_cfg)
                 test_cases[scenario_name] = self.example_class.from_dir(
                     stage_name=self.stage_name,
                     scenario_name=scenario_name,
                     example_dir=example_dir,
+                    stage_cfg=parsed_stage_cfg,
                     **schema_updates,
                 )
             else:
