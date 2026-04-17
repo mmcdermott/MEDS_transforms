@@ -217,33 +217,39 @@ def reduce_over(
             "otherwise legitimately slow mappers will trigger a TimeoutError on the first recheck."
         )
 
-    deadline = time.monotonic() + max_poll_time if max_poll_time is not None else None
-    ready_fps: set[Path] = set()
+    deadline = None if max_poll_time is None else time.monotonic() + max_poll_time
+    ready: set[Path] = set()
+
+    def _is_ready(fp: Path) -> bool:
+        # ``is_file`` is a cheap stat; only if it passes do we open the parquet to check completeness.
+        return fp.is_file() and default_file_checker(fp)
+
     while True:
-        not_ready: list[Path] = []
-        for fp in in_fps:
-            if fp in ready_fps:
-                continue
-            # Fast path: skip the parquet completeness check when the file isn't even on disk yet.
-            if not fp.is_file() or not default_file_checker(fp):
-                not_ready.append(fp)
-                continue
-            ready_fps.add(fp)
-        if not not_ready:
+        ready.update(fp for fp in in_fps if fp not in ready and _is_ready(fp))
+        if len(ready) == len(in_fps):
             break
-        if deadline is not None and time.monotonic() >= deadline:
-            stuck = [fp for fp in not_ready if fp.exists()]
-            missing = [fp for fp in not_ready if not fp.exists()]
-            parts = []
-            if stuck:
-                parts.append(f"present but unreadable: {', '.join(str(fp) for fp in stuck)}")
-            if missing:
-                parts.append(f"missing: {', '.join(str(fp) for fp in missing)}")
-            raise TimeoutError(
-                f"Timed out after {max_poll_time}s waiting for reduction inputs — " + "; ".join(parts)
-            )
+
+        if deadline is None:
+            sleep_for = polling_time
+        else:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                pending = [fp for fp in in_fps if fp not in ready]
+                stuck = [fp for fp in pending if fp.exists()]
+                missing = [fp for fp in pending if not fp.exists()]
+                parts = []
+                if stuck:
+                    parts.append(f"present but unreadable: {', '.join(str(fp) for fp in stuck)}")
+                if missing:
+                    parts.append(f"missing: {', '.join(str(fp) for fp in missing)}")
+                raise TimeoutError(
+                    f"Timed out after {max_poll_time}s waiting for reduction inputs — " + "; ".join(parts)
+                )
+            # Don't oversleep past the deadline; if remaining < polling_time, wake up sooner.
+            sleep_for = min(polling_time, remaining)
+
         logger.info("Waiting to begin reduction for all files to be written...")
-        time.sleep(polling_time)
+        time.sleep(sleep_for)
 
     reduced = reduce_fn(*[read_fn(fp) for fp in in_fps])
 
