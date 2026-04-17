@@ -44,7 +44,7 @@ def _publish_before_complete_write(
     write_df(df, fp)
 
 
-def _reduce_fn(*dfs: pl.DataFrame) -> pl.DataFrame:
+def _reduce_fn(*dfs: pl.LazyFrame | pl.DataFrame) -> pl.LazyFrame | pl.DataFrame:
     return pl.concat(dfs, how="vertical")
 
 
