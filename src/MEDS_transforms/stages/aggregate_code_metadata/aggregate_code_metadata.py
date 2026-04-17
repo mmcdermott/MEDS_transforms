@@ -170,6 +170,14 @@ VAL_PRESENT: pl.Expr = VAL.is_not_null() & VAL.is_not_nan()
 IS_INT: pl.Expr = VAL.round() == VAL
 PRESENT_VALS = VAL.filter(VAL_PRESENT)
 
+#: Aggregations that must be declared in object form with a specific required sub-key because their
+#: reducer takes parameters beyond the column selector. Maps aggregation name to the required extra
+#: key. Used by :func:`validate_args_and_get_code_cols` to raise a targeted error (issue #164).
+AGGREGATIONS_REQUIRING_OBJECT_FORM: dict[str, str] = {
+    MetadataFn.VALUES_QUANTILES.value: "quantiles",
+}
+
+
 CODE_METADATA_AGGREGATIONS: dict[MetadataFn, MapReducePair] = {
     MetadataFn.CODE_N_PATIENTS: MapReducePair(
         pl.col(DataSchema.subject_id_name).n_unique(), pl.sum_horizontal
@@ -221,6 +229,29 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
         ValueError: Metadata aggregation function INVALID not found in MetadataFn enumeration. Values are:
             code/n_subjects, code/n_occurrences, values/n_subjects, values/n_occurrences, values/n_ints,
             values/sum, values/sum_sqd, values/min, values/max, values/quantiles
+
+        Aggregations such as ``values/quantiles`` require the object form with a specific field. The
+        validator raises an actionable error pointing at the missing key:
+
+        >>> validate_args_and_get_code_cols(DictConfig({"aggregations": ["values/quantiles"]}), None)
+        Traceback (most recent call last):
+            ...
+        ValueError: Aggregation 'values/quantiles' requires object form with a 'quantiles' field. Got it
+        as a plain string.
+        Example:
+          aggregations:
+            - name: values/quantiles
+              quantiles: [0.25, 0.5, 0.75]
+        >>> cfg = DictConfig({"aggregations": [{"name": "values/quantiles"}]})
+        >>> validate_args_and_get_code_cols(cfg, None)
+        Traceback (most recent call last):
+            ...
+        ValueError: Aggregation 'values/quantiles' is missing the required 'quantiles' field. Got:
+        {'name': 'values/quantiles'}.
+        Example:
+          aggregations:
+            - name: values/quantiles
+              quantiles: [0.25, 0.5, 0.75]
         >>> valid_cfg = DictConfig({"aggregations": ["code/n_subjects", {"name": "values/n_ints"}]})
         >>> validate_args_and_get_code_cols(valid_cfg, 33)
         Traceback (most recent call last):
@@ -244,12 +275,34 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
     aggregations = stage_cfg.aggregations
     for agg in aggregations:
         if isinstance(agg, dict | DictConfig):
-            agg = agg.get("name", None)
-        if agg not in {fn.value for fn in MetadataFn}:
+            agg_name = agg.get("name", None)
+            agg_obj = agg
+        else:
+            agg_name = agg
+            agg_obj = None
+        if agg_name not in {fn.value for fn in MetadataFn}:
             raise ValueError(
-                f"Metadata aggregation function {agg} not found in MetadataFn enumeration. Values are: "
-                f"{', '.join([fn.value for fn in MetadataFn])}"
+                f"Metadata aggregation function {agg_name} not found in MetadataFn enumeration. Values "
+                f"are: {', '.join([fn.value for fn in MetadataFn])}"
             )
+        if agg_name in AGGREGATIONS_REQUIRING_OBJECT_FORM:
+            required_key = AGGREGATIONS_REQUIRING_OBJECT_FORM[agg_name]
+            if agg_obj is None:
+                raise ValueError(
+                    f"Aggregation '{agg_name}' requires object form with a '{required_key}' field. "
+                    f"Got it as a plain string.\nExample:\n"
+                    f"  aggregations:\n"
+                    f"    - name: {agg_name}\n"
+                    f"      {required_key}: [0.25, 0.5, 0.75]"
+                )
+            if required_key not in agg_obj:
+                raise ValueError(
+                    f"Aggregation '{agg_name}' is missing the required '{required_key}' field. "
+                    f"Got: {dict(agg_obj)}.\nExample:\n"
+                    f"  aggregations:\n"
+                    f"    - name: {agg_name}\n"
+                    f"      {required_key}: [0.25, 0.5, 0.75]"
+                )
 
     match code_modifiers:
         case None:
