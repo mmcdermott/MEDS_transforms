@@ -8,6 +8,7 @@ from typing import Protocol
 import polars as pl
 
 from ..dataframe import DF_T, READ_FN_T, WRITE_FN_T
+from .rwlock import default_file_checker
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +204,7 @@ def reduce_over(
     if out_fp.is_file() and not do_overwrite:
         raise FileExistsError(f"Output file already exists: {out_fp.resolve()!s}")
 
-    while not all(fp.is_file() for fp in in_fps):
+    while not all(default_file_checker(fp) for fp in in_fps):
         logger.info("Waiting to begin reduction for all files to be written...")
         time.sleep(polling_time)
 
