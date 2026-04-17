@@ -744,10 +744,44 @@ class Stage:
            behavior even when no example is in scope).
         4. ``None`` as a last resort.
 
-        If ``output_schema_updates`` is a plain dict (or None), it is returned unchanged.
+        If ``output_schema_updates`` is a plain dict, it is returned unchanged.
+
+        Examples:
+            Dict overrides are returned verbatim (and the returned dict is a fresh copy):
+
+            >>> stage = Stage.register(
+            ...     stage_name="dict_stage",
+            ...     stage_docstring="x",
+            ...     map_fn=lambda df: df,
+            ...     output_schema_updates={"foo": pl.Int64},
+            ... )
+            >>> stage._resolve_output_schema_updates()
+            {'foo': Int64}
+
+            Callable overrides receive the resolved ``stage_cfg``. Priority: explicit
+            ``stage_cfg`` arg, then ``example_dir/cfg.yaml``, then ``default_config``:
+
+            >>> def schema_fn(cfg):
+            ...     return {"probs": cfg["probs"] if cfg else "(no cfg)"}
+            >>> stage = Stage.register(
+            ...     stage_name="callable_stage",
+            ...     stage_docstring="x",
+            ...     map_fn=lambda df: df,
+            ...     output_schema_updates=schema_fn,
+            ...     default_config={"probs": "from-default"},
+            ... )
+            >>> stage._resolve_output_schema_updates(stage_cfg={"probs": "from-arg"})
+            {'probs': 'from-arg'}
+            >>> import tempfile
+            >>> with tempfile.TemporaryDirectory() as td:
+            ...     example_dir = Path(td)
+            ...     (example_dir / "cfg.yaml").write_text("probs: from-example\\n")
+            ...     stage._resolve_output_schema_updates(example_dir)
+            20
+            {'probs': 'from-example'}
+            >>> stage._resolve_output_schema_updates()
+            {'probs': 'from-default'}
         """
-        if self.output_schema_updates is None:
-            return {}
         if not callable(self.output_schema_updates):
             return dict(self.output_schema_updates)
 
