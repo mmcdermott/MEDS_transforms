@@ -24,9 +24,12 @@ from .examples import StageExample, StageExampleDict
 
 if TYPE_CHECKING:
     import polars as pl
+    from flexible_schema import Schema
 
     from ..compute_modes import ANY_COMPUTE_FN_T
     from ..dataframe import READ_FN_T, WRITE_FN_T
+
+    SchemaLike = type[Schema] | Schema
 
 logger = logging.getLogger(__name__)
 
@@ -477,6 +480,10 @@ class Stage:
     write_fn: WRITE_FN_T | None = None
 
     output_schema_updates: dict[str, pl.DataType] | None = None
+    input_schema: SchemaLike | None = None
+    output_schema: SchemaLike | None = None
+    metadata_input_schema: SchemaLike | None = None
+    metadata_output_schema: SchemaLike | None = None
     is_metadata: bool | None = None
 
     __mimic_fn: Callable | None = None
@@ -539,6 +546,10 @@ class Stage:
         stage_name: str | None = None,
         stage_docstring: str | None = None,
         output_schema_updates: dict[str, pl.DataType] | None = None,
+        input_schema: SchemaLike | None = None,
+        output_schema: SchemaLike | None = None,
+        metadata_input_schema: SchemaLike | None = None,
+        metadata_output_schema: SchemaLike | None = None,
         examples_dir: Path | None = None,
         default_config: dict[str, Any] | DictConfig | Path | str | None = None,
         is_metadata: bool | None = None,
@@ -606,6 +617,11 @@ class Stage:
             self.output_schema_updates = {}
         else:
             self.output_schema_updates = copy.deepcopy(output_schema_updates)
+
+        self.input_schema = input_schema
+        self.output_schema = output_schema
+        self.metadata_input_schema = metadata_input_schema
+        self.metadata_output_schema = metadata_output_schema
 
         self.example_class = example_class if example_class is not None else StageExample
 
@@ -720,6 +736,34 @@ class Stage:
                     "Default configuration must be a dictionary, DictConfig, or path to a YAML file. Got "
                     f"{type(default_config)}: {default_config}"
                 )
+
+    @property
+    def declared_schemas(self) -> dict[str, SchemaLike | None]:
+        """Return all declared ``flexible_schema`` schemas on this stage, keyed by role.
+
+        The four roles are ``input``, ``output``, ``metadata_input``, ``metadata_output``. Values
+        are ``None`` when the stage has not declared that particular schema. Intended to feed
+        pipeline-load-time schema validation (see #324) and composer schema checks (see #56).
+
+        Examples:
+            >>> def compute(cfg):
+            ...     '''docstring'''
+            ...     return 0
+            >>> from meds import DataSchema
+            >>> stage = Stage(map_fn=compute, input_schema=DataSchema, output_schema=DataSchema)
+            >>> sorted(stage.declared_schemas.keys())
+            ['input', 'metadata_input', 'metadata_output', 'output']
+            >>> stage.declared_schemas["input"] is DataSchema
+            True
+            >>> stage.declared_schemas["metadata_input"] is None
+            True
+        """
+        return {
+            "input": self.input_schema,
+            "output": self.output_schema,
+            "metadata_input": self.metadata_input_schema,
+            "metadata_output": self.metadata_output_schema,
+        }
 
     @property
     def test_cases(self) -> dict[str, StageExample]:
