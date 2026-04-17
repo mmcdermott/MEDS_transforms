@@ -476,7 +476,9 @@ class Stage:
     read_fn: READ_FN_T | None = None
     write_fn: WRITE_FN_T | None = None
 
-    output_schema_updates: dict[str, pl.DataType] | None = None
+    output_schema_updates: dict[str, pl.DataType] | Callable[[dict | None], dict[str, pl.DataType]] | None = (
+        None
+    )
     is_metadata: bool | None = None
 
     __mimic_fn: Callable | None = None
@@ -538,7 +540,9 @@ class Stage:
         write_fn: WRITE_FN_T | None = None,
         stage_name: str | None = None,
         stage_docstring: str | None = None,
-        output_schema_updates: dict[str, pl.DataType] | None = None,
+        output_schema_updates: (
+            dict[str, pl.DataType] | Callable[[dict | None], dict[str, pl.DataType]] | None
+        ) = None,
         examples_dir: Path | None = None,
         default_config: dict[str, Any] | DictConfig | Path | str | None = None,
         is_metadata: bool | None = None,
@@ -604,6 +608,8 @@ class Stage:
 
         if output_schema_updates is None:
             self.output_schema_updates = {}
+        elif callable(output_schema_updates):
+            self.output_schema_updates = output_schema_updates
         else:
             self.output_schema_updates = copy.deepcopy(output_schema_updates)
 
@@ -721,6 +727,24 @@ class Stage:
                     f"{type(default_config)}: {default_config}"
                 )
 
+    def _resolve_output_schema_updates(self, example_dir: Path | None = None) -> dict[str, pl.DataType]:
+        """Resolve ``output_schema_updates`` against an optional example directory.
+
+        If ``output_schema_updates`` is a callable, it is called with the example's parsed
+        ``cfg.yaml`` (or ``None`` when there is none) and expected to return a dict. Otherwise the
+        dict is returned as-is.
+        """
+        if self.output_schema_updates is None:
+            return {}
+        if not callable(self.output_schema_updates):
+            return dict(self.output_schema_updates)
+        stage_cfg: dict | None = None
+        if example_dir is not None:
+            stage_cfg_fp = example_dir / "cfg.yaml"
+            if stage_cfg_fp.is_file():
+                stage_cfg = OmegaConf.to_container(OmegaConf.load(stage_cfg_fp))
+        return dict(self.output_schema_updates(stage_cfg))
+
     @property
     def test_cases(self) -> dict[str, StageExample]:
         if self.examples_dir is None:
@@ -737,11 +761,12 @@ class Stage:
 
             if self.example_class.is_example_dir(example_dir):
                 scenario_name = example_dir.relative_to(self.examples_dir).as_posix()
+                schema_updates = self._resolve_output_schema_updates(example_dir)
                 test_cases[scenario_name] = self.example_class.from_dir(
                     stage_name=self.stage_name,
                     scenario_name=scenario_name,
                     example_dir=example_dir,
-                    **self.output_schema_updates,
+                    **schema_updates,
                 )
             else:
                 examples_to_check.extend(sorted(example_dir.iterdir()))
@@ -951,9 +976,10 @@ class Stage:
             lines.append("  Default config:")
             lines.extend(textwrap.indent(str(OmegaConf.to_yaml(self.default_config)), "    | ").splitlines())
 
-        if self.output_schema_updates:
+        schema_updates = self._resolve_output_schema_updates()
+        if schema_updates:
             lines.append("  Output schema updates:")
-            lines.extend(pretty_wrap(str(self.output_schema_updates)))
+            lines.extend(pretty_wrap(str(schema_updates)))
 
         lines.extend(
             [
