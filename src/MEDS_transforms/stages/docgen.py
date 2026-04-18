@@ -69,6 +69,15 @@ def read_example_readme(directory: Path | None) -> str | None:
         ...     _ = (Path(d) / "README.md").write_text("### Deep Heading\\n\\nDeep body.\\n")
         ...     read_example_readme(Path(d))
         'Deep body.'
+
+        A heading-only README (no body) returns ``None`` — the heading is stripped even without a
+        trailing newline:
+
+        >>> with tempfile.TemporaryDirectory() as d:
+        ...     _ = (Path(d) / "README.md").write_text("# Just A Heading")
+        ...     read_example_readme(Path(d)) is None
+        True
+
         >>> with tempfile.TemporaryDirectory() as d:
         ...     read_example_readme(Path(d)) is None
         True
@@ -81,7 +90,8 @@ def read_example_readme(directory: Path | None) -> str | None:
         return None
     text = readme.read_text().strip()
     # Strip a leading ATX heading (``# Title``, ``## Sub``, etc.) to avoid duplicate/conflicting headings.
-    text = re.sub(r"^#+[^\n]*\n+", "", text).strip()
+    # Anchor to end-of-string too so heading-only READMEs (no body) are handled.
+    text = re.sub(r"^#+[^\n]*(?:\n+|$)", "", text).strip()
     return text or None
 
 
@@ -275,6 +285,10 @@ def _build_stage_content(stage_name: str, stage) -> str:
 def _safe_relative_to(path: Path, root: Path) -> Path | None:
     """Return ``path`` relative to ``root``, or ``None`` if ``path`` is not under ``root``.
 
+    Both operands are resolved first, so an absolute ``path`` against a relative ``root`` (or vice
+    versa) is handled consistently — otherwise ``Path.relative_to`` would spuriously report
+    "not under root" whenever the two disagreed on absoluteness.
+
     Used for MkDocs edit links when the stage lives outside the package ``root`` being documented
     (e.g., ``generate_stage_docs(\"downstream_pkg\")`` invoked from a MEDS-Transforms docs build).
 
@@ -284,10 +298,25 @@ def _safe_relative_to(path: Path, root: Path) -> Path | None:
         'b/c'
         >>> _safe_relative_to(Path("/other/place"), Path("/a")) is None
         True
+
+        Mixed absolute/relative operands are normalized (both resolved) before comparison:
+
+        >>> import os, tempfile
+        >>> with tempfile.TemporaryDirectory() as td:
+        ...     nested = Path(td) / "pkg" / "stage"
+        ...     nested.mkdir(parents=True)
+        ...     prev = os.getcwd()
+        ...     os.chdir(td)
+        ...     try:
+        ...         rel = _safe_relative_to(nested, Path("pkg"))
+        ...     finally:
+        ...         os.chdir(prev)
+        >>> rel.as_posix()
+        'stage'
     """
 
     try:
-        return path.relative_to(root)
+        return path.resolve().relative_to(Path(root).resolve())
     except ValueError:
         return None
 
@@ -297,10 +326,12 @@ def generate_stage_docs(package: str, root: Path | None = None) -> list[StageDoc
 
     Args:
         package: Package prefix used to filter stages from the registry.
-        root: Repository root for computing edit links. Defaults to two
-            directories above this file. Stages whose ``stage_dir`` lives outside
-            ``root`` get a ``None`` ``edit_path`` (no MkDocs edit link) rather
-            than raising.
+        root: Base directory used to compute *package-relative* ``edit_path`` values (e.g.,
+            ``stages/<stage_name>`` when documenting the ``MEDS_transforms`` package). Defaults
+            to the ``MEDS_transforms`` package directory — i.e., ``docgen.py``'s parent-of-parent
+            — not the repository root. Downstream-package docs builds should pass their own
+            package root. Stages whose ``stage_dir`` lives outside ``root`` get a ``None``
+            ``edit_path`` (no MkDocs edit link) rather than raising.
 
     Returns:
         A list of :class:`StageDoc` objects describing each page.
