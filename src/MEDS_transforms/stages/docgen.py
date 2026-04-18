@@ -48,10 +48,10 @@ class StageDoc:
 
 
 def read_example_readme(directory: Path | None) -> str | None:
-    """Read a README.md from *directory*, stripping any leading ``#`` heading.
+    """Read a README.md from *directory*, stripping any leading ATX heading.
 
     The leading heading is removed because the README content is embedded under an existing section heading in
-    the generated page.
+    the generated page. Any ATX level is stripped (``#``, ``##``, ``###``, ...).
 
     Exposed publicly so :class:`StageExample` subclass overrides of
     :meth:`~StageExample.render_content` can reuse the same preamble behavior.
@@ -66,6 +66,10 @@ def read_example_readme(directory: Path | None) -> str | None:
         ...     read_example_readme(Path(d))
         'Body text.'
         >>> with tempfile.TemporaryDirectory() as d:
+        ...     _ = (Path(d) / "README.md").write_text("### Deep Heading\\n\\nDeep body.\\n")
+        ...     read_example_readme(Path(d))
+        'Deep body.'
+        >>> with tempfile.TemporaryDirectory() as d:
         ...     read_example_readme(Path(d)) is None
         True
     """
@@ -76,8 +80,8 @@ def read_example_readme(directory: Path | None) -> str | None:
     if not readme.is_file():
         return None
     text = readme.read_text().strip()
-    # Strip a leading ATX heading (e.g. "# Title\n\n...") to avoid duplicate/conflicting headings.
-    text = re.sub(r"^#[^\n]*\n+", "", text).strip()
+    # Strip a leading ATX heading (``# Title``, ``## Sub``, etc.) to avoid duplicate/conflicting headings.
+    text = re.sub(r"^#+[^\n]*\n+", "", text).strip()
     return text or None
 
 

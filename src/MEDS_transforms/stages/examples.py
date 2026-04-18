@@ -1128,7 +1128,7 @@ class StageExample:
 
         The default implementation renders, in order:
 
-        - optional ``example_dir/README.md`` as a preamble (leading ATX heading stripped),
+        - optional ``example_dir/README.md`` as a preamble (leading ATX heading of any level stripped),
         - ``stage_cfg`` as a YAML code block when non-empty,
         - a note when ``do_use_config_yaml`` is set,
         - ``in_data`` as Markdown shard tables (:class:`MEDSDataset`) or a YAML code block when it is
