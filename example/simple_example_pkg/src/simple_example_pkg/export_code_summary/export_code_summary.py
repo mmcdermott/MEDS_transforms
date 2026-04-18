@@ -101,6 +101,49 @@ class JsonOutputStageExample(StageExample):
                         f"Content mismatch in {rel}:\n  Expected: {expected_text}\n  Got: {actual_text}"
                     )
 
+    def render_content(self, example_dir=None):
+        """Render the example with JSON output parsed into a Markdown table.
+
+        Demonstrates the ``StageExample.render_content`` extension hook. The base class's default
+        ``Path`` handling would render ``want_data`` as a generic YAML code block; this override
+        materializes the spec, parses each ``.json`` file into rows, and emits a table for each —
+        which is friendlier for readers than raw YAML.
+
+        Subclasses like this one own the full rendering of their example sections; they call
+        shared helpers from :mod:`MEDS_transforms.stages.docgen` for table formatting.
+        """
+        from omegaconf import OmegaConf
+        from polars import DataFrame
+
+        from MEDS_transforms.stages.docgen import df_to_markdown, read_example_readme
+
+        lines: list[str] = []
+
+        example_readme = read_example_readme(example_dir)
+        if example_readme:
+            lines.extend([example_readme, ""])
+
+        if self.stage_cfg:
+            cfg_str = OmegaConf.to_yaml(OmegaConf.create(self.stage_cfg)).strip()
+            lines.extend(["**Stage configuration:**", "", "```yaml", cfg_str, "```", ""])
+
+        if self.want_data is not None:
+            with tempfile.TemporaryDirectory() as expected_root:
+                expected_root = Path(expected_root)
+                yaml_disk(self.want_data, root_dir=expected_root)
+                for fp in sorted(expected_root.rglob("*.json")):
+                    rel = fp.relative_to(expected_root)
+                    obj = json.loads(fp.read_text())
+                    rows = [{"key": k, "value": v} for k, v in sorted(obj.items())]
+                    lines.extend([f"**Expected `{rel}`:**", ""])
+                    lines.append(df_to_markdown(DataFrame(rows)))
+                    lines.append("")
+
+        cmd = f"MEDS_transform-stage <pipeline.yaml> {self.stage_name} input_dir=<input> output_dir=<output>"
+        lines.extend(["**Run this stage:**", "", "```bash", cmd, "```", ""])
+
+        return lines
+
 
 @Stage.register(is_metadata=False, example_class=JsonOutputStageExample)
 def main(cfg: DictConfig):
