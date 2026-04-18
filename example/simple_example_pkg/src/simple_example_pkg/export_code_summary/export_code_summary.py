@@ -139,7 +139,10 @@ class JsonOutputStageExample(StageExample):
                     lines.append(df_to_markdown(DataFrame(rows)))
                     lines.append("")
 
-        cmd = f"MEDS_transform-stage <pipeline.yaml> {self.stage_name} input_dir=<input> output_dir=<output>"
+        cmd = f"MEDS_transform-stage <pipeline.yaml> {self.stage_name}"
+        if self.cmd_args:
+            cmd += " " + " ".join(self.cmd_args)
+        cmd += " input_dir=<input> output_dir=<output>"
         lines.extend(["**Run this stage:**", "", "```bash", cmd, "```", ""])
 
         return lines

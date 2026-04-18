@@ -1193,7 +1193,34 @@ class StageExample:
             **Custom section**
             <BLANKLINE>
             wants: 1 codes
-        """
+
+            The CLI hint is built from ``self.cmd_args``, so non-string ``stage_cfg`` values
+            (``bool``, ``None``, ``list``) render as valid Hydra dotlist syntax rather than raw
+            Python ``repr``:
+
+            >>> with_overrides = StageExample(
+            ...     stage_name="demo",
+            ...     want_metadata=metadata_df,
+            ...     stage_cfg={"drop": True, "missing": None},
+            ... )
+            >>> cli = next(
+            ...     line for line in with_overrides.render_content() if "MEDS_transform-stage" in line
+            ... )
+            >>> print(cli)
+            MEDS_transform-stage <pipeline.yaml> demo stage_cfg.drop=true ~stage_cfg.missing input_dir=<input> output_dir=<output>
+
+            When ``do_use_config_yaml`` is set, the hint carries no dotlist overrides (they live in
+            ``config.yaml``):
+
+            >>> via_yaml = StageExample(
+            ...     stage_name="demo",
+            ...     want_metadata=metadata_df,
+            ...     stage_cfg={"drop": True},
+            ...     do_use_config_yaml=True,
+            ... )
+            >>> next(line for line in via_yaml.render_content() if "MEDS_transform-stage" in line)
+            'MEDS_transform-stage <pipeline.yaml> demo input_dir=<input> output_dir=<output>'
+        """  # noqa: E501
 
         from .docgen import df_to_markdown, format_dataset, read_example_readme
 
@@ -1236,12 +1263,12 @@ class StageExample:
             lines.append(df_to_markdown(self.want_metadata))
             lines.append("")
 
-        cfg_parts = [
-            f"stage_cfg.{k}={v}" for k, v in (self.stage_cfg or {}).items() if not isinstance(v, dict)
-        ]
+        # Use the same dotlist formatter as ``self.test_env`` so the rendered command line
+        # matches how the example actually runs (handles bool/None/list values correctly and
+        # yields no overrides when ``do_use_config_yaml`` is set — config.yaml supplies them).
         cmd = f"MEDS_transform-stage <pipeline.yaml> {self.stage_name}"
-        if cfg_parts:
-            cmd += " " + " ".join(cfg_parts)
+        if self.cmd_args:
+            cmd += " " + " ".join(self.cmd_args)
         cmd += " input_dir=<input> output_dir=<output>"
         lines.extend(["**Run this stage:**", "", "```bash", cmd, "```", ""])
 
