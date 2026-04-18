@@ -1123,6 +1123,157 @@ class StageExample:
             except AssertionError as e:
                 raise AssertionError("\n".join(err_lines)) from e
 
+    def render_content(self, example_dir: Path | None = None) -> list[str]:
+        """Return Markdown lines rendering this example for ``generate_stage_docs``.
+
+        The default implementation renders, in order:
+
+        - optional ``example_dir/README.md`` as a preamble (leading ATX heading of any level stripped),
+        - ``stage_cfg`` as a YAML code block when non-empty,
+        - a note when ``do_use_config_yaml`` is set,
+        - ``in_data`` as Markdown shard tables (:class:`MEDSDataset`) or a YAML code block when it is
+          a :class:`~pathlib.Path` to a ``yaml_to_disk`` spec,
+        - ``want_data`` with the same MEDSDataset/Path dispatch as ``in_data``,
+        - ``want_metadata`` as a single Markdown table,
+        - a bash invocation hint under a ``**Run this stage:**`` heading.
+
+        Subclasses override this method when their example fields (``in_data``, ``want_data``,
+        ``want_metadata``) aren't :class:`MEDSDataset` / :class:`polars.DataFrame` instances.
+        :func:`MEDS_transforms.stages.docgen.df_to_markdown` and
+        :func:`MEDS_transforms.stages.docgen.format_dataset` are the reusable helpers for such
+        overrides.
+
+        Args:
+            example_dir: Optional directory containing an ``README.md`` to render as a per-example
+                preamble. ``None`` disables the preamble.
+
+        Returns:
+            A list of Markdown lines (suitable for ``\\n``-joining) describing this example.
+
+        Examples:
+            >>> import polars as pl
+            >>> metadata_df = pl.DataFrame({"code": ["foo"], "description": ["Foo"]})
+            >>> example = StageExample(stage_name="demo", want_metadata=metadata_df)
+            >>> print("\\n".join(example.render_content()))
+            **Expected output metadata:**
+            <BLANKLINE>
+            | **code** | **description** |
+            | --- | --- |
+            | foo | Foo |
+            <BLANKLINE>
+            **Run this stage:**
+            <BLANKLINE>
+            ```bash
+            MEDS_transform-stage <pipeline.yaml> demo input_dir=<input> output_dir=<output>
+            ```
+            <BLANKLINE>
+
+            When ``in_data`` is a :class:`~pathlib.Path` to a ``yaml_to_disk`` spec, its raw text is
+            rendered as a YAML code block under an ``**Input files:**`` heading. ``want_data`` uses
+            the same dispatch:
+
+            >>> import tempfile
+            >>> with tempfile.TemporaryDirectory() as d:
+            ...     spec_fp = Path(d) / "out_data.yaml"
+            ...     _ = spec_fp.write_text("foo.json:\\n  a: 1\\n")
+            ...     ex = StageExample(stage_name="demo", want_data=spec_fp)
+            ...     rendered = "\\n".join(ex.render_content())
+            >>> "**Expected output files:**" in rendered
+            True
+            >>> "foo.json:" in rendered
+            True
+
+            Subclasses override this method to render non-MEDS outputs:
+
+            >>> class TextOutputExample(StageExample):
+            ...     def render_content(self, example_dir=None):
+            ...         return ["**Custom section**", "", f"wants: {self.want_metadata.height} codes"]
+            >>> custom = TextOutputExample(stage_name="demo", want_metadata=metadata_df)
+            >>> print("\\n".join(custom.render_content()))
+            **Custom section**
+            <BLANKLINE>
+            wants: 1 codes
+
+            The CLI hint is built from ``self.cmd_args``, so non-string ``stage_cfg`` values
+            (``bool``, ``None``, ``list``) render as valid Hydra dotlist syntax rather than raw
+            Python ``repr``:
+
+            >>> with_overrides = StageExample(
+            ...     stage_name="demo",
+            ...     want_metadata=metadata_df,
+            ...     stage_cfg={"drop": True, "missing": None},
+            ... )
+            >>> cli = next(
+            ...     line for line in with_overrides.render_content() if "MEDS_transform-stage" in line
+            ... )
+            >>> print(cli)
+            MEDS_transform-stage <pipeline.yaml> demo stage_cfg.drop=true ~stage_cfg.missing input_dir=<input> output_dir=<output>
+
+            When ``do_use_config_yaml`` is set, the hint carries no dotlist overrides (they live in
+            ``config.yaml``):
+
+            >>> via_yaml = StageExample(
+            ...     stage_name="demo",
+            ...     want_metadata=metadata_df,
+            ...     stage_cfg={"drop": True},
+            ...     do_use_config_yaml=True,
+            ... )
+            >>> next(line for line in via_yaml.render_content() if "MEDS_transform-stage" in line)
+            'MEDS_transform-stage <pipeline.yaml> demo input_dir=<input> output_dir=<output>'
+        """  # noqa: E501
+
+        from .docgen import df_to_markdown, format_dataset, read_example_readme
+
+        lines: list[str] = []
+
+        example_readme = read_example_readme(example_dir)
+        if example_readme:
+            lines.extend([example_readme, ""])
+
+        if self.stage_cfg:
+            cfg_str = OmegaConf.to_yaml(OmegaConf.create(self.stage_cfg)).strip()
+            lines.extend(["**Stage configuration:**", "", "```yaml", cfg_str, "```", ""])
+
+        if self.do_use_config_yaml:
+            lines.extend(["> This example uses the stage's `config.yaml` file.", ""])
+
+        if self.in_data is not None:
+            if isinstance(self.in_data, Path):
+                lines.extend(["**Input files:**", "", "```yaml", self.in_data.read_text().strip(), "```", ""])
+            else:
+                lines.extend(format_dataset(self.in_data, "Input data"))
+
+        if self.want_data is not None:
+            if isinstance(self.want_data, Path):
+                lines.extend(
+                    [
+                        "**Expected output files:**",
+                        "",
+                        "```yaml",
+                        self.want_data.read_text().strip(),
+                        "```",
+                        "",
+                    ]
+                )
+            else:
+                lines.extend(format_dataset(self.want_data, "Expected output data"))
+
+        if self.want_metadata is not None:
+            lines.extend(["**Expected output metadata:**", ""])
+            lines.append(df_to_markdown(self.want_metadata))
+            lines.append("")
+
+        # Use the same dotlist formatter as ``self.test_env`` so the rendered command line
+        # matches how the example actually runs (handles bool/None/list values correctly and
+        # yields no overrides when ``do_use_config_yaml`` is set — config.yaml supplies them).
+        cmd = f"MEDS_transform-stage <pipeline.yaml> {self.stage_name}"
+        if self.cmd_args:
+            cmd += " " + " ".join(self.cmd_args)
+        cmd += " input_dir=<input> output_dir=<output>"
+        lines.extend(["**Run this stage:**", "", "```bash", cmd, "```", ""])
+
+        return lines
+
 
 class StageExampleDict(dict):
     """A dictionary subclass to hold stage examples.
