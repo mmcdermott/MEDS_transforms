@@ -170,6 +170,62 @@ VAL_PRESENT: pl.Expr = VAL.is_not_null() & VAL.is_not_nan()
 IS_INT: pl.Expr = VAL.round() == VAL
 PRESENT_VALS = VAL.filter(VAL_PRESENT)
 
+
+def _validate_quantiles(value: object) -> str | None:
+    """Return an error message if ``value`` isn't a non-empty sequence of floats in (0, 1)."""
+    if not isinstance(value, (list, tuple, ListConfig)):
+        return f"must be a list of numbers; got {type(value).__name__} ({value!r})"
+    if len(value) == 0:
+        return "must be non-empty"
+    for q in value:
+        if not isinstance(q, (int, float)) or isinstance(q, bool):
+            return f"each entry must be a number; got {type(q).__name__} ({q!r})"
+        if not (0 < float(q) < 1):
+            return f"each entry must satisfy 0 < q < 1; got {q!r}"
+    return None
+
+
+def _validate_non_null(value: object) -> str | None:
+    """Default ``_ObjectFormRequirement.validator``: rejects only ``None``.
+
+    Examples:
+        >>> _validate_non_null("anything") is None
+        True
+        >>> _validate_non_null(0) is None
+        True
+        >>> _validate_non_null(None)
+        'must not be null'
+    """
+    return None if value is not None else "must not be null"
+
+
+class _ObjectFormRequirement(NamedTuple):
+    """Schema for an aggregation whose reducer takes parameters beyond the column selector.
+
+    Attributes:
+        required_key: The name of the extra field the aggregation object must carry.
+        example_value: A syntactically valid example value for the required field (shown in errors).
+        validator: Callable that returns a human-readable error string when the supplied value is
+            invalid, or ``None`` when the value is acceptable. Default: reject ``None`` only.
+    """
+
+    required_key: str
+    example_value: str
+    validator: Callable[[object], str | None] = _validate_non_null
+
+
+#: Aggregations that must be declared in object form. Maps aggregation name to its required-key
+#: contract. Used by :func:`validate_args_and_get_code_cols` to raise a targeted error (issue #164).
+#: Extend this dict when adding new parametrised aggregations.
+AGGREGATIONS_REQUIRING_OBJECT_FORM: dict[str, _ObjectFormRequirement] = {
+    MetadataFn.VALUES_QUANTILES.value: _ObjectFormRequirement(
+        required_key="quantiles",
+        example_value="[0.25, 0.5, 0.75]",
+        validator=_validate_quantiles,
+    ),
+}
+
+
 CODE_METADATA_AGGREGATIONS: dict[MetadataFn, MapReducePair] = {
     MetadataFn.CODE_N_PATIENTS: MapReducePair(
         pl.col(DataSchema.subject_id_name).n_unique(), pl.sum_horizontal
@@ -221,6 +277,81 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
         ValueError: Metadata aggregation function INVALID not found in MetadataFn enumeration. Values are:
             code/n_subjects, code/n_occurrences, values/n_subjects, values/n_occurrences, values/n_ints,
             values/sum, values/sum_sqd, values/min, values/max, values/quantiles
+
+        Aggregation objects must carry an explicit ``name`` field:
+
+        >>> validate_args_and_get_code_cols(DictConfig({"aggregations": [{"quantiles": [0.5]}]}), None)
+        Traceback (most recent call last):
+            ...
+        ValueError: Aggregation object is missing a 'name' field. Got: {'quantiles': [0.5]}.
+
+        Aggregations such as ``values/quantiles`` require the object form with a specific field. The
+        validator raises an actionable error pointing at the missing key:
+
+        >>> validate_args_and_get_code_cols(DictConfig({"aggregations": ["values/quantiles"]}), None)
+        Traceback (most recent call last):
+            ...
+        ValueError: Aggregation 'values/quantiles' requires object form with a 'quantiles' field.
+        Got it as a plain string.
+        Example:
+          aggregations:
+            - name: values/quantiles
+              quantiles: [0.25, 0.5, 0.75]
+        >>> cfg = DictConfig({"aggregations": [{"name": "values/quantiles"}]})
+        >>> validate_args_and_get_code_cols(cfg, None)
+        Traceback (most recent call last):
+            ...
+        ValueError: Aggregation 'values/quantiles' is missing the required 'quantiles' field.
+        Got:
+          {'name': 'values/quantiles'}
+        Example:
+          aggregations:
+            - name: values/quantiles
+              quantiles: [0.25, 0.5, 0.75]
+
+        The required field's value is also checked for its expected shape. For ``quantiles``,
+        this must be a non-empty list of floats in ``(0, 1)``:
+
+        >>> cfg = DictConfig({"aggregations": [{"name": "values/quantiles", "quantiles": None}]})
+        >>> validate_args_and_get_code_cols(cfg, None)
+        Traceback (most recent call last):
+            ...
+        ValueError: Aggregation 'values/quantiles' has an invalid 'quantiles' value: must be a list
+        of numbers; got NoneType (None).
+        Example:
+          aggregations:
+            - name: values/quantiles
+              quantiles: [0.25, 0.5, 0.75]
+        >>> cfg = DictConfig({"aggregations": [{"name": "values/quantiles", "quantiles": []}]})
+        >>> validate_args_and_get_code_cols(cfg, None)
+        Traceback (most recent call last):
+            ...
+        ValueError: Aggregation 'values/quantiles' has an invalid 'quantiles' value: must be
+        non-empty.
+        Example:
+          aggregations:
+            - name: values/quantiles
+              quantiles: [0.25, 0.5, 0.75]
+        >>> cfg = DictConfig({"aggregations": [{"name": "values/quantiles", "quantiles": [1.5]}]})
+        >>> validate_args_and_get_code_cols(cfg, None)
+        Traceback (most recent call last):
+            ...
+        ValueError: Aggregation 'values/quantiles' has an invalid 'quantiles' value: each entry must
+        satisfy 0 < q < 1; got 1.5.
+        Example:
+          aggregations:
+            - name: values/quantiles
+              quantiles: [0.25, 0.5, 0.75]
+        >>> cfg = DictConfig({"aggregations": [{"name": "values/quantiles", "quantiles": ["oops"]}]})
+        >>> validate_args_and_get_code_cols(cfg, None)
+        Traceback (most recent call last):
+            ...
+        ValueError: Aggregation 'values/quantiles' has an invalid 'quantiles' value: each entry must
+        be a number; got str ('oops').
+        Example:
+          aggregations:
+            - name: values/quantiles
+              quantiles: [0.25, 0.5, 0.75]
         >>> valid_cfg = DictConfig({"aggregations": ["code/n_subjects", {"name": "values/n_ints"}]})
         >>> validate_args_and_get_code_cols(valid_cfg, 33)
         Traceback (most recent call last):
@@ -244,12 +375,42 @@ def validate_args_and_get_code_cols(stage_cfg: DictConfig, code_modifiers: list[
     aggregations = stage_cfg.aggregations
     for agg in aggregations:
         if isinstance(agg, dict | DictConfig):
-            agg = agg.get("name", None)
-        if agg not in {fn.value for fn in MetadataFn}:
+            agg_obj = agg
+            if "name" not in agg_obj or agg_obj.get("name") in (None, ""):
+                raise ValueError(f"Aggregation object is missing a 'name' field. Got: {dict(agg_obj)}.")
+            agg_name = agg_obj["name"]
+        else:
+            agg_name = agg
+            agg_obj = None
+        if agg_name not in {fn.value for fn in MetadataFn}:
             raise ValueError(
-                f"Metadata aggregation function {agg} not found in MetadataFn enumeration. Values are: "
-                f"{', '.join([fn.value for fn in MetadataFn])}"
+                f"Metadata aggregation function {agg_name} not found in MetadataFn enumeration. Values "
+                f"are: {', '.join([fn.value for fn in MetadataFn])}"
             )
+        if agg_name in AGGREGATIONS_REQUIRING_OBJECT_FORM:
+            required = AGGREGATIONS_REQUIRING_OBJECT_FORM[agg_name]
+            example_block = (
+                "Example:\n"
+                "  aggregations:\n"
+                f"    - name: {agg_name}\n"
+                f"      {required.required_key}: {required.example_value}"
+            )
+            if agg_obj is None:
+                raise ValueError(
+                    f"Aggregation '{agg_name}' requires object form with a '{required.required_key}' "
+                    f"field.\nGot it as a plain string.\n{example_block}"
+                )
+            if required.required_key not in agg_obj:
+                raise ValueError(
+                    f"Aggregation '{agg_name}' is missing the required '{required.required_key}' "
+                    f"field.\nGot:\n  {dict(agg_obj)}\n{example_block}"
+                )
+            validator_err = required.validator(agg_obj[required.required_key])
+            if validator_err is not None:
+                raise ValueError(
+                    f"Aggregation '{agg_name}' has an invalid '{required.required_key}' value: "
+                    f"{validator_err}.\n{example_block}"
+                )
 
     match code_modifiers:
         case None:
