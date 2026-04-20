@@ -810,12 +810,17 @@ def _quantiles_schema(aggregations: list) -> pl.Struct | None:
         >>> _quantiles_schema(["code/n_occurrences"]) is None
         True
         >>> s = _quantiles_schema([{"name": "values/quantiles", "quantiles": [0.1, 0.5, 0.9]}])
-        >>> list(s.fields)
-        [Field('values/quantile/0.1', Float32), Field('values/quantile/0.5', Float32), Field('values/quantile/0.9', Float32)]
+        >>> for f in s.fields:
+        ...     print(f)
+        Field('values/quantile/0.1', Float32)
+        Field('values/quantile/0.5', Float32)
+        Field('values/quantile/0.9', Float32)
         >>> s = _quantiles_schema([{"name": "values/quantiles", "quantiles": [0.25, 0.75]}])
-        >>> list(s.fields)
-        [Field('values/quantile/0.25', Float32), Field('values/quantile/0.75', Float32)]
-    """  # noqa: E501
+        >>> for f in s.fields:
+        ...     print(f)
+        Field('values/quantile/0.25', Float32)
+        Field('values/quantile/0.75', Float32)
+    """
     for agg in aggregations or []:
         if isinstance(agg, dict) and agg.get("name") == "values/quantiles":
             qs = agg.get("quantiles", []) or []
@@ -831,13 +836,29 @@ def aggregation_schema_updates(stage_cfg: dict | None = None) -> dict[str, pl.Da
     non-default ``probs`` round-trip correctly (see issue #342).
 
     Examples:
-        >>> aggregation_schema_updates({"aggregations": ["code/n_occurrences"]})["values/sum"]
-        Float32
-        >>> "values/quantiles" in aggregation_schema_updates({"aggregations": ["code/n_occurrences"]})
-        False
+        >>> from pprint import pprint
+        >>> pprint(aggregation_schema_updates({"aggregations": ["code/n_occurrences"]}))
+        {'code/n_occurrences': UInt8,
+         'code/n_subjects': UInt8,
+         'values/max': Float32,
+         'values/min': Float32,
+         'values/n_ints': UInt8,
+         'values/n_occurrences': UInt8,
+         'values/n_subjects': UInt8,
+         'values/sum': Float32,
+         'values/sum_sqd': Float32}
         >>> cfg = {"aggregations": [{"name": "values/quantiles", "quantiles": [0.1, 0.9]}]}
-        >>> list(aggregation_schema_updates(cfg)["values/quantiles"].fields)
-        [Field('values/quantile/0.1', Float32), Field('values/quantile/0.9', Float32)]
+        >>> pprint(aggregation_schema_updates(cfg))
+        {'code/n_occurrences': UInt8,
+         'code/n_subjects': UInt8,
+         'values/max': Float32,
+         'values/min': Float32,
+         'values/n_ints': UInt8,
+         'values/n_occurrences': UInt8,
+         'values/n_subjects': UInt8,
+         'values/quantiles': Struct({'values/quantile/0.1': Float32, 'values/quantile/0.9': Float32}),
+         'values/sum': Float32,
+         'values/sum_sqd': Float32}
     """
     updates = dict(AGGREGATION_SCHEMA_UPDATES_BASE)
     if stage_cfg:

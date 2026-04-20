@@ -775,9 +775,8 @@ class Stage:
             >>> import tempfile
             >>> with tempfile.TemporaryDirectory() as td:
             ...     example_dir = Path(td)
-            ...     (example_dir / "cfg.yaml").write_text("probs: from-example\\n")
+            ...     _ = (example_dir / "cfg.yaml").write_text("probs: from-example\\n")
             ...     stage._resolve_output_schema_updates(example_dir)
-            20
             {'probs': 'from-example'}
             >>> stage._resolve_output_schema_updates()
             {'probs': 'from-default'}
