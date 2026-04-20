@@ -128,15 +128,27 @@ def in_memory_read(fp: str | Path) -> DF_T:
 def in_memory_write(df: DF_T, fp: str | Path) -> None:
     """Store a frame into the active registry. Raises if no registry is active.
 
-    Collects lazy frames eagerly so each stage's output is materialized at the point of write, preventing
-    later stages from accidentally re-triggering an earlier stage's compute graph.
+    Materializes the frame and stores it as a fresh ``LazyFrame`` so reads via ``read_df`` return
+    the same type they would in disk mode (where ``pl.scan_parquet`` yields ``LazyFrame``). This
+    prevents type drift across chained MAP stages regardless of whether the stage's compute
+    function returns an eager ``pl.DataFrame`` or a ``pl.LazyFrame``. Collecting at write time
+    also severs any lingering compute-graph references to the previous stage.
+
+    Examples:
+        >>> with in_memory_mode() as reg:
+        ...     in_memory_write(pl.DataFrame({"a": [1, 2]}), "/eager/shard.parquet")
+        ...     in_memory_write(pl.LazyFrame({"a": [3, 4]}), "/lazy/shard.parquet")
+        ...     print(type(reg.get("/eager/shard.parquet")).__name__)
+        ...     print(type(reg.get("/lazy/shard.parquet")).__name__)
+        LazyFrame
+        LazyFrame
     """
     reg = active_registry()
     if reg is None:  # pragma: no cover - defensive
         raise RuntimeError("in_memory_write called outside of an in_memory_mode context")
     if isinstance(df, pl.LazyFrame):
-        df = df.collect().lazy()
-    reg.put(fp, df)
+        df = df.collect()
+    reg.put(fp, df.lazy())
 
 
 @contextmanager

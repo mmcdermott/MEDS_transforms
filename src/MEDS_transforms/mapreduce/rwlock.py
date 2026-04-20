@@ -56,19 +56,43 @@ def default_file_checker(fp: Path) -> bool:
     return fp.is_file()
 
 
+def _uses_default_registry_io(read_fn: READ_FN_T, write_fn: WRITE_FN_T) -> bool:
+    """Return ``True`` when ``read_fn``/``write_fn`` are the package defaults.
+
+    Only the defaults know how to talk to the ``FrameRegistry``. Stages that pass custom
+    ``read_fn``/``write_fn`` (e.g. CSV, JSON, or any non-parquet IO) continue through the full
+    ``rwlock_wrap`` path so their locking and caching semantics are preserved verbatim.
+    """
+    from ..dataframe import read_df, write_df
+
+    return read_fn is read_df and write_fn is write_df
+
+
 def _rwlock_in_memory(
     in_fp: Path,
     out_fp: Path,
     read_fn: READ_FN_T,
     write_fn: WRITE_FN_T,
     compute_fn: COMPUTE_FN_T,
+    do_overwrite: bool,
 ) -> bool:
     """rwlock_wrap fast path when an in-memory ``FrameRegistry`` is active.
 
-    In-memory runs are single-process and the registry is thread-safe, so the ``FileLock`` and
-    ``out_fp_checker`` are unnecessary — they'd just cause spurious disk IO. We read, compute,
-    and write directly.
+    In-memory runs are single-process and the registry is thread-safe, so the ``FileLock`` is
+    unnecessary — it'd just cause spurious disk IO. Cache semantics are preserved: if the
+    registry already holds ``out_fp`` and ``do_overwrite`` is false, return ``False`` and skip
+    the compute (mirrors disk-mode ``out_fp_checker`` + skip-if-exists).
     """
+    from ..compute_modes.in_memory import active_registry
+
+    reg = active_registry()
+    if reg is not None and reg.has(out_fp):
+        if do_overwrite:
+            logger.info(f"(in-memory) overwriting cached output at {out_fp}")
+        else:
+            logger.info(f"(in-memory) cached output exists at {out_fp}; returning.")
+            return False
+
     logger.info(f"(in-memory) reading input frame keyed by {in_fp}")
     df = read_fn(in_fp)
     df = compute_fn(df)
@@ -164,8 +188,8 @@ def rwlock_wrap(
 
     from ..compute_modes.in_memory import active_registry
 
-    if active_registry() is not None:
-        return _rwlock_in_memory(in_fp, out_fp, read_fn, write_fn, compute_fn)
+    if active_registry() is not None and _uses_default_registry_io(read_fn, write_fn):
+        return _rwlock_in_memory(in_fp, out_fp, read_fn, write_fn, compute_fn, do_overwrite)
 
     if out_fp_checker(out_fp):
         if do_overwrite:
