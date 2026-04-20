@@ -1,13 +1,4 @@
 aggregations:
-  - code/n_occurrences
-  - code/n_subjects
-  - values/n_occurrences
-  - values/n_subjects
-  - values/sum
-  - values/sum_sqd
-  - values/n_ints
-  - values/min
-  - values/max
   - name: values/quantiles
     quantiles:
       - 0.1
