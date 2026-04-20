@@ -22,6 +22,10 @@ PIPELINE_CONFIG_KEYS: dict[str, str] = {
 def pipeline_keys_help_block() -> str:
     """Return a stable help-text block listing pipeline-level config keys.
 
+    Dot-notation keys (e.g. ``parallelize.n_workers``) show the Hydra override path — that form
+    works directly with ``MEDS_transform-pipeline --overrides``. In pipeline YAML, the same key
+    is written as a nested mapping (``parallelize:`` with ``n_workers:`` indented beneath).
+
     Examples:
         >>> block = pipeline_keys_help_block()
         >>> block.startswith("Pipeline-level configuration keys")
@@ -30,10 +34,13 @@ def pipeline_keys_help_block() -> str:
         True
         >>> "MEDS_transform-pipeline" in block
         True
+        >>> "nested" in block
+        True
     """
     header = (
-        "Pipeline-level configuration keys (settable in the pipeline YAML; `--overrides` is "
-        "accepted by `MEDS_transform-pipeline`):"
+        "Pipeline-level configuration keys (dot-notation is the Hydra override path accepted by "
+        "`MEDS_transform-pipeline --overrides`; in a pipeline YAML, write these as nested "
+        "mappings — e.g. `parallelize:` with `n_workers:` indented):"
     )
     lines = [header]
     width = max(len(k) for k in PIPELINE_CONFIG_KEYS)
