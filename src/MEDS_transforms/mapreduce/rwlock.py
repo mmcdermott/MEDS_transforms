@@ -96,7 +96,10 @@ def _rwlock_in_memory(
 
     if reg.has(out_fp):
         if do_overwrite:
-            logger.info(f"(in-memory) overwriting cached output at {out_fp}")
+            logger.info(f"(in-memory) evicting cached output at {out_fp} (do_overwrite=True)")
+            # Evict before reserving/computing so a crash in compute_fn can't leave a stale
+            # entry behind; mirrors disk-mode `out_fp.unlink()` in the same branch.
+            reg.delete(out_fp)
         else:
             logger.info(f"(in-memory) cached output exists at {out_fp}; returning.")
             return False

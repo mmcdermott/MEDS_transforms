@@ -228,6 +228,43 @@ def test_in_memory_fast_path_serializes_same_out_fp(tmp_path: Path):
     assert_frame_equal(registry.get(out_key).collect(), pl.DataFrame({"a": [2, 4]}))
 
 
+def test_do_overwrite_evicts_before_compute(tmp_path: Path):
+    """do_overwrite=True evicts the cached entry so a failing compute leaves no stale entry.
+
+    Disk mode calls ``out_fp.unlink()`` before recomputing; the in-memory fast path should
+    do the same with ``FrameRegistry.delete``. Otherwise a crash in ``compute_fn`` would leave
+    the old value behind, and a later ``do_overwrite=False`` call would incorrectly skip as
+    if the cache were still valid.
+    """
+    registry = FrameRegistry()
+    in_key = _virtual(tmp_path, "in.parquet")
+    out_key = _virtual(tmp_path, "out.parquet")
+    registry.put(in_key, pl.LazyFrame({"a": [1, 2, 3]}))
+
+    # First run: succeed, seed the cache.
+    with in_memory_mode(registry):
+        assert rwlock_wrap(in_key, out_key, read_df, write_df, compute_fn=_double_a) is True
+    assert registry.has(out_key)
+
+    # Second run: do_overwrite=True with a compute that raises after the eviction point.
+    class BoomError(RuntimeError):
+        pass
+
+    def exploding_compute(df: pl.LazyFrame) -> pl.LazyFrame:
+        raise BoomError("intentional")
+
+    with in_memory_mode(registry), pytest.raises(BoomError):
+        rwlock_wrap(in_key, out_key, read_df, write_df, compute_fn=exploding_compute, do_overwrite=True)
+
+    # The stale entry must be gone so the next do_overwrite=False call re-runs compute rather
+    # than returning the old value.
+    assert not registry.has(out_key), "stale cache entry leaked across a failed overwrite"
+
+    with in_memory_mode(registry):
+        assert rwlock_wrap(in_key, out_key, read_df, write_df, compute_fn=_double_a) is True
+    assert_frame_equal(registry.get(out_key).collect(), pl.DataFrame({"a": [2, 4, 6]}))
+
+
 def test_registry_get_missing_key_has_informative_error(tmp_path: Path):
     """A missing-key read surfaces a registry-scoped KeyError, not a bare dict one."""
     registry = FrameRegistry()

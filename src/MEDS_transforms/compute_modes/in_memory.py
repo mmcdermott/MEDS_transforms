@@ -74,6 +74,27 @@ class FrameRegistry:
         with self._lock:
             self._frames[Path(fp)] = df
 
+    def delete(self, fp: str | Path) -> bool:
+        """Remove the frame keyed by ``fp``. Returns ``True`` if a frame was removed.
+
+        Used by the in-memory fast path to mirror disk mode's ``out_fp.unlink()`` when
+        ``do_overwrite=True``: evicting before recompute ensures a crash in ``compute_fn`` can't
+        leave a stale entry that a later ``do_overwrite=False`` call would incorrectly treat as
+        a cache hit.
+
+        Examples:
+            >>> reg = FrameRegistry()
+            >>> reg.put("/virtual/shard.parquet", pl.LazyFrame({"a": [1]}))
+            >>> reg.delete("/virtual/shard.parquet")
+            True
+            >>> reg.has("/virtual/shard.parquet")
+            False
+            >>> reg.delete("/virtual/shard.parquet")
+            False
+        """
+        with self._lock:
+            return self._frames.pop(Path(fp), None) is not None
+
     def get(self, fp: str | Path) -> DF_T:
         """Fetch the frame keyed by ``fp``. Raises ``KeyError`` with a registry-scoped message.
 
