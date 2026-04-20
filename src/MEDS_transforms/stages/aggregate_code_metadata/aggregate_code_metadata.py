@@ -186,7 +186,16 @@ def _validate_quantiles(value: object) -> str | None:
 
 
 def _validate_non_null(value: object) -> str | None:
-    """Default ``_ObjectFormRequirement.validator``: rejects only ``None``."""
+    """Default ``_ObjectFormRequirement.validator``: rejects only ``None``.
+
+    Examples:
+        >>> _validate_non_null("anything") is None
+        True
+        >>> _validate_non_null(0) is None
+        True
+        >>> _validate_non_null(None)
+        'must not be null'
+    """
     return None if value is not None else "must not be null"
 
 
