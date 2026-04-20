@@ -7,7 +7,7 @@ from typing import NamedTuple
 
 import polars as pl
 import polars.selectors as cs
-from meds import DataSchema
+from meds import CodeMetadataSchema, DataSchema
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from .. import Stage
@@ -809,5 +809,9 @@ AGGREGATION_SCHEMA_UPDATES = {
 
 
 stage = Stage.register(
-    map_fn=mapper_fntr, reduce_fn=reducer_fntr, output_schema_updates=AGGREGATION_SCHEMA_UPDATES
+    map_fn=mapper_fntr,
+    reduce_fn=reducer_fntr,
+    output_schema_updates=AGGREGATION_SCHEMA_UPDATES,
+    input_schema=DataSchema,
+    metadata_output_schema=CodeMetadataSchema,
 )

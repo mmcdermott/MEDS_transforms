@@ -5,7 +5,6 @@ from collections.abc import Callable
 from functools import partial
 
 import polars as pl
-from meds import DataSchema
 from omegaconf import DictConfig
 
 from .. import Stage
@@ -202,7 +201,7 @@ def filter_subjects_by_num_events(df: pl.LazyFrame, min_events_per_subject: int)
     return df.filter(pl.col("time").n_unique().over("subject_id") >= min_events_per_subject)
 
 
-@Stage.register(input_schema=DataSchema, output_schema=DataSchema)
+@Stage.register
 def filter_subjects(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Returns a function that filters subjects by the number of measurements and events they have.
 
