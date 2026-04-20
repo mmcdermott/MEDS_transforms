@@ -788,14 +788,7 @@ def reducer_fntr(
     return reducer
 
 
-AGGREGATION_SCHEMA_UPDATES = {
-    "values/quantiles": pl.Struct(
-        {
-            "values/quantile/0.25": pl.Float32,
-            "values/quantile/0.5": pl.Float32,
-            "values/quantile/0.75": pl.Float32,
-        }
-    ),
+AGGREGATION_SCHEMA_UPDATES_BASE = {
     "code/n_occurrences": pl.UInt8,
     "code/n_subjects": pl.UInt8,
     "values/n_occurrences": pl.UInt8,
@@ -808,6 +801,74 @@ AGGREGATION_SCHEMA_UPDATES = {
 }
 
 
+def _quantiles_schema(aggregations: list) -> pl.Struct | None:
+    """Build the ``values/quantiles`` struct schema for the quantile list declared in ``aggregations``.
+
+    Returns ``None`` when no ``values/quantiles`` aggregation is declared.
+
+    Examples:
+        >>> _quantiles_schema(["code/n_occurrences"]) is None
+        True
+        >>> s = _quantiles_schema([{"name": "values/quantiles", "quantiles": [0.1, 0.5, 0.9]}])
+        >>> for f in s.fields:
+        ...     print(f)
+        Field('values/quantile/0.1', Float32)
+        Field('values/quantile/0.5', Float32)
+        Field('values/quantile/0.9', Float32)
+        >>> s = _quantiles_schema([{"name": "values/quantiles", "quantiles": [0.25, 0.75]}])
+        >>> for f in s.fields:
+        ...     print(f)
+        Field('values/quantile/0.25', Float32)
+        Field('values/quantile/0.75', Float32)
+    """
+    for agg in aggregations or []:
+        if isinstance(agg, dict) and agg.get("name") == "values/quantiles":
+            qs = agg.get("quantiles", []) or []
+            return pl.Struct({f"values/quantile/{q}": pl.Float32 for q in qs})
+    return None
+
+
+def aggregation_schema_updates(stage_cfg: dict | None = None) -> dict[str, pl.DataType]:
+    """Compose the example-time output schema overrides for this stage, including dynamic quantiles.
+
+    Static column types (``code/n_occurrences``, ``values/sum``, etc.) are always emitted. The
+    ``values/quantiles`` struct is generated from the example's ``aggregations`` config so that
+    non-default ``quantiles`` (i.e. the quantile probabilities) round-trip correctly (see
+    issue #342).
+
+    Examples:
+        >>> from pprint import pprint
+        >>> pprint(aggregation_schema_updates({"aggregations": ["code/n_occurrences"]}))
+        {'code/n_occurrences': UInt8,
+         'code/n_subjects': UInt8,
+         'values/max': Float32,
+         'values/min': Float32,
+         'values/n_ints': UInt8,
+         'values/n_occurrences': UInt8,
+         'values/n_subjects': UInt8,
+         'values/sum': Float32,
+         'values/sum_sqd': Float32}
+        >>> cfg = {"aggregations": [{"name": "values/quantiles", "quantiles": [0.1, 0.9]}]}
+        >>> pprint(aggregation_schema_updates(cfg))
+        {'code/n_occurrences': UInt8,
+         'code/n_subjects': UInt8,
+         'values/max': Float32,
+         'values/min': Float32,
+         'values/n_ints': UInt8,
+         'values/n_occurrences': UInt8,
+         'values/n_subjects': UInt8,
+         'values/quantiles': Struct({'values/quantile/0.1': Float32, 'values/quantile/0.9': Float32}),
+         'values/sum': Float32,
+         'values/sum_sqd': Float32}
+    """
+    updates = dict(AGGREGATION_SCHEMA_UPDATES_BASE)
+    if stage_cfg:
+        quantiles_struct = _quantiles_schema(stage_cfg.get("aggregations"))
+        if quantiles_struct is not None:
+            updates["values/quantiles"] = quantiles_struct
+    return updates
+
+
 stage = Stage.register(
-    map_fn=mapper_fntr, reduce_fn=reducer_fntr, output_schema_updates=AGGREGATION_SCHEMA_UPDATES
+    map_fn=mapper_fntr, reduce_fn=reducer_fntr, output_schema_updates=aggregation_schema_updates
 )

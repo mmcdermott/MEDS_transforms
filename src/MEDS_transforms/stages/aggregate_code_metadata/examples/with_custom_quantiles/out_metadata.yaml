@@ -1,0 +1,68 @@
+metadata/codes.parquet:
+  - code: null
+    values/quantiles:
+      values/quantile/0.1: 96.0
+      values/quantile/0.9: 160.395309
+    description: null
+    parent_codes: null
+
+  - code: "ADMISSION//CARDIAC"
+    values/quantiles: null
+    description: null
+    parent_codes: null
+
+  - code: "ADMISSION//ORTHOPEDIC"
+    values/quantiles: null
+    description: null
+    parent_codes: null
+
+  - code: "ADMISSION//PULMONARY"
+    values/quantiles: null
+    description: null
+    parent_codes: null
+
+  - code: "DISCHARGE"
+    values/quantiles: null
+    description: null
+    parent_codes: null
+
+  - code: "EYE_COLOR//BLUE"
+    values/quantiles: null
+    description: "Blue Eyes. Less common than brown."
+    parent_codes: null
+
+  - code: "EYE_COLOR//BROWN"
+    values/quantiles: null
+    description: "Brown Eyes. The most common eye color."
+    parent_codes: null
+
+  - code: "EYE_COLOR//HAZEL"
+    values/quantiles: null
+    description: "Hazel eyes. These are uncommon"
+    parent_codes: null
+
+  - code: "HEIGHT"
+    values/quantiles:
+      values/quantile/0.1: 156.485596
+      values/quantile/0.9: 175.271118
+    description: null
+    parent_codes: null
+
+  - code: "HR"
+    values/quantiles:
+      values/quantile/0.1: 102.6
+      values/quantile/0.9: 119.800003
+    description: "Heart Rate"
+    parent_codes: ["LOINC/8867-4"]
+
+  - code: "MEDS_BIRTH"
+    values/quantiles: null
+    description: null
+    parent_codes: null
+
+  - code: "TEMP"
+    values/quantiles:
+      values/quantile/0.1: 95.800003
+      values/quantile/0.9: 100.099998
+    description: "Body Temperature"
+    parent_codes: ["LOINC/8310-5"]
