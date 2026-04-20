@@ -185,6 +185,11 @@ def _validate_quantiles(value: object) -> str | None:
     return None
 
 
+def _validate_non_null(value: object) -> str | None:
+    """Default ``_ObjectFormRequirement.validator``: rejects only ``None``."""
+    return None if value is not None else "must not be null"
+
+
 class _ObjectFormRequirement(NamedTuple):
     """Schema for an aggregation whose reducer takes parameters beyond the column selector.
 
@@ -197,7 +202,7 @@ class _ObjectFormRequirement(NamedTuple):
 
     required_key: str
     example_value: str
-    validator: Callable[[object], str | None] = lambda v: None if v is not None else "must not be null"
+    validator: Callable[[object], str | None] = _validate_non_null
 
 
 #: Aggregations that must be declared in object form. Maps aggregation name to its required-key
