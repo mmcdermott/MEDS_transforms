@@ -155,8 +155,11 @@ class Stage:
         examples_dir: A directory containing nested test cases for the stage.
             If not set, this is automatically inferred in the case that the stage name and registering file
             conform to the pattern mentioned above.
-        output_schema_updates: A dictionary mapping column name to a Polars type for the output of the stage,
-            with the base MEDS schema options as defaults for unspecified columns.
+        output_schema_updates: Column-name → Polars-type overrides for the stage's output, layered
+            on top of the base MEDS schema. Either a plain dict, or a callable
+            ``(stage_cfg) -> dict`` that derives the overrides from the stage's effective config
+            (``default_config`` deep-merged with the example/pipeline overrides). Use the callable
+            form when the schema depends on user-chosen config, e.g. quantile probabilities.
         default_config: A dictionary containing the default configuration options for the stage. This can be
             passed manually during registration or is set automatically based on the calling file location in
             a manner similar to the examples directory.
@@ -736,13 +739,17 @@ class Stage:
         """Resolve ``output_schema_updates`` against an optional example or pre-parsed config.
 
         If ``output_schema_updates`` is a callable, it is called with a ``stage_cfg`` dict and
-        expected to return a dict. Resolution order for that dict:
+        expected to return a dict. The argument is built by starting from ``self.default_config``
+        (if any) and deep-merging the example's overrides on top, mirroring what the pipeline
+        runner does at execution time:
 
-        1. Explicit ``stage_cfg`` argument (lets callers parse ``cfg.yaml`` once and share).
-        2. ``example_dir / "cfg.yaml"`` if ``example_dir`` is given and the file exists.
-        3. ``self.default_config`` (so ``Stage.__str__`` / ``docgen`` reflect the stage's default
-           behavior even when no example is in scope).
-        4. ``None`` as a last resort.
+        1. Base layer: ``self.default_config`` (may be empty).
+        2. Overrides (takes precedence, first non-``None`` wins):
+            a. Explicit ``stage_cfg`` argument (lets callers parse ``cfg.yaml`` once and share).
+            b. ``example_dir / "cfg.yaml"`` if ``example_dir`` is given and the file exists.
+
+        If neither overrides nor default config is available, the callable is invoked with
+        ``None``.
 
         If ``output_schema_updates`` is a plain dict, it is returned unchanged.
 
@@ -758,39 +765,48 @@ class Stage:
             >>> stage._resolve_output_schema_updates()
             {'foo': Int64}
 
-            Callable overrides receive the resolved ``stage_cfg``. Priority: explicit
-            ``stage_cfg`` arg, then ``example_dir/cfg.yaml``, then ``default_config``:
+            Callable overrides receive the effective config (``default_config`` merged with the
+            example or arg overrides). Keys unique to ``default_config`` survive the merge, and
+            override values take precedence on conflict:
 
             >>> def schema_fn(cfg):
-            ...     return {"probs": cfg["probs"] if cfg else "(no cfg)"}
+            ...     return dict(cfg) if cfg else {"(no cfg)": None}
             >>> stage = Stage.register(
             ...     stage_name="callable_stage",
             ...     stage_docstring="x",
             ...     map_fn=lambda df: df,
             ...     output_schema_updates=schema_fn,
-            ...     default_config={"probs": "from-default"},
+            ...     default_config={"probs": "from-default", "n_bins": 8},
             ... )
             >>> stage._resolve_output_schema_updates(stage_cfg={"probs": "from-arg"})
-            {'probs': 'from-arg'}
+            {'probs': 'from-arg', 'n_bins': 8}
             >>> import tempfile
             >>> with tempfile.TemporaryDirectory() as td:
             ...     example_dir = Path(td)
             ...     _ = (example_dir / "cfg.yaml").write_text("probs: from-example\\n")
             ...     stage._resolve_output_schema_updates(example_dir)
-            {'probs': 'from-example'}
+            {'probs': 'from-example', 'n_bins': 8}
             >>> stage._resolve_output_schema_updates()
-            {'probs': 'from-default'}
+            {'probs': 'from-default', 'n_bins': 8}
         """
         if not callable(self.output_schema_updates):
             return dict(self.output_schema_updates)
 
-        resolved_cfg: dict | None = stage_cfg
-        if resolved_cfg is None and example_dir is not None:
+        override_cfg: dict | None = stage_cfg
+        if override_cfg is None and example_dir is not None:
             stage_cfg_fp = example_dir / "cfg.yaml"
             if stage_cfg_fp.is_file():
-                resolved_cfg = OmegaConf.to_container(OmegaConf.load(stage_cfg_fp))
-        if resolved_cfg is None and self.default_config:
-            resolved_cfg = OmegaConf.to_container(self.default_config, resolve=False)
+                override_cfg = OmegaConf.to_container(OmegaConf.load(stage_cfg_fp))
+
+        default_cfg = (
+            OmegaConf.to_container(self.default_config, resolve=False) if self.default_config else None
+        )
+
+        if default_cfg and override_cfg:
+            resolved_cfg = OmegaConf.to_container(OmegaConf.merge(default_cfg, override_cfg))
+        else:
+            resolved_cfg = override_cfg if override_cfg is not None else default_cfg
+
         return dict(self.output_schema_updates(resolved_cfg))
 
     @property
