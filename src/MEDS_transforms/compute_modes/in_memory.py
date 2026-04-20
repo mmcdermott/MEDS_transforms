@@ -66,14 +66,28 @@ class FrameRegistry:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._frames: dict[Path, DF_T] = {}
+        # Paths currently being written by a worker; used by ``try_reserve_write`` to preserve
+        # the mutual-exclusion semantics that ``FileLock`` provides in disk mode.
+        self._in_progress: set[Path] = set()
 
     def put(self, fp: str | Path, df: DF_T) -> None:
         with self._lock:
             self._frames[Path(fp)] = df
 
     def get(self, fp: str | Path) -> DF_T:
+        """Fetch the frame keyed by ``fp``. Raises ``KeyError`` with a registry-scoped message.
+
+        The bare-dict ``KeyError`` would just show the Path repr; this version makes it obvious
+        that the failure is "registry wasn't seeded" rather than "file missing on disk".
+        """
+        key = Path(fp)
         with self._lock:
-            return self._frames[Path(fp)]
+            if key not in self._frames:
+                raise KeyError(
+                    f"In-memory FrameRegistry has no frame registered for path: {key!s}. "
+                    f"Known keys: {sorted(str(k) for k in self._frames)}"
+                )
+            return self._frames[key]
 
     def has(self, fp: str | Path) -> bool:
         with self._lock:
@@ -83,8 +97,39 @@ class FrameRegistry:
         with self._lock:
             return list(self._frames.keys())
 
+    def try_reserve_write(self, fp: str | Path) -> bool:
+        """Reserve ``fp`` for writing if no other worker is currently holding it.
+
+        Returns ``True`` if the caller obtained the reservation (and must pair it with
+        ``release_write``). Returns ``False`` if the path is already in progress — mirroring
+        disk mode where ``FileLock.acquire(timeout=0)`` raises ``Timeout`` and
+        ``rwlock_wrap`` returns ``False`` without running ``compute_fn``.
+
+        Examples:
+            >>> reg = FrameRegistry()
+            >>> reg.try_reserve_write("/virtual/out.parquet")
+            True
+            >>> reg.try_reserve_write("/virtual/out.parquet")
+            False
+            >>> reg.release_write("/virtual/out.parquet")
+            >>> reg.try_reserve_write("/virtual/out.parquet")
+            True
+        """
+        key = Path(fp)
+        with self._lock:
+            if key in self._in_progress:
+                return False
+            self._in_progress.add(key)
+            return True
+
+    def release_write(self, fp: str | Path) -> None:
+        """Release a reservation previously obtained via ``try_reserve_write``."""
+        with self._lock:
+            self._in_progress.discard(Path(fp))
+
 
 _registry: FrameRegistry | None = None
+_registry_lock = threading.Lock()
 
 
 def active_registry() -> FrameRegistry | None:
@@ -191,10 +236,13 @@ def in_memory_mode(registry: FrameRegistry | None = None) -> Iterator[FrameRegis
         RuntimeError: in_memory_mode is not re-entrant
     """
     global _registry
-    if _registry is not None:
-        raise RuntimeError("in_memory_mode is not re-entrant")
-    _registry = registry if registry is not None else FrameRegistry()
+    with _registry_lock:
+        if _registry is not None:
+            raise RuntimeError("in_memory_mode is not re-entrant")
+        _registry = registry if registry is not None else FrameRegistry()
+        installed = _registry
     try:
-        yield _registry
+        yield installed
     finally:
-        _registry = None
+        with _registry_lock:
+            _registry = None

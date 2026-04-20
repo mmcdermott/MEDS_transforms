@@ -78,27 +78,42 @@ def _rwlock_in_memory(
 ) -> bool:
     """rwlock_wrap fast path when an in-memory ``FrameRegistry`` is active.
 
-    In-memory runs are single-process and the registry is thread-safe, so the ``FileLock`` is
-    unnecessary — it'd just cause spurious disk IO. Cache semantics are preserved: if the
-    registry already holds ``out_fp`` and ``do_overwrite`` is false, return ``False`` and skip
-    the compute (mirrors disk-mode ``out_fp_checker`` + skip-if-exists).
+    Disk-mode ``rwlock_wrap`` uses two filesystem primitives to coordinate workers: the output
+    file's existence (skip-if-exists, honored by ``out_fp_checker``) and an adjacent
+    ``.lock`` file acquired via ``FileLock`` (mutual exclusion between workers). We replace
+    both with the registry:
+
+    - Skip-if-exists: ``registry.has(out_fp)`` + ``do_overwrite``.
+    - Mutual exclusion: ``registry.try_reserve_write(out_fp)`` — returns ``False`` if another
+      worker is mid-compute on the same key, matching the ``FileLock.Timeout → return False``
+      path in disk mode.
     """
     from ..compute_modes.in_memory import active_registry
 
     reg = active_registry()
-    if reg is not None and reg.has(out_fp):
+    if reg is None:  # pragma: no cover - defensive; caller guards on active_registry
+        raise RuntimeError("_rwlock_in_memory called outside of an in_memory_mode context")
+
+    if reg.has(out_fp):
         if do_overwrite:
             logger.info(f"(in-memory) overwriting cached output at {out_fp}")
         else:
             logger.info(f"(in-memory) cached output exists at {out_fp}; returning.")
             return False
 
-    logger.info(f"(in-memory) reading input frame keyed by {in_fp}")
-    df = read_fn(in_fp)
-    df = compute_fn(df)
-    logger.info(f"(in-memory) writing output frame keyed by {out_fp}")
-    write_fn(df, out_fp)
-    return True
+    if not reg.try_reserve_write(out_fp):
+        logger.info(f"(in-memory) {out_fp} is already in progress on another worker; returning.")
+        return False
+
+    try:
+        logger.info(f"(in-memory) reading input frame keyed by {in_fp}")
+        df = read_fn(in_fp)
+        df = compute_fn(df)
+        logger.info(f"(in-memory) writing output frame keyed by {out_fp}")
+        write_fn(df, out_fp)
+        return True
+    finally:
+        reg.release_write(out_fp)
 
 
 def rwlock_wrap(
