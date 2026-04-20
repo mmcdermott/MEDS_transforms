@@ -56,6 +56,27 @@ def default_file_checker(fp: Path) -> bool:
     return fp.is_file()
 
 
+def _rwlock_in_memory(
+    in_fp: Path,
+    out_fp: Path,
+    read_fn: READ_FN_T,
+    write_fn: WRITE_FN_T,
+    compute_fn: COMPUTE_FN_T,
+) -> bool:
+    """rwlock_wrap fast path when an in-memory ``FrameRegistry`` is active.
+
+    In-memory runs are single-process and the registry is thread-safe, so the ``FileLock`` and
+    ``out_fp_checker`` are unnecessary — they'd just cause spurious disk IO. We read, compute,
+    and write directly.
+    """
+    logger.info(f"(in-memory) reading input frame keyed by {in_fp}")
+    df = read_fn(in_fp)
+    df = compute_fn(df)
+    logger.info(f"(in-memory) writing output frame keyed by {out_fp}")
+    write_fn(df, out_fp)
+    return True
+
+
 def rwlock_wrap(
     in_fp: Path,
     out_fp: Path,
@@ -140,6 +161,11 @@ def rwlock_wrap(
         >>> assert result_computed
         >>> assert not lock_fp.exists()
     """
+
+    from ..compute_modes.in_memory import active_registry
+
+    if active_registry() is not None:
+        return _rwlock_in_memory(in_fp, out_fp, read_fn, write_fn, compute_fn)
 
     if out_fp_checker(out_fp):
         if do_overwrite:

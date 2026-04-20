@@ -14,8 +14,19 @@ READ_FN_T = Callable[[Path], DF_T]
 
 
 def read_df(in_fp: Path) -> DF_T:
-    """A generic helper to read a dataframe without accounting for globs."""
+    """A generic helper to read a dataframe without accounting for globs.
 
+    When an in-memory ``FrameRegistry`` is active (see
+    :func:`MEDS_transforms.compute_modes.in_memory_mode`), the frame keyed by ``in_fp`` is
+    returned directly from the registry — no parquet scan is performed. Outside an in-memory
+    context, reads go to disk via ``pl.scan_parquet``.
+    """
+
+    from ..compute_modes.in_memory import active_registry
+
+    reg = active_registry()
+    if reg is not None:
+        return reg.get(in_fp)
     return pl.scan_parquet(in_fp, glob=False)
 
 
