@@ -103,9 +103,21 @@ def active_registry() -> FrameRegistry | None:
 
 
 def in_memory_read(fp: str | Path) -> DF_T:
-    """Fetch a frame from the active registry.
+    """Fetch a frame from the active registry. Raises if no registry is active.
 
-    Raises if no registry is active.
+    Examples:
+        >>> with in_memory_mode() as reg:
+        ...     reg.put("/virtual/shard.parquet", pl.LazyFrame({"a": [1, 2]}))
+        ...     print(in_memory_read("/virtual/shard.parquet").collect())
+        shape: (2, 1)
+        ┌─────┐
+        │ a   │
+        │ --- │
+        │ i64 │
+        ╞═════╡
+        │ 1   │
+        │ 2   │
+        └─────┘
     """
     reg = active_registry()
     if reg is None:  # pragma: no cover - defensive

@@ -22,11 +22,10 @@ def read_df(in_fp: Path) -> DF_T:
     context, reads go to disk via ``pl.scan_parquet``.
     """
 
-    from ..compute_modes.in_memory import active_registry
+    from ..compute_modes.in_memory import active_registry, in_memory_read
 
-    reg = active_registry()
-    if reg is not None:
-        return reg.get(in_fp)
+    if active_registry() is not None:
+        return in_memory_read(in_fp)
     return pl.scan_parquet(in_fp, glob=False)
 
 
