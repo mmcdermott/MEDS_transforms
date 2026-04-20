@@ -145,6 +145,18 @@ def test_pipeline_help():
     help_text = out.stdout.decode("utf-8")
     assert "usage:" in help_text.lower()
     assert "pipeline_config_fp" in help_text
+    # Pipeline-level config keys should be surfaced in the epilog (see #320).
+    assert "Pipeline-level configuration keys" in help_text
+    assert "parallelize.n_workers" in help_text
+    assert "input_dir" in help_text
+
+
+def test_stage_help_lists_pipeline_keys():
+    """``MEDS_transform-stage -h`` should also surface pipeline-level config keys (see #320)."""
+    out = subprocess.run("MEDS_transform-stage -h", shell=True, check=True, capture_output=True)
+    help_text = out.stdout.decode("utf-8")
+    assert "Pipeline-level configuration keys" in help_text
+    assert "parallelize.n_workers" in help_text
 
 
 def test_pipeline_runner_with_done_file():
