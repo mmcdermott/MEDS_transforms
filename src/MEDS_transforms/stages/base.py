@@ -788,6 +788,12 @@ class Stage:
             {'probs': 'from-example', 'n_bins': 8}
             >>> stage._resolve_output_schema_updates()
             {'probs': 'from-default', 'n_bins': 8}
+
+            An empty override dict still triggers the merge — defaults survive (guarded against
+            the truthiness trap where ``{}`` would otherwise discard ``default_config``):
+
+            >>> stage._resolve_output_schema_updates(stage_cfg={})
+            {'probs': 'from-default', 'n_bins': 8}
         """
         if not callable(self.output_schema_updates):
             return dict(self.output_schema_updates)
@@ -802,7 +808,7 @@ class Stage:
             OmegaConf.to_container(self.default_config, resolve=False) if self.default_config else None
         )
 
-        if default_cfg and override_cfg:
+        if default_cfg is not None and override_cfg is not None:
             resolved_cfg = OmegaConf.to_container(OmegaConf.merge(default_cfg, override_cfg))
         else:
             resolved_cfg = override_cfg if override_cfg is not None else default_cfg

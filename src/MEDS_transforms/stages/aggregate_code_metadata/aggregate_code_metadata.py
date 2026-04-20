@@ -833,7 +833,8 @@ def aggregation_schema_updates(stage_cfg: dict | None = None) -> dict[str, pl.Da
 
     Static column types (``code/n_occurrences``, ``values/sum``, etc.) are always emitted. The
     ``values/quantiles`` struct is generated from the example's ``aggregations`` config so that
-    non-default ``probs`` round-trip correctly (see issue #342).
+    non-default ``quantiles`` (i.e. the quantile probabilities) round-trip correctly (see
+    issue #342).
 
     Examples:
         >>> from pprint import pprint
