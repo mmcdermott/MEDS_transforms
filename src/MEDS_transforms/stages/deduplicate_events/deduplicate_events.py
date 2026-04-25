@@ -202,6 +202,23 @@ def deduplicate_events(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.Laz
         │ 1          ┆ null ┆ A    │
         └────────────┴──────┴──────┘
 
+        If the user-supplied ``by`` shares NO columns with the input schema, the
+        stage degrades to a no-op rather than collapsing the entire frame to one
+        row — better to do nothing than to silently destroy data:
+
+        >>> df_no_overlap = pl.DataFrame({"a": [1, 1, 2], "b": ["x", "x", "y"]}).lazy()
+        >>> deduplicate_events(DictConfig({"by": ["subject_id", "time"]}))(df_no_overlap).collect()
+        shape: (3, 2)
+        ┌─────┬─────┐
+        │ a   ┆ b   │
+        │ --- ┆ --- │
+        │ i64 ┆ str │
+        ╞═════╪═════╡
+        │ 1   ┆ x   │
+        │ 1   ┆ x   │
+        │ 2   ┆ y   │
+        └─────┴─────┘
+
         Unknown ``on_conflict`` raises immediately — at stage-construction time,
         before any data is touched:
 
