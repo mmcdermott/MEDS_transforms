@@ -19,6 +19,8 @@ MAIN_CFG_PATH = files(__package_name__) / "configs" / "_main.yaml"
 def print_help_stage():
     """Print help for all stages."""
 
+    from ._cli_help import pipeline_keys_help_block
+
     all_stage_names = list(get_all_registered_stages().keys())
 
     print(f"Usage: {sys.argv[0]} <pipeline_yaml> <stage_name> [args]")
@@ -31,6 +33,8 @@ def print_help_stage():
     print("Available stages:")
     for name in sorted(all_stage_names):
         print(f"  - {name}")
+    print()
+    print(pipeline_keys_help_block())
 
 
 def run_stage():  # pragma: no cover
