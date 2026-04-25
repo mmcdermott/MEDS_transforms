@@ -269,11 +269,12 @@ def _build_stage_content(stage_name: str, stage) -> str:
         lines.extend(["", "## Default Configuration", "", "```yaml", config_yaml, "```"])
 
     # Output schema updates
-    if stage.output_schema_updates:
+    schema_updates = stage._resolve_output_schema_updates()
+    if schema_updates:
         lines.extend(["", "## Output Schema Updates", ""])
         lines.append("| Column | Type |")
         lines.append("| --- | --- |")
-        for col, dtype in stage.output_schema_updates.items():
+        for col, dtype in schema_updates.items():
             lines.append(f"| `{col}` | `{dtype}` |")
 
     # CLI usage

@@ -881,9 +881,19 @@ class StageExample:
 
     @classmethod
     def from_dir(
-        cls, stage_name: str, scenario_name: str, example_dir: Path, **schema_updates
+        cls,
+        stage_name: str,
+        scenario_name: str,
+        example_dir: Path,
+        *,
+        stage_cfg: dict | None = None,
+        **schema_updates,
     ) -> StageExample:
-        """Parse the example directory and return a StageExample object, or raise an error if invalid."""
+        """Parse the example directory and return a StageExample object, or raise an error if invalid.
+
+        ``stage_cfg`` may be passed in pre-parsed (e.g. by ``Stage.test_cases``) to avoid re-reading
+        ``cfg.yaml``; if ``None`` the file is loaded here as before.
+        """
 
         stage_cfg_fp = example_dir / "cfg.yaml"
         in_fp = example_dir / "in.yaml"
@@ -904,7 +914,8 @@ class StageExample:
                 in_data = MEDSDataset.from_yaml(in_fp)
             except ValueError:
                 in_data = in_fp
-        stage_cfg = OmegaConf.to_container(OmegaConf.load(stage_cfg_fp)) if stage_cfg_fp.is_file() else {}
+        if stage_cfg is None:
+            stage_cfg = OmegaConf.to_container(OmegaConf.load(stage_cfg_fp)) if stage_cfg_fp.is_file() else {}
         test_kwargs = OmegaConf.to_container(OmegaConf.load(test_cfg_fp)) if test_cfg_fp.is_file() else {}
         pipeline_cfg = (
             OmegaConf.to_container(OmegaConf.load(pipeline_cfg_fp)) if pipeline_cfg_fp.is_file() else {}
