@@ -290,6 +290,47 @@ def test_per_instance_comparator_overrides_class_default(tmp_path: Path):
 # ---------------------------------------------------------------------------------------------
 
 
+def test_compare_parquet_read_failure_raises_assertion(tmp_path: Path):
+    """Corrupt / unreadable parquet surfaces as AssertionError, not a raw polars exception."""
+    (tmp_path / "want.parquet").write_bytes(b"not a parquet file")
+    pl.DataFrame({"a": [1]}).write_parquet(tmp_path / "got.parquet")
+    ctx = CompareContext(rel=Path("want.parquet"), tolerances={".parquet": {}})
+    with pytest.raises(AssertionError, match=r"Failed to read parquet at want\.parquet"):
+        _compare_parquet(tmp_path / "want.parquet", tmp_path / "got.parquet", ctx)
+
+
+def test_from_dir_falls_back_to_path_for_non_meds_metadata(tmp_path: Path):
+    """out_metadata.yaml that isn't a MEDS-shaped metadata spec is stored as Path."""
+    import yaml
+
+    example_dir = tmp_path / "example"
+    example_dir.mkdir()
+    # A yaml_to_disk spec that isn't in metadata/codes.parquet shape.
+    (example_dir / "out_metadata.yaml").write_text(yaml.dump({"extra/manifest.json": {"v": 1}}))
+    (example_dir / "cfg.yaml").write_text(yaml.dump({}))
+
+    ex = StageExample.from_dir("test", ".", example_dir)
+    assert isinstance(ex.want_metadata, Path)
+    assert ex.want_metadata == example_dir / "out_metadata.yaml"
+
+
+def test_check_outputs_dispatches_path_spec_on_want_metadata(tmp_path: Path):
+    """want_metadata as Path goes through _check_path_spec just like want_data."""
+    from yaml_to_disk import yaml_disk
+
+    spec = _write_yaml_spec(tmp_path / "out_metadata.yaml", "extra/m.csv: |\n  x\n  1\n")
+    actual = tmp_path / "actual"
+    actual.mkdir()
+    yaml_disk(spec, root_dir=actual)
+
+    ex = StageExample(
+        stage_name="test",
+        want_metadata=spec,
+        suffix_comparators={".csv": lambda a, b, ctx: None},
+    )
+    ex.check_outputs(actual, is_resolved_dir=True)  # must not raise
+
+
 def test_compare_parquet_tolerance_bridge(tmp_path: Path):
     """df_check_kwargs flows through CompareContext.tol_for('.parquet')."""
     # Values differ by more than default atol but within loose rtol — strict would fail, loose passes.
