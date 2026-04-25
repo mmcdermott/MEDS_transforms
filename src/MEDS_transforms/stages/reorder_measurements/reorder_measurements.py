@@ -47,7 +47,7 @@ def get_smallest_valid_uint_type(num: int | float | pl.Expr) -> pl.DataType:
         return pl.UInt8
 
 
-@Stage.register(requires_fresh_metadata=True)
+@Stage.register
 def reorder_measurements(
     stage_cfg: DictConfig, code_metadata: pl.DataFrame, code_modifiers: list[str] | None = None
 ) -> Callable[[pl.LazyFrame], pl.LazyFrame]:

@@ -3,8 +3,17 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
+
+import pytest
 
 from MEDS_transforms.configs import PipelineConfig
+from MEDS_transforms.stages.base import Stage
+from MEDS_transforms.stages.discovery import get_all_registered_stages
+
+if TYPE_CHECKING:
+    import polars as pl
+    from omegaconf import DictConfig
 
 
 def test_warns_when_requires_fresh_metadata_has_no_preceding_metadata_stage(
@@ -46,4 +55,83 @@ def test_warns_when_non_refreshing_metadata_stage_precedes_dependent_stage(caplo
     pipeline.register_for("filter_measurements")
     assert any("requires a fresh metadata/codes.parquet" in r.message for r in caplog.records), (
         f"Expected warning about fresh metadata dependency; got: {[r.message for r in caplog.records]}"
+    )
+
+
+# ----------------------------------------------------------------------------------------------
+# Auto-inference of requires_fresh_metadata from compute-fn signatures
+# ----------------------------------------------------------------------------------------------
+
+
+def test_inference_sets_true_when_compute_fn_takes_code_metadata(caplog) -> None:
+    """A stage whose registered fn takes ``code_metadata`` auto-infers requires_fresh_metadata=True.
+
+    ``filter_measurements`` and ``reorder_measurements`` no longer pass the explicit flag — the
+    inference path should still produce the same warning behavior.
+    """
+    stages = get_all_registered_stages()
+    for name in ("filter_measurements", "reorder_measurements"):
+        stage = stages[name].load()
+        assert stage.requires_fresh_metadata is True, (
+            f"{name} should infer requires_fresh_metadata=True from its `code_metadata` parameter"
+        )
+
+
+def test_explicit_true_still_respected_when_signature_doesnt_take_code_metadata() -> None:
+    """fit_vocabulary_indices.main(cfg) doesn't take code_metadata, but explicit True wins."""
+    stages = get_all_registered_stages()
+    stage = stages["fit_vocabulary_indices"].load()
+    assert stage.requires_fresh_metadata is True
+
+
+def test_explicit_false_overrides_signature_inference() -> None:
+    """Explicit ``requires_fresh_metadata=False`` is honored even when the fn takes ``code_metadata``.
+
+    Escape hatch for stages that take ``code_metadata`` but tolerate stale input.
+    """
+
+    def map_fn(stage_cfg: DictConfig, code_metadata: pl.DataFrame, df: pl.LazyFrame) -> pl.LazyFrame:
+        return df
+
+    with Stage.suppress_validation():
+        stage = Stage(map_fn=map_fn, stage_name="opt_out", requires_fresh_metadata=False)
+    assert stage.requires_fresh_metadata is False
+
+
+def test_no_signature_no_inference() -> None:
+    """A stage whose fns don't declare ``code_metadata`` defaults to False without manual flag."""
+
+    def map_fn(df: pl.LazyFrame) -> pl.LazyFrame:
+        return df
+
+    with Stage.suppress_validation():
+        stage = Stage(map_fn=map_fn, stage_name="no_metadata_use")
+    assert stage.requires_fresh_metadata is False
+
+
+def test_inference_sees_through_functools_wraps() -> None:
+    """``inspect.signature`` follows ``__wrapped__`` chains so wrapped fns are inferred correctly."""
+    import functools
+
+    def inner(stage_cfg: DictConfig, code_metadata: pl.DataFrame, df: pl.LazyFrame) -> pl.LazyFrame:
+        return df
+
+    @functools.wraps(inner)
+    def wrapped(*args, **kwargs):
+        return inner(*args, **kwargs)
+
+    with Stage.suppress_validation():
+        stage = Stage(map_fn=wrapped, stage_name="wrapped_stage")
+    assert stage.requires_fresh_metadata is True
+
+
+@pytest.mark.parametrize(
+    "stage_name", ["filter_measurements", "reorder_measurements", "bin_numeric_values", "normalization"]
+)
+def test_known_metadata_consumers_are_inferred(stage_name: str) -> None:
+    """Stages whose registered fns take ``code_metadata`` should all auto-infer the flag."""
+    stages = get_all_registered_stages()
+    stage = stages[stage_name].load()
+    assert stage.requires_fresh_metadata is True, (
+        f"{stage_name}'s fn declares `code_metadata`; expected auto-inference to set the flag"
     )

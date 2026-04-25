@@ -162,6 +162,49 @@ class ComputeFnType(Enum):
         print(sig.return_annotation)
 
 
+def takes_param(fn: Callable, name: str) -> bool:
+    """Return ``True`` if ``fn`` declares a parameter named ``name`` in its signature.
+
+    Used by :func:`bind_compute_fn` to decide which auto-bound kwargs to populate (``cfg``,
+    ``stage_cfg``, ``code_modifiers``, ``code_metadata``), and by ``Stage.__init__`` to infer
+    flags like ``requires_fresh_metadata`` from the user's function signature without
+    introducing a parallel naming convention.
+
+    ``inspect.signature`` follows ``@functools.wraps`` chains by default, so wrappers like
+    :func:`MEDS_transforms.compute_modes.match_revise.match_revise_fntr` are transparent
+    (their inner ``compute_fn`` is the user's original function and is what gets inspected).
+
+    Returns ``False`` defensively when ``inspect.signature`` raises (some C builtins / partials
+    of opaque callables); callers can opt back in via the explicit registration kwarg.
+
+    Examples:
+        >>> def fn(stage_cfg, code_metadata): ...
+        >>> takes_param(fn, "code_metadata")
+        True
+        >>> takes_param(fn, "df")
+        False
+
+        Wrapped functions are seen through their ``__wrapped__`` chain — ``inspect.signature``
+        does this automatically when the decorator uses ``functools.wraps``:
+
+        >>> import functools
+        >>> @functools.wraps(fn)
+        ... def wrapped(*args, **kwargs):
+        ...     return fn(*args, **kwargs)
+        >>> takes_param(wrapped, "code_metadata")
+        True
+
+        Opaque callables that don't expose a signature return ``False`` rather than raising:
+
+        >>> takes_param(len, "code_metadata")
+        False
+    """
+    try:
+        return name in inspect.signature(fn).parameters
+    except (ValueError, TypeError):
+        return False
+
+
 def identity_fn(df: Any) -> Any:
     """A "null" compute function that returns the input DataFrame as is.
 
@@ -290,17 +333,15 @@ def bind_compute_fn(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_COMP
         return identity_fn
 
     def fntr_params(compute_fn: ANY_COMPUTE_FN_T) -> ComputeFnArgs:
-        compute_fn_params = inspect.signature(compute_fn).parameters
         kwargs = ComputeFnArgs()
 
-        if "cfg" in compute_fn_params:
+        if takes_param(compute_fn, "cfg"):
             kwargs["cfg"] = cfg
-        if "stage_cfg" in compute_fn_params:
+        if takes_param(compute_fn, "stage_cfg"):
             kwargs["stage_cfg"] = stage_cfg
-        if "code_modifiers" in compute_fn_params:
-            code_modifiers = cfg.get("code_modifiers", None)
-            kwargs["code_modifiers"] = code_modifiers
-        if "code_metadata" in compute_fn_params:
+        if takes_param(compute_fn, "code_modifiers"):
+            kwargs["code_modifiers"] = cfg.get("code_modifiers", None)
+        if takes_param(compute_fn, "code_metadata"):
             kwargs["code_metadata"] = pl.read_parquet(
                 Path(stage_cfg.metadata_input_dir) / "codes.parquet", use_pyarrow=True
             )

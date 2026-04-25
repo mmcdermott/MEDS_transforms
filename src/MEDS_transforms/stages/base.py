@@ -488,7 +488,14 @@ class Stage:
     # ``refreshes_codes_metadata=True``. That check does not guarantee the metadata was refreshed
     # from this stage's actual input data; it catches the common misconfiguration of omitting an
     # aggregation stage entirely. See #117, #116, #118, #200.
-    requires_fresh_metadata: bool = False
+    #
+    # Default ``None`` triggers signature-based auto-inference: if any of ``map_fn`` /
+    # ``reduce_fn`` / ``main_fn`` declares a ``code_metadata`` parameter, the same convention
+    # ``bind_compute_fn`` uses to auto-load ``codes.parquet`` at execute time, the field
+    # resolves to ``True`` at the end of ``__init__``. Explicit ``True``/``False`` always wins
+    # — escape hatch for stages that read ``codes.parquet`` via raw paths in their main_fn
+    # (e.g. ``fit_vocabulary_indices``, which can't expose ``code_metadata`` as a kwarg).
+    requires_fresh_metadata: bool | None = None
     # When True, this stage (re)computes ``metadata/codes.parquet`` from the data that feeds it.
     # Only ``aggregate_code_metadata``-style mapreduce stages should set this — metadata stages that
     # merely decorate an existing codes.parquet (e.g. ``fit_vocabulary_indices``) leave it False.
@@ -559,7 +566,7 @@ class Stage:
         examples_dir: Path | None = None,
         default_config: dict[str, Any] | DictConfig | Path | str | None = None,
         is_metadata: bool | None = None,
-        requires_fresh_metadata: bool = False,
+        requires_fresh_metadata: bool | None = None,
         refreshes_codes_metadata: bool = False,
         example_class: type[StageExample] | None = None,
         _calling_file: Path | None = None,
@@ -628,6 +635,18 @@ class Stage:
         else:
             self.output_schema_updates = copy.deepcopy(output_schema_updates)
 
+        if requires_fresh_metadata is None:
+            # Auto-infer from the user's compute-fn signatures: if any of them declares
+            # ``code_metadata``, the same convention ``bind_compute_fn`` uses to auto-load the
+            # metadata at execute time, treat the stage as requiring fresh metadata. Explicit
+            # ``True``/``False`` overrides the inference (already preserved above).
+            from ..compute_modes import takes_param
+
+            requires_fresh_metadata = any(
+                takes_param(fn, "code_metadata")
+                for fn in (self.map_fn, self.reduce_fn, self.main_fn)
+                if fn is not None
+            )
         self.requires_fresh_metadata = requires_fresh_metadata
         self.refreshes_codes_metadata = refreshes_codes_metadata
 
