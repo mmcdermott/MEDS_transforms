@@ -155,8 +155,11 @@ class Stage:
         examples_dir: A directory containing nested test cases for the stage.
             If not set, this is automatically inferred in the case that the stage name and registering file
             conform to the pattern mentioned above.
-        output_schema_updates: A dictionary mapping column name to a Polars type for the output of the stage,
-            with the base MEDS schema options as defaults for unspecified columns.
+        output_schema_updates: Column-name → Polars-type overrides for the stage's output, layered
+            on top of the base MEDS schema. Either a plain dict, or a callable
+            ``(stage_cfg) -> dict`` that derives the overrides from the stage's effective config
+            (``default_config`` deep-merged with the example/pipeline overrides). Use the callable
+            form when the schema depends on user-chosen config, e.g. quantile probabilities.
         default_config: A dictionary containing the default configuration options for the stage. This can be
             passed manually during registration or is set automatically based on the calling file location in
             a manner similar to the examples directory.
@@ -476,7 +479,9 @@ class Stage:
     read_fn: READ_FN_T | None = None
     write_fn: WRITE_FN_T | None = None
 
-    output_schema_updates: dict[str, pl.DataType] | None = None
+    output_schema_updates: dict[str, pl.DataType] | Callable[[dict | None], dict[str, pl.DataType]] | None = (
+        None
+    )
     is_metadata: bool | None = None
     # When True, this stage expects ``metadata/codes.parquet`` to be current for the data it reads.
     # The pipeline runner may emit a load-time warning if no earlier stage in the pipeline declares
@@ -548,7 +553,9 @@ class Stage:
         write_fn: WRITE_FN_T | None = None,
         stage_name: str | None = None,
         stage_docstring: str | None = None,
-        output_schema_updates: dict[str, pl.DataType] | None = None,
+        output_schema_updates: (
+            dict[str, pl.DataType] | Callable[[dict | None], dict[str, pl.DataType]] | None
+        ) = None,
         examples_dir: Path | None = None,
         default_config: dict[str, Any] | DictConfig | Path | str | None = None,
         is_metadata: bool | None = None,
@@ -616,6 +623,8 @@ class Stage:
 
         if output_schema_updates is None:
             self.output_schema_updates = {}
+        elif callable(output_schema_updates):
+            self.output_schema_updates = output_schema_updates
         else:
             self.output_schema_updates = copy.deepcopy(output_schema_updates)
 
@@ -736,6 +745,91 @@ class Stage:
                     f"{type(default_config)}: {default_config}"
                 )
 
+    def _resolve_output_schema_updates(
+        self,
+        example_dir: Path | None = None,
+        *,
+        stage_cfg: dict | None = None,
+    ) -> dict[str, pl.DataType]:
+        """Resolve ``output_schema_updates`` against an optional example or pre-parsed config.
+
+        If ``output_schema_updates`` is a callable, it is called with a ``stage_cfg`` dict and
+        expected to return a dict. The argument is built by starting from ``self.default_config``
+        (if any) and deep-merging the example's overrides on top, mirroring what the pipeline
+        runner does at execution time:
+
+        1. Base layer: ``self.default_config`` (may be empty).
+        2. Overrides (takes precedence, first non-``None`` wins):
+            a. Explicit ``stage_cfg`` argument (lets callers parse ``cfg.yaml`` once and share).
+            b. ``example_dir / "cfg.yaml"`` if ``example_dir`` is given and the file exists.
+
+        If neither overrides nor default config is available, the callable is invoked with
+        ``None``.
+
+        If ``output_schema_updates`` is a plain dict, it is returned unchanged.
+
+        Examples:
+            Dict overrides are returned verbatim (and the returned dict is a fresh copy):
+
+            >>> stage = Stage.register(
+            ...     stage_name="dict_stage",
+            ...     stage_docstring="x",
+            ...     map_fn=lambda df: df,
+            ...     output_schema_updates={"foo": pl.Int64},
+            ... )
+            >>> stage._resolve_output_schema_updates()
+            {'foo': Int64}
+
+            Callable overrides receive the effective config (``default_config`` merged with the
+            example or arg overrides). Keys unique to ``default_config`` survive the merge, and
+            override values take precedence on conflict:
+
+            >>> def schema_fn(cfg):
+            ...     return dict(cfg) if cfg else {"(no cfg)": None}
+            >>> stage = Stage.register(
+            ...     stage_name="callable_stage",
+            ...     stage_docstring="x",
+            ...     map_fn=lambda df: df,
+            ...     output_schema_updates=schema_fn,
+            ...     default_config={"probs": "from-default", "n_bins": 8},
+            ... )
+            >>> stage._resolve_output_schema_updates(stage_cfg={"probs": "from-arg"})
+            {'probs': 'from-arg', 'n_bins': 8}
+            >>> import tempfile
+            >>> with tempfile.TemporaryDirectory() as td:
+            ...     example_dir = Path(td)
+            ...     _ = (example_dir / "cfg.yaml").write_text("probs: from-example\\n")
+            ...     stage._resolve_output_schema_updates(example_dir)
+            {'probs': 'from-example', 'n_bins': 8}
+            >>> stage._resolve_output_schema_updates()
+            {'probs': 'from-default', 'n_bins': 8}
+
+            An empty override dict still triggers the merge — defaults survive (guarded against
+            the truthiness trap where ``{}`` would otherwise discard ``default_config``):
+
+            >>> stage._resolve_output_schema_updates(stage_cfg={})
+            {'probs': 'from-default', 'n_bins': 8}
+        """
+        if not callable(self.output_schema_updates):
+            return dict(self.output_schema_updates)
+
+        override_cfg: dict | None = stage_cfg
+        if override_cfg is None and example_dir is not None:
+            stage_cfg_fp = example_dir / "cfg.yaml"
+            if stage_cfg_fp.is_file():
+                override_cfg = OmegaConf.to_container(OmegaConf.load(stage_cfg_fp))
+
+        default_cfg = (
+            OmegaConf.to_container(self.default_config, resolve=False) if self.default_config else None
+        )
+
+        if default_cfg is not None and override_cfg is not None:
+            resolved_cfg = OmegaConf.to_container(OmegaConf.merge(default_cfg, override_cfg))
+        else:
+            resolved_cfg = override_cfg if override_cfg is not None else default_cfg
+
+        return dict(self.output_schema_updates(resolved_cfg))
+
     @property
     def test_cases(self) -> dict[str, StageExample]:
         if self.examples_dir is None:
@@ -752,11 +846,18 @@ class Stage:
 
             if self.example_class.is_example_dir(example_dir):
                 scenario_name = example_dir.relative_to(self.examples_dir).as_posix()
+                # Parse cfg.yaml once per example so both the schema resolver and from_dir reuse it.
+                stage_cfg_fp = example_dir / "cfg.yaml"
+                parsed_stage_cfg: dict | None = (
+                    OmegaConf.to_container(OmegaConf.load(stage_cfg_fp)) if stage_cfg_fp.is_file() else None
+                )
+                schema_updates = self._resolve_output_schema_updates(stage_cfg=parsed_stage_cfg)
                 test_cases[scenario_name] = self.example_class.from_dir(
                     stage_name=self.stage_name,
                     scenario_name=scenario_name,
                     example_dir=example_dir,
-                    **self.output_schema_updates,
+                    stage_cfg=parsed_stage_cfg,
+                    **schema_updates,
                 )
             else:
                 examples_to_check.extend(sorted(example_dir.iterdir()))
@@ -966,9 +1067,10 @@ class Stage:
             lines.append("  Default config:")
             lines.extend(textwrap.indent(str(OmegaConf.to_yaml(self.default_config)), "    | ").splitlines())
 
-        if self.output_schema_updates:
+        schema_updates = self._resolve_output_schema_updates()
+        if schema_updates:
             lines.append("  Output schema updates:")
-            lines.extend(pretty_wrap(str(self.output_schema_updates)))
+            lines.extend(pretty_wrap(str(schema_updates)))
 
         lines.extend(
             [
