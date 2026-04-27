@@ -125,6 +125,48 @@ def test_inference_sees_through_functools_wraps() -> None:
     assert stage.requires_fresh_metadata is True
 
 
+def test_takes_param_returns_false_when_signature_raises() -> None:
+    """``takes_param`` swallows ``ValueError``/``TypeError`` from ``inspect.signature``.
+
+    Some opaque callables (a few C builtins, objects whose ``__signature__`` descriptor raises)
+    don't expose an inspectable signature. The defensive try/except keeps the inference path
+    from blowing up Stage construction in those cases — it's what lets us safely walk
+    ``map_fn``/``reduce_fn``/``main_fn`` without filtering in advance.
+    """
+    from MEDS_transforms.compute_modes import takes_param
+
+    class FailingSignature:
+        def __call__(self, x):  # pragma: no cover - never invoked
+            return x
+
+        @property
+        def __signature__(self):
+            raise ValueError("no signature for this thing")
+
+    assert takes_param(FailingSignature(), "code_metadata") is False
+
+
+def test_inference_skips_callables_with_unintrospectable_signatures() -> None:
+    """A stage whose compute fn raises on signature inspection still constructs successfully.
+
+    Belt-and-suspenders for ``test_takes_param_returns_false_when_signature_raises`` at the
+    Stage layer: the inference path must not bring down construction when signature inspection
+    fails.
+    """
+
+    class WeirdMap:
+        def __call__(self, df: pl.LazyFrame) -> pl.LazyFrame:  # pragma: no cover
+            return df
+
+        @property
+        def __signature__(self):
+            raise TypeError("signature unavailable")
+
+    with Stage.suppress_validation():
+        stage = Stage(map_fn=WeirdMap(), stage_name="weird")
+    assert stage.requires_fresh_metadata is False
+
+
 @pytest.mark.parametrize(
     "stage_name", ["filter_measurements", "reorder_measurements", "bin_numeric_values", "normalization"]
 )
