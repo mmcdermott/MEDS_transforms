@@ -10,5 +10,12 @@ by: null
 # - first / last: keep the first / last row in source order.
 # - drop: remove ALL rows in the disagreement group; the dropped keys are emitted via
 #   logger.warning so the data loss isn't silent.
+# - capture: keep every row in the disagreement group and add a ``_conflicts`` struct
+#   column carrying ``n_collisions`` plus per-non-``by``-column value lists. Best for
+#   ETL pipelines that want to retain the raw disagreement for downstream audit.
 # True duplicates (rows that agree on every column) collapse to one row in every policy.
 on_conflict: error
+# When True, log offending ``by`` keys at WARNING for every non-``error`` policy.
+# ``drop`` always logs regardless of this flag; this opts ``first`` / ``last`` / ``capture``
+# into the same visibility.
+log_conflicts: false
