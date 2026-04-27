@@ -95,10 +95,10 @@ class MapReducePair(NamedTuple):
     """
 
     mapper: pl.Expr
-    reducer: Callable[[pl.Expr | Sequence[pl.Expr] | cs._selector_proxy_], pl.Expr]
+    reducer: Callable[[pl.Expr | Sequence[pl.Expr] | cs.Selector], pl.Expr]
 
 
-def quantile_reducer(cols: cs._selector_proxy_, quantiles: list[float]) -> pl.Expr:
+def quantile_reducer(cols: cs.Selector, quantiles: list[float]) -> pl.Expr:
     """Calculates the specified quantiles for the combined set of all numerical values in `cols`.
 
     Args:
