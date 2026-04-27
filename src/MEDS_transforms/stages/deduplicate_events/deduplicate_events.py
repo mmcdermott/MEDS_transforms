@@ -6,6 +6,8 @@ behavior, the ``on_conflict`` policies, and end-to-end doctests.
 
 from __future__ import annotations
 
+import logging
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 import polars as pl
@@ -18,18 +20,33 @@ if TYPE_CHECKING:
 
     from omegaconf import DictConfig
 
+logger = logging.getLogger(__name__)
 
-# Default ``by`` set: the four mandatory MEDS event-row columns. ``text_value`` is
-# part of the schema but optional, so callers who want it as part of the uniqueness
-# key must list it explicitly via ``by``.
-_DEFAULT_BY: tuple[str, ...] = (
-    DataSchema.subject_id_name,
-    DataSchema.time_name,
-    DataSchema.code_name,
-    DataSchema.numeric_value_name,
-)
 
-_VALID_POLICIES: frozenset[str] = frozenset({"error", "first", "last", "drop"})
+def _default_by_cols() -> tuple[str, ...]:
+    """Return the full set of MEDS ``DataSchema`` field names to use as the default ``by``."""
+    return tuple(f.name for f in DataSchema.schema())
+
+
+class OnConflictPolicy(StrEnum):
+    """How :func:`deduplicate_events` resolves rows that agree on ``by`` but disagree elsewhere.
+
+    Stored as a ``StrEnum`` so users can specify the policy as a plain string in the Hydra
+    stage config (``on_conflict: error`` etc.) and the same constant powers the dispatch
+    inside the function body.
+
+    Attributes:
+        ERROR: Raise :class:`DuplicateEventConflictError` naming the offending group.
+        FIRST: Keep the first row in source order.
+        LAST: Keep the last row in source order.
+        DROP: Remove every row in the disagreement group, with a logger warning naming the
+            dropped groups so the data loss isn't silent.
+    """
+
+    ERROR = "error"
+    FIRST = "first"
+    LAST = "last"
+    DROP = "drop"
 
 
 class DuplicateEventConflictError(ValueError):
@@ -69,27 +86,28 @@ def deduplicate_events(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.Laz
       - ``"first"`` / ``"last"``: keep the first / last row in source order.
       - ``"drop"``: remove **all** rows in the disagreement group.
 
-    The default ``by`` set is the four mandatory MEDS event-row columns
-    (``subject_id``, ``time``, ``code``, ``numeric_value``). ``by`` columns that
-    aren't present in the input are silently dropped from the key — datasets that
-    don't carry e.g. ``numeric_value`` still dedupe correctly on the columns they do
-    have. Pipeline configs that carry ``text_value`` (or any other extra schema
-    column) should override ``by`` to include it; otherwise rows that share the
-    default key but disagree on ``text_value`` will be silently collapsed.
+    The default ``by`` set is the full MEDS ``DataSchema`` field set (``subject_id``,
+    ``time``, ``code``, ``numeric_value``, ``text_value``) read at runtime via
+    :meth:`meds.DataSchema.schema`. ``by`` columns that aren't present in the input are
+    silently dropped from the key — datasets that don't carry e.g. ``text_value`` still
+    dedupe correctly on the columns they do have. To dedupe on a strict subset (or to
+    include extra non-schema columns), override ``by`` explicitly.
 
     Args:
         stage_cfg: Hydra-supplied stage config. Recognized keys:
 
-            - ``by`` (``list[str] | None``): see above. Default ``None`` → use the
-              MEDS mandatory columns.
-            - ``on_conflict`` (``str``): one of ``"error"``, ``"first"``,
-              ``"last"``, ``"drop"``. Default ``"error"``.
+            - ``by`` (``list[str] | None``): see above. Default ``None`` → use the full
+              ``DataSchema`` field set.
+            - ``on_conflict`` (``str``): one of the values of
+              :class:`OnConflictPolicy`: ``"error"``, ``"first"``, ``"last"``,
+              ``"drop"``. Default ``"error"``.
 
     Returns:
         A function ``df → df`` that applies the dedup policy.
 
     Raises:
-        ValueError: If ``on_conflict`` is not one of the four supported policies.
+        ValueError: If ``on_conflict`` is not one of the supported :class:`OnConflictPolicy`
+            values.
 
     Examples:
         Pure duplicates collapse under every policy — try it on the strictest
@@ -114,59 +132,80 @@ def deduplicate_events(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.Laz
         │ 2          ┆ null ┆ B    ┆ 2.0           │
         └────────────┴──────┴──────┴───────────────┘
 
-        Rows that share the ``by`` columns but disagree on something outside
-        ``by`` raise under the default ``error`` policy. The error message names
-        the offending group so the user can find it in the source data:
+        Rows that share every ``DataSchema`` column but disagree on a non-schema
+        column raise under the default ``error`` policy. The error message names
+        the offending group so the user can find it in the source data. Here
+        ``annotation`` is outside ``DataSchema`` and therefore not in the default
+        ``by``, so the two MEDS_DEATH rows look like the same event with two
+        different annotations attached:
 
         >>> df_disagree = pl.DataFrame({
         ...     "subject_id": [1, 1],
         ...     "time": [None, None],
         ...     "code": ["MEDS_DEATH", "MEDS_DEATH"],
         ...     "numeric_value": [None, None],
-        ...     "text_value": ["2020-03-01", "2020-03-05"],   # disagrees!
+        ...     "text_value": [None, None],
+        ...     "annotation": ["from-EHR", "from-claims"],   # disagrees!
         ... }).lazy()
         >>> deduplicate_events(DictConfig({}))(df_disagree).collect()
+        ... # doctest: +NORMALIZE_WHITESPACE
         Traceback (most recent call last):
             ...
-        MEDS_transforms.stages.deduplicate_events.deduplicate_events.DuplicateEventConflictError: ...
+        MEDS_transforms.stages.deduplicate_events.deduplicate_events.DuplicateEventConflictError:
+        deduplicate_events: 2 rows in 1 group(s) share their `by` columns
+        (['subject_id', 'time', 'code', 'numeric_value', 'text_value']) but disagree on a
+        non-`by` column. First offending group: by={'subject_id': 1, 'time': None,
+        'code': 'MEDS_DEATH', 'numeric_value': None, 'text_value': None}, rows=
+        shape: (2, 6)
+        ┌────────────┬──────┬────────────┬───────────────┬────────────┬─────────────┐
+        │ subject_id ┆ time ┆ code       ┆ numeric_value ┆ text_value ┆ annotation  │
+        │ ---        ┆ ---  ┆ ---        ┆ ---           ┆ ---        ┆ ---         │
+        │ i64        ┆ null ┆ str        ┆ null          ┆ null       ┆ str         │
+        ╞════════════╪══════╪════════════╪═══════════════╪════════════╪═════════════╡
+        │ 1          ┆ null ┆ MEDS_DEATH ┆ null          ┆ null       ┆ from-EHR    │
+        │ 1          ┆ null ┆ MEDS_DEATH ┆ null          ┆ null       ┆ from-claims │
+        └────────────┴──────┴────────────┴───────────────┴────────────┴─────────────┘
+        Fix the source data, or rerun this stage with on_conflict in {'first', 'last',
+        'drop'} to apply a silent-collapse policy.
 
         Switch to ``first`` to keep the earliest row in source order, ``last`` for
         the latest:
 
         >>> deduplicate_events(DictConfig({"on_conflict": "first"}))(df_disagree).collect()
-        shape: (1, 5)
-        ┌────────────┬──────┬────────────┬───────────────┬────────────┐
-        │ subject_id ┆ time ┆ code       ┆ numeric_value ┆ text_value │
-        │ ---        ┆ ---  ┆ ---        ┆ ---           ┆ ---        │
-        │ i64        ┆ null ┆ str        ┆ null          ┆ str        │
-        ╞════════════╪══════╪════════════╪═══════════════╪════════════╡
-        │ 1          ┆ null ┆ MEDS_DEATH ┆ null          ┆ 2020-03-01 │
-        └────────────┴──────┴────────────┴───────────────┴────────────┘
+        shape: (1, 6)
+        ┌────────────┬──────┬────────────┬───────────────┬────────────┬────────────┐
+        │ subject_id ┆ time ┆ code       ┆ numeric_value ┆ text_value ┆ annotation │
+        │ ---        ┆ ---  ┆ ---        ┆ ---           ┆ ---        ┆ ---        │
+        │ i64        ┆ null ┆ str        ┆ null          ┆ null       ┆ str        │
+        ╞════════════╪══════╪════════════╪═══════════════╪════════════╪════════════╡
+        │ 1          ┆ null ┆ MEDS_DEATH ┆ null          ┆ null       ┆ from-EHR   │
+        └────────────┴──────┴────────────┴───────────────┴────────────┴────────────┘
         >>> deduplicate_events(DictConfig({"on_conflict": "last"}))(df_disagree).collect()
-        shape: (1, 5)
-        ┌────────────┬──────┬────────────┬───────────────┬────────────┐
-        │ subject_id ┆ time ┆ code       ┆ numeric_value ┆ text_value │
-        │ ---        ┆ ---  ┆ ---        ┆ ---           ┆ ---        │
-        │ i64        ┆ null ┆ str        ┆ null          ┆ str        │
-        ╞════════════╪══════╪════════════╪═══════════════╪════════════╡
-        │ 1          ┆ null ┆ MEDS_DEATH ┆ null          ┆ 2020-03-05 │
-        └────────────┴──────┴────────────┴───────────────┴────────────┘
+        shape: (1, 6)
+        ┌────────────┬──────┬────────────┬───────────────┬────────────┬─────────────┐
+        │ subject_id ┆ time ┆ code       ┆ numeric_value ┆ text_value ┆ annotation  │
+        │ ---        ┆ ---  ┆ ---        ┆ ---           ┆ ---        ┆ ---         │
+        │ i64        ┆ null ┆ str        ┆ null          ┆ null       ┆ str         │
+        ╞════════════╪══════╪════════════╪═══════════════╪════════════╪═════════════╡
+        │ 1          ┆ null ┆ MEDS_DEATH ┆ null          ┆ null       ┆ from-claims │
+        └────────────┴──────┴────────────┴───────────────┴────────────┴─────────────┘
 
         ``drop`` removes every row in the disagreement group. Useful when "if I
         can't tell which value is right, throw the observation away" matches the
-        downstream contract better than picking one:
+        downstream contract better than picking one. The dropped keys are emitted
+        via ``logger.warning`` so the data loss isn't silent:
 
         >>> df_mixed = pl.DataFrame({
         ...     "subject_id": [1, 1, 2, 3],
         ...     "time": [None, None, None, None],
         ...     "code": ["A", "A", "B", "C"],
         ...     "numeric_value": [None, None, None, None],
-        ...     "text_value": ["x", "y", "ok", "fine"],   # subject 1 disagrees
+        ...     "annotation": ["x", "y", "ok", "fine"],   # subject 1 disagrees
         ... }).lazy()
         >>> deduplicate_events(DictConfig({"on_conflict": "drop"}))(df_mixed).collect().sort("subject_id")
         shape: (2, 5)
         ┌────────────┬──────┬──────┬───────────────┬────────────┐
-        │ subject_id ┆ time ┆ code ┆ numeric_value ┆ text_value │
+        │ subject_id ┆ time ┆ code ┆ numeric_value ┆ annotation │
         │ ---        ┆ ---  ┆ ---  ┆ ---           ┆ ---        │
         │ i64        ┆ null ┆ str  ┆ null          ┆ str        │
         ╞════════════╪══════╪══════╪═══════════════╪════════════╡
@@ -175,23 +214,23 @@ def deduplicate_events(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.Laz
         └────────────┴──────┴──────┴───────────────┴────────────┘
 
         Custom ``by`` controls what counts as "the same row". Including
-        ``text_value`` here makes the disagreement above NOT a conflict — the two
-        rows now have different keys and both survive:
+        ``annotation`` in ``by`` makes the disagreement above NOT a conflict — the
+        two rows now have different keys and both survive:
 
         >>> stage_cfg = DictConfig({
-        ...     "by": ["subject_id", "time", "code", "numeric_value", "text_value"],
+        ...     "by": ["subject_id", "time", "code", "numeric_value", "text_value", "annotation"],
         ...     "on_conflict": "error",
         ... })
-        >>> deduplicate_events(stage_cfg)(df_disagree).collect().sort("text_value")
-        shape: (2, 5)
-        ┌────────────┬──────┬────────────┬───────────────┬────────────┐
-        │ subject_id ┆ time ┆ code       ┆ numeric_value ┆ text_value │
-        │ ---        ┆ ---  ┆ ---        ┆ ---           ┆ ---        │
-        │ i64        ┆ null ┆ str        ┆ null          ┆ str        │
-        ╞════════════╪══════╪════════════╪═══════════════╪════════════╡
-        │ 1          ┆ null ┆ MEDS_DEATH ┆ null          ┆ 2020-03-01 │
-        │ 1          ┆ null ┆ MEDS_DEATH ┆ null          ┆ 2020-03-05 │
-        └────────────┴──────┴────────────┴───────────────┴────────────┘
+        >>> deduplicate_events(stage_cfg)(df_disagree).collect().sort("annotation")
+        shape: (2, 6)
+        ┌────────────┬──────┬────────────┬───────────────┬────────────┬─────────────┐
+        │ subject_id ┆ time ┆ code       ┆ numeric_value ┆ text_value ┆ annotation  │
+        │ ---        ┆ ---  ┆ ---        ┆ ---           ┆ ---        ┆ ---         │
+        │ i64        ┆ null ┆ str        ┆ null          ┆ null       ┆ str         │
+        ╞════════════╪══════╪════════════╪═══════════════╪════════════╪═════════════╡
+        │ 1          ┆ null ┆ MEDS_DEATH ┆ null          ┆ null       ┆ from-EHR    │
+        │ 1          ┆ null ┆ MEDS_DEATH ┆ null          ┆ null       ┆ from-claims │
+        └────────────┴──────┴────────────┴───────────────┴────────────┴─────────────┘
 
         ``by`` columns missing from the input are silently dropped from the key
         — datasets without ``numeric_value`` still dedupe on the columns they
@@ -237,11 +276,15 @@ def deduplicate_events(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.Laz
             ...
         ValueError: deduplicate_events: unknown on_conflict 'median'. ...
     """
-    on_conflict = stage_cfg.get("on_conflict", "error")
-    if on_conflict not in _VALID_POLICIES:
-        supported = ", ".join(sorted(_VALID_POLICIES))
-        raise ValueError(f"deduplicate_events: unknown on_conflict {on_conflict!r}. Supported: {supported}.")
-    by_cfg = stage_cfg.get("by") or list(_DEFAULT_BY)
+    raw_policy = stage_cfg.get("on_conflict", OnConflictPolicy.ERROR)
+    try:
+        on_conflict = OnConflictPolicy(raw_policy)
+    except ValueError as e:
+        supported = ", ".join(p.value for p in OnConflictPolicy)
+        raise ValueError(
+            f"deduplicate_events: unknown on_conflict {raw_policy!r}. Supported: {supported}."
+        ) from e
+    by_cfg = stage_cfg.get("by") or list(_default_by_cols())
 
     def fn(df: pl.LazyFrame) -> pl.LazyFrame:
         cols = df.collect_schema().names()
@@ -250,9 +293,9 @@ def deduplicate_events(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.Laz
             # No usable key — every row is its own group, dedup is a no-op.
             return df
 
-        if on_conflict == "first":
+        if on_conflict is OnConflictPolicy.FIRST:
             return df.unique(subset=by_cols, keep="first", maintain_order=True)
-        if on_conflict == "last":
+        if on_conflict is OnConflictPolicy.LAST:
             return df.unique(subset=by_cols, keep="last", maintain_order=True)
 
         # ``error`` and ``drop`` both need to identify disagreement groups. Strategy:
@@ -260,7 +303,23 @@ def deduplicate_events(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.Laz
         # remaining rows per ``by`` group — anything left with count > 1 is a group
         # whose rows agree on ``by`` but disagree on some other column.
         deduped = df.unique(maintain_order=True)
-        if on_conflict == "drop":
+        if on_conflict is OnConflictPolicy.DROP:
+            # Surface the dropped groups via WARNING so the data loss isn't silent.
+            # Materializing here is unfortunate but necessary for the log message; it
+            # mirrors the cost of the ``error`` path's diagnostic collect.
+            conflicts = (
+                deduped.with_columns(_n=pl.len().over(by_cols)).filter(pl.col("_n") > 1).drop("_n").collect()
+            )
+            if not conflicts.is_empty():
+                offending_keys = conflicts.select(by_cols).unique(maintain_order=True)
+                logger.warning(
+                    "deduplicate_events(on_conflict='drop'): dropping %d row(s) across %d "
+                    "`by` group(s) that disagree on a non-`by` column. Dropped keys "
+                    "(first 10):\n%s",
+                    len(conflicts),
+                    offending_keys.height,
+                    offending_keys.head(10),
+                )
             return deduped.filter(pl.len().over(by_cols) == 1)
 
         # on_conflict == "error": materialize the conflicts so the message can name them.

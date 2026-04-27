@@ -1,12 +1,14 @@
-# Columns whose value-tuple defines uniqueness. Defaults to the four mandatory MEDS
-# event-row columns. Pipeline configs that carry additional columns (e.g.
-# ``text_value`` from #182) should override ``by`` to include them, otherwise
-# disagreements on those columns are silently collapsed.
+# Columns whose value-tuple defines uniqueness. Defaults to the full MEDS ``DataSchema``
+# field set (subject_id, time, code, numeric_value, text_value), read at runtime via
+# ``meds.DataSchema.schema()``. Override ``by`` to dedupe on a strict subset, or to
+# include non-schema columns that should also count toward uniqueness. Columns named in
+# ``by`` that aren't present in the input are silently dropped from the key.
 by: null
 # Behavior when rows in the same ``by`` group disagree on a non-``by`` column.
 # - error (default): raise with an example offending group. Surfaces data-quality
 #   issues rather than silently masking them.
 # - first / last: keep the first / last row in source order.
-# - drop: remove ALL rows in the disagreement group.
+# - drop: remove ALL rows in the disagreement group; the dropped keys are emitted via
+#   logger.warning so the data loss isn't silent.
 # True duplicates (rows that agree on every column) collapse to one row in every policy.
 on_conflict: error
