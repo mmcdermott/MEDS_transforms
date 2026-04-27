@@ -7,7 +7,7 @@ from typing import NamedTuple
 
 import polars as pl
 import polars.selectors as cs
-from meds import CodeMetadataSchema, DataSchema
+from meds import DataSchema
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from .. import Stage
@@ -1034,6 +1034,9 @@ stage = Stage.register(
     map_fn=mapper_fntr,
     reduce_fn=reducer_fntr,
     output_schema_updates=aggregation_schema_updates,
-    input_schema=DataSchema,
-    metadata_output_schema=CodeMetadataSchema,
+    # ``input_schema``/``metadata_output_schema`` are the MEDS-schema defaults on Stage; the
+    # only override needed here is ``output_schema=None`` because this MAPREDUCE writes no
+    # data shards — only ``metadata/codes.parquet``. ``metadata_input_schema`` stays at the
+    # default ``CodeMetadataSchema`` because the merge step reads any prior codes.parquet.
+    output_schema=None,
 )
