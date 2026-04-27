@@ -273,3 +273,83 @@ def test_registry_get_missing_key_has_informative_error(tmp_path: Path):
 
     with pytest.raises(KeyError, match="In-memory FrameRegistry has no frame registered"):
         registry.get(missing)
+
+
+def test_read_df_falls_back_to_disk_on_registry_miss(tmp_path: Path):
+    """An active registry doesn't block reads of files it hasn't been told about.
+
+    Pipeline-level in-memory mode relies on this: the first stage's input shards live on disk,
+    not in the registry, and the registry layer must transparently pass through. Pre-seeding
+    every original input would require walking the dataset before any stage runs.
+    """
+    real_fp = tmp_path / "from_disk.parquet"
+    pl.DataFrame({"a": [10, 20]}).write_parquet(real_fp)
+    registry = FrameRegistry()
+
+    with in_memory_mode(registry):
+        df = read_df(real_fp).collect()
+
+    assert_frame_equal(df, pl.DataFrame({"a": [10, 20]}))
+
+
+def test_reduce_over_in_memory_skips_polling(tmp_path: Path):
+    """``reduce_over`` under in_memory_mode reads inputs from the registry and writes back to it.
+
+    Disk mode polls the filesystem for in_fps; the in-memory fast path skips polling because
+    in single-process mode all mapper outputs were already written to the registry before the
+    reducer ran. The reducer's output is keyed by ``out_fp`` in the registry, with no parquet
+    on disk.
+    """
+    from MEDS_transforms.mapreduce.reducer import reduce_over
+
+    def reduce_fn(*dfs: pl.LazyFrame) -> pl.LazyFrame:
+        return pl.concat(dfs, how="vertical")
+
+    registry = FrameRegistry()
+    in_keys = [_virtual(tmp_path, f"shard_{i}.parquet") for i in range(3)]
+    out_key = _virtual(tmp_path, "reduced.parquet")
+    for i, k in enumerate(in_keys):
+        registry.put(k, pl.LazyFrame({"a": [i, i + 1]}))
+
+    with in_memory_mode(registry):
+        reduce_over(in_keys, out_key, read_fn=read_df, write_fn=write_df, reduce_fn=reduce_fn)
+
+    assert not out_key.exists(), "in-memory reducer must not touch the filesystem"
+    assert registry.has(out_key)
+    result = registry.get(out_key).collect().sort("a")
+    assert_frame_equal(
+        result,
+        pl.DataFrame({"a": [0, 1, 1, 2, 2, 3]}, schema={"a": pl.Int8}),
+        check_dtypes=False,
+    )
+
+
+def test_reduce_over_in_memory_honors_do_overwrite(tmp_path: Path):
+    """A cached reducer output is skipped on a second call unless do_overwrite=True."""
+    from MEDS_transforms.mapreduce.reducer import reduce_over
+
+    calls = {"n": 0}
+
+    def counting_concat(*dfs: pl.LazyFrame) -> pl.LazyFrame:
+        calls["n"] += 1
+        return pl.concat(dfs, how="vertical")
+
+    registry = FrameRegistry()
+    in_keys = [_virtual(tmp_path, f"shard_{i}.parquet") for i in range(2)]
+    out_key = _virtual(tmp_path, "reduced.parquet")
+    for i, k in enumerate(in_keys):
+        registry.put(k, pl.LazyFrame({"a": [i]}))
+
+    with in_memory_mode(registry):
+        reduce_over(in_keys, out_key, read_fn=read_df, write_fn=write_df, reduce_fn=counting_concat)
+        reduce_over(in_keys, out_key, read_fn=read_df, write_fn=write_df, reduce_fn=counting_concat)
+        reduce_over(
+            in_keys,
+            out_key,
+            read_fn=read_df,
+            write_fn=write_df,
+            reduce_fn=counting_concat,
+            do_overwrite=True,
+        )
+
+    assert calls["n"] == 2  # first run, skipped second, recomputed third

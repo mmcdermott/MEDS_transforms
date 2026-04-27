@@ -18,14 +18,17 @@ def read_df(in_fp: Path) -> DF_T:
 
     When an in-memory ``FrameRegistry`` is active (see
     :func:`MEDS_transforms.compute_modes.in_memory_mode`), the frame keyed by ``in_fp`` is
-    returned directly from the registry — no parquet scan is performed. Outside an in-memory
-    context, reads go to disk via ``pl.scan_parquet``.
+    returned directly from the registry. On a registry miss the read falls through to disk via
+    ``pl.scan_parquet`` — this lets the first stage of an in-memory pipeline read the original
+    on-disk inputs without manual pre-seeding, while subsequent stages naturally short-circuit
+    through prior stages' registry writes.
     """
 
-    from ..compute_modes.in_memory import active_registry, in_memory_read
+    from ..compute_modes.in_memory import try_in_memory_read
 
-    if active_registry() is not None:
-        return in_memory_read(in_fp)
+    df = try_in_memory_read(in_fp)
+    if df is not None:
+        return df
     return pl.scan_parquet(in_fp, glob=False)
 
 

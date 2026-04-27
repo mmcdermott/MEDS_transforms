@@ -191,6 +191,42 @@ def in_memory_read(fp: str | Path) -> DF_T:
     return reg.get(fp)
 
 
+def try_in_memory_read(fp: str | Path) -> DF_T | None:
+    """Return the registry-stored frame for ``fp`` if one exists; otherwise ``None``.
+
+    Used by ``read_df`` to layer the registry on top of the on-disk store: a registry hit
+    short-circuits the parquet scan, but a miss falls through to disk so the first stage of a
+    pipeline can read the original on-disk inputs without manual pre-seeding. This keeps "skip
+    intermediate IO" as the only behavior the registry adds — it never blocks reads of files
+    the registry hasn't been told about.
+
+    Returns ``None`` if no registry is active.
+
+    Examples:
+        >>> try_in_memory_read("/anywhere") is None
+        True
+        >>> with in_memory_mode() as reg:
+        ...     print(try_in_memory_read("/virtual/missing.parquet"))
+        ...     reg.put("/virtual/shard.parquet", pl.LazyFrame({"a": [1]}))
+        ...     print(try_in_memory_read("/virtual/shard.parquet").collect())
+        None
+        shape: (1, 1)
+        ┌─────┐
+        │ a   │
+        │ --- │
+        │ i64 │
+        ╞═════╡
+        │ 1   │
+        └─────┘
+    """
+    reg = active_registry()
+    if reg is None:
+        return None
+    if not reg.has(fp):
+        return None
+    return reg.get(fp)
+
+
 def in_memory_write(df: DF_T, fp: str | Path) -> None:
     """Store a frame into the active registry. Raises if no registry is active.
 

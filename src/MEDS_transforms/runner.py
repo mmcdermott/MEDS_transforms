@@ -26,6 +26,64 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+def _run_stages_in_memory(
+    pipeline_config_fp: str,
+    pipeline_cfg: PipelineConfig,
+    cfg_overrides: list[str] | None,
+    log_dir: Path,
+) -> None:
+    """Run all stages of ``pipeline_cfg`` in-process under a single ``in_memory_mode`` context.
+
+    A subprocess-per-stage runner can't share a process-local ``FrameRegistry``, so the in-memory
+    mode requires an in-process execution path. This walks the stages sequentially, composes the
+    same Hydra config a stage subprocess would see, and dispatches to ``stage.main`` directly.
+    Per-stage ``.done`` files are still honored (for resumability) but no parquet round-trips
+    happen between stages — intermediate frames live in the registry only.
+
+    Limitations vs. the disk-mode runner: parallelization configs are ignored (single-process by
+    construction) and stage ``script`` overrides are not respected (you'd lose registry sharing).
+    Both raise ``ValueError`` rather than silently degrading.
+    """
+    from hydra import compose, initialize_config_dir
+    from hydra.core.global_hydra import GlobalHydra
+
+    from . import __package_name__, __version__
+    from .__main__ import MAIN_CFG_PATH
+    from .compute_modes import in_memory_mode
+
+    OmegaConf.register_new_resolver("get_package_version", lambda: __version__, replace=True)
+    OmegaConf.register_new_resolver("get_package_name", lambda: __package_name__, replace=True)
+
+    stages = [s.name for s in pipeline_cfg.parsed_stages]
+
+    with in_memory_mode():
+        for stage_name in stages:
+            done_file = log_dir / f"{stage_name}.done"
+            if done_file.exists():
+                logger.info(f"Skipping stage {stage_name} as it is already complete.")
+                continue
+
+            stage_obj = pipeline_cfg.register_for(stage_name)
+
+            OmegaConf.register_new_resolver("stage_name", lambda sn=stage_name: sn, replace=True)
+            OmegaConf.register_new_resolver(
+                "stage_docstring",
+                lambda s=stage_obj: (s.stage_docstring or "").replace("$", "$$"),
+                replace=True,
+            )
+
+            if GlobalHydra.instance().is_initialized():
+                GlobalHydra.instance().clear()
+
+            overrides = [f"stage={stage_name}", *(cfg_overrides or [])]
+            with initialize_config_dir(version_base=None, config_dir=str(MAIN_CFG_PATH.parent.absolute())):
+                cfg = compose(config_name="_main", overrides=overrides)
+
+            logger.info(f"Running stage in-process (in-memory): {stage_name}")
+            stage_obj.main(cfg)
+            done_file.touch()
+
+
 def get_parallelization_args(
     parallelization_cfg: dict | DictConfig | None, default_parallelization_cfg: dict | DictConfig
 ) -> list[str]:
@@ -306,6 +364,16 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     parser.add_argument(
         "--overrides", nargs="*", default=[], help="Additional overrides for the pipeline configuration."
     )
+    parser.add_argument(
+        "--in_memory",
+        default=False,
+        action=argparse.BooleanOptionalAction,
+        help=(
+            "Run all stages in-process with shared in-memory frames between MAP/MAPREDUCE stages. "
+            "Skips parquet round-trips between stages. Disables stage-runner parallelization and "
+            "custom-script overrides — those require subprocess execution."
+        ),
+    )
     args = parser.parse_args(argv)
 
     pipeline_config = PipelineConfig.from_arg(args.pipeline_config_fp, args.overrides)
@@ -329,6 +397,26 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     stages = [s.name for s in pipeline_config.parsed_stages]
     if not stages:
         raise ValueError("Pipeline configuration must specify at least one stage.")
+
+    if args.in_memory:
+        if args.stage_runner_fp is not None:
+            raise ValueError(
+                "--in_memory is incompatible with --stage_runner_fp: stage runners launch "
+                "subprocesses, but in-memory execution requires a single shared process."
+            )
+        if args.do_profile:
+            raise ValueError(
+                "--in_memory is incompatible with --do_profile: profiling hooks are wired in via "
+                "Hydra's subprocess invocation, which the in-memory path bypasses."
+            )
+        _run_stages_in_memory(
+            pipeline_config_fp=args.pipeline_config_fp,
+            pipeline_cfg=pipeline_config,
+            cfg_overrides=args.overrides,
+            log_dir=log_dir,
+        )
+        global_done_file.touch()
+        return 0
 
     stage_runners_cfg = load_yaml_file(args.stage_runner_fp)
 
