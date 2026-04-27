@@ -2,6 +2,10 @@
 
 This helper builds a ``StageDoc`` for each registered stage so it can be
 rendered in the documentation site.
+
+Per-example rendering is delegated to :meth:`StageExample.render_content`, so downstream packages
+that subclass :class:`StageExample` for non-MEDS-shaped output (JSON, CSV, etc.) can override the
+rendering without monkey-patching this module. See the default implementation there.
 """
 
 from __future__ import annotations
@@ -43,23 +47,39 @@ class StageDoc:
     edit_path: Path | None = None
 
 
-def _read_readme(directory: Path | None) -> str | None:
-    """Read a README.md from *directory*, stripping any leading ``#`` heading.
+def read_example_readme(directory: Path | None) -> str | None:
+    """Read a README.md from *directory*, stripping any leading ATX heading.
 
     The leading heading is removed because the README content is embedded under an existing section heading in
-    the generated page.
+    the generated page. Any ATX level is stripped (``#``, ``##``, ``###``, ...).
+
+    Exposed publicly so :class:`StageExample` subclass overrides of
+    :meth:`~StageExample.render_content` can reuse the same preamble behavior.
 
     Examples:
-        >>> _read_readme(None) is None
+        >>> read_example_readme(None) is None
         True
         >>> import tempfile
         >>> from pathlib import Path
         >>> with tempfile.TemporaryDirectory() as d:
         ...     _ = (Path(d) / "README.md").write_text("# Title\\n\\nBody text.\\n")
-        ...     _read_readme(Path(d))
+        ...     read_example_readme(Path(d))
         'Body text.'
         >>> with tempfile.TemporaryDirectory() as d:
-        ...     _read_readme(Path(d)) is None
+        ...     _ = (Path(d) / "README.md").write_text("### Deep Heading\\n\\nDeep body.\\n")
+        ...     read_example_readme(Path(d))
+        'Deep body.'
+
+        A heading-only README (no body) returns ``None`` — the heading is stripped even without a
+        trailing newline:
+
+        >>> with tempfile.TemporaryDirectory() as d:
+        ...     _ = (Path(d) / "README.md").write_text("# Just A Heading")
+        ...     read_example_readme(Path(d)) is None
+        True
+
+        >>> with tempfile.TemporaryDirectory() as d:
+        ...     read_example_readme(Path(d)) is None
         True
     """
 
@@ -69,8 +89,9 @@ def _read_readme(directory: Path | None) -> str | None:
     if not readme.is_file():
         return None
     text = readme.read_text().strip()
-    # Strip a leading ATX heading (e.g. "# Title\n\n...") to avoid duplicate/conflicting headings.
-    text = re.sub(r"^#[^\n]*\n+", "", text).strip()
+    # Strip a leading ATX heading (``# Title``, ``## Sub``, etc.) to avoid duplicate/conflicting headings.
+    # Anchor to end-of-string too so heading-only READMEs (no body) are handled.
+    text = re.sub(r"^#+[^\n]*(?:\n+|$)", "", text).strip()
     return text or None
 
 
@@ -94,19 +115,20 @@ def _extract_description(docstring: str) -> str:
     return text
 
 
-def _df_to_markdown(df: pl.DataFrame, max_rows: int = 20) -> str:
+def df_to_markdown(df: pl.DataFrame, max_rows: int = 20) -> str:
     """Render a Polars DataFrame as a Markdown table.
 
-    Truncates to *max_rows* to keep examples readable.
+    Truncates to *max_rows* to keep examples readable. Exposed publicly so subclass overrides of
+    :meth:`StageExample.render_content` can reuse the same table formatting.
 
     Examples:
         >>> import polars as pl
-        >>> print(_df_to_markdown(pl.DataFrame({"a": [1, None], "b": ["x", "y"]})))
+        >>> print(df_to_markdown(pl.DataFrame({"a": [1, None], "b": ["x", "y"]})))
         | **a** | **b** |
         | --- | --- |
         | 1 | x |
         | *null* | y |
-        >>> print(_df_to_markdown(pl.DataFrame({"v": [1, 2, 3]}), max_rows=2))
+        >>> print(df_to_markdown(pl.DataFrame({"v": [1, 2, 3]}), max_rows=2))
         | **v** |
         | --- |
         | 1 |
@@ -142,14 +164,18 @@ def _df_to_markdown(df: pl.DataFrame, max_rows: int = 20) -> str:
     return "\n".join(lines)
 
 
-def _format_dataset(dataset, label: str) -> list[str]:
+def format_dataset(dataset, label: str) -> list[str]:
     """Render a MEDSDataset as labelled Markdown sections with tables.
+
+    Exposed publicly so subclass overrides of :meth:`StageExample.render_content` can reuse this
+    renderer for any object exposing ``_pl_shards`` (a mapping of shard name to
+    :class:`polars.DataFrame`).
 
     Examples:
         >>> from types import SimpleNamespace
         >>> import polars as pl
         >>> ds = SimpleNamespace(_pl_shards={"0": pl.DataFrame({"x": [1]})})
-        >>> lines = _format_dataset(ds, "Test")
+        >>> lines = format_dataset(ds, "Test")
         >>> print("\\n".join(lines))
         **Test:**
         <BLANKLINE>
@@ -168,7 +194,7 @@ def _format_dataset(dataset, label: str) -> list[str]:
         shard_name, df = next(iter(shards.items()))
         lines.append(f"*Shard `{shard_name}`:*")
         lines.append("")
-        lines.append(_df_to_markdown(df))
+        lines.append(df_to_markdown(df))
         lines.append("")
     else:
         for shard_name, df in shards.items():
@@ -176,63 +202,12 @@ def _format_dataset(dataset, label: str) -> list[str]:
                 f'<details markdown="1"><summary>Shard <code>{shard_name}</code> ({df.height} rows)</summary>'
             )
             lines.append("")
-            lines.append(_df_to_markdown(df))
+            lines.append(df_to_markdown(df))
             lines.append("")
             lines.append("</details>")
             lines.append("")
 
     return lines
-
-
-def _format_example(stage_name: str, example, example_dir: Path | None = None) -> str:
-    """Format a single :class:`StageExample` as structured Markdown.
-
-    Renders configuration as YAML, data as Markdown tables, and includes a sample CLI invocation.
-    """
-
-    lines: list[str] = []
-
-    # Per-example description from README.md in the example directory
-    example_readme = _read_readme(example_dir)
-    if example_readme:
-        lines.extend([example_readme, ""])
-
-    # Stage configuration
-    if example.stage_cfg:
-        cfg_str = OmegaConf.to_yaml(OmegaConf.create(example.stage_cfg)).strip()
-        lines.extend(["**Stage configuration:**", "", "```yaml", cfg_str, "```", ""])
-
-    if example.do_use_config_yaml:
-        lines.extend(["> This example uses the stage's `config.yaml` file.", ""])
-
-    # Input data as tables
-    if example.in_data is not None:
-        if isinstance(example.in_data, Path):
-            lines.extend(["**Input files:**", "", "```yaml", example.in_data.read_text().strip(), "```", ""])
-        else:
-            lines.extend(_format_dataset(example.in_data, "Input data"))
-
-    # Expected output data as tables
-    if example.want_data is not None:
-        lines.extend(_format_dataset(example.want_data, "Expected output data"))
-
-    # Expected output metadata as a table
-    if example.want_metadata is not None:
-        lines.extend(["**Expected output metadata:**", ""])
-        lines.append(_df_to_markdown(example.want_metadata))
-        lines.append("")
-
-    # CLI usage hint
-    cfg_parts = [
-        f"stage_cfg.{k}={v}" for k, v in (example.stage_cfg or {}).items() if not isinstance(v, dict)
-    ]
-    cmd = f"MEDS_transform-stage <pipeline.yaml> {stage_name}"
-    if cfg_parts:
-        cmd += " " + " ".join(cfg_parts)
-    cmd += " input_dir=<input> output_dir=<output>"
-    lines.extend(["**Run this stage:**", "", "```bash", cmd, "```", ""])
-
-    return "\n".join(lines)
 
 
 def _build_stage_content(stage_name: str, stage) -> str:
@@ -249,7 +224,7 @@ def _build_stage_content(stage_name: str, stage) -> str:
             lines.append(description)
 
     # Stage-level README (from the stage directory itself)
-    stage_readme = _read_readme(stage.stage_dir)
+    stage_readme = read_example_readme(stage.stage_dir)
     if stage_readme:
         lines.extend(["", stage_readme])
 
@@ -295,7 +270,7 @@ def _build_stage_content(stage_name: str, stage) -> str:
         lines.append("## Examples")
 
         # Examples-level README (overview of all examples)
-        examples_readme = _read_readme(stage.examples_dir)
+        examples_readme = read_example_readme(stage.examples_dir)
         if examples_readme:
             lines.extend(["", examples_readme])
 
@@ -303,9 +278,51 @@ def _build_stage_content(stage_name: str, stage) -> str:
             scenario_name = scenario or "default"
             example_dir = stage.examples_dir / scenario if stage.examples_dir and scenario else None
             lines.extend(["", f"### {scenario_name}", ""])
-            lines.append(_format_example(stage_name, example, example_dir))
+            lines.extend(example.render_content(example_dir))
 
     return "\n".join(lines)
+
+
+def _safe_relative_to(path: Path, root: Path) -> Path | None:
+    """Return ``path`` relative to ``root``, or ``None`` if ``path`` is not under ``root``.
+
+    Both operands are resolved first, so an absolute ``path`` against a relative ``root`` (or vice
+    versa) is handled consistently — otherwise ``Path.relative_to`` would spuriously report
+    "not under root" whenever the two disagreed on absoluteness. Note that ``Path.resolve()``
+    dereferences symlinks, so a symlinked stage directory is compared against its canonical
+    target path — which is what MkDocs edit links need (the canonical repo location), but worth
+    knowing if you're debugging a "stage not under root" surprise on a symlinked checkout.
+
+    Used for MkDocs edit links when the stage lives outside the package ``root`` being documented
+    (e.g., ``generate_stage_docs(\"downstream_pkg\")`` invoked from a MEDS-Transforms docs build).
+
+    Examples:
+        >>> from pathlib import Path
+        >>> _safe_relative_to(Path("/a/b/c"), Path("/a")).as_posix()
+        'b/c'
+        >>> _safe_relative_to(Path("/other/place"), Path("/a")) is None
+        True
+
+        Mixed absolute/relative operands are normalized (both resolved) before comparison:
+
+        >>> import os, tempfile
+        >>> with tempfile.TemporaryDirectory() as td:
+        ...     nested = Path(td) / "pkg" / "stage"
+        ...     nested.mkdir(parents=True)
+        ...     prev = os.getcwd()
+        ...     os.chdir(td)
+        ...     try:
+        ...         rel = _safe_relative_to(nested, Path("pkg"))
+        ...     finally:
+        ...         os.chdir(prev)
+        >>> rel.as_posix()
+        'stage'
+    """
+
+    try:
+        return path.resolve().relative_to(Path(root).resolve())
+    except ValueError:
+        return None
 
 
 def generate_stage_docs(package: str, root: Path | None = None) -> list[StageDoc]:
@@ -313,8 +330,12 @@ def generate_stage_docs(package: str, root: Path | None = None) -> list[StageDoc
 
     Args:
         package: Package prefix used to filter stages from the registry.
-        root: Repository root for computing edit links. Defaults to two
-            directories above this file.
+        root: Base directory used to compute *package-relative* ``edit_path`` values (e.g.,
+            ``stages/<stage_name>`` when documenting the ``MEDS_transforms`` package). Defaults
+            to the ``MEDS_transforms`` package directory — i.e., ``docgen.py``'s parent-of-parent
+            — not the repository root. Downstream-package docs builds should pass their own
+            package root. Stages whose ``stage_dir`` lives outside ``root`` get a ``None``
+            ``edit_path`` (no MkDocs edit link) rather than raising.
 
     Returns:
         A list of :class:`StageDoc` objects describing each page.
@@ -334,6 +355,14 @@ def generate_stage_docs(package: str, root: Path | None = None) -> list[StageDoc
 
         >>> generate_stage_docs("fake_package")
         []
+
+    When a stage's ``stage_dir`` is outside the ``root`` used for edit links, ``edit_path`` falls
+    back to ``None`` instead of raising:
+
+        >>> from pathlib import Path
+        >>> docs_no_edit = generate_stage_docs("MEDS_transforms", root=Path("/nonexistent"))
+        >>> all(d.edit_path is None for d in docs_no_edit)
+        True
     """
 
     root = Path(root) if root else Path(__file__).resolve().parents[1]
@@ -346,11 +375,17 @@ def generate_stage_docs(package: str, root: Path | None = None) -> list[StageDoc
 
         stage = entry_point.load()
         content = _build_stage_content(stage_name, stage)
-        edit_path = stage.stage_dir.relative_to(root) if stage.stage_dir else None
+        edit_path = _safe_relative_to(stage.stage_dir, root) if stage.stage_dir else None
 
         docs.append(StageDoc(stage_name, stage_name, content, edit_path))
 
     return docs
 
 
-__all__ = ["StageDoc", "generate_stage_docs"]
+__all__ = [
+    "StageDoc",
+    "df_to_markdown",
+    "format_dataset",
+    "generate_stage_docs",
+    "read_example_readme",
+]
