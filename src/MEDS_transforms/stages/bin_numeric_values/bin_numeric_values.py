@@ -63,7 +63,7 @@ def _check_and_get_bin_endpoints(schema: pl.Schema, col: str) -> pl.Expr:
         ...     "C": pl.Struct([pl.Field("bin1", pl.Float32), pl.Field("bin2", pl.Int64)]),
         ... }
         >>> print(_check_and_get_bin_endpoints(schema, "A"))
-        .when(col("A").is_not_null()).then(col("A").multiple_fields().list.concat()).otherwise(null)
+        .when(col("A").is_not_null()).then(col("A").struct.field().list.concat()).otherwise(null)
         >>> _check_and_get_bin_endpoints(schema, "B")
         Traceback (most recent call last):
             ...
