@@ -301,6 +301,21 @@ def bind_compute_fn(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_COMP
         │ 2   ┆ bar       ┆ quo     │
         │ 3   ┆ bar       ┆ quo     │
         └─────┴───────────┴─────────┘
+        >>> def compute_fntr_modifiers(stage_cfg, code_modifiers):
+        ...     return lambda df: df.with_columns(pl.lit(",".join(code_modifiers)).alias("mods"))
+        >>> compute_fn = bind_compute_fn(
+        ...     DictConfig({"code_modifiers": ["abs", "rel"]}), DictConfig({}), compute_fntr_modifiers
+        ... )
+        >>> compute_fn(pl.DataFrame({"a": [1, 2]}))
+        shape: (2, 2)
+        ┌─────┬─────────┐
+        │ a   ┆ mods    │
+        │ --- ┆ ---     │
+        │ i64 ┆ str     │
+        ╞═════╪═════════╡
+        │ 1   ┆ abs,rel │
+        │ 2   ┆ abs,rel │
+        └─────┴─────────┘
         >>> def compute_fntr(df, code_metadata):
         ...     return df.join(code_metadata, on="a")
         >>> code_metadata_df = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
