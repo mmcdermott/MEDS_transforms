@@ -138,6 +138,45 @@ def test_in_memory_rejects_incompatible_flags(tmp_path: Path, incompatible_flag:
         runner_main([str(pipeline_fp), "--in_memory", *incompatible_flag])
 
 
+def test_in_memory_runner_skips_per_stage_done_file(tmp_path: Path):
+    """Pre-existing per-stage ``.done`` files cause the in-memory runner to skip those stages.
+
+    Mirrors the disk-mode resumability contract — a partially-completed run shouldn't recompute
+    already-finished stages. Uses a single-stage pipeline so the skipped stage doesn't leave an
+    empty input for any downstream stage (the in-memory registry doesn't survive across runs, so
+    a resumed pipeline can't actually proceed past a skipped intermediate stage; the per-stage
+    done file is meaningful for the all-skipped case the global done file also covers).
+    Hits the ``done_file.exists() → continue`` branch in the in-process loop.
+    """
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    _seed_input(input_dir)
+
+    one_stage_yaml = """
+input_dir: {input_dir}
+output_dir: {output_dir}
+
+stages:
+  - filter_subjects:
+      min_events_per_subject: 5
+"""
+
+    log_dir = output_dir / ".logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    (log_dir / "filter_subjects.done").touch()
+
+    pipeline_fp = tmp_path / "pipeline.yaml"
+    pipeline_fp.write_text(one_stage_yaml.format(input_dir=input_dir, output_dir=output_dir))
+
+    rc = runner_main([str(pipeline_fp), "--in_memory"])
+    assert rc == 0
+    # The pre-existing per-stage done file plus the global done file (written at the end of the
+    # successful resume) is the observable signal that the skip branch was taken without
+    # recomputing — recompute would have crashed the test on the missing on-disk inputs that the
+    # registry replaced.
+    assert (log_dir / "_all_stages.done").exists()
+
+
 def test_in_memory_rejects_stage_runner_fp(tmp_path: Path):
     """``--stage_runner_fp`` is also incompatible — stage-runner subprocesses can't share state."""
     input_dir = tmp_path / "input"

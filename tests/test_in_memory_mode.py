@@ -324,6 +324,136 @@ def test_reduce_over_in_memory_skips_polling(tmp_path: Path):
     )
 
 
+def test_reduce_over_in_memory_with_merge_fp_from_registry(tmp_path: Path):
+    """``reduce_over`` reads ``merge_fp`` from the registry when present.
+
+    Pipeline-style runs seed the registry with the upstream stage's metadata output keyed at the
+    location the reducer would expect on disk. The fast path must consult the registry before
+    falling back to ``merge_fp.is_file()`` — otherwise the merge is silently skipped.
+    """
+    from MEDS_transforms.mapreduce.reducer import reduce_over
+
+    def reduce_fn(*dfs: pl.LazyFrame) -> pl.LazyFrame:
+        return pl.concat(dfs, how="vertical")
+
+    def merge_fn(new: pl.LazyFrame, old: pl.LazyFrame) -> pl.LazyFrame:
+        return pl.concat([old, new], how="vertical")
+
+    registry = FrameRegistry()
+    in_keys = [_virtual(tmp_path, f"shard_{i}.parquet") for i in range(2)]
+    out_key = _virtual(tmp_path, "reduced.parquet")
+    merge_key = _virtual(tmp_path, "merge.parquet")
+    registry.put(in_keys[0], pl.LazyFrame({"a": [1]}))
+    registry.put(in_keys[1], pl.LazyFrame({"a": [2]}))
+    registry.put(merge_key, pl.LazyFrame({"a": [-1]}))
+
+    with in_memory_mode(registry):
+        reduce_over(
+            in_keys,
+            out_key,
+            read_fn=read_df,
+            write_fn=write_df,
+            reduce_fn=reduce_fn,
+            merge_fp=merge_key,
+            merge_fn=merge_fn,
+        )
+
+    result = registry.get(out_key).collect().sort("a")
+    # merge_fn(reduce(in_keys), merge_key) → concat([merge, reduced]) = [-1, 1, 2]
+    assert_frame_equal(
+        result,
+        pl.DataFrame({"a": [-1, 1, 2]}, schema={"a": pl.Int8}),
+        check_dtypes=False,
+    )
+
+
+def test_reduce_over_in_memory_with_merge_fp_from_disk(tmp_path: Path):
+    """``merge_fp`` falls back to disk when not in the registry.
+
+    The first MAPREDUCE stage of a pipeline merges with the original dataset's metadata, which
+    lives on disk — the registry hasn't been told about it. ``reduce_over`` must fall through to
+    ``merge_fp.is_file()`` so the merge actually happens.
+    """
+    from MEDS_transforms.mapreduce.reducer import reduce_over
+
+    def reduce_fn(*dfs: pl.LazyFrame) -> pl.LazyFrame:
+        return pl.concat(dfs, how="vertical")
+
+    def merge_fn(new: pl.LazyFrame, old: pl.LazyFrame) -> pl.LazyFrame:
+        return pl.concat([old, new], how="vertical")
+
+    merge_fp = tmp_path / "merge.parquet"
+    pl.DataFrame({"a": [-1]}).write_parquet(merge_fp)
+
+    registry = FrameRegistry()
+    in_keys = [_virtual(tmp_path, f"shard_{i}.parquet") for i in range(2)]
+    out_key = _virtual(tmp_path, "reduced.parquet")
+    registry.put(in_keys[0], pl.LazyFrame({"a": [1]}))
+    registry.put(in_keys[1], pl.LazyFrame({"a": [2]}))
+
+    with in_memory_mode(registry):
+        reduce_over(
+            in_keys,
+            out_key,
+            read_fn=read_df,
+            write_fn=write_df,
+            reduce_fn=reduce_fn,
+            merge_fp=merge_fp,
+            merge_fn=merge_fn,
+        )
+
+    result = registry.get(out_key).collect().sort("a")
+    assert_frame_equal(
+        result,
+        pl.DataFrame({"a": [-1, 1, 2]}, schema={"a": pl.Int8}),
+        check_dtypes=False,
+    )
+
+
+def test_shard_iterator_filters_unrelated_registry_keys(tmp_path: Path):
+    """``shard_iterator`` skips registry entries that don't belong to ``data_input_dir``.
+
+    Exercises the three filter branches in the registry path: keys outside the input dir
+    (``ValueError`` on ``relative_to``), keys with the wrong suffix, and duplicate keys that
+    already came from the disk glob.
+    """
+    from omegaconf import DictConfig
+
+    from MEDS_transforms.mapreduce.shard_iteration import shard_iterator
+
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    input_dir.mkdir()
+    # Disk shard — should appear once, even though the registry also has it (dedup branch).
+    pl.DataFrame({"a": [1]}).write_parquet(input_dir / "disk_shard.parquet")
+
+    cfg = DictConfig(
+        {
+            "stage_cfg": {
+                "data_input_dir": str(input_dir),
+                "output_dir": str(output_dir),
+            },
+            "worker": 0,
+        }
+    )
+
+    registry = FrameRegistry()
+    # Registry key duplicating the disk shard (must dedup, not double-count).
+    registry.put(input_dir / "disk_shard.parquet", pl.LazyFrame({"a": [1]}))
+    # Registry-only shard inside input_dir → should appear.
+    registry.put(input_dir / "registry_only.parquet", pl.LazyFrame({"a": [2]}))
+    # Outside input_dir → ``relative_to`` raises, branch hit.
+    registry.put(tmp_path / "elsewhere" / "shard.parquet", pl.LazyFrame({"a": [3]}))
+    # Wrong suffix → suffix-mismatch branch hit.
+    registry.put(input_dir / "not_parquet.csv", pl.LazyFrame({"a": [4]}))
+
+    with in_memory_mode(registry):
+        fps, _ = shard_iterator(cfg)
+
+    shard_names = sorted(in_fp.relative_to(input_dir).as_posix() for in_fp, _ in fps)
+    assert shard_names == ["disk_shard.parquet", "registry_only.parquet"], shard_names
+
+
 def test_reduce_over_in_memory_honors_do_overwrite(tmp_path: Path):
     """A cached reducer output is skipped on a second call unless do_overwrite=True."""
     from MEDS_transforms.mapreduce.reducer import reduce_over

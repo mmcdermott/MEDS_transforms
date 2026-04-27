@@ -65,6 +65,10 @@ def _run_stages_in_memory(
 
             stage_obj = pipeline_cfg.register_for(stage_name)
 
+            # Default-arg trick captures the *current* loop value in the lambda closure. Without
+            # it, every resolver would close over the same ``stage_name`` reference and resolve
+            # to the last stage in the list. ``replace=True`` lets us re-register on each
+            # iteration without raising — only the most recent registration is live.
             OmegaConf.register_new_resolver("stage_name", lambda sn=stage_name: sn, replace=True)
             OmegaConf.register_new_resolver(
                 "stage_docstring",
