@@ -839,6 +839,23 @@ class Stage:
         are ``None`` when the stage has not declared that particular schema. Intended to feed
         pipeline-load-time schema validation (see #324) and composer schema checks (see #56).
 
+        **Not all four roles must be declared, and which ones are appropriate depends on the
+        stage type:**
+
+        - A typical ``MAP`` stage transforms data only — declare ``input_schema`` and
+          ``output_schema`` (the same schema, possibly extended); leave ``metadata_*`` ``None``.
+        - A typical ``MAPREDUCE`` stage that reduces over data into a metadata file (e.g.
+          ``aggregate_code_metadata``) declares ``input_schema`` (data it reads) plus
+          ``metadata_output_schema`` (codes.parquet it writes); ``output_schema`` and
+          ``metadata_input_schema`` are typically ``None``.
+        - A ``MAPREDUCE`` stage that consumes existing code metadata and emits new code metadata
+          (e.g. a future ``decorate_metadata`` style stage) would declare
+          ``metadata_input_schema`` and ``metadata_output_schema``.
+
+        Treat ``None`` as "this stage doesn't read/write that role" rather than "not yet
+        annotated" — pipeline validation should not assume the absent roles are implicitly
+        present.
+
         Examples:
             >>> def compute(cfg):
             ...     '''docstring'''
@@ -1148,7 +1165,11 @@ class Stage:
                 keyword arguments should be set.
             **kwargs: Keyword arguments. These can include all keyword arguments to the `Stage` constructor
                 save for `_calling_file`; namely, `main_fn`, `map_fn`, `reduce_fn`, `stage_name`,
-                `stage_docstring`, `examples_dir`, `output_schema_updates`, and `default_config`.
+                `stage_docstring`, `examples_dir`, `output_schema_updates`, `default_config`,
+                `is_metadata`, `example_class`, and the four flexible-schema declarations
+                `input_schema` / `output_schema` / `metadata_input_schema` / `metadata_output_schema`
+                (see :attr:`Stage.declared_schemas` for what these are used for and which
+                combinations make sense for MAP vs MAPREDUCE stages).
                 Not all keyword arguments are required for all usages of the decorator.
 
         ## Inference of static data examples and the default configuration filepath.
