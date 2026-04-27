@@ -983,15 +983,19 @@ class StageExample:
         if want_data_fp.is_file():
             try:
                 want_data = MEDSDataset.from_yaml(want_data_fp, **schema_updates)
-            except (ValueError, TypeError):
+            except ValueError:
                 # Not a MEDS-format spec — fall back to a Path to the yaml_to_disk file, to be
                 # materialized and compared file-by-file via SUFFIX_COMPARATORS. Mirrors the
-                # graceful fallback already used for ``in_data`` below.
+                # graceful fallback already used for ``in_data`` below. ``TypeError`` is
+                # deliberately *not* caught: a YAML that parses to the wrong types (e.g. a list
+                # where a dict is expected) is a user error, not a "treat as opaque file spec"
+                # case, and should surface during loading rather than re-emerge as a confusing
+                # path-spec mismatch in ``check_outputs``.
                 want_data = want_data_fp
         if want_metadata_fp.is_file():
             try:
                 want_metadata = read_metadata_only(want_metadata_fp, **schema_updates)
-            except (ValueError, TypeError):
+            except ValueError:
                 want_metadata = want_metadata_fp
 
         in_data = None
@@ -1095,8 +1099,8 @@ class StageExample:
                     f"Expected metadata file {code_metadata_filepath} in {output_dir}. Got:\n{all_files_str}"
                 )
 
-    def _check_path_spec(self, spec_fp: Path, output_dir: Path) -> None:
-        """Compare an actual output tree against a ``yaml_to_disk`` spec file-by-file.
+    def _compare_path_spec(self, spec_fp: Path, output_dir: Path) -> set[Path]:
+        """Compare an actual output tree against one ``yaml_to_disk`` spec, file-by-file.
 
         Expected files are materialized into a tempdir via ``yaml_to_disk.yaml_disk``, then each
         file is compared against its counterpart under ``output_dir`` using the per-suffix
@@ -1104,14 +1108,18 @@ class StageExample:
         puts ``self.df_check_kwargs`` under ``tolerances['.parquet']`` so the default parquet
         comparator picks it up.
 
+        Returns the set of expected file rel-paths covered by this spec so the caller can union
+        across multiple specs before doing the no-unexpected-files check. The caller owns that
+        check: when ``want_data`` and ``want_metadata`` are *both* Paths, neither spec alone
+        knows about the other's files, so each one must contribute its expected set and the
+        check happens against the union.
+
         Args:
             spec_fp: Path to the ``yaml_to_disk`` spec describing the expected output tree.
             output_dir: Root of the actual output tree to compare against.
 
         Raises:
-            AssertionError: If an expected file is missing, a comparator reports a mismatch, or
-                (when ``tolerate_unexpected=False``) the actual tree has files the spec doesn't
-                mention (after applying ``skip_dirs`` / ``skip_files``).
+            AssertionError: If an expected file is missing, or a comparator reports a mismatch.
             RuntimeError: If a file's suffix has no registered comparator.
         """
         from yaml_to_disk import yaml_disk
@@ -1141,14 +1149,24 @@ class StageExample:
                     )
                 comparator(expected_fp, actual_fp, CompareContext(rel=rel, tolerances=tolerances))
 
-            if not self.tolerate_unexpected:
-                actual_rel = self.__actual_files_rel(output_dir)
-                extra = actual_rel - expected_rel
-                if extra:
-                    raise AssertionError(
-                        f"Unexpected files in {output_dir} (not in {spec_fp.name}): "
-                        f"{sorted(str(p) for p in extra)}"
-                    )
+        return expected_rel
+
+    def _check_path_spec(self, spec_fp: Path, output_dir: Path) -> None:
+        """Single-spec wrapper around :meth:`_compare_path_spec` with no-unexpected-files check.
+
+        Used when only one of ``want_data`` / ``want_metadata`` is a Path. When both are Paths,
+        ``check_outputs`` calls ``_compare_path_spec`` directly and runs a single union-aware
+        unexpected-files check across both specs.
+        """
+        expected_rel = self._compare_path_spec(spec_fp, output_dir)
+        if not self.tolerate_unexpected:
+            actual_rel = self.__actual_files_rel(output_dir)
+            extra = actual_rel - expected_rel
+            if extra:
+                raise AssertionError(
+                    f"Unexpected files in {output_dir} (not in {spec_fp.name}): "
+                    f"{sorted(str(p) for p in extra)}"
+                )
 
     def __actual_files_rel(self, output_dir: Path) -> set[Path]:
         """Return file paths under ``output_dir`` (relative), after applying skip_dirs/skip_files."""
@@ -1166,6 +1184,22 @@ class StageExample:
 
     def check_outputs(self, output_dir: Path, is_resolved_dir: bool = False) -> None:
         self.__check_files(output_dir, is_resolved_dir)
+
+        # Both fields as Paths: union the expected sets so the no-unexpected-files check
+        # doesn't reject one spec's files for being absent from the other's. This is the
+        # extraction-style use case the XOR relaxation enables.
+        if isinstance(self.want_data, Path) and isinstance(self.want_metadata, Path):
+            expected = self._compare_path_spec(self.want_data, output_dir)
+            expected |= self._compare_path_spec(self.want_metadata, output_dir)
+            if not self.tolerate_unexpected:
+                actual_rel = self.__actual_files_rel(output_dir)
+                extra = actual_rel - expected
+                if extra:
+                    raise AssertionError(
+                        f"Unexpected files in {output_dir} (not in either spec): "
+                        f"{sorted(str(p) for p in extra)}"
+                    )
+            return
 
         if isinstance(self.want_data, Path):
             self._check_path_spec(self.want_data, output_dir)

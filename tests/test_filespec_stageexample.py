@@ -131,8 +131,11 @@ def test_check_outputs_path_spec_mismatch_propagates_comparator_error(tmp_path: 
         want_data=spec,
         suffix_comparators={".csv": _strict_text_compare},
     )
-    with pytest.raises(AssertionError, match="CSV mismatch"):
+    with pytest.raises(AssertionError, match="CSV mismatch") as excinfo:
         ex.check_outputs(actual, is_resolved_dir=True)
+    # The comparator received ``ctx.rel`` and used it; without that thread, users wouldn't
+    # know which file failed when many files are checked in one ``check_outputs`` call.
+    assert "data/a.csv" in str(excinfo.value)
 
 
 def test_check_outputs_path_spec_missing_file_raises(tmp_path: Path):
@@ -228,6 +231,62 @@ def test_custom_skip_files_ignores_named_file(tmp_path: Path):
         skip_files=frozenset({"README"}),
     )
     ex.check_outputs(actual, is_resolved_dir=True)
+
+
+def test_skip_files_matches_basename_in_nested_dirs(tmp_path: Path):
+    """``skip_files`` filters by basename so a file at any depth is ignored.
+
+    The implementation uses ``fp.name``; this test pins that behavior so a future change to
+    full-path matching (which would silently break user configs) requires intentional update.
+    """
+    spec = _write_yaml_spec(tmp_path / "want.yaml", "data/a.csv: |\n  x\n  1\n")
+    actual = tmp_path / "actual"
+    (actual / "data" / "sub").mkdir(parents=True)
+    (actual / "data" / "a.csv").write_text("x\n1\n")
+    (actual / "data" / "sub" / "README").write_text("nested notes\n")
+
+    ex = StageExample(
+        stage_name="test",
+        want_data=spec,
+        suffix_comparators={".csv": lambda a, b, ctx: None},
+        skip_files=frozenset({"README"}),
+    )
+    ex.check_outputs(actual, is_resolved_dir=True)
+
+
+def test_check_outputs_runs_path_spec_for_both_want_data_and_want_metadata(tmp_path: Path):
+    """When both ``want_data`` and ``want_metadata`` are Paths, ``check_outputs`` runs both.
+
+    Locks in the XOR-relaxation: extraction-style stages legitimately describe a data file tree
+    AND a metadata file tree side-by-side. If the dispatch ever regressed to checking only one
+    side, the test would catch it because each spec asserts a different file's presence.
+    """
+    data_spec = _write_yaml_spec(tmp_path / "want_data.yaml", "data/a.csv: |\n  x\n  1\n")
+    metadata_spec = _write_yaml_spec(tmp_path / "want_metadata.yaml", "metadata/manifest.csv: |\n  v\n  42\n")
+    actual = tmp_path / "actual"
+    (actual / "data").mkdir(parents=True)
+    (actual / "metadata").mkdir(parents=True)
+    (actual / "data" / "a.csv").write_text("x\n1\n")
+    (actual / "metadata" / "manifest.csv").write_text("v\n42\n")
+
+    def _csv_eq(exp_fp: Path, act_fp: Path, ctx: CompareContext) -> None:
+        # Strip trailing whitespace because yaml_to_disk materialization may not preserve a
+        # final newline — the comparison is content-equality, not byte-equality.
+        assert exp_fp.read_text().strip() == act_fp.read_text().strip(), f"mismatch at {ctx.rel}"
+
+    ex = StageExample(
+        stage_name="test",
+        want_data=data_spec,
+        want_metadata=metadata_spec,
+        suffix_comparators={".csv": _csv_eq},
+    )
+    # Must not raise — both spec branches ran successfully.
+    ex.check_outputs(actual, is_resolved_dir=True)
+
+    # And if either side is wrong, the comparator fires with the right rel path.
+    (actual / "metadata" / "manifest.csv").write_text("v\n999\n")
+    with pytest.raises(AssertionError, match=r"metadata/manifest\.csv"):
+        ex.check_outputs(actual, is_resolved_dir=True)
 
 
 # ---------------------------------------------------------------------------------------------
