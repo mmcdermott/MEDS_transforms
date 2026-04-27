@@ -42,9 +42,14 @@ class DuplicateEventConflictError(ValueError):
     """
 
 
-@Stage.register
+@Stage.register(output_schema_updates={})
 def deduplicate_events(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Returns a function that drops duplicate event rows.
+
+    The output schema is identical to the input — this is a pure row-filter, declared
+    via the empty ``output_schema_updates={}``. Once the flexible-schema mechanism
+    (#379) lands, that explicit declaration helps validation tooling see this stage
+    is intentionally a no-op on schema.
 
     Two rows are "in the same ``by`` group" when their ``by``-column values are equal.
     For each such group:
@@ -55,7 +60,12 @@ def deduplicate_events(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.Laz
 
       - ``"error"`` (default): raise :class:`DuplicateEventConflictError` with an
         example. Conservative — surfaces a real data-quality problem rather than
-        silently masking it.
+        silently masking it. Trade-off: the error path collects the disagreement
+        groups to materialize a useful error message, so a pipeline running with
+        millions of small disagreement groups in the dataset will pay an extra
+        full scan just to fail. The clear-failure-over-fast-path bias is the right
+        one for a data-cleaning stage; switch to ``drop`` / ``first`` / ``last``
+        if you'd rather lose that diagnostic in exchange for speed.
       - ``"first"`` / ``"last"``: keep the first / last row in source order.
       - ``"drop"``: remove **all** rows in the disagreement group.
 
