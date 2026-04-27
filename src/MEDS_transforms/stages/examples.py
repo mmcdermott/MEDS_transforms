@@ -1155,6 +1155,13 @@ class StageExample:
         :func:`MEDS_transforms.stages.docgen.format_dataset` are the reusable helpers for such
         overrides.
 
+        **Override semantics: all-or-nothing.** A subclass override is responsible for rendering
+        the *entire* example — there is no per-field hook. ``super().render_content(...)`` plus
+        an append doesn't compose cleanly because the base implementation owns headings,
+        ordering, and the trailing CLI block. If your subclass needs only a small tweak (e.g.,
+        a different ``want_data`` rendering), prefer copying the relevant block from this
+        method's body rather than calling ``super()``.
+
         Args:
             example_dir: Optional directory containing an ``README.md`` to render as a per-example
                 preamble. ``None`` disables the preamble.
