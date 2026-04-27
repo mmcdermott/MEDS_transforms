@@ -326,6 +326,48 @@ def deduplicate_events(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.Laz
         │ 1          ┆ null ┆ MEDS_DEATH ┆ null          ┆ null       │
         └────────────┴──────┴────────────┴───────────────┴────────────┘
 
+        Same toggle works under ``capture`` — the captured-conflict struct is added
+        and the dropped keys are also logged:
+
+        >>> with print_warnings():
+        ...     _ = deduplicate_events(
+        ...         DictConfig({"on_conflict": "capture", "log_conflicts": True})
+        ...     )(df_disagree).collect()
+        ... # doctest: +ELLIPSIS
+        Warning: deduplicate_events(on_conflict='capture'): annotating 2 row(s) ...
+
+        ``log_conflicts: True`` on a frame with no conflicts is a no-op — the
+        helper short-circuits when there's nothing to log:
+
+        >>> df_clean = pl.DataFrame({
+        ...     "subject_id": [1, 2],
+        ...     "time": [None, None],
+        ...     "code": ["A", "B"],
+        ...     "numeric_value": [1.0, 2.0],
+        ...     "text_value": [None, None],
+        ... }).lazy()
+        >>> with print_warnings():
+        ...     _ = deduplicate_events(
+        ...         DictConfig({"on_conflict": "first", "log_conflicts": True})
+        ...     )(df_clean).collect()
+
+        ``capture`` on a frame whose ``by`` covers every column degrades to a no-op
+        — there are no non-``by`` columns to capture into the struct, so the input
+        is returned unchanged:
+
+        >>> df_full = pl.DataFrame({"subject_id": [1, 1], "code": ["A", "A"]}).lazy()
+        >>> deduplicate_events(
+        ...     DictConfig({"by": ["subject_id", "code"], "on_conflict": "capture"})
+        ... )(df_full).collect()
+        shape: (1, 2)
+        ┌────────────┬──────┐
+        │ subject_id ┆ code │
+        │ ---        ┆ ---  │
+        │ i64        ┆ str  │
+        ╞════════════╪══════╡
+        │ 1          ┆ A    │
+        └────────────┴──────┘
+
         Unknown ``on_conflict`` raises immediately — at stage-construction time,
         before any data is touched:
 
