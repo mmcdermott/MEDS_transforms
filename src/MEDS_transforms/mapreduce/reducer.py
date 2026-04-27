@@ -8,7 +8,7 @@ from typing import Protocol
 import polars as pl
 
 from ..dataframe import DF_T, READ_FN_T, WRITE_FN_T
-from .rwlock import default_file_checker
+from .rwlock import _uses_default_registry_io, default_file_checker
 
 logger = logging.getLogger(__name__)
 
@@ -208,6 +208,21 @@ def reduce_over(
         └─────┴─────┘
     """
 
+    from ..compute_modes.in_memory import active_registry
+
+    reg = active_registry()
+    if reg is not None and _uses_default_registry_io(read_fn, write_fn):
+        return _reduce_over_in_memory(
+            in_fps=in_fps,
+            out_fp=out_fp,
+            read_fn=read_fn,
+            write_fn=write_fn,
+            reduce_fn=reduce_fn,
+            merge_fp=merge_fp,
+            merge_fn=merge_fn,
+            do_overwrite=do_overwrite,
+        )
+
     if out_fp.is_file() and not do_overwrite:
         raise FileExistsError(f"Output file already exists: {out_fp.resolve()!s}")
 
@@ -261,4 +276,49 @@ def reduce_over(
     reduced = reduced.with_columns(s.shrink_dtype() for s in reduced if s.dtype.is_numeric())
 
     out_fp.parent.mkdir(parents=True, exist_ok=True)
+    write_fn(reduced, out_fp)
+
+
+def _reduce_over_in_memory(
+    in_fps: list[Path],
+    out_fp: Path,
+    read_fn: READ_FN_T,
+    write_fn: WRITE_FN_T,
+    reduce_fn: "REDUCE_FN_T",
+    merge_fp: Path | None,
+    merge_fn: "REDUCE_FN_T | None",
+    do_overwrite: bool,
+) -> None:
+    """``reduce_over`` fast path when an in-memory ``FrameRegistry`` is active.
+
+    In single-process in-memory mode, all mapper outputs were written to the registry earlier
+    in the same call sequence, so the cross-worker FS polling that disk mode performs is both
+    unnecessary and incorrect (a missing key never appears later). We delegate the read to
+    ``read_fn`` (which falls back to disk via ``read_df`` for any input not in the registry —
+    e.g., the original dataset files on the first stage) and let ``write_fn`` route the result
+    back into the registry.
+    """
+    from ..compute_modes.in_memory import active_registry
+
+    reg = active_registry()
+    if reg is None:  # pragma: no cover - defensive; caller guards on active_registry
+        raise RuntimeError("_reduce_over_in_memory called outside of an in_memory_mode context")
+
+    if reg.has(out_fp):
+        if do_overwrite:
+            logger.info(f"(in-memory reduce) evicting cached output at {out_fp} (do_overwrite=True)")
+            reg.delete(out_fp)
+        else:
+            logger.info(f"(in-memory reduce) cached output exists at {out_fp}; returning without recompute.")
+            return
+
+    reduced = reduce_fn(*[read_fn(fp) for fp in in_fps])
+
+    if merge_fp is not None and (reg.has(merge_fp) or merge_fp.is_file()):
+        reduced = merge_fn(reduced, read_fn(merge_fp))
+
+    if isinstance(reduced, pl.LazyFrame):
+        reduced = reduced.collect()
+    reduced = reduced.with_columns(s.shrink_dtype() for s in reduced if s.dtype.is_numeric())
+
     write_fn(reduced, out_fp)

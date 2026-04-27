@@ -56,6 +56,69 @@ def default_file_checker(fp: Path) -> bool:
     return fp.is_file()
 
 
+def _uses_default_registry_io(read_fn: READ_FN_T, write_fn: WRITE_FN_T) -> bool:
+    """Return ``True`` when ``read_fn``/``write_fn`` are the package defaults.
+
+    Only the defaults know how to talk to the ``FrameRegistry``. Stages that pass custom
+    ``read_fn``/``write_fn`` (e.g. CSV, JSON, or any non-parquet IO) continue through the full
+    ``rwlock_wrap`` path so their locking and caching semantics are preserved verbatim.
+    """
+    from ..dataframe import read_df, write_df
+
+    return read_fn is read_df and write_fn is write_df
+
+
+def _rwlock_in_memory(
+    in_fp: Path,
+    out_fp: Path,
+    read_fn: READ_FN_T,
+    write_fn: WRITE_FN_T,
+    compute_fn: COMPUTE_FN_T,
+    do_overwrite: bool,
+) -> bool:
+    """rwlock_wrap fast path when an in-memory ``FrameRegistry`` is active.
+
+    Disk-mode ``rwlock_wrap`` uses two filesystem primitives to coordinate workers: the output
+    file's existence (skip-if-exists, honored by ``out_fp_checker``) and an adjacent
+    ``.lock`` file acquired via ``FileLock`` (mutual exclusion between workers). We replace
+    both with the registry:
+
+    - Skip-if-exists: ``registry.has(out_fp)`` + ``do_overwrite``.
+    - Mutual exclusion: ``registry.try_reserve_write(out_fp)`` — returns ``False`` if another
+      worker is mid-compute on the same key, matching the ``FileLock.Timeout → return False``
+      path in disk mode.
+    """
+    from ..compute_modes.in_memory import active_registry
+
+    reg = active_registry()
+    if reg is None:  # pragma: no cover - defensive; caller guards on active_registry
+        raise RuntimeError("_rwlock_in_memory called outside of an in_memory_mode context")
+
+    if reg.has(out_fp):
+        if do_overwrite:
+            logger.info(f"(in-memory) evicting cached output at {out_fp} (do_overwrite=True)")
+            # Evict before reserving/computing so a crash in compute_fn can't leave a stale
+            # entry behind; mirrors disk-mode `out_fp.unlink()` in the same branch.
+            reg.delete(out_fp)
+        else:
+            logger.info(f"(in-memory) cached output exists at {out_fp}; returning.")
+            return False
+
+    if not reg.try_reserve_write(out_fp):
+        logger.info(f"(in-memory) {out_fp} is already in progress on another worker; returning.")
+        return False
+
+    try:
+        logger.info(f"(in-memory) reading input frame keyed by {in_fp}")
+        df = read_fn(in_fp)
+        df = compute_fn(df)
+        logger.info(f"(in-memory) writing output frame keyed by {out_fp}")
+        write_fn(df, out_fp)
+        return True
+    finally:
+        reg.release_write(out_fp)
+
+
 def rwlock_wrap(
     in_fp: Path,
     out_fp: Path,
@@ -140,6 +203,11 @@ def rwlock_wrap(
         >>> assert result_computed
         >>> assert not lock_fp.exists()
     """
+
+    from ..compute_modes.in_memory import active_registry
+
+    if active_registry() is not None and _uses_default_registry_io(read_fn, write_fn):
+        return _rwlock_in_memory(in_fp, out_fp, read_fn, write_fn, compute_fn, do_overwrite)
 
     if out_fp_checker(out_fp):
         if do_overwrite:
