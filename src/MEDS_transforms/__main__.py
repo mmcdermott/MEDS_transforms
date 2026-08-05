@@ -9,6 +9,7 @@ from omegaconf import OmegaConf
 from . import __package_name__, __version__
 from .configs import PipelineConfig
 from .stages.discovery import get_all_registered_stages
+from .utils import invocation_name
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ def print_help_stage():
 
     all_stage_names = list(get_all_registered_stages().keys())
 
-    print(f"Usage: {sys.argv[0]} <pipeline_yaml> <stage_name> [args]")
+    print(f"Usage: {invocation_name()} <pipeline_yaml> <stage_name> [args]")
     print(
         "  * pipeline_yaml: Path to the pipeline YAML file on disk or in the "
         "'pkg://<pkg_name>.<relative_path>' format."
@@ -69,3 +70,7 @@ def run_stage():  # pragma: no cover
     OmegaConf.register_new_resolver("stage_docstring", lambda: stage.stage_docstring.replace("$", "$$"))
 
     hydra_wrapper(stage.main)()
+
+
+if __name__ == "__main__":
+    run_stage()
