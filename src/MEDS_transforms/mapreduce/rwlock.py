@@ -75,6 +75,12 @@ def run_marker_dir(cfg: DictConfig) -> Path | None:
     invocation gets a new one. Markers live under ``log_dir`` (already a per-stage scratch area) so no
     bookkeeping files land next to the MEDS data.
 
+    One invocation means one dispatcher process. Workers launched as *separate* invocations — a shell
+    per worker, or a Slurm array whose tasks each call ``MEDS_transform-stage`` — each mint their own
+    ``run_id`` and so will not share work under ``do_overwrite=True``. Pass an explicit, matching
+    ``run_id=<value>`` to all of them to opt into sharing; the dispatcher honors a caller-supplied value
+    rather than overwriting it.
+
     Args:
         cfg: The stage configuration. Uses ``run_id`` and ``log_dir``, both optional.
 

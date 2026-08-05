@@ -260,6 +260,82 @@ def test_output_finished_while_waiting_for_the_lock_is_not_recomputed(tmp_path: 
     assert not (tmp_path / "out.parquet.lock").exists(), "Lock file should still be cleaned up."
 
 
+def write_single_stage_pipeline(tmp_path: Path, input_dir) -> tuple[Path, Path]:
+    """A one-stage pipeline config, plus the output dir it targets."""
+
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    output_dir = tmp_path / "output"
+    pipeline_fp = tmp_path / "pipeline.yaml"
+    pipeline_fp.write_text(
+        f"input_dir: {input_dir}\n"
+        f"output_dir: {output_dir}\n"
+        "stages:\n"
+        "  - filter_subjects:\n"
+        "      min_events_per_subject: 1\n"
+    )
+    return pipeline_fp, output_dir
+
+
+def run_stage_by_hand(pipeline_fp: Path, *extra: str) -> subprocess.CompletedProcess:
+    """Invoke a single stage the way the docs tell users to, one dispatcher process per call."""
+
+    return subprocess.run(
+        ["MEDS_transform-stage", str(pipeline_fp), "filter_subjects", "stage=filter_subjects", *extra],
+        check=False,
+        capture_output=True,
+    )
+
+
+def marker_run_ids(output_dir: Path) -> list[str]:
+    """The run ids that left markers under `output_dir`."""
+
+    roots = list(output_dir.glob(f"**/{RUN_MARKER_DIRNAME}"))
+    return sorted(p.name for root in roots for p in root.iterdir())
+
+
+def test_hand_launched_workers_need_an_explicit_shared_run_id(simple_static_MEDS, tmp_path: Path):
+    """Run scoping spans one dispatcher process, and users can widen it when they need to.
+
+    `run_id` is minted per invocation. Workers launched as separate invocations — a shell per worker, or
+    a Slurm array whose tasks each call `MEDS_transform-stage` — therefore do not share work under
+    `do_overwrite=True`; they fall back to the old behavior rather than to anything worse. Passing a
+    matching `run_id` opts them back in, which is the documented escape hatch and is pinned here.
+    """
+
+    pipeline_fp, output_dir = write_single_stage_pipeline(tmp_path, simple_static_MEDS)
+
+    for worker in ("worker=0", "worker=1"):
+        result = run_stage_by_hand(pipeline_fp, "do_overwrite=True", worker)
+        assert result.returncode == 0, result.stderr.decode()[-2000:]
+
+    assert len(marker_run_ids(output_dir)) == 2, (
+        "Separate invocations are separate runs by construction; this is the documented limitation."
+    )
+
+    # Same two commands, now told they belong to one run.
+    shared_pipeline_fp, shared_output_dir = write_single_stage_pipeline(
+        tmp_path / "shared", simple_static_MEDS
+    )
+    for worker in ("worker=0", "worker=1"):
+        result = run_stage_by_hand(shared_pipeline_fp, "do_overwrite=True", worker, "run_id=one-shared-run")
+        assert result.returncode == 0, result.stderr.decode()[-2000:]
+
+    assert marker_run_ids(shared_output_dir) == ["one-shared-run"]
+
+
+def test_running_stages_by_hand_is_unaffected_by_default(simple_static_MEDS, tmp_path: Path):
+    """The documented per-stage invocation writes no run bookkeeping unless `do_overwrite` is set."""
+
+    pipeline_fp, output_dir = write_single_stage_pipeline(tmp_path, simple_static_MEDS)
+
+    result = run_stage_by_hand(pipeline_fp)
+    assert result.returncode == 0, result.stderr.decode()[-2000:]
+
+    assert marker_run_ids(output_dir) == []
+    assert not list(output_dir.glob(f"**/{RUN_MARKER_DIRNAME}"))
+    assert list((output_dir / "data").rglob("*.parquet")), "Stage should still have produced output."
+
+
 @pytest.mark.parallelized
 def test_multirun_workers_all_inherit_one_run_id(simple_static_MEDS, tmp_path: Path):
     """End-to-end: a real `--multirun` sweep stamps one `run_id` and shares it across every worker.
