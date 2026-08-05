@@ -11,13 +11,21 @@ import argparse
 import logging
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 
 import yaml
 from omegaconf import DictConfig, OmegaConf
 
+from . import __package_name__
 from .configs import PipelineConfig
 from .configs.utils import OmegaConfResolver
+from .utils import invocation_name
+
+# Under ``python -m MEDS_transforms.runner`` this module's ``__name__`` is ``"__main__"``, so it can't be
+# used to spell the ``-m`` target back to the user. ``__spec__.name`` still carries the real dotted name
+# (and is ``None`` only when the file is executed as a bare path, where there is no ``-m`` form anyway).
+_MODULE_NAME = __spec__.name if __spec__ is not None else f"{__package_name__}.runner"
 
 try:
     from yaml import CLoader as Loader
@@ -291,7 +299,9 @@ def run_stage(
 def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     """Run an entire pipeline based on command line arguments."""
 
-    parser = argparse.ArgumentParser(description="MEDS-Transforms Pipeline Runner")
+    parser = argparse.ArgumentParser(
+        prog=invocation_name(_MODULE_NAME), description="MEDS-Transforms Pipeline Runner"
+    )
     parser.add_argument(
         "pipeline_config_fp",
         help="Path to the pipeline configuration file, either as a raw path or with pkg:// syntax.",
@@ -415,3 +425,7 @@ def load_yaml_file(path: str | None) -> dict | DictConfig:
         logger.warning(f"Failed to load {path} as an OmegaConf: {e}. Trying as a plain YAML file.")
         yaml_text = path.read_text()
         return yaml.load(yaml_text, Loader=Loader)
+
+
+if __name__ == "__main__":  # pragma: no cover
+    sys.exit(main())

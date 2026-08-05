@@ -1,10 +1,47 @@
 """Utility helpers for path resolution and miscellaneous tasks."""
 
 import os
+import sys
 from importlib.resources import files
 from pathlib import Path
 
 PKG_PFX = "pkg://"
+
+
+def invocation_name(module: str, argv_0: str | None = None) -> str:
+    """Return a user-facing program name for how this process was invoked.
+
+    Console scripts (``MEDS_transform-stage``, ``MEDS_transform-pipeline``) put their own name in
+    ``sys.argv[0]``, which reads well in a usage line. ``python -m <module>`` instead puts the absolute
+    path of the executed ``.py`` file there, which does not, so we render the module form in that case.
+
+    Args:
+        module: The dotted module name to suggest for ``python -m`` invocations.
+        argv_0: The value to interpret. Defaults to ``sys.argv[0]``.
+
+    Returns:
+        The program name to show the user.
+
+    Examples:
+        >>> invocation_name("MEDS_transforms", "MEDS_transform-stage")
+        'MEDS_transform-stage'
+        >>> invocation_name("MEDS_transforms", "/usr/local/bin/MEDS_transform-stage")
+        'MEDS_transform-stage'
+        >>> invocation_name("MEDS_transforms", "/src/MEDS_transforms/__main__.py")
+        'python -m MEDS_transforms'
+        >>> invocation_name("MEDS_transforms.runner", "/src/MEDS_transforms/runner.py")
+        'python -m MEDS_transforms.runner'
+        >>> invocation_name("MEDS_transforms", "")
+        'python -m MEDS_transforms'
+    """
+
+    if argv_0 is None:  # pragma: no cover
+        argv_0 = sys.argv[0]
+
+    name = Path(argv_0).name
+    if not name or name.endswith(".py"):
+        return f"python -m {module}"
+    return name
 
 
 def resolve_pkg_path(pkg_path: str) -> Path:
