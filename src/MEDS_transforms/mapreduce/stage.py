@@ -19,6 +19,7 @@ from ..compute_modes import (
 from ..dataframe import DF_T, READ_FN_T, WRITE_FN_T, read_and_filter_fntr, read_df, write_df
 from .mapper import map_over
 from .reducer import REDUCE_FN_T, reduce_over
+from .rwlock import run_marker_dir
 from .shard_iteration import SHARD_ITR_FNTR_T, shard_iterator
 
 logger = logging.getLogger(__name__)
@@ -499,6 +500,7 @@ def map_stage(
         read_fn=read_fn,
         write_fn=write_fn,
         do_overwrite=cfg.do_overwrite,
+        marker_dir=run_marker_dir(cfg),
     )
     logger.info(f"Finished mapping in {datetime.now(tz=UTC) - start}")
     return all_out_fps
