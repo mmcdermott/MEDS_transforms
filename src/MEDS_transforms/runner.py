@@ -11,13 +11,21 @@ import argparse
 import logging
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 
 import yaml
 from omegaconf import DictConfig, OmegaConf
 
+from . import __package_name__
 from .configs import PipelineConfig
 from .configs.utils import OmegaConfResolver
+from .utils import invocation_name
+
+# Spelled out rather than taken from ``__name__``, which is ``"__main__"`` in exactly the case being
+# named. Unlike the package's ``__main__.py``, whose ``-m`` target is the package itself, this module is
+# its own ``-m`` target.
+_MODULE_NAME = f"{__package_name__}.runner"
 
 try:
     from yaml import CLoader as Loader
@@ -291,7 +299,9 @@ def run_stage(
 def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     """Run an entire pipeline based on command line arguments."""
 
-    parser = argparse.ArgumentParser(description="MEDS-Transforms Pipeline Runner")
+    parser = argparse.ArgumentParser(
+        prog=invocation_name(_MODULE_NAME), description="MEDS-Transforms Pipeline Runner"
+    )
     parser.add_argument(
         "pipeline_config_fp",
         help="Path to the pipeline configuration file, either as a raw path or with pkg:// syntax.",
@@ -305,7 +315,9 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     parser.add_argument(
         "--do_profile",
         default=False,
-        type=bool,
+        # No `type=`: `BooleanOptionalAction` already yields a bool, and pairing the two is deprecated
+        # as of 3.12 and removed in 3.14. Running `main` in-process (rather than only via subprocess)
+        # is what surfaced the warning.
         action=argparse.BooleanOptionalAction,
         help="Enable Hydra profiling for the stages.",
     )
@@ -370,7 +382,10 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     return 0
 
 
-@OmegaConfResolver
+# `replace=True` so re-executing this module is idempotent. It is executed a second time whenever it is
+# entered as `__main__` (`python -m MEDS_transforms.runner`) in a process that has already imported it;
+# without this, registering the resolver again raises.
+@OmegaConfResolver(replace=True)
 def load_yaml_file(path: str | None) -> dict | DictConfig:
     """Loads a YAML file as an OmegaConf object.
 
@@ -415,3 +430,7 @@ def load_yaml_file(path: str | None) -> dict | DictConfig:
         logger.warning(f"Failed to load {path} as an OmegaConf: {e}. Trying as a plain YAML file.")
         yaml_text = path.read_text()
         return yaml.load(yaml_text, Loader=Loader)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
