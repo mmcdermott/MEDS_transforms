@@ -1,6 +1,5 @@
 import doctest
 import re
-import runpy
 import subprocess
 import sys
 from unittest.mock import patch
@@ -133,35 +132,3 @@ def test_runner_module_is_runnable_via_dash_m():
 
     assert module_body == script_body
     assert module_body.startswith("MEDS-Transforms Pipeline Runner")
-
-
-# `MEDS_transforms.__main__` is already imported (tests/conftest.py), so re-executing it under runpy
-# warns about the double import. Harmless here: the module is re-run in a throwaway namespace and we
-# only observe its exit code and stdout.
-@pytest.mark.filterwarnings("ignore:.*found in sys.modules after import of package.*:RuntimeWarning")
-def test_stage_dash_m_guard_dispatches_to_run_stage(capsys):
-    """Execute `__main__.py` with `__name__ == "__main__"`, as `python -m` does.
-
-    The subprocess tests above prove the behavior but run in another interpreter, where coverage is not
-    collected. `runpy` reproduces the same entry — module body executed under the name `__main__` — in
-    this process, so the guard is measured rather than excluded.
-    """
-
-    with patch.object(sys, "argv", ["MEDS_transform-stage"]), pytest.raises(SystemExit) as excinfo:
-        runpy.run_module("MEDS_transforms", run_name="__main__")
-
-    assert excinfo.value.code == 1
-    assert "Available stages:" in capsys.readouterr().out
-
-
-def test_runner_dash_m_guard_dispatches_to_main(capsys):
-    """As above, for `MEDS_transforms.runner`; `--help` keeps it to a no-side-effect path."""
-
-    with (
-        patch.object(sys, "argv", ["MEDS_transform-pipeline", "--help"]),
-        pytest.raises(SystemExit) as excinfo,
-    ):
-        runpy.run_module("MEDS_transforms.runner", run_name="__main__")
-
-    assert excinfo.value.code == 0
-    assert "MEDS-Transforms Pipeline Runner" in capsys.readouterr().out
