@@ -22,10 +22,10 @@ from .configs import PipelineConfig
 from .configs.utils import OmegaConfResolver
 from .utils import invocation_name
 
-# Under ``python -m MEDS_transforms.runner`` this module's ``__name__`` is ``"__main__"``, so it can't be
-# used to spell the ``-m`` target back to the user. ``__spec__.name`` still carries the real dotted name
-# (and is ``None`` only when the file is executed as a bare path, where there is no ``-m`` form anyway).
-_MODULE_NAME = __spec__.name if __spec__ is not None else f"{__package_name__}.runner"
+# Spelled out rather than taken from ``__name__``, which is ``"__main__"`` in exactly the case being
+# named. Unlike the package's ``__main__.py``, whose ``-m`` target is the package itself, this module is
+# its own ``-m`` target.
+_MODULE_NAME = f"{__package_name__}.runner"
 
 try:
     from yaml import CLoader as Loader
@@ -315,7 +315,9 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     parser.add_argument(
         "--do_profile",
         default=False,
-        type=bool,
+        # No `type=`: `BooleanOptionalAction` already yields a bool, and pairing the two is deprecated
+        # as of 3.12 and removed in 3.14. Running `main` in-process (rather than only via subprocess)
+        # is what surfaced the warning.
         action=argparse.BooleanOptionalAction,
         help="Enable Hydra profiling for the stages.",
     )
@@ -380,7 +382,10 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     return 0
 
 
-@OmegaConfResolver
+# `replace=True` so re-executing this module is idempotent. It is executed a second time whenever it is
+# entered as `__main__` (`python -m MEDS_transforms.runner`) in a process that has already imported it;
+# without this, registering the resolver again raises.
+@OmegaConfResolver(replace=True)
 def load_yaml_file(path: str | None) -> dict | DictConfig:
     """Loads a YAML file as an OmegaConf object.
 
@@ -427,5 +432,5 @@ def load_yaml_file(path: str | None) -> dict | DictConfig:
         return yaml.load(yaml_text, Loader=Loader)
 
 
-if __name__ == "__main__":  # pragma: no cover
+if __name__ == "__main__":
     sys.exit(main())

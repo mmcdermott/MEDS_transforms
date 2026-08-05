@@ -22,7 +22,7 @@ def print_help_stage():
 
     all_stage_names = list(get_all_registered_stages().keys())
 
-    print(f"Usage: {invocation_name(__package_name__)} <pipeline_yaml> <stage_name> [args]")
+    print(f"Usage: {invocation_name()} <pipeline_yaml> <stage_name> [args]")
     print(
         "  * pipeline_yaml: Path to the pipeline YAML file on disk or in the "
         "'pkg://<pkg_name>.<relative_path>' format."
@@ -68,5 +68,5 @@ def run_stage():  # pragma: no cover
     hydra_wrapper(stage.main)()
 
 
-if __name__ == "__main__":  # pragma: no cover
+if __name__ == "__main__":
     run_stage()
