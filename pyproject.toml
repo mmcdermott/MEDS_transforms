@@ -83,6 +83,7 @@ markers = [
 
 [tool.coverage.run]
 source = ["src"]
+patch = ["subprocess"]
 
 [tool.coverage.report]
 exclude_also = [
