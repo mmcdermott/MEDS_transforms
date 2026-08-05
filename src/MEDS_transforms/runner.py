@@ -299,8 +299,13 @@ def run_stage(
 def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     """Run an entire pipeline based on command line arguments."""
 
+    from ._cli_help import pipeline_keys_help_block
+
     parser = argparse.ArgumentParser(
-        prog=invocation_name(_MODULE_NAME), description="MEDS-Transforms Pipeline Runner"
+        prog=invocation_name(_MODULE_NAME),
+        description="MEDS-Transforms Pipeline Runner",
+        epilog=pipeline_keys_help_block(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "pipeline_config_fp",

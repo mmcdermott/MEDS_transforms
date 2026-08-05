@@ -64,6 +64,8 @@ def stamp_run_id(argv: list[str], run_id: str) -> list[str]:
 def print_help_stage():
     """Print help for all stages."""
 
+    from ._cli_help import pipeline_keys_help_block
+
     all_stage_names = list(get_all_registered_stages().keys())
 
     print(f"Usage: {invocation_name()} <pipeline_yaml> <stage_name> [args]")
@@ -76,6 +78,8 @@ def print_help_stage():
     print("Available stages:")
     for name in sorted(all_stage_names):
         print(f"  - {name}")
+    print()
+    print(pipeline_keys_help_block())
 
 
 def run_stage():  # pragma: no cover
