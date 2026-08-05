@@ -178,8 +178,6 @@ def test_pipeline_cfg_in_str():
 
 def test_docgen_with_generic_input():
     """Docgen should render non-MEDS input as a YAML code block."""
-    from MEDS_transforms.stages.docgen import _format_example
-
     want_data = MEDSDataset.from_yaml(SIMPLE_STATIC_SHARDED_BY_SPLIT)
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -192,9 +190,9 @@ def test_docgen_with_generic_input():
             want_data=want_data,
             in_data=in_fp,
         )
-        output = _format_example("test_stage", example)
+        output = "\n".join(example.render_content())
         assert "**Input files:**" in output
         assert "```yaml" in output
         assert "raw/patients.csv" in output
-        # Should NOT contain _format_dataset output
+        # Should NOT contain format_dataset output for in_data
         assert "**Input data:**" not in output
