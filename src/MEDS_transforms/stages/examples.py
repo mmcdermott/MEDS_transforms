@@ -9,10 +9,11 @@ from __future__ import annotations
 import subprocess
 import tempfile
 import textwrap
+from collections.abc import Callable, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import Any, ClassVar
 
 import polars as pl
 from meds import DatasetMetadataSchema, code_metadata_filepath
@@ -22,9 +23,6 @@ from omegaconf import DictConfig, OmegaConf
 from polars.testing import assert_frame_equal
 from pretty_print_directory import list_directory
 from yaml import load as load_yaml
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
 
 _SPACE = "    "
 _BRANCH = "│   "
@@ -275,6 +273,54 @@ class TestEnv:
             lines.extend(textwrap.indent(cfg_yaml_contents, _SPACE + _BRANCH).splitlines())
         lines.append(f"  - Script: {self.script}")
         return "\n".join(lines)
+
+
+@dataclass(frozen=True)
+class CompareContext:
+    """Context bundle passed to per-suffix output comparators.
+
+    Kept minimal on purpose: comparators that need new tolerance knobs (e.g. NRT atol/rtol) pull
+    them from ``tolerances`` under their own suffix key, so the comparator signature never has
+    to grow.
+
+    Attributes:
+        rel: The expected file's path relative to the expected root. Used in error messages so
+            the failure points at the logical location a stage author cares about.
+        tolerances: Per-suffix tolerance bundles. A comparator looks up ``tolerances.get(".parquet")``,
+            ``tolerances.get(".nrt")``, etc. Empty dict if the caller didn't configure any.
+    """
+
+    rel: Path
+    tolerances: Mapping[str, Any] = field(default_factory=dict)
+
+    def tol_for(self, suffix: str) -> dict:
+        """Return a (possibly empty) tolerance dict for ``suffix``.
+
+        Always a fresh dict.
+        """
+        return dict(self.tolerances.get(suffix, {}))
+
+
+#: Comparator signature. Must ``raise AssertionError`` on mismatch; return value is ignored.
+ComparatorFn = Callable[[Path, Path, "CompareContext"], None]
+
+
+def _compare_parquet(expected_fp: Path, actual_fp: Path, ctx: CompareContext) -> None:
+    """Default comparator for ``.parquet`` outputs.
+
+    Uses ``pl.read_parquet(..., glob=False)`` on both sides (raw shard filenames like
+    ``[0-10).parquet`` that appear in extraction pipelines carry glob metacharacters). Tolerance
+    comes from ``ctx.tol_for('.parquet')`` and is forwarded to ``polars.testing.assert_frame_equal``.
+    """
+    try:
+        want = pl.read_parquet(expected_fp, glob=False)
+        got = pl.read_parquet(actual_fp, glob=False)
+    except Exception as e:
+        raise AssertionError(f"Failed to read parquet at {ctx.rel}: {e}") from e
+    try:
+        assert_frame_equal(want, got, **ctx.tol_for(".parquet"))
+    except AssertionError as e:
+        raise AssertionError(f"Parquet mismatch at {ctx.rel}:\n  want:\n{want}\n  got:\n{got}") from e
 
 
 @dataclass
@@ -848,19 +894,44 @@ class StageExample:
     stage_name: str
     scenario_name: str | None = None
     stage_cfg: dict = field(default_factory=dict)
-    want_data: MEDSDataset | None = None
-    want_metadata: pl.DataFrame | None = None
+    want_data: MEDSDataset | Path | None = None
+    want_metadata: pl.DataFrame | Path | None = None
     in_data: MEDSDataset | Path | None = None
     pipeline_cfg: dict = field(default_factory=dict)
     do_use_config_yaml: bool = False
     df_check_kwargs: dict | None = None
+    #: Top-level directory names to ignore when comparing a Path-spec output tree against the
+    #: actual output directory. Defaults cover the usual Hydra / logging byproducts.
+    skip_dirs: frozenset[str] = field(default_factory=lambda: frozenset({".logs", ".hydra"}))
+    #: File names (matched anywhere in the actual output) to ignore when reconciling expected
+    #: vs. actual. Empty by default; subclasses set this to ignore stage-specific auxiliary files.
+    skip_files: frozenset[str] = field(default_factory=frozenset)
+    #: If ``True``, actual-output files that the Path spec does not mention are silently ignored
+    #: rather than raising. Defaults to strict behavior.
+    tolerate_unexpected: bool = False
+    #: Per-instance override of the per-suffix comparator map. ``None`` means "use the
+    #: subclass's ``SUFFIX_COMPARATORS`` class var (merged with base defaults)".
+    suffix_comparators: dict[str, ComparatorFn] | None = None
 
     BASE_PACKAGE: ClassVar[str] = "__null__"
+    #: Default per-suffix comparators, resolved at the class level. Downstream packages subclass
+    #: ``StageExample`` and override this to register format-specific comparators (MTD's ``.nrt``,
+    #: MEDS-extract's ``.json``/``.yaml``). Per-instance overrides via ``suffix_comparators``
+    #: take precedence over this.
+    SUFFIX_COMPARATORS: ClassVar[dict[str, ComparatorFn]] = {".parquet": _compare_parquet}
 
     def __post_init__(self):
         if self.want_data is None and self.want_metadata is None:
             raise ValueError("Either want_data or want_metadata must be provided.")
-        elif self.want_data is not None and self.want_metadata is not None:
+        elif (
+            self.want_data is not None
+            and self.want_metadata is not None
+            and not isinstance(self.want_data, Path)
+            and not isinstance(self.want_metadata, Path)
+        ):
+            # The XOR rule is about MEDSDataset + DataFrame ambiguity; Path-spec examples may
+            # legitimately describe both data and metadata file trees simultaneously (e.g.
+            # extraction stages emit raw shard parquets AND a metadata/codes.parquet in one run).
             raise ValueError("Either want_data or want_metadata must be provided, but not both.")
 
         if self.scenario_name == ".":
@@ -871,6 +942,12 @@ class StageExample:
 
         if self.df_check_kwargs is None:
             self.df_check_kwargs = {"rel_tol": 1e-3, "abs_tol": 1e-5}
+
+    def _resolve_comparators(self) -> dict[str, ComparatorFn]:
+        """Return the effective comparator map: instance override wins over class default."""
+        return dict(
+            self.suffix_comparators if self.suffix_comparators is not None else self.SUFFIX_COMPARATORS
+        )
 
     @classmethod
     def is_example_dir(cls, path: Path) -> bool:
@@ -904,9 +981,22 @@ class StageExample:
         want_data = None
         want_metadata = None
         if want_data_fp.is_file():
-            want_data = MEDSDataset.from_yaml(want_data_fp, **schema_updates)
+            try:
+                want_data = MEDSDataset.from_yaml(want_data_fp, **schema_updates)
+            except ValueError:
+                # Not a MEDS-format spec — fall back to a Path to the yaml_to_disk file, to be
+                # materialized and compared file-by-file via SUFFIX_COMPARATORS. Mirrors the
+                # graceful fallback already used for ``in_data`` below. ``TypeError`` is
+                # deliberately *not* caught: a YAML that parses to the wrong types (e.g. a list
+                # where a dict is expected) is a user error, not a "treat as opaque file spec"
+                # case, and should surface during loading rather than re-emerge as a confusing
+                # path-spec mismatch in ``check_outputs``.
+                want_data = want_data_fp
         if want_metadata_fp.is_file():
-            want_metadata = read_metadata_only(want_metadata_fp, **schema_updates)
+            try:
+                want_metadata = read_metadata_only(want_metadata_fp, **schema_updates)
+            except ValueError:
+                want_metadata = want_metadata_fp
 
         in_data = None
         if in_fp.is_file():
@@ -989,7 +1079,11 @@ class StageExample:
 
         all_files_str = f"{output_dir.name}\n" + "\n".join(list_directory(output_dir))
 
-        if self.want_data is not None:
+        # ``__check_files`` enforces the MEDSDataset / DataFrame layout assumption (``data/`` +
+        # ``metadata/codes.parquet``). Path-spec fields describe their own layout via
+        # ``yaml_to_disk``, so we skip this prefix check in that case — the file-by-file walk in
+        # ``_check_path_spec`` gives a better failure mode.
+        if isinstance(self.want_data, MEDSDataset):
             data_dir = output_dir if is_resolved_dir else output_dir / "data"
             if not self.__data_files(data_dir):
                 raise AssertionError(
@@ -997,7 +1091,7 @@ class StageExample:
                     f"{all_files_str}"
                 )
 
-        if self.want_metadata is not None:
+        if isinstance(self.want_metadata, pl.DataFrame):
             metadata_dir = output_dir if is_resolved_dir else output_dir / "metadata"
             metadata_fp = metadata_dir / "codes.parquet"
             if not metadata_fp.is_file():
@@ -1005,10 +1099,111 @@ class StageExample:
                     f"Expected metadata file {code_metadata_filepath} in {output_dir}. Got:\n{all_files_str}"
                 )
 
+    def _compare_path_spec(self, spec_fp: Path, output_dir: Path) -> set[Path]:
+        """Compare an actual output tree against one ``yaml_to_disk`` spec, file-by-file.
+
+        Expected files are materialized into a tempdir via ``yaml_to_disk.yaml_disk``, then each
+        file is compared against its counterpart under ``output_dir`` using the per-suffix
+        comparator resolved from :meth:`_resolve_comparators`. The comparator-to-context bridge
+        puts ``self.df_check_kwargs`` under ``tolerances['.parquet']`` so the default parquet
+        comparator picks it up.
+
+        Returns the set of expected file rel-paths covered by this spec so the caller can union
+        across multiple specs before doing the no-unexpected-files check. The caller owns that
+        check: when ``want_data`` and ``want_metadata`` are *both* Paths, neither spec alone
+        knows about the other's files, so each one must contribute its expected set and the
+        check happens against the union.
+
+        Args:
+            spec_fp: Path to the ``yaml_to_disk`` spec describing the expected output tree.
+            output_dir: Root of the actual output tree to compare against.
+
+        Raises:
+            AssertionError: If an expected file is missing, or a comparator reports a mismatch.
+            RuntimeError: If a file's suffix has no registered comparator.
+        """
+        from yaml_to_disk import yaml_disk
+
+        comparators = self._resolve_comparators()
+        tolerances = {".parquet": dict(self.df_check_kwargs or {})}
+
+        with tempfile.TemporaryDirectory() as expected_root:
+            expected_root = Path(expected_root)
+            yaml_disk(spec_fp, root_dir=expected_root)
+
+            expected_rel: set[Path] = set()
+            for expected_fp in sorted(expected_root.rglob("*")):
+                if not expected_fp.is_file():
+                    continue
+                rel = expected_fp.relative_to(expected_root)
+                expected_rel.add(rel)
+                actual_fp = output_dir / rel
+                if not actual_fp.is_file():
+                    raise AssertionError(f"Expected output file {rel} not found under {output_dir}")
+                comparator = comparators.get(expected_fp.suffix)
+                if comparator is None:
+                    raise RuntimeError(
+                        f"No comparator registered for {expected_fp.suffix!r} "
+                        f"(file {rel}). Register one on SUFFIX_COMPARATORS or "
+                        f"pass suffix_comparators= to the StageExample."
+                    )
+                comparator(expected_fp, actual_fp, CompareContext(rel=rel, tolerances=tolerances))
+
+        return expected_rel
+
+    def _check_path_spec(self, spec_fp: Path, output_dir: Path) -> None:
+        """Single-spec wrapper around :meth:`_compare_path_spec` with no-unexpected-files check.
+
+        Used when only one of ``want_data`` / ``want_metadata`` is a Path. When both are Paths,
+        ``check_outputs`` calls ``_compare_path_spec`` directly and runs a single union-aware
+        unexpected-files check across both specs.
+        """
+        expected_rel = self._compare_path_spec(spec_fp, output_dir)
+        if not self.tolerate_unexpected:
+            actual_rel = self.__actual_files_rel(output_dir)
+            extra = actual_rel - expected_rel
+            if extra:
+                raise AssertionError(
+                    f"Unexpected files in {output_dir} (not in {spec_fp.name}): "
+                    f"{sorted(str(p) for p in extra)}"
+                )
+
+    def __actual_files_rel(self, output_dir: Path) -> set[Path]:
+        """Return file paths under ``output_dir`` (relative), after applying skip_dirs/skip_files."""
+        out: set[Path] = set()
+        for fp in output_dir.rglob("*"):
+            if not fp.is_file():
+                continue
+            rel = fp.relative_to(output_dir)
+            if rel.parts and rel.parts[0] in self.skip_dirs:
+                continue
+            if fp.name in self.skip_files:
+                continue
+            out.add(rel)
+        return out
+
     def check_outputs(self, output_dir: Path, is_resolved_dir: bool = False) -> None:
         self.__check_files(output_dir, is_resolved_dir)
 
-        if self.want_data is not None:
+        # Both fields as Paths: union the expected sets so the no-unexpected-files check
+        # doesn't reject one spec's files for being absent from the other's. This is the
+        # extraction-style use case the XOR relaxation enables.
+        if isinstance(self.want_data, Path) and isinstance(self.want_metadata, Path):
+            expected = self._compare_path_spec(self.want_data, output_dir)
+            expected |= self._compare_path_spec(self.want_metadata, output_dir)
+            if not self.tolerate_unexpected:
+                actual_rel = self.__actual_files_rel(output_dir)
+                extra = actual_rel - expected
+                if extra:
+                    raise AssertionError(
+                        f"Unexpected files in {output_dir} (not in either spec): "
+                        f"{sorted(str(p) for p in extra)}"
+                    )
+            return
+
+        if isinstance(self.want_data, Path):
+            self._check_path_spec(self.want_data, output_dir)
+        elif isinstance(self.want_data, MEDSDataset):
             data_dir = output_dir if is_resolved_dir else output_dir / "data"
             got_data = MEDSDataset(
                 data_shards=self.__data_shards(data_dir), dataset_metadata=DatasetMetadataSchema()
@@ -1028,7 +1223,9 @@ class StageExample:
                 pl.Config.set_tbl_rows(-1)
                 raise AssertionError(f"Want data:\n{self.want_data}\nGot data:\n{got_data}") from e
 
-        if self.want_metadata is not None:
+        if isinstance(self.want_metadata, Path):
+            self._check_path_spec(self.want_metadata, output_dir)
+        elif isinstance(self.want_metadata, pl.DataFrame):
             metadata_dir = output_dir if is_resolved_dir else output_dir / "metadata"
             metadata_fp = metadata_dir / "codes.parquet"
             got_metadata = pl.read_parquet(metadata_fp)
