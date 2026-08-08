@@ -1031,5 +1031,12 @@ def aggregation_schema_updates(stage_cfg: dict | None = None) -> dict[str, pl.Da
 
 
 stage = Stage.register(
-    map_fn=mapper_fntr, reduce_fn=reducer_fntr, output_schema_updates=aggregation_schema_updates
+    map_fn=mapper_fntr,
+    reduce_fn=reducer_fntr,
+    output_schema_updates=aggregation_schema_updates,
+    # ``input_schema``/``metadata_output_schema`` are the MEDS-schema defaults on Stage; the
+    # only override needed here is ``output_schema=None`` because this MAPREDUCE writes no
+    # data shards — only ``metadata/codes.parquet``. ``metadata_input_schema`` stays at the
+    # default ``CodeMetadataSchema`` because the merge step reads any prior codes.parquet.
+    output_schema=None,
 )
