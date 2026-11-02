@@ -15,7 +15,7 @@ from meds import DataSchema, SubjectSplitSchema, subject_splits_filepath
 from omegaconf import DictConfig
 
 from ...dataframe import read_and_filter_fntr, write_df
-from ...mapreduce.rwlock import rwlock_wrap
+from ...mapreduce.rwlock import run_marker_dir, rwlock_wrap
 from ...mapreduce.shard_iteration import shard_iterator, shuffle_shards
 from .. import Stage
 
@@ -270,6 +270,8 @@ def main(cfg: DictConfig):  # pragma: no cover
     splits_file = Path(cfg.input_dir) / subject_splits_filepath
     shards_fp = output_dir / ".shards.json"
 
+    marker_dir = run_marker_dir(cfg)
+
     rwlock_wrap(
         splits_file,
         shards_fp,
@@ -278,6 +280,7 @@ def main(cfg: DictConfig):  # pragma: no cover
         partial(make_new_shards_fn, cfg=cfg, stage_cfg=cfg.stage_cfg),
         do_overwrite=cfg.do_overwrite,
         out_fp_checker=valid_json_file,
+        marker_dir=marker_dir,
     )
 
     max_iters = cfg.get("max_iters", 10)
@@ -328,6 +331,7 @@ def main(cfg: DictConfig):  # pragma: no cover
             write_df,
             compute_fn,
             do_overwrite=cfg.do_overwrite,
+            marker_dir=marker_dir,
         )
 
     logger.info(f"Done with {cfg.stage}")
