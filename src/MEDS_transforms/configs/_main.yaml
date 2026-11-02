@@ -19,6 +19,13 @@ seed: 1
 worker: 0
 polling_time: 300 # wait time in seconds before beginning reduction steps
 
+# Identifier shared by every worker of one stage invocation and unique across invocations. Stamped by the
+# `MEDS_transform-stage` dispatcher before Hydra fans out; leave unset and `do_overwrite=True` reverts to
+# overwriting outputs unconditionally, which stops parallel workers from sharing work between themselves.
+# Set it explicitly to the same value in each command if you launch workers as separate invocations (a
+# shell per worker, or a Slurm array) rather than via a single `--multirun` sweep.
+run_id: null
+
 # Stage information
 stages: ??? # The list of stages to this overall pipeline (in order)
 stage: ${stage_name:}
