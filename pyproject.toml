@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pre-commit<4", "ruff", "pytest-cov", "pip"]
+dev = ["pre-commit<4", "ruff", "pytest-cov", "pip", "hypothesis"]
 
 [tool.setuptools_scm]
 
@@ -84,6 +84,7 @@ markers = [
 
 [tool.coverage.run]
 source = ["src"]
+patch = ["subprocess"]
 
 [tool.coverage.report]
 exclude_also = [
