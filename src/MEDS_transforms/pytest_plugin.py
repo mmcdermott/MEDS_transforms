@@ -483,7 +483,8 @@ def pipeline_tester(
             ]
             return "\n".join(lines)
 
-        assert out.returncode == 0, err_msg(f"Pipeline returned code {out.returncode}.")
+        if out.returncode != 0:
+            raise AssertionError(err_msg(f"Pipeline returned code {out.returncode}."))
 
         pipeline_log_text = pipeline_log.read_text() if pipeline_log.exists() else ""
 

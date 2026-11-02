@@ -17,6 +17,7 @@ def map_over(
     read_fn: READ_FN_T = read_df,
     write_fn: WRITE_FN_T = write_df,
     do_overwrite: bool = False,
+    marker_dir: Path | None = None,
 ) -> list[Path]:
     """Performs a map operation over a list of input file paths, writing the outputs to output files.
 
@@ -32,6 +33,9 @@ def map_over(
             reads parquet files.
         write_fn: Function to write the mapped data to the output file path.
         do_overwrite: Should this overwrite an existing out file?
+        marker_dir: Run-scoping directory for `do_overwrite`, as resolved by `run_marker_dir`. Workers
+            divide work by racing over this shard list and skipping outputs a sibling already produced,
+            so without this `do_overwrite=True` makes every worker redo (and delete) the whole list.
 
     Returns:
         The list of output files written by this operation.
@@ -95,6 +99,7 @@ def map_over(
             write_fn,
             compute_fn=map_fn,
             do_overwrite=do_overwrite,
+            marker_dir=marker_dir,
         )
         all_out_fps.append(out_fp)
     return all_out_fps
