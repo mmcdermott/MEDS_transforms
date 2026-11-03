@@ -542,6 +542,7 @@ def join_and_replace(new: DF_T, old: DF_T, join_cols: list[str]) -> DF_T:
         on=join_cols,
         how="left",
         coalesce=True,
+        maintain_order="left",
     )
 
 
