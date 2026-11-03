@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -440,32 +440,6 @@ wheels = [
 ]
 
 [[package]]
-name = "griffe"
-version = "2.4.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "griffecli" },
-    { name = "griffelib" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/33/a4/be055b9ced02e39ac0ab85960e0ed3d8c6017c03e90965e77ff276684418/griffe-2.4.1.tar.gz", hash = "sha256:766123e26ec35b2ead63202e9e43ec309d876085d571b7df288256cd6fe4a3ef", size = 450805, upload-time = "2026-10-22T11:20:02.532Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/29/93/67a1814b4b13e9a5cc02510dbfa1d3937603140192a701c96d861b272611/griffe-2.4.1-py3-none-any.whl", hash = "sha256:ca58ccdb1d8590ad062fad837a875dd704f94acf7a0104795a098a991ceaf728", size = 5100, upload-time = "2026-10-22T11:19:58.365Z" },
-]
-
-[[package]]
-name = "griffecli"
-version = "2.4.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "colorama" },
-    { name = "griffelib" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/c9/8e/d3130e17ae27c900f8f76c96ceb2f02edfe0c7db0366b49e033f81ff81d7/griffecli-2.4.1.tar.gz", hash = "sha256:6db9acad984990b08c833ab5ec73d5a604e317b2290074d04c91ca9e52d35a7b", size = 61762, upload-time = "2026-10-22T11:20:01.054Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3f/dc/5cdbbbfd1a9e8c0e9b6b8b6e6d839e67f82cb138b77cf74856e5b80527de/griffecli-2.4.1-py3-none-any.whl", hash = "sha256:1678938e7b75a0aa34d3e408d550707a192f5297c3005aa0f92660648c30bc0a", size = 11774, upload-time = "2026-10-22T11:19:57.134Z" },
-]
-
-[[package]]
 name = "griffelib"
 version = "2.4.1"
 source = { registry = "https://pypi.org/simple" }
@@ -897,6 +871,7 @@ docs = [
     { name = "mkdocs-material" },
     { name = "mkdocs-section-index" },
     { name = "mkdocstrings", extra = ["python"] },
+    { name = "mkdocstrings-python" },
 ]
 local-parallelism = [
     { name = "hydra-joblib-launcher" },
@@ -931,6 +906,7 @@ requires-dist = [
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = "==9.6.7" },
     { name = "mkdocs-section-index", marker = "extra == 'docs'", specifier = "==0.3.9" },
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = "==1.0.8" },
+    { name = "mkdocstrings-python", marker = "extra == 'docs'", specifier = "==2.0.10" },
     { name = "numpy" },
     { name = "polars", specifier = ">=1.35,<2" },
     { name = "pretty-print-directory", specifier = ">=0.1.3" },
@@ -1128,16 +1104,16 @@ python = [
 
 [[package]]
 name = "mkdocstrings-python"
-version = "1.16.2"
+version = "2.0.10"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "griffe" },
+    { name = "griffelib" },
     { name = "mkdocs-autorefs" },
     { name = "mkdocstrings" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ed/a9/5990642e1bb2d90b049f655b92f46d0a77acb76ed59ef3233d5a6934312e/mkdocstrings_python-1.16.2.tar.gz", hash = "sha256:942ec1a2e0481d28f96f93be3d6e343cab92a21e5baf01c37dd2d7236c4d0bd7", size = 423492, upload-time = "2025-02-24T16:18:13.997Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fb/43/4783d5606de4f5e4bea10388c8741b0c40d03e7cb9527b94ad35966351f5/mkdocstrings_python-2.0.10.tar.gz", hash = "sha256:5e34ae56b2f20a57807ee479d603ddc5ec7cc6d2252c4c177754627ef2d3b833", size = 207682, upload-time = "2026-10-19T15:58:07.934Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/82/a2/60be7e17a2f2a9d4bfb7273cdb2071eeeb65bdca5c0d07ff16df63221ca2/mkdocstrings_python-1.16.2-py3-none-any.whl", hash = "sha256:ff7e719404e59ad1a72f1afbe854769984c889b8fa043c160f6c988e1ad9e966", size = 449141, upload-time = "2025-02-24T16:18:11.484Z" },
+    { url = "https://files.pythonhosted.org/packages/be/1b/fc924a97a237adda47f15c1b0cc271639e6b181ab3f95500fbf060c79a69/mkdocstrings_python-2.0.10-py3-none-any.whl", hash = "sha256:4a3aaeebb25ba5ae57a8f9e75432fe4571984889602f2b2f7d672faa760e9062", size = 105538, upload-time = "2026-10-19T15:58:06.287Z" },
 ]
 
 [[package]]
