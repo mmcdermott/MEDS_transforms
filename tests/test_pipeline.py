@@ -103,6 +103,9 @@ def test_example_pipeline_cleanup_intermediates():
 
         assert out.returncode == 0, f"Error running pipeline:\n{out.stdout.decode()}\n{out.stderr.decode()}"
         assert {p.name for p in output_dir.iterdir()} == {".logs", "data", "metadata"}
+        # `normalization` writes straight to `data/`, so it had no stage dir to remove and keeps its marker.
+        done_files = {p.name for p in (output_dir / ".logs").glob("*.done")}
+        assert done_files == {"_all_stages.done", "normalization.done"}
 
 
 @pytest.mark.parallelized

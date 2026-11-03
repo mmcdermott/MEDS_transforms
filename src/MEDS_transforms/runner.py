@@ -388,11 +388,13 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
 
     if pipeline_config.additional_params.get("cleanup_intermediates", False):
         # Each stage caches its output under `<output_dir>/<stage>`; the last data and metadata stages
-        # write the pipeline's result to `<output_dir>/data` and `<output_dir>/metadata` instead.
+        # write the pipeline's result to `<output_dir>/data` and `<output_dir>/metadata` instead. A removed
+        # stage's `.done` marker goes too, so a partial re-run recomputes it rather than skipping it.
         for stage in stages:
             if (stage_dir := log_dir.parent / stage).is_dir():
                 logger.info(f"Removing intermediate stage output {stage_dir}")
                 shutil.rmtree(stage_dir)
+                (log_dir / f"{stage}.done").unlink(missing_ok=True)
     return 0
 
 
