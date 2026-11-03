@@ -15,6 +15,7 @@ log_dir: "${stage_cfg.output_dir}/.logs"
 
 # Control variables
 do_overwrite: False
+cleanup_intermediates: False # read by the pipeline runner
 seed: 1
 worker: 0
 polling_time: 300 # wait time in seconds before beginning reduction steps

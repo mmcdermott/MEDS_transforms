@@ -16,6 +16,7 @@ PIPELINE_CONFIG_KEYS: dict[str, str] = {
     "parallelize.n_workers": "Number of parallel workers to launch per stage (default 1).",
     "parallelize.launcher": "Hydra launcher to use (e.g. 'joblib', 'slurm').",
     "parallelize.launcher_params": "Launcher-specific keyword arguments forwarded to Hydra.",
+    "cleanup_intermediates": "Delete each stage's `<output_dir>/<stage>` dir once all stages succeed.",
 }
 
 
@@ -38,6 +39,7 @@ def pipeline_keys_help_block() -> str:
           parallelize.n_workers        Number of parallel workers to launch per stage (default 1).
           parallelize.launcher         Hydra launcher to use (e.g. 'joblib', 'slurm').
           parallelize.launcher_params  Launcher-specific keyword arguments forwarded to Hydra.
+          cleanup_intermediates        Delete each stage's `<output_dir>/<stage>` dir once all stages succeed.
     """
     header_lines = [
         "Pipeline-level configuration keys (dot-notation is the Hydra override path accepted by",
