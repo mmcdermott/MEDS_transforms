@@ -28,26 +28,27 @@ split between the following files:
 ├── output_data
 │   ├── .logs
 │   │   ├── _all_stages.done
-│   │   ├── count_codes.done
-│   │   ├── drop_regex.done
-│   │   └── pipeline.log
-│   ├── count_codes
-│   │   ├── .logs
+│   │   ├── count_codes
 │   │   │   ├── .hydra
 │   │   │   │   ├── config.yaml
 │   │   │   │   ├── hydra.yaml
 │   │   │   │   └── overrides.yaml
 │   │   │   └── count_codes_0_...log
-│   │   └── train
-│   │       ├── 0.parquet
-│   │       └── 1.parquet
-│   ├── data
-│   │   ├── .logs
+│   │   ├── count_codes.done
+│   │   ├── drop_regex
 │   │   │   ├── .hydra
 │   │   │   │   ├── config.yaml
 │   │   │   │   ├── hydra.yaml
 │   │   │   │   └── overrides.yaml
 │   │   │   └── drop_regex_0_...log
+│   │   ├── drop_regex.done
+│   │   └── pipeline.log
+│   ├── .scratch
+│   │   └── count_codes
+│   │       └── train
+│   │           ├── 0.parquet
+│   │           └── 1.parquet
+│   ├── data
 │   │   ├── held_out
 │   │   │   └── 0.parquet
 │   │   ├── train
@@ -55,8 +56,23 @@ split between the following files:
 │   │   │   └── 1.parquet
 │   │   └── tuning
 │   │       └── 0.parquet
+│   ├── drop_regex
+│   │   ├── data
+│   │   │   ├── held_out
+│   │   │   │   └── 0.parquet
+│   │   │   ├── train
+│   │   │   │   ├── 0.parquet
+│   │   │   │   └── 1.parquet
+│   │   │   └── tuning
+│   │   │       └── 0.parquet
+│   │   └── metadata
+│   │       ├── codes.parquet
+│   │       ├── dataset.json
+│   │       └── subject_splits.parquet
 │   └── metadata
-│       └── codes.parquet
+│       ├── codes.parquet
+│       ├── dataset.json
+│       └── subject_splits.parquet
 └── simple_example_pkg
     ├── README.md
     ├── pyproject.toml
@@ -225,3 +241,7 @@ MEDS_transform-pipeline pkg://simple_example_pkg.pipelines.example_pipeline.yaml
 ```
 
 The pipeline will then run and produce data identical to the data currently in the `output_data` folder.
+Each stage's output is a full MEDS dataset: `output_data/drop_regex` holds the data after `drop_regex` (with
+the input metadata carried forward), and the final `output_data/data` and `output_data/metadata` hold the
+result of `count_codes` (with the `drop_regex` data carried forward). The per-shard outputs of `count_codes`'s
+map step are kept in `output_data/.scratch/count_codes`.

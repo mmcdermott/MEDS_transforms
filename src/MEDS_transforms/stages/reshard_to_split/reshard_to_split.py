@@ -268,7 +268,8 @@ def main(cfg: DictConfig):  # pragma: no cover
     output_dir = Path(cfg.stage_cfg.output_dir)
 
     splits_file = Path(cfg.input_dir) / subject_splits_filepath
-    shards_fp = output_dir / ".shards.json"
+    scratch_dir = Path(cfg.stage_cfg.get("scratch_dir", None) or output_dir)
+    shards_fp = scratch_dir / ".shards.json"
 
     marker_dir = run_marker_dir(cfg)
 

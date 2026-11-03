@@ -136,7 +136,10 @@ class PipelineConfig:
         {'stages': ['filter_subjects'],
          'stage_cfg': {'min_events_per_subject': None, 'min_measurements_per_subject': None,
                        'data_input_dir': '${input_dir}/data', 'metadata_input_dir': '${input_dir}/metadata',
-                       'reducer_output_dir': None, 'train_only': False, 'output_dir': '${output_dir}/data'}}
+                       'data_output_dir': '${output_dir}/data',
+                       'metadata_output_dir': '${output_dir}/metadata',
+                       'scratch_dir': '${output_dir}/.scratch/filter_subjects',
+                       'output_dir': '${output_dir}/data', 'reducer_output_dir': None, 'train_only': False}}
 
     The simplest pipeline, a "null" pipeline, with `PipelineConfig()` or
     `PipelineConfig.from_arg("__null__")`, will not have any stages or stage configurations. When you call
@@ -183,9 +186,12 @@ class PipelineConfig:
                     'occlude_outliers'],
          'stage_cfg': {'data_input_dir': '${input_dir}/data',
                        'metadata_input_dir': '${input_dir}/metadata',
-                       'output_dir': '${output_dir}/count_codes',
+                       'data_output_dir': '${output_dir}/count_codes/data',
+                       'metadata_output_dir': '${output_dir}/count_codes/metadata',
+                       'scratch_dir': '${output_dir}/.scratch/count_codes',
+                       'output_dir': '${output_dir}/.scratch/count_codes',
+                       'reducer_output_dir': '${output_dir}/count_codes/metadata',
                        'train_only': True,
-                       'reducer_output_dir': '${output_dir}/count_codes',
                        'aggregations': ['code/n_subjects', 'code/n_occurrences']}}
         >>> runnable_stage = pipeline_cfg.register_for("filter_measurements")
         >>> print(runnable_stage.stage_name)
@@ -201,11 +207,14 @@ class PipelineConfig:
                     'occlude_outliers'],
          'stage_cfg': {'min_subjects_per_code': 4,
                        'min_occurrences_per_code': 10,
-                       'data_input_dir': '${input_dir}/data',
-                       'metadata_input_dir': '${output_dir}/count_codes',
+                       'data_input_dir': '${output_dir}/count_codes/data',
+                       'metadata_input_dir': '${output_dir}/count_codes/metadata',
+                       'data_output_dir': '${output_dir}/filter_measurements/data',
+                       'metadata_output_dir': '${output_dir}/filter_measurements/metadata',
+                       'scratch_dir': '${output_dir}/.scratch/filter_measurements',
+                       'output_dir': '${output_dir}/filter_measurements/data',
                        'reducer_output_dir': None,
-                       'train_only': False,
-                       'output_dir': '${output_dir}/filter_measurements'}}
+                       'train_only': False}}
 
     If you try to register a pipeline that includes an unregistered stage, an error will be raised:
 
@@ -379,61 +388,117 @@ class PipelineConfig:
         return {s.name: s for s in self.parsed_stages}
 
     def _resolve_stages(self, all_stages: dict[str, Stage]) -> dict[str, DictConfig]:
-        stage_objects = []
-        last_data_stage_name = None
-        last_metadata_stage_name = None
-        for s in self.parsed_stages:
-            stage = all_stages[s.resolved_name]
+        """Resolve the input, output and scratch directories of every stage in the pipeline.
 
-            if stage.is_metadata:
-                last_metadata_stage_name = s.name
-            else:
-                last_data_stage_name = s.name
-            stage_objects.append((s.name, stage, {**s.config}))
+        Every stage writes a full MEDS dataset (a ``data/`` and a ``metadata/`` directory) into its own
+        directory, ``${output_dir}/<stage name>``, except for the final stage, which writes into
+        ``${output_dir}`` itself. Each stage reads the dataset written by the stage before it (or
+        ``${input_dir}``, for the first stage). Whichever half of the dataset a stage does not compute is
+        carried forward from its inputs once it finishes (see `carry_forward_unchanged_outputs`).
 
-        prior_data_stage = None
-        prior_metadata_stage = None
+        Other files a stage writes (the per-shard outputs of a metadata stage's map step, for instance) go in
+        its scratch directory, ``${output_dir}/.scratch/<stage name>``.
 
+        The resolved keys are:
+
+        - ``data_input_dir`` and ``metadata_input_dir``: the prior stage's ``data/`` and ``metadata/``.
+        - ``data_output_dir`` and ``metadata_output_dir``: this stage's ``data/`` and ``metadata/``.
+        - ``scratch_dir``: this stage's scratch directory.
+        - ``output_dir``: where the stage's map step writes its shards: ``data_output_dir`` for data stages
+          and ``scratch_dir`` for metadata stages.
+        - ``reducer_output_dir``: where the stage's reduce step writes ``codes.parquet``:
+          ``metadata_output_dir`` for metadata stages and ``None`` for data stages.
+        - ``train_only``: ``True`` for metadata stages, ``False`` otherwise.
+
+        Args:
+            all_stages: The loaded `Stage` objects, keyed by their registered (base) stage names.
+
+        Returns:
+            The resolved stage configuration for each stage in the pipeline, keyed by stage name.
+
+        Examples:
+            >>> pipeline_cfg = PipelineConfig(
+            ...     stages=[
+            ...         "filter_subjects",
+            ...         {"count_codes": {"_base_stage": "aggregate_code_metadata", "aggregations": []}},
+            ...         "occlude_outliers",
+            ...     ],
+            ... )
+            >>> all_stages = {
+            ...     n: get_all_registered_stages()[n].load()
+            ...     for n in ("filter_subjects", "aggregate_code_metadata", "occlude_outliers")
+            ... }
+            >>> keys = [
+            ...     "data_input_dir", "metadata_input_dir", "data_output_dir", "metadata_output_dir",
+            ...     "scratch_dir", "output_dir", "reducer_output_dir", "train_only",
+            ... ]
+            >>> for name, cfg in pipeline_cfg._resolve_stages(all_stages).items():
+            ...     cfg = OmegaConf.to_container(cfg, resolve=False)
+            ...     print(f"{name}:")
+            ...     for k in keys:
+            ...         print(f"  {k}: {cfg[k]}")
+            filter_subjects:
+              data_input_dir: ${input_dir}/data
+              metadata_input_dir: ${input_dir}/metadata
+              data_output_dir: ${output_dir}/filter_subjects/data
+              metadata_output_dir: ${output_dir}/filter_subjects/metadata
+              scratch_dir: ${output_dir}/.scratch/filter_subjects
+              output_dir: ${output_dir}/filter_subjects/data
+              reducer_output_dir: None
+              train_only: False
+            count_codes:
+              data_input_dir: ${output_dir}/filter_subjects/data
+              metadata_input_dir: ${output_dir}/filter_subjects/metadata
+              data_output_dir: ${output_dir}/count_codes/data
+              metadata_output_dir: ${output_dir}/count_codes/metadata
+              scratch_dir: ${output_dir}/.scratch/count_codes
+              output_dir: ${output_dir}/.scratch/count_codes
+              reducer_output_dir: ${output_dir}/count_codes/metadata
+              train_only: True
+            occlude_outliers:
+              data_input_dir: ${output_dir}/count_codes/data
+              metadata_input_dir: ${output_dir}/count_codes/metadata
+              data_output_dir: ${output_dir}/data
+              metadata_output_dir: ${output_dir}/metadata
+              scratch_dir: ${output_dir}/.scratch/occlude_outliers
+              output_dir: ${output_dir}/data
+              reducer_output_dir: None
+              train_only: False
+        """
         resolved_stage_configs = {}
 
         input_dir = Path("${input_dir}")
         output_dir = Path("${output_dir}")
 
-        for name, stage, config_overwrites in stage_objects:
+        parsed_stages = self.parsed_stages
+        prior_stage_dir = input_dir
+
+        for i, s in enumerate(parsed_stages):
+            stage = all_stages[s.resolved_name]
+            is_last = i == len(parsed_stages) - 1
+            stage_dir = output_dir if is_last else output_dir / s.name
+
             config = {**stage.default_config} if stage.default_config else {}
 
-            if prior_data_stage is None:
-                config["data_input_dir"] = str(input_dir / "data")
-            else:
-                config["data_input_dir"] = prior_data_stage["output_dir"]
-
-            if prior_metadata_stage is None:
-                config["metadata_input_dir"] = str(input_dir / "metadata")
-            else:
-                config["metadata_input_dir"] = prior_metadata_stage["reducer_output_dir"]
+            config["data_input_dir"] = str(prior_stage_dir / "data")
+            config["metadata_input_dir"] = str(prior_stage_dir / "metadata")
+            config["data_output_dir"] = str(stage_dir / "data")
+            config["metadata_output_dir"] = str(stage_dir / "metadata")
+            config["scratch_dir"] = str(output_dir / ".scratch" / s.name)
 
             if stage.is_metadata:
-                config["output_dir"] = str(output_dir / name)
+                config["output_dir"] = config["scratch_dir"]
+                config["reducer_output_dir"] = config["metadata_output_dir"]
                 config["train_only"] = True
-                if name == last_metadata_stage_name:
-                    config["reducer_output_dir"] = str(output_dir / "metadata")
-                else:
-                    config["reducer_output_dir"] = str(output_dir / name)
             else:
+                config["output_dir"] = config["data_output_dir"]
                 config["reducer_output_dir"] = None
                 config["train_only"] = False
-                if name == last_data_stage_name:
-                    config["output_dir"] = str(output_dir / "data")
-                else:
-                    config["output_dir"] = str(output_dir / name)
 
-            config.update({k: v for k, v in config_overwrites.items() if k != "_base_stage"})
-            resolved_stage_configs[name] = OmegaConf.create(config)
+            config.update({k: v for k, v in s.config.items() if k != "_base_stage"})
+            resolved_stage_configs[s.name] = OmegaConf.create(config)
 
-            if stage.is_metadata:
-                prior_metadata_stage = config
-            else:
-                prior_data_stage = config
+            prior_stage_dir = stage_dir
 
         return resolved_stage_configs
 

@@ -105,9 +105,13 @@ You can optionally supply a *stage runner* YAML as a second argument to control 
 forwarded to the stage invocations using Hydra override syntax, allowing you to tweak stage parameters on
 the command line.
 
-After running, you will see output files stored in `$PIPELINE_OUTPUT` with the results of each stage of the
-pipeline in stage-specific directories, and the global output in `$PIPELINE_OUTPUT/data` and
-`$PIPELINE_OUTPUT/metadata` (for data and metadata outputs, respectively). That's it!
+After running, you will see output files stored in `$PIPELINE_OUTPUT`. Each stage writes a complete MEDS
+dataset (a `data/` and a `metadata/` directory) into `$PIPELINE_OUTPUT/<stage name>`, and the last stage
+writes the final dataset into `$PIPELINE_OUTPUT/data` and `$PIPELINE_OUTPUT/metadata`. Each stage reads the
+dataset written by the stage before it. A stage only computes data or metadata; the other half is carried
+forward from its input (as hard links where the filesystem supports them, so no data is copied). Logs live in
+`$PIPELINE_OUTPUT/.logs/<stage name>` and other per-stage working files (such as the per-shard outputs of a
+metadata stage's map step) in `$PIPELINE_OUTPUT/.scratch/<stage name>`. That's it!
 
 ### 4. Do even more!
 

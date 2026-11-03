@@ -1,0 +1,23 @@
+[2026-11-03 14:48:13,023][MEDS_transforms.mapreduce.shard_iteration][INFO] - Mapping computation over a maximum of 4 shards
+[2026-11-03 14:48:13,023][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/data/data/held_out/0.parquet into /home/mmd/Projects/MEDS_transforms/example/output_data/drop_regex/data/held_out/0.parquet
+[2026-11-03 14:48:13,024][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from data/data/held_out/0.parquet
+[2026-11-03 14:48:13,024][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2026-11-03 14:48:13,024][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to output_data/drop_regex/data/held_out/0.parquet
+[2026-11-03 14:48:13,029][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.005612
+[2026-11-03 14:48:13,030][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/data/data/tuning/0.parquet into /home/mmd/Projects/MEDS_transforms/example/output_data/drop_regex/data/tuning/0.parquet
+[2026-11-03 14:48:13,030][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from data/data/tuning/0.parquet
+[2026-11-03 14:48:13,030][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2026-11-03 14:48:13,030][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to output_data/drop_regex/data/tuning/0.parquet
+[2026-11-03 14:48:13,032][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.002299
+[2026-11-03 14:48:13,033][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/data/data/train/1.parquet into /home/mmd/Projects/MEDS_transforms/example/output_data/drop_regex/data/train/1.parquet
+[2026-11-03 14:48:13,033][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from data/data/train/1.parquet
+[2026-11-03 14:48:13,033][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2026-11-03 14:48:13,033][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to output_data/drop_regex/data/train/1.parquet
+[2026-11-03 14:48:13,034][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.001555
+[2026-11-03 14:48:13,035][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/data/data/train/0.parquet into /home/mmd/Projects/MEDS_transforms/example/output_data/drop_regex/data/train/0.parquet
+[2026-11-03 14:48:13,035][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from data/data/train/0.parquet
+[2026-11-03 14:48:13,035][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2026-11-03 14:48:13,035][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to output_data/drop_regex/data/train/0.parquet
+[2026-11-03 14:48:13,037][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.001841
+[2026-11-03 14:48:13,037][MEDS_transforms.mapreduce.stage][INFO] - Finished mapping in 0:00:00.014751
+[2026-11-03 14:48:13,038][MEDS_transforms.mapreduce.passthrough][INFO] - Carried 3 metadata file(s) forward from data/metadata to output_data/drop_regex/metadata

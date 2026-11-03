@@ -11,7 +11,7 @@ _default_description: |-
   This is a MEDS pipeline ETL. Please set a more detailed description at the top of your specific pipeline
   configuration file.
 
-log_dir: "${stage_cfg.output_dir}/.logs"
+log_dir: "${output_dir}/.logs/${stage}"
 
 # Control variables
 do_overwrite: False
