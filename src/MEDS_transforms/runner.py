@@ -10,6 +10,7 @@ To do this effectively, this runner functionally takes a "meta configuration" fi
 import argparse
 import logging
 import shlex
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -384,6 +385,14 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
             done_file.touch()
 
     global_done_file.touch()
+
+    if pipeline_config.additional_params.get("cleanup_intermediates", False):
+        # Each stage caches its output under `<output_dir>/<stage>`; the last data and metadata stages
+        # write the pipeline's result to `<output_dir>/data` and `<output_dir>/metadata` instead.
+        for stage in stages:
+            if (stage_dir := log_dir.parent / stage).is_dir():
+                logger.info(f"Removing intermediate stage output {stage_dir}")
+                shutil.rmtree(stage_dir)
     return 0
 
 
