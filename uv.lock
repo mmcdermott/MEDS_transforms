@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -944,7 +944,7 @@ provides-extras = ["local-parallelism", "slurm-parallelism", "docs"]
 dev = [
     { name = "hypothesis" },
     { name = "pip" },
-    { name = "pre-commit", specifier = "<5" },
+    { name = "pre-commit", specifier = ">=4.7" },
     { name = "pytest-cov" },
     { name = "ruff" },
 ]
