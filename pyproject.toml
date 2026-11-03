@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pre-commit<4", "ruff", "pytest-cov", "pip", "hypothesis"]
+dev = ["pre-commit>=4.7", "ruff", "pytest-cov", "pip", "hypothesis"]
 
 [tool.setuptools_scm]
 
@@ -38,9 +38,9 @@ dev = ["pre-commit<4", "ruff", "pytest-cov", "pip", "hypothesis"]
 local_parallelism = ["hydra-joblib-launcher"]
 slurm_parallelism = ["hydra-submitit-launcher"]
 docs = [
-  "mkdocs==1.6.1", "mkdocs-material==9.8.0", "mkdocstrings[python]==0.28.2", "mkdocs-gen-files==0.6.1",
-  "mkdocs-literate-nav==0.6.3", "mkdocs-section-index==0.3.12", "mkdocs-git-authors-plugin==0.10.0",
-  "mkdocs-git-revision-date-localized-plugin==1.6.2", "markdown-callouts"
+  "mkdocs==1.6.1", "mkdocs-material==9.8.0", "mkdocstrings[python]==1.0.8", "mkdocstrings-python==2.0.10",
+  "mkdocs-gen-files==0.6.1", "mkdocs-literate-nav==0.6.3", "mkdocs-section-index==0.3.12",
+  "mkdocs-git-authors-plugin==0.10.0", "mkdocs-git-revision-date-localized-plugin==1.6.2", "markdown-callouts"
 ]
 
 [project.scripts]
