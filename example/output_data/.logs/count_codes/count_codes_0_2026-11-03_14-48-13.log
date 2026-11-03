@@ -1,0 +1,17 @@
+[2026-11-03 14:48:13,466][MEDS_transforms.mapreduce.shard_iteration][INFO] - Mapping computation over a maximum of 2 shards
+[2026-11-03 14:48:13,466][MEDS_transforms.mapreduce.stage][INFO] - Processing train split only via shard prefix. Not filtering with /home/mmd/Projects/MEDS_transforms/example/data/metadata/subject_splits.parquet.
+[2026-11-03 14:48:13,467][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/output_data/drop_regex/data/train/1.parquet into /home/mmd/Projects/MEDS_transforms/example/output_data/.scratch/count_codes/train/1.parquet
+[2026-11-03 14:48:13,467][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from output_data/drop_regex/data/train/1.parquet
+[2026-11-03 14:48:13,467][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2026-11-03 14:48:13,468][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to output_data/.scratch/count_codes/train/1.parquet
+[2026-11-03 14:48:13,473][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.005832
+[2026-11-03 14:48:13,474][MEDS_transforms.mapreduce.mapper][INFO] - Processing /home/mmd/Projects/MEDS_transforms/example/output_data/drop_regex/data/train/0.parquet into /home/mmd/Projects/MEDS_transforms/example/output_data/.scratch/count_codes/train/0.parquet
+[2026-11-03 14:48:13,474][MEDS_transforms.mapreduce.rwlock][INFO] - Reading input dataframe from output_data/drop_regex/data/train/0.parquet
+[2026-11-03 14:48:13,474][MEDS_transforms.mapreduce.rwlock][INFO] - Read dataset
+[2026-11-03 14:48:13,474][MEDS_transforms.mapreduce.rwlock][INFO] - Writing final output to output_data/.scratch/count_codes/train/0.parquet
+[2026-11-03 14:48:13,476][MEDS_transforms.mapreduce.rwlock][INFO] - Succeeded in 0:00:00.002308
+[2026-11-03 14:48:13,477][MEDS_transforms.mapreduce.stage][INFO] - Finished mapping in 0:00:00.011097
+[2026-11-03 14:48:13,477][MEDS_transforms.mapreduce.stage][INFO] - Starting reduction process
+[2026-11-03 14:48:13,482][MEDS_transforms.mapreduce.stage][INFO] - Finished reduction in 0:00:00.005110
+[2026-11-03 14:48:13,483][MEDS_transforms.mapreduce.passthrough][INFO] - Carried 4 data file(s) forward from output_data/drop_regex/data to output_data/data
+[2026-11-03 14:48:13,483][MEDS_transforms.mapreduce.passthrough][INFO] - Carried 2 metadata file(s) forward to output_data/metadata

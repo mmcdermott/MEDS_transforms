@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from omegaconf import DictConfig, OmegaConf
 
 from ..mapreduce import map_stage, mapreduce_stage
+from ..mapreduce.passthrough import carry_forward_unchanged_outputs
 from .discovery import get_all_registered_stages
 from .examples import StageExample, StageExampleDict
 
@@ -939,12 +940,14 @@ class Stage:
                 @wraps(self.main_fn)
                 def main_fn(cfg: DictConfig):
                     self.main_fn(cfg)
+                    carry_forward_unchanged_outputs(cfg, self.is_metadata)
 
             case StageType.MAP:
 
                 @wraps(self.map_fn)
                 def main_fn(cfg: DictConfig):
                     map_stage(cfg, self.map_fn, read_fn=self.read_fn, write_fn=self.write_fn)
+                    carry_forward_unchanged_outputs(cfg, self.is_metadata)
 
             case StageType.MAPREDUCE:
 
@@ -952,6 +955,8 @@ class Stage:
                     mapreduce_stage(
                         cfg, self.map_fn, self.reduce_fn, read_fn=self.read_fn, write_fn=self.write_fn
                     )
+                    # Only worker 0 runs the reduction; other workers exit once their map shards are done.
+                    carry_forward_unchanged_outputs(cfg, self.is_metadata, wrote_metadata=cfg.worker == 0)
 
         main_fn.__name__ = self.stage_name
         main_fn.__doc__ = self.stage_docstring

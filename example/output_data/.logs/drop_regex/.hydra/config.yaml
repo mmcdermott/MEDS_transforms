@@ -3,17 +3,18 @@ dataset:
   name: ${oc:get_dataset_name_from_root:root_dir}
   version: ${oc:get_dataset_version_from_root:root_dir}
   code_modifiers: []
-input_dir: example/data
-output_dir: /tmp/tmp0f99nbwj
+input_dir: data
+output_dir: output_data
 _default_description: 'This is a MEDS pipeline ETL. Please set a more detailed description
   at the top of your specific pipeline
 
   configuration file.'
-log_dir: ${stage_cfg.output_dir}/.logs
+log_dir: ${output_dir}/.logs/${stage}
 do_overwrite: false
 seed: 1
 worker: 0
 polling_time: 300
+run_id: 397d6f3a89894d1085bbc28f16dc2b7f
 stages:
 - drop_regex:
     regex: ^H.*
@@ -34,6 +35,9 @@ stage_cfg:
   regex: ^H.*
   data_input_dir: ${input_dir}/data
   metadata_input_dir: ${input_dir}/metadata
+  data_output_dir: ${output_dir}/drop_regex/data
+  metadata_output_dir: ${output_dir}/drop_regex/metadata
+  scratch_dir: ${output_dir}/.scratch/drop_regex
+  output_dir: ${output_dir}/drop_regex/data
   reducer_output_dir: null
   train_only: false
-  output_dir: ${output_dir}/data

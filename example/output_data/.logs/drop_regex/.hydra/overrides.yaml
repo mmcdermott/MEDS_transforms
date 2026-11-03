@@ -1,0 +1,4 @@
+- stage=drop_regex
+- input_dir=data
+- output_dir=output_data
+- ++run_id=397d6f3a89894d1085bbc28f16dc2b7f
