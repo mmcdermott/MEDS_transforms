@@ -202,7 +202,9 @@ VocabularyOrdering_METHODS: dict[VocabularyOrdering, INDEX_ASSIGNMENT_FN] = {
 VOCABULARY_SCHEMA_UPDATES = {"code/vocab_index": pl.UInt8}
 
 
-@Stage.register(output_schema_updates=VOCABULARY_SCHEMA_UPDATES, is_metadata=True)
+@Stage.register(
+    output_schema_updates=VOCABULARY_SCHEMA_UPDATES, is_metadata=True, requires_fresh_metadata=True
+)
 def main(cfg: DictConfig):
     """Assigns integral vocabulary IDs to codes in the metadata file, for use in tokenizing the dataset.
 

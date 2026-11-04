@@ -391,6 +391,8 @@ class PipelineConfig:
                 last_data_stage_name = s.name
             stage_objects.append((s.name, stage, {**s.config}))
 
+        self._warn_on_stale_metadata_dependencies(stage_objects)
+
         prior_data_stage = None
         prior_metadata_stage = None
 
@@ -436,6 +438,37 @@ class PipelineConfig:
                 prior_data_stage = config
 
         return resolved_stage_configs
+
+    @staticmethod
+    def _warn_on_stale_metadata_dependencies(
+        stage_objects: list[tuple[str, Stage, dict]],
+    ) -> None:
+        """Warn when a stage requires fresh ``metadata/codes.parquet`` but nothing refreshes it.
+
+        A stage is considered to refresh the code metadata when it declares
+        ``refreshes_codes_metadata=True`` at registration time (e.g. ``aggregate_code_metadata``).
+        Stages that declare ``requires_fresh_metadata=True`` should always have such a stage
+        somewhere before them. If none is found, a user-facing warning is emitted pointing at the
+        misconfigured stage (see issues #117, #116, #118, #200).
+
+        Note: the check only verifies that *some* earlier stage refreshes codes; it does not check
+        whether that refresh happened against this stage's actual input data. Downstream data-mutating
+        stages may still introduce new codes that aren't in the cached metadata.
+        """
+        saw_refresh = False
+        for name, stage, _ in stage_objects:
+            if getattr(stage, "requires_fresh_metadata", False) and not saw_refresh:
+                logger.warning(
+                    "Stage %r requires a fresh metadata/codes.parquet but no preceding stage "
+                    "refreshes it (no stage with `refreshes_codes_metadata=True`). Add an "
+                    "`aggregate_code_metadata` (or similar) stage before %r, or ignore this "
+                    "warning if the pipeline intentionally uses an externally prepared "
+                    "metadata/codes.parquet.",
+                    name,
+                    name,
+                )
+            if getattr(stage, "refreshes_codes_metadata", False):
+                saw_refresh = True
 
     def _resolve_stage_name(self, stage_name: str) -> str:
         """Return the registered stage corresponding to the specified stage for the given pipeline.

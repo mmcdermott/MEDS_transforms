@@ -1031,5 +1031,8 @@ def aggregation_schema_updates(stage_cfg: dict | None = None) -> dict[str, pl.Da
 
 
 stage = Stage.register(
-    map_fn=mapper_fntr, reduce_fn=reducer_fntr, output_schema_updates=aggregation_schema_updates
+    map_fn=mapper_fntr,
+    reduce_fn=reducer_fntr,
+    output_schema_updates=aggregation_schema_updates,
+    refreshes_codes_metadata=True,
 )
