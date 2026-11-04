@@ -267,6 +267,8 @@ def shard_iterator(
         FileNotFoundError: No shards found in ... with suffix .parquet. Directory contents:...
     """
 
+    from ..compute_modes import active_registry
+
     input_dir = Path(cfg.stage_cfg.data_input_dir)
     output_dir = Path(cfg.stage_cfg.output_dir)
 
@@ -275,12 +277,31 @@ def shard_iterator(
     if in_prefix:
         input_dir = input_dir / in_prefix
 
-    shards = []
+    shards: list[str] = []
     for p in input_dir.glob(f"**/*{in_suffix}"):
         relative_path = p.relative_to(input_dir)
-        shard_name = str(relative_path)
-        shard_name = shard_name[: -len(in_suffix)]
+        shard_name = str(relative_path)[: -len(in_suffix)]
         shards.append(shard_name)
+
+    # Layer registry-keyed shards on top of any disk shards. In-memory mode keys frames by the
+    # logical output path that the previous stage *would have* written, so when a downstream
+    # stage's ``data_input_dir`` matches that location, the registry is the source of truth.
+    reg = active_registry()
+    if reg is not None:
+        seen = set(shards)
+        registry_keys = reg.keys()
+        for key in registry_keys:
+            try:
+                rel = key.relative_to(input_dir)
+            except ValueError:
+                continue
+            if key.suffix != in_suffix:
+                continue
+            shard_name = str(rel)[: -len(in_suffix)]
+            if shard_name in seen:
+                continue
+            seen.add(shard_name)
+            shards.append(shard_name)
 
     if not shards:
         raise FileNotFoundError(
