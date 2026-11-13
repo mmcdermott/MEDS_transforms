@@ -159,3 +159,22 @@ def test_stage_config_resolves_dataset_metadata(invocation, tmp_path):
     out = result.stdout.decode()
     assert "dataset_name: my_dataset" in out
     assert "dataset_version: 1.2.3" in out
+
+
+@INVOCATIONS
+@pytest.mark.parametrize("flags", [["--cfg", "job"], ["--multirun"]], ids=["cfg", "multirun"])
+def test_hydra_flags_after_overrides(invocation, flags, tmp_path):
+    """Hydra flags may follow the overrides; the dispatcher's `run_id` stamp must not split them up."""
+    from MEDS_transforms.stages.discovery import get_all_registered_stages
+
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    get_all_registered_stages()["filter_subjects"].load().test_cases["."].write_for_test(input_dir)
+    pipeline_fp = tmp_path / "pipeline.yaml"
+    pipeline_fp.write_text(
+        f"input_dir: {input_dir}\noutput_dir: {tmp_path / 'output'}\nstages:\n  - filter_subjects\n"
+    )
+
+    result = run_dispatcher(invocation, str(pipeline_fp), "filter_subjects", "stage=filter_subjects", *flags)
+
+    assert result.returncode == 0, result.stderr.decode()
