@@ -109,6 +109,21 @@ def link_or_copy(src: Path, dst: Path) -> None:
         ...     link_or_copy(new_src, dst)
         ...     print(dst.read_text(), old_src.read_text())
         new old
+
+        If the final rename fails, the staged link is removed and the error is raised:
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     src = Path(tmpdir) / "codes.parquet"
+        ...     _ = src.write_text("original")
+        ...     dst = Path(tmpdir) / "out" / "codes.parquet"
+        ...     with patch("os.replace", side_effect=OSError("rename failed")):
+        ...         try:
+        ...             link_or_copy(src, dst)
+        ...         except OSError as e:
+        ...             print(e)
+        ...     print(list((Path(tmpdir) / "out").iterdir()))
+        rename failed
+        []
     """
     dst.parent.mkdir(parents=True, exist_ok=True)
     tmp_fp = dst.with_name(f".{dst.name}.{uuid.uuid4().hex}.tmp")
