@@ -31,12 +31,26 @@ def stamp_run_id(argv: list[str], run_id: str) -> list[str]:
         argv: The Hydra argument list, with the dispatcher's own arguments already stripped.
         run_id: The identifier to stamp.
 
+    Hydra parses its overrides as a single positional argument, so they must be contiguous: an override
+    after a flag such as `--multirun` or `--cfg job` that follows other overrides is rejected. The stamp is
+    therefore put just before the caller's first override (or right after the program name, if there are
+    none), never at the end.
+
     Returns:
-        `argv`, with a `run_id` override appended if it did not already carry one.
+        `argv`, with a `run_id` override added if it did not already carry one.
 
     Examples:
         >>> stamp_run_id(["some_stage", "worker=0"], "abc123")
-        ['some_stage', 'worker=0', 'run_id=abc123']
+        ['some_stage', 'run_id=abc123', 'worker=0']
+
+        Flags before, between or after the overrides stay where they are:
+
+        >>> stamp_run_id(["some_stage", "stage=x", 'worker="range(0,2)"', "--multirun"], "abc123")
+        ['some_stage', 'run_id=abc123', 'stage=x', 'worker="range(0,2)"', '--multirun']
+        >>> stamp_run_id(["some_stage", "--multirun", "stage=x", "--cfg", "job"], "abc123")
+        ['some_stage', '--multirun', 'run_id=abc123', 'stage=x', '--cfg', 'job']
+        >>> stamp_run_id(["some_stage", "--cfg", "job"], "abc123")
+        ['some_stage', 'run_id=abc123', '--cfg', 'job']
 
         A caller that sets `run_id` itself — a wrapping tool coordinating several invocations, say —
         keeps their value, however it is spelled:
@@ -51,7 +65,7 @@ def stamp_run_id(argv: list[str], run_id: str) -> list[str]:
         Overrides that merely start with the same characters are not mistaken for it:
 
         >>> stamp_run_id(["some_stage", "run_id_prefix=x"], "abc123")
-        ['some_stage', 'run_id_prefix=x', 'run_id=abc123']
+        ['some_stage', 'run_id=abc123', 'run_id_prefix=x']
     """
 
     for arg in argv:
@@ -59,7 +73,10 @@ def stamp_run_id(argv: list[str], run_id: str) -> list[str]:
         if key == "run_id":
             return argv
 
-    return [*argv, f"run_id={run_id}"]
+    first_override = next(
+        (i for i, arg in enumerate(argv[1:], start=1) if "=" in arg and not arg.startswith("-")), 1
+    )
+    return [*argv[:first_override], f"run_id={run_id}", *argv[first_override:]]
 
 
 def print_help_stage():
