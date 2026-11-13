@@ -71,14 +71,13 @@ class DuplicateEventConflictError(ValueError):
     """
 
 
-@Stage.register(output_schema_updates={})
+@Stage.register
 def deduplicate_events(stage_cfg: DictConfig) -> Callable[[pl.LazyFrame], pl.LazyFrame]:
     """Returns a function that drops duplicate event rows.
 
-    The output schema is identical to the input — this is a pure row-filter, declared
-    via the empty ``output_schema_updates={}``. Once the flexible-schema mechanism
-    (#379) lands, that explicit declaration helps validation tooling see this stage
-    is intentionally a no-op on schema.
+    Under every policy but ``capture`` the output schema is identical to the input: the stage only drops
+    rows. ``capture`` adds the ``_conflicts`` struct column, whose fields depend on the input's non-``by``
+    columns, so it cannot be declared statically via ``output_schema_updates``; the stage declares none.
 
     Two rows are "in the same ``by`` group" when their ``by``-column values are equal.
     For each such group:
