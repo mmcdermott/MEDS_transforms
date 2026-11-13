@@ -5,7 +5,7 @@ from pathlib import Path
 
 from ..compute_modes import COMPUTE_FN_T
 from ..dataframe import READ_FN_T, WRITE_FN_T, read_df, write_df
-from .rwlock import rwlock_wrap
+from .rwlock import output_is_complete, run_until_complete, rwlock_wrap
 from .shard_iteration import InOutFilePair
 
 logger = logging.getLogger(__name__)
@@ -18,12 +18,17 @@ def map_over(
     write_fn: WRITE_FN_T = write_df,
     do_overwrite: bool = False,
     marker_dir: Path | None = None,
+    polling_time: float = 1.0,
 ) -> list[Path]:
     """Performs a map operation over a list of input file paths, writing the outputs to output files.
 
     Internally, for each operation, this uses `rwlock_wrap` to ensure that multiple competing workers do not
     attempt to compute over the same input/output pair at once. This means that this function can be run
     safely in parallel without subdividing the set of shards manually in advance.
+
+    It returns only once every output exists, waiting on (or taking over from, if they die) any other
+    workers still writing outputs it skipped; see `run_until_complete`. So when any worker returns, the
+    whole map is done, even when the other workers belong to a separate invocation of the same command.
 
     Args:
         shards: List of input-output file pairs to process.
@@ -36,6 +41,7 @@ def map_over(
         marker_dir: Run-scoping directory for `do_overwrite`, as resolved by `run_marker_dir`. Workers
             divide work by racing over this shard list and skipping outputs a sibling already produced,
             so without this `do_overwrite=True` makes every worker redo (and delete) the whole list.
+        polling_time: Seconds to wait between checks on outputs that other workers are still writing.
 
     Returns:
         The list of output files written by this operation.
@@ -89,10 +95,12 @@ def map_over(
         └─────┴─────┘
     """
 
-    all_out_fps = []
-    for in_fp, out_fp in shards:
+    in_fps = {out_fp: in_fp for in_fp, out_fp in shards}
+
+    def attempt_fn(out_fp: Path) -> bool:
+        in_fp = in_fps[out_fp]
         logger.info(f"Processing {in_fp.resolve()!s} into {out_fp.resolve()!s}")
-        rwlock_wrap(
+        return rwlock_wrap(
             in_fp,
             out_fp,
             read_fn,
@@ -101,5 +109,10 @@ def map_over(
             do_overwrite=do_overwrite,
             marker_dir=marker_dir,
         )
-        all_out_fps.append(out_fp)
+
+    def is_complete_fn(out_fp: Path) -> bool:
+        return output_is_complete(out_fp, do_overwrite=do_overwrite, marker_dir=marker_dir)
+
+    all_out_fps = [out_fp for _, out_fp in shards]
+    run_until_complete(all_out_fps, attempt_fn, is_complete_fn, polling_time=polling_time)
     return all_out_fps

@@ -81,6 +81,21 @@ def test_example_pipeline():
     pipeline_tester(PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE)
 
 
+def _run_twice_concurrently(cmd, **kwargs) -> subprocess.CompletedProcess:
+    """Launch the same pipeline command twice at once, as a user re-launching it to add workers would."""
+    procs = [subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE) for _ in range(2)]
+    outs = [proc.communicate() for proc in procs]
+    returncode = next((proc.returncode for proc in procs if proc.returncode != 0), 0)
+    return subprocess.CompletedProcess(
+        cmd, returncode, stdout=b"\n".join(o for o, _ in outs), stderr=b"\n".join(e for _, e in outs)
+    )
+
+
+def test_example_pipeline_concurrent_launches():
+    """Two launches of the same pipeline share its work, and both finish only once every stage is done."""
+    pipeline_tester(PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE, run_fn=_run_twice_concurrently)
+
+
 def test_example_pipeline_cleanup_intermediates():
     """With `cleanup_intermediates=true`, only the pipeline's result and logs remain after the run."""
     from MEDS_transforms.stages.discovery import get_all_registered_stages
@@ -103,9 +118,10 @@ def test_example_pipeline_cleanup_intermediates():
 
         assert out.returncode == 0, f"Error running pipeline:\n{out.stdout.decode()}\n{out.stderr.decode()}"
         assert {p.name for p in output_dir.iterdir()} == {".logs", "data", "metadata"}
-        # `normalization` writes straight to `data/`, so it had no stage dir to remove and keeps its marker.
+        # Every stage directory is removed with its marker; the published result outlives them.
         done_files = {p.name for p in (output_dir / ".logs").glob("*.done")}
-        assert done_files == {"_all_stages.done", "normalization.done"}
+        assert done_files == {"_all_stages.done"}
+        assert any((output_dir / "data").rglob("*.parquet"))
 
 
 @pytest.mark.parallelized

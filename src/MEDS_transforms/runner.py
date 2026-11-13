@@ -21,6 +21,7 @@ from omegaconf import DictConfig, OmegaConf
 from . import __package_name__
 from .configs import PipelineConfig
 from .configs.utils import OmegaConfResolver
+from .stage_outputs import carry_forward
 from .utils import invocation_name
 
 # Spelled out rather than taken from ``__name__``, which is ``"__main__"`` in exactly the case being
@@ -34,6 +35,96 @@ except ImportError:
     from yaml import Loader
 
 logger = logging.getLogger(__name__)
+
+
+def stage_dir_overrides(stage_name: str, prior_stage_name: str | None) -> list[str]:
+    """The overrides that point a stage at its own directories within the pipeline's output directory.
+
+    Run on its own, a stage reads ``input_dir`` and writes ``output_dir``. In a pipeline, each stage instead
+    writes the MEDS dataset ``${output_dir}/<stage>`` and reads the one written by the stage before it (the
+    first stage reads ``input_dir``, as it would on its own). Its logs go to ``${output_dir}/.logs/<stage>``,
+    next to the runner's own, so they are kept if the stage's directory is removed. Once every stage has
+    finished, the runner publishes the last stage's dataset as ``${output_dir}/data`` and
+    ``${output_dir}/metadata`` (see `publish_final_outputs`).
+
+    The paths are left as interpolations of ``output_dir``, so they follow any override of it, and each
+    override is quoted for the shell. These are plain overrides of keys every stage's config defines (see
+    ``configs/_main.yaml``), so a custom stage ``script`` whose config lacks them fails at launch rather than
+    ignoring them and writing somewhere the next stage won't look.
+
+    Args:
+        stage_name: The stage to run.
+        prior_stage_name: The stage before it in the pipeline, or ``None`` if it is the first.
+
+    Returns:
+        The overrides, ready to be joined into a shell command.
+
+    Examples:
+        >>> for o in stage_dir_overrides("count_codes", None):
+        ...     print(o)
+        'stage_output_dir=${output_dir}/count_codes'
+        'log_dir=${output_dir}/.logs/count_codes'
+        >>> for o in stage_dir_overrides("filter_measurements", "count_codes"):
+        ...     print(o)
+        'stage_input_dir=${output_dir}/count_codes'
+        'stage_output_dir=${output_dir}/filter_measurements'
+        'log_dir=${output_dir}/.logs/filter_measurements'
+    """
+    overrides = []
+    if prior_stage_name is not None:
+        overrides.append(f"stage_input_dir=${{output_dir}}/{prior_stage_name}")
+    overrides.append(f"stage_output_dir=${{output_dir}}/{stage_name}")
+    overrides.append(f"log_dir=${{output_dir}}/.logs/{stage_name}")
+    return [shlex.quote(o) for o in overrides]
+
+
+def publish_final_outputs(output_dir: Path, last_stage_name: str) -> None:
+    """Publish the last stage's dataset as the pipeline's result, ``output_dir/{data,metadata}``.
+
+    The result is made to mirror ``output_dir/<last stage>`` exactly, with hard links where possible (see
+    `MEDS_transforms.stage_outputs.carry_forward`), so it costs no extra disk space and holds no files left
+    over from an earlier run of a different pipeline into the same directory.
+
+    Args:
+        output_dir: The pipeline's output directory.
+        last_stage_name: The name of the pipeline's last stage.
+
+    Examples:
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     out = Path(tmpdir)
+        ...     _ = yaml_disk(
+        ...         {
+        ...             "count_codes/": {
+        ...                 "data/train/": {"0.txt": "shard"},
+        ...                 "metadata/": {"codes.txt": "codes"},
+        ...                 ".scratch/": {"partial.txt": "partial"},
+        ...             },
+        ...             "data/": {"stale.txt": "from an earlier run"},
+        ...         },
+        ...         out,
+        ...     )
+        ...     publish_final_outputs(out, "count_codes")
+        ...     print_directory(out)
+        ...     print((out / "data" / "train" / "0.txt").samefile(out / "count_codes/data/train/0.txt"))
+        ├── count_codes
+        │   ├── .scratch
+        │   │   └── partial.txt
+        │   ├── data
+        │   │   └── train
+        │   │       └── 0.txt
+        │   └── metadata
+        │       └── codes.txt
+        ├── data
+        │   └── train
+        │       └── 0.txt
+        └── metadata
+            └── codes.txt
+        True
+    """
+    for half in ("data", "metadata"):
+        src, dst = output_dir / last_stage_name / half, output_dir / half
+        n = len(carry_forward(src, dst, mirror=True))
+        logger.info(f"Published {src} as {dst} ({n} file(s) updated)")
 
 
 def get_parallelization_args(
@@ -366,7 +457,7 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
         logger.info("No parallelization configuration provided.")
         default_parallelization_cfg = None
 
-    for stage in stages:
+    for prior_stage, stage in zip([None, *stages[:-1]], stages, strict=True):
         done_file = log_dir / f"{stage}.done"
 
         if done_file.exists():
@@ -378,18 +469,19 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
                 stage_runners_cfg,
                 pipeline_config,
                 stage,
-                cfg_overrides=args.overrides,
+                cfg_overrides=[*stage_dir_overrides(stage, prior_stage), *args.overrides],
                 default_parallelization_cfg=default_parallelization_cfg,
                 do_profile=args.do_profile,
             )
             done_file.touch()
 
+    publish_final_outputs(log_dir.parent, stages[-1])
     global_done_file.touch()
 
     if pipeline_config.additional_params.get("cleanup_intermediates", False):
-        # Each stage caches its output under `<output_dir>/<stage>`; the last data and metadata stages
-        # write the pipeline's result to `<output_dir>/data` and `<output_dir>/metadata` instead. A removed
-        # stage's `.done` marker goes too, so a partial re-run recomputes it rather than skipping it.
+        # Each stage writes its output under `<output_dir>/<stage>`, and the pipeline's result was published
+        # to `<output_dir>/{data,metadata}` as links to (or copies of) the last stage's files, so every stage
+        # directory can go. A removed stage's `.done` marker goes too, so a re-run recomputes it.
         for stage in stages:
             if (stage_dir := log_dir.parent / stage).is_dir():
                 logger.info(f"Removing intermediate stage output {stage_dir}")

@@ -7,11 +7,18 @@ defaults:
 input_dir: ${dataset.root_dir}
 output_dir: ???
 
+# The MEDS dataset this stage reads, and the one it writes (as `data/` and `metadata/` subdirectories). Run on
+# its own, a stage reads `input_dir` and writes `output_dir`. The pipeline runner points each stage at its own
+# directory instead: it reads `${output_dir}/<prior stage>` (or `input_dir`, for the first stage) and writes
+# `${output_dir}/<stage>`.
+stage_input_dir: ${input_dir}
+stage_output_dir: ${output_dir}
+
 _default_description: |-
   This is a MEDS pipeline ETL. Please set a more detailed description at the top of your specific pipeline
   configuration file.
 
-log_dir: "${stage_cfg.output_dir}/.logs"
+log_dir: "${stage_output_dir}/.logs"
 
 # Control variables
 do_overwrite: False
@@ -43,6 +50,10 @@ code_modifiers: null
 
 # Hydra
 hydra:
+  callbacks:
+    # Lets the `MEDS_transform-stage` launcher finish the stage's outputs once all of its workers are done.
+    capture_stage_config:
+      _target_: MEDS_transforms.stage_outputs.CaptureStageConfig
   job:
     name: "${stage}_${worker}_${now:%Y-%m-%d_%H-%M-%S}"
   run:

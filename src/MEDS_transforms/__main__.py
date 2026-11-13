@@ -9,6 +9,7 @@ from omegaconf import OmegaConf
 
 from . import __package_name__, __version__
 from .configs import PipelineConfig
+from .stage_outputs import CaptureStageConfig, carry_forward_unchanged_outputs
 from .stages.discovery import get_all_registered_stages
 from .utils import invocation_name
 
@@ -40,16 +41,16 @@ def stamp_run_id(argv: list[str], run_id: str) -> list[str]:
 
     Examples:
         >>> stamp_run_id(["some_stage", "worker=0"], "abc123")
-        ['some_stage', '++run_id=abc123', 'worker=0']
+        ['some_stage', 'run_id=abc123', 'worker=0']
 
         Flags before, between or after the overrides stay where they are:
 
         >>> stamp_run_id(["some_stage", "stage=x", 'worker="range(0,2)"', "--multirun"], "abc123")
-        ['some_stage', '++run_id=abc123', 'stage=x', 'worker="range(0,2)"', '--multirun']
+        ['some_stage', 'run_id=abc123', 'stage=x', 'worker="range(0,2)"', '--multirun']
         >>> stamp_run_id(["some_stage", "--multirun", "stage=x", "--cfg", "job"], "abc123")
-        ['some_stage', '--multirun', '++run_id=abc123', 'stage=x', '--cfg', 'job']
+        ['some_stage', '--multirun', 'run_id=abc123', 'stage=x', '--cfg', 'job']
         >>> stamp_run_id(["some_stage", "--cfg", "job"], "abc123")
-        ['some_stage', '++run_id=abc123', '--cfg', 'job']
+        ['some_stage', 'run_id=abc123', '--cfg', 'job']
 
         A caller that sets `run_id` itself — a wrapping tool coordinating several invocations, say —
         keeps their value, however it is spelled:
@@ -64,7 +65,7 @@ def stamp_run_id(argv: list[str], run_id: str) -> list[str]:
         Overrides that merely start with the same characters are not mistaken for it:
 
         >>> stamp_run_id(["some_stage", "run_id_prefix=x"], "abc123")
-        ['some_stage', '++run_id=abc123', 'run_id_prefix=x']
+        ['some_stage', 'run_id=abc123', 'run_id_prefix=x']
     """
 
     for arg in argv:
@@ -75,7 +76,7 @@ def stamp_run_id(argv: list[str], run_id: str) -> list[str]:
     first_override = next(
         (i for i, arg in enumerate(argv[1:], start=1) if "=" in arg and not arg.startswith("-")), 1
     )
-    return [*argv[:first_override], f"++run_id={run_id}", *argv[first_override:]]
+    return [*argv[:first_override], f"run_id={run_id}", *argv[first_override:]]
 
 
 def print_help_stage():
@@ -134,7 +135,14 @@ def run_stage():  # pragma: no cover
     OmegaConf.register_new_resolver("stage_name", lambda: stage_name)
     OmegaConf.register_new_resolver("stage_docstring", lambda: stage.stage_docstring.replace("$", "$$"))
 
+    CaptureStageConfig.config = None
     hydra_wrapper(stage.main)()
+
+    # Hydra only returns once every worker it launched has finished, and only if all of them succeeded, so
+    # this runs once per invocation of this command. It is idempotent, so concurrent invocations of the same
+    # stage (which share its work between them) may each run it.
+    if CaptureStageConfig.config is not None:
+        carry_forward_unchanged_outputs(CaptureStageConfig.config, stage.stage_type, stage.is_metadata)
 
 
 if __name__ == "__main__":
