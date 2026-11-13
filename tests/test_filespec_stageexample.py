@@ -283,6 +283,12 @@ def test_check_outputs_runs_path_spec_for_both_want_data_and_want_metadata(tmp_p
     # Must not raise — both spec branches ran successfully.
     ex.check_outputs(actual, is_resolved_dir=True)
 
+    # A file in neither spec is flagged, even though each spec on its own lacks the other's file.
+    (actual / "metadata" / "extra.csv").write_text("v\n1\n")
+    with pytest.raises(AssertionError, match=r"not in either spec.*extra\.csv"):
+        ex.check_outputs(actual, is_resolved_dir=True)
+    (actual / "metadata" / "extra.csv").unlink()
+
     # And if either side is wrong, the comparator fires with the right rel path.
     (actual / "metadata" / "manifest.csv").write_text("v\n999\n")
     with pytest.raises(AssertionError, match=r"metadata/manifest\.csv"):
