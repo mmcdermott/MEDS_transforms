@@ -1342,7 +1342,8 @@ class StageExample:
         - ``in_data`` as Markdown shard tables (:class:`MEDSDataset`) or a YAML code block when it is
           a :class:`~pathlib.Path` to a ``yaml_to_disk`` spec,
         - ``want_data`` with the same MEDSDataset/Path dispatch as ``in_data``,
-        - ``want_metadata`` as a single Markdown table,
+        - ``want_metadata`` as a single Markdown table (:class:`polars.DataFrame`) or a YAML code
+          block when it is a :class:`~pathlib.Path` to a ``yaml_to_disk`` spec,
         - a bash invocation hint under a ``**Run this stage:**`` heading.
 
         Subclasses override this method when their example fields (``in_data``, ``want_data``,
@@ -1350,6 +1351,13 @@ class StageExample:
         :func:`MEDS_transforms.stages.docgen.df_to_markdown` and
         :func:`MEDS_transforms.stages.docgen.format_dataset` are the reusable helpers for such
         overrides.
+
+        **Override semantics: all-or-nothing.** A subclass override is responsible for rendering
+        the *entire* example — there is no per-field hook. ``super().render_content(...)`` plus
+        an append doesn't compose cleanly because the base implementation owns headings,
+        ordering, and the trailing CLI block. If your subclass needs only a small tweak (e.g.,
+        a different ``want_data`` rendering), prefer copying the relevant block from this
+        method's body rather than calling ``super()``.
 
         Args:
             example_dir: Optional directory containing an ``README.md`` to render as a per-example
@@ -1377,8 +1385,8 @@ class StageExample:
             <BLANKLINE>
 
             When ``in_data`` is a :class:`~pathlib.Path` to a ``yaml_to_disk`` spec, its raw text is
-            rendered as a YAML code block under an ``**Input files:**`` heading. ``want_data`` uses
-            the same dispatch:
+            rendered as a YAML code block under an ``**Input files:**`` heading. ``want_data`` and
+            ``want_metadata`` use the same dispatch:
 
             >>> import tempfile
             >>> with tempfile.TemporaryDirectory() as d:
@@ -1389,6 +1397,16 @@ class StageExample:
             >>> "**Expected output files:**" in rendered
             True
             >>> "foo.json:" in rendered
+            True
+
+            >>> with tempfile.TemporaryDirectory() as d:
+            ...     spec_fp = Path(d) / "out_metadata.yaml"
+            ...     _ = spec_fp.write_text("extra/manifest.json:\\n  v: 1\\n")
+            ...     ex = StageExample(stage_name="demo", want_metadata=spec_fp)
+            ...     rendered = "\\n".join(ex.render_content())
+            >>> "**Expected output metadata files:**" in rendered
+            True
+            >>> "extra/manifest.json:" in rendered
             True
 
             Subclasses override this method to render non-MEDS outputs:
@@ -1467,9 +1485,21 @@ class StageExample:
                 lines.extend(format_dataset(self.want_data, "Expected output data"))
 
         if self.want_metadata is not None:
-            lines.extend(["**Expected output metadata:**", ""])
-            lines.append(df_to_markdown(self.want_metadata))
-            lines.append("")
+            if isinstance(self.want_metadata, Path):
+                lines.extend(
+                    [
+                        "**Expected output metadata files:**",
+                        "",
+                        "```yaml",
+                        self.want_metadata.read_text().strip(),
+                        "```",
+                        "",
+                    ]
+                )
+            else:
+                lines.extend(["**Expected output metadata:**", ""])
+                lines.append(df_to_markdown(self.want_metadata))
+                lines.append("")
 
         # Use the same dotlist formatter as ``self.test_env`` so the rendered command line
         # matches how the example actually runs (handles bool/None/list values correctly and

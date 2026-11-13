@@ -104,9 +104,14 @@ def _get_val_bin_idx(bin_endpoints: pl.Expr) -> pl.Expr:
 
     This is mostly separated out to enable more direct testing.
 
+    The bin endpoints are sorted, so the right-side insertion index of a value is the number of endpoints
+    `<=` it, with `NaN` sorting after every endpoint (as in `search_sorted`). It is computed within each
+    row's own endpoint list, so memory stays proportional to the data rather than requiring one window group
+    per row (the previous `search_sorted(...).over(row_index)` formulation held per-group state for every
+    row, several KB each, which exhausted memory on shards of a few million rows).
+
     > [!WARNING]
-    > This will only work on a dataframe with a row index column named `__idx` and a numeric values column
-    > named `numeric_value`.
+    > This will only work on a dataframe with a numeric values column named `numeric_value`.
 
     Args:
         bin_endpoints: The bin endpoints as a polars list expression.
@@ -141,49 +146,53 @@ def _get_val_bin_idx(bin_endpoints: pl.Expr) -> pl.Expr:
         ...         [0.0],
         ...         [0.0],
         ...     ],
-        ... }).with_row_index("__idx")
+        ... })
         >>> df
-        shape: (10, 3)
-        ┌───────┬───────────────┬───────────────────┐
-        │ __idx ┆ numeric_value ┆ bin_endpoints     │
-        │ ---   ┆ ---           ┆ ---               │
-        │ u32   ┆ f64           ┆ list[f64]         │
-        ╞═══════╪═══════════════╪═══════════════════╡
-        │ 0     ┆ -1.0          ┆ [0.0, 1.0, 2.0]   │
-        │ 1     ┆ 3.0           ┆ [0.0, 1.0, 2.0]   │
-        │ 2     ┆ 0.5           ┆ [0.0, 1.0, 2.0]   │
-        │ 3     ┆ 1.0           ┆ [0.0, 1.0, 2.0]   │
-        │ 4     ┆ null          ┆ [0.0, 1.0, 2.0]   │
-        │ 5     ┆ 0.25          ┆ [0.0, 0.1, … 0.3] │
-        │ 6     ┆ 1.0           ┆ null              │
-        │ 7     ┆ -1.0          ┆ [0.0]             │
-        │ 8     ┆ 1.0           ┆ [0.0]             │
-        │ 9     ┆ 0.0           ┆ [0.0]             │
-        └───────┴───────────────┴───────────────────┘
+        shape: (10, 2)
+        ┌───────────────┬───────────────────┐
+        │ numeric_value ┆ bin_endpoints     │
+        │ ---           ┆ ---               │
+        │ f64           ┆ list[f64]         │
+        ╞═══════════════╪═══════════════════╡
+        │ -1.0          ┆ [0.0, 1.0, 2.0]   │
+        │ 3.0           ┆ [0.0, 1.0, 2.0]   │
+        │ 0.5           ┆ [0.0, 1.0, 2.0]   │
+        │ 1.0           ┆ [0.0, 1.0, 2.0]   │
+        │ null          ┆ [0.0, 1.0, 2.0]   │
+        │ 0.25          ┆ [0.0, 0.1, … 0.3] │
+        │ 1.0           ┆ null              │
+        │ -1.0          ┆ [0.0]             │
+        │ 1.0           ┆ [0.0]             │
+        │ 0.0           ┆ [0.0]             │
+        └───────────────┴───────────────────┘
         >>> df.with_columns(_get_val_bin_idx(pl.col("bin_endpoints")).alias("idx"))
-        shape: (10, 4)
-        ┌───────┬───────────────┬───────────────────┬──────┐
-        │ __idx ┆ numeric_value ┆ bin_endpoints     ┆ idx  │
-        │ ---   ┆ ---           ┆ ---               ┆ ---  │
-        │ u32   ┆ f64           ┆ list[f64]         ┆ u32  │
-        ╞═══════╪═══════════════╪═══════════════════╪══════╡
-        │ 0     ┆ -1.0          ┆ [0.0, 1.0, 2.0]   ┆ 0    │
-        │ 1     ┆ 3.0           ┆ [0.0, 1.0, 2.0]   ┆ 3    │
-        │ 2     ┆ 0.5           ┆ [0.0, 1.0, 2.0]   ┆ 1    │
-        │ 3     ┆ 1.0           ┆ [0.0, 1.0, 2.0]   ┆ 2    │
-        │ 4     ┆ null          ┆ [0.0, 1.0, 2.0]   ┆ null │
-        │ 5     ┆ 0.25          ┆ [0.0, 0.1, … 0.3] ┆ 3    │
-        │ 6     ┆ 1.0           ┆ null              ┆ null │
-        │ 7     ┆ -1.0          ┆ [0.0]             ┆ 0    │
-        │ 8     ┆ 1.0           ┆ [0.0]             ┆ 1    │
-        │ 9     ┆ 0.0           ┆ [0.0]             ┆ 1    │
-        └───────┴───────────────┴───────────────────┴──────┘
+        shape: (10, 3)
+        ┌───────────────┬───────────────────┬──────┐
+        │ numeric_value ┆ bin_endpoints     ┆ idx  │
+        │ ---           ┆ ---               ┆ ---  │
+        │ f64           ┆ list[f64]         ┆ u32  │
+        ╞═══════════════╪═══════════════════╪══════╡
+        │ -1.0          ┆ [0.0, 1.0, 2.0]   ┆ 0    │
+        │ 3.0           ┆ [0.0, 1.0, 2.0]   ┆ 3    │
+        │ 0.5           ┆ [0.0, 1.0, 2.0]   ┆ 1    │
+        │ 1.0           ┆ [0.0, 1.0, 2.0]   ┆ 2    │
+        │ null          ┆ [0.0, 1.0, 2.0]   ┆ null │
+        │ 0.25          ┆ [0.0, 0.1, … 0.3] ┆ 3    │
+        │ 1.0           ┆ null              ┆ null │
+        │ -1.0          ┆ [0.0]             ┆ 0    │
+        │ 1.0           ┆ [0.0]             ┆ 1    │
+        │ 0.0           ┆ [0.0]             ┆ 1    │
+        └───────────────┴───────────────────┴──────┘
     """
 
     val_col = pl.col(DataSchema.numeric_value_name)
     do_bin = bin_endpoints.is_not_null() & val_col.is_not_null()
-    idx_expr = bin_endpoints.list.explode().search_sorted(val_col, side="right").over("__idx")
-    return pl.when(do_bin).then(idx_expr)
+    # Append the value to its row's endpoints and count, inside that list, the elements <= the value (its
+    # last element), excluding the value itself.
+    with_value = pl.concat_list(bin_endpoints, val_col)
+    n_le = with_value.list.eval((pl.element() <= pl.element().last()).sum()).list.first() - 1
+    idx_expr = pl.when(val_col.is_nan()).then(bin_endpoints.list.len()).otherwise(n_le)
+    return pl.when(do_bin).then(idx_expr.cast(pl.UInt32))
 
 
 def get_code(bin_endpoints: pl.Expr, val_bin_idx: pl.Expr) -> pl.Expr:
@@ -360,8 +369,6 @@ def add_bin_to_code(
 
     schema = df.collect_schema()
 
-    df = df.with_row_index("__idx")
-
     if DataSchema.numeric_value_name not in schema:
         raise ValueError(f"Dataframe does not contain the required column '{DataSchema.numeric_value_name}'.")
 
@@ -387,7 +394,7 @@ def add_bin_to_code(
             pl.when(~do_bin).then(DataSchema.numeric_value_name).alias(DataSchema.numeric_value_name)
         )
 
-    return df.drop(*bin_with_columns, "__idx")
+    return df.drop(*bin_with_columns)
 
 
 @Stage.register

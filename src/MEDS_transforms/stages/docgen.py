@@ -288,7 +288,10 @@ def _safe_relative_to(path: Path, root: Path) -> Path | None:
 
     Both operands are resolved first, so an absolute ``path`` against a relative ``root`` (or vice
     versa) is handled consistently — otherwise ``Path.relative_to`` would spuriously report
-    "not under root" whenever the two disagreed on absoluteness.
+    "not under root" whenever the two disagreed on absoluteness. Note that ``Path.resolve()``
+    dereferences symlinks, so a symlinked stage directory is compared against its canonical
+    target path — which is what MkDocs edit links need (the canonical repo location), but worth
+    knowing if you're debugging a "stage not under root" surprise on a symlinked checkout.
 
     Used for MkDocs edit links when the stage lives outside the package ``root`` being documented
     (e.g., ``generate_stage_docs(\"downstream_pkg\")`` invoked from a MEDS-Transforms docs build).
