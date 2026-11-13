@@ -11,12 +11,14 @@ from pathlib import Path
 
 import numpy as np
 import polars as pl
-from meds import DataSchema, SubjectSplitSchema, subject_splits_filepath
+from meds import DataSchema, SubjectSplitSchema
 from omegaconf import DictConfig
 
 from ...dataframe import read_and_filter_fntr, write_df
-from ...mapreduce.rwlock import run_marker_dir, rwlock_wrap
+from ...mapreduce.rwlock import output_is_complete, run_marker_dir, run_until_complete, rwlock_wrap
 from ...mapreduce.shard_iteration import shard_iterator, shuffle_shards
+from ...mapreduce.stage import subject_splits_fp
+from ...stage_outputs import prune_stale_outputs
 from .. import Stage
 
 logger = logging.getLogger(__name__)
@@ -267,8 +269,8 @@ def main(cfg: DictConfig):  # pragma: no cover
 
     output_dir = Path(cfg.stage_cfg.output_dir)
 
-    splits_file = Path(cfg.input_dir) / subject_splits_filepath
-    shards_fp = output_dir / ".shards.json"
+    splits_file = subject_splits_fp(cfg)
+    shards_fp = Path(cfg.stage_cfg.get("scratch_dir", None) or output_dir) / ".shards.json"
 
     marker_dir = run_marker_dir(cfg)
 
@@ -302,20 +304,21 @@ def main(cfg: DictConfig):  # pragma: no cover
     # Step 1: Sub-sharding stage
     logger.info("Starting sub-sharding")
 
-    for subshard_name, out_fp in new_shards_iter:
+    def attempt_fn(out_fp: Path) -> bool:
+        subshard_name = out_shard_names[out_fp]
         subjects = new_sharded_splits[subshard_name]
 
         read_df = read_and_filter_fntr(pl.col(DataSchema.subject_id_name).is_in(subjects))
 
         def read_fn(input_dir: Path) -> pl.LazyFrame:
             df = None
-            logger.info(f"Reading shards for {subshard_name} (file names are in the input sharding scheme):")  # noqa: B023
+            logger.info(f"Reading shards for {subshard_name} (file names are in the input sharding scheme):")
             for in_fp, _ in orig_shards_iter:
                 logger.info(f"  - {in_fp.relative_to(input_dir).resolve()!s}")
                 if df is None:
-                    df = read_df(in_fp)  # noqa: B023
+                    df = read_df(in_fp)
                 else:
-                    df = df.merge_sorted(read_df(in_fp), key=DataSchema.subject_id_name)  # noqa: B023
+                    df = df.merge_sorted(read_df(in_fp), key=DataSchema.subject_id_name)
 
             return df
 
@@ -324,7 +327,7 @@ def main(cfg: DictConfig):  # pragma: no cover
             return df.sort(by=sort_cols, maintain_order=True, multithreaded=False)
 
         logger.info(f"Merging sub-shards for {subshard_name} to {out_fp.resolve()!s}")
-        rwlock_wrap(
+        return rwlock_wrap(
             cfg.stage_cfg.data_input_dir,
             out_fp,
             read_fn,
@@ -333,5 +336,18 @@ def main(cfg: DictConfig):  # pragma: no cover
             do_overwrite=cfg.do_overwrite,
             marker_dir=marker_dir,
         )
+
+    def is_complete_fn(out_fp: Path) -> bool:
+        return output_is_complete(out_fp, do_overwrite=cfg.do_overwrite, marker_dir=marker_dir)
+
+    out_shard_names = {out_fp: shard_name for shard_name, out_fp in new_shards_iter}
+    out_fps = [out_fp for _, out_fp in new_shards_iter]
+    run_until_complete(out_fps, attempt_fn, is_complete_fn)
+
+    # The input's shards (e.g. `train/0.parquet`) are not the output's, so a re-run into the same directory
+    # must remove any shard the new sharding no longer produces.
+    data_output_dir = cfg.stage_cfg.get("data_output_dir", None)
+    if data_output_dir is not None and Path(data_output_dir) == output_dir:
+        prune_stale_outputs(output_dir, out_fps)
 
     logger.info(f"Done with {cfg.stage}")

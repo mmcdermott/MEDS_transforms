@@ -1,0 +1,7 @@
+- stage=count_codes
+- ++stage_input_dir="${output_dir}/drop_regex"
+- ++stage_output_dir="${output_dir}/count_codes"
+- ++log_dir="${output_dir}/.logs/count_codes"
+- input_dir=data
+- output_dir=output_data
+- ++run_id=c04f24da6a87496f99c2f9fc6ab7ec24

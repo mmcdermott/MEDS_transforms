@@ -81,6 +81,21 @@ def test_example_pipeline():
     pipeline_tester(PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE)
 
 
+def _run_twice_concurrently(cmd, **kwargs) -> subprocess.CompletedProcess:
+    """Launch the same pipeline command twice at once, as a user re-launching it to add workers would."""
+    procs = [subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE) for _ in range(2)]
+    outs = [proc.communicate() for proc in procs]
+    returncode = next((proc.returncode for proc in procs if proc.returncode != 0), 0)
+    return subprocess.CompletedProcess(
+        cmd, returncode, stdout=b"\n".join(o for o, _ in outs), stderr=b"\n".join(e for _, e in outs)
+    )
+
+
+def test_example_pipeline_concurrent_launches():
+    """Two launches of the same pipeline share its work, and both finish only once every stage is done."""
+    pipeline_tester(PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE, run_fn=_run_twice_concurrently)
+
+
 @pytest.mark.parallelized
 def test_example_pipeline_parallel_stage_runner():
     log_out = pipeline_tester(PIPELINE_YAML, PARALLEL_STAGE_RUNNER_YAML, STAGE_SCENARIO_SEQUENCE)

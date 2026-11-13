@@ -9,6 +9,7 @@ from omegaconf import OmegaConf
 
 from . import __package_name__, __version__
 from .configs import PipelineConfig
+from .stage_outputs import CaptureStageConfig, carry_forward_unchanged_outputs
 from .stages.discovery import get_all_registered_stages
 from .utils import invocation_name
 
@@ -117,7 +118,14 @@ def run_stage():  # pragma: no cover
     OmegaConf.register_new_resolver("stage_name", lambda: stage_name)
     OmegaConf.register_new_resolver("stage_docstring", lambda: stage.stage_docstring.replace("$", "$$"))
 
+    CaptureStageConfig.config = None
     hydra_wrapper(stage.main)()
+
+    # Hydra only returns once every worker it launched has finished, and only if all of them succeeded, so
+    # this runs once per invocation of this command. It is idempotent, so concurrent invocations of the same
+    # stage (which share its work between them) may each run it.
+    if CaptureStageConfig.config is not None:
+        carry_forward_unchanged_outputs(CaptureStageConfig.config, stage.stage_type, stage.is_metadata)
 
 
 if __name__ == "__main__":

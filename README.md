@@ -105,9 +105,28 @@ You can optionally supply a *stage runner* YAML as a second argument to control 
 forwarded to the stage invocations using Hydra override syntax, allowing you to tweak stage parameters on
 the command line.
 
-After running, you will see output files stored in `$PIPELINE_OUTPUT` with the results of each stage of the
-pipeline in stage-specific directories, and the global output in `$PIPELINE_OUTPUT/data` and
-`$PIPELINE_OUTPUT/metadata` (for data and metadata outputs, respectively). That's it!
+After running, `$PIPELINE_OUTPUT` holds a complete MEDS dataset (`data/` and `metadata/`) for each stage, in
+a directory named after it. Each stage reads the dataset written by the stage before it. Whichever half of
+the dataset a stage does not compute (the metadata, for a data stage; the data, for a metadata stage) is
+hard-linked in from its input, so it costs no extra disk space. The last stage's dataset is published as
+`$PIPELINE_OUTPUT/data` and `$PIPELINE_OUTPUT/metadata`, again via hard links. That's it!
+
+```
+$PIPELINE_OUTPUT/
+├── .logs/                  # the runner's `.done` markers and log, and each stage's logs
+├── <stage 1>/{data,metadata}/
+├── <stage 2>/{data,metadata}/
+├── ...
+├── data/                   # the last stage's data
+└── metadata/               # the last stage's metadata
+```
+
+Running a single stage on its own (`MEDS_transform-stage <pipeline.yaml> <stage>`) reads `input_dir` and
+writes its dataset directly to `output_dir/data` and `output_dir/metadata`.
+
+You can launch the same pipeline command more than once at the same time (for example, on several machines
+sharing a filesystem) to add workers. The launches split each stage's shards between them, and each launch
+waits for the others' shards before moving on, so neither finishes before the whole pipeline is done.
 
 ### 4. Do even more!
 

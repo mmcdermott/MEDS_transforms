@@ -28,26 +28,39 @@ split between the following files:
 ├── output_data
 │   ├── .logs
 │   │   ├── _all_stages.done
-│   │   ├── count_codes.done
-│   │   ├── drop_regex.done
-│   │   └── pipeline.log
-│   ├── count_codes
-│   │   ├── .logs
+│   │   ├── count_codes
 │   │   │   ├── .hydra
 │   │   │   │   ├── config.yaml
 │   │   │   │   ├── hydra.yaml
 │   │   │   │   └── overrides.yaml
 │   │   │   └── count_codes_0_...log
-│   │   └── train
-│   │       ├── 0.parquet
-│   │       └── 1.parquet
-│   ├── data
-│   │   ├── .logs
+│   │   ├── count_codes.done
+│   │   ├── drop_regex
 │   │   │   ├── .hydra
 │   │   │   │   ├── config.yaml
 │   │   │   │   ├── hydra.yaml
 │   │   │   │   └── overrides.yaml
 │   │   │   └── drop_regex_0_...log
+│   │   ├── drop_regex.done
+│   │   └── pipeline.log
+│   ├── count_codes
+│   │   ├── .scratch
+│   │   │   └── train
+│   │   │       ├── 0.parquet
+│   │   │       └── 1.parquet
+│   │   ├── data
+│   │   │   ├── held_out
+│   │   │   │   └── 0.parquet
+│   │   │   ├── train
+│   │   │   │   ├── 0.parquet
+│   │   │   │   └── 1.parquet
+│   │   │   └── tuning
+│   │   │       └── 0.parquet
+│   │   └── metadata
+│   │       ├── codes.parquet
+│   │       ├── dataset.json
+│   │       └── subject_splits.parquet
+│   ├── data
 │   │   ├── held_out
 │   │   │   └── 0.parquet
 │   │   ├── train
@@ -55,8 +68,23 @@ split between the following files:
 │   │   │   └── 1.parquet
 │   │   └── tuning
 │   │       └── 0.parquet
+│   ├── drop_regex
+│   │   ├── data
+│   │   │   ├── held_out
+│   │   │   │   └── 0.parquet
+│   │   │   ├── train
+│   │   │   │   ├── 0.parquet
+│   │   │   │   └── 1.parquet
+│   │   │   └── tuning
+│   │   │       └── 0.parquet
+│   │   └── metadata
+│   │       ├── codes.parquet
+│   │       ├── dataset.json
+│   │       └── subject_splits.parquet
 │   └── metadata
-│       └── codes.parquet
+│       ├── codes.parquet
+│       ├── dataset.json
+│       └── subject_splits.parquet
 └── simple_example_pkg
     ├── README.md
     ├── pyproject.toml
