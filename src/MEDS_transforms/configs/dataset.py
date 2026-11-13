@@ -168,17 +168,40 @@ class DatasetConfig:
 
     This class is used to define the base configuration for a dataset (largely for type safety purposes). It
     includes the root directory of the dataset, and the name and version of the dataset. This is merely a base
-    class used for type safety in the Hydra configs. In hydra configuration usage, the resolvers defined below
-    populate the name and version parameters given the root dir automatically, if possible.
+    class used for type safety in the Hydra configs. In hydra configuration usage, the resolvers defined above
+    populate the name and version from the dataset metadata in the pipeline's ``input_dir``, if possible.
+    They read ``input_dir`` rather than ``root_dir`` because ``input_dir`` is what users set: it defaults to
+    ``root_dir``, but ``root_dir`` stays unset when ``input_dir`` is given directly.
 
     Attributes:
         root_dir: The root directory of the dataset.
         name: The name of the dataset.
         version: The version of the dataset.
         code_modifiers: A list of code modifiers for use when processing to the dataset.
+
+    Examples:
+        >>> from omegaconf import OmegaConf
+        >>> def make_cfg(input_dir):
+        ...     dataset = OmegaConf.structured(DatasetConfig)
+        ...     return OmegaConf.create({"input_dir": input_dir, "dataset": dataset})
+        >>> metadata = DatasetMetadataSchema(dataset_name="example_dataset", dataset_version="1.0.0")
+        >>> with tempfile.TemporaryDirectory() as MEDS_root:
+        ...     metadata_fp = Path(MEDS_root) / dataset_metadata_filepath
+        ...     metadata_fp.parent.mkdir(parents=True)
+        ...     _ = metadata_fp.write_text(json.dumps(metadata.to_dict()))
+        ...     cfg = make_cfg(MEDS_root)
+        ...     print(cfg.dataset.name, cfg.dataset.version)
+        example_dataset 1.0.0
+
+        Without dataset metadata, both fall back to ``"Unknown"``:
+
+        >>> with tempfile.TemporaryDirectory() as MEDS_root:
+        ...     cfg = make_cfg(MEDS_root)
+        ...     print(cfg.dataset.name, cfg.dataset.version)
+        Unknown Unknown
     """
 
     root_dir: str
-    name: str = "${oc:get_dataset_name_from_root:root_dir}"
-    version: str = "${oc:get_dataset_version_from_root:root_dir}"
+    name: str = "${get_dataset_name_from_root:${input_dir}}"
+    version: str = "${get_dataset_version_from_root:${input_dir}}"
     code_modifiers: list[str] = dataclasses.field(default_factory=list)
