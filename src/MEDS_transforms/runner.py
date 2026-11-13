@@ -10,6 +10,7 @@ To do this effectively, this runner functionally takes a "meta configuration" fi
 import argparse
 import logging
 import shlex
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -475,6 +476,16 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
 
     publish_final_outputs(log_dir.parent, stages[-1])
     global_done_file.touch()
+
+    if pipeline_config.additional_params.get("cleanup_intermediates", False):
+        # Each stage writes its output under `<output_dir>/<stage>`, and the pipeline's result was published
+        # to `<output_dir>/{data,metadata}` as links to (or copies of) the last stage's files, so every stage
+        # directory can go. A removed stage's `.done` marker goes too, so a re-run recomputes it.
+        for stage in stages:
+            if (stage_dir := log_dir.parent / stage).is_dir():
+                logger.info(f"Removing intermediate stage output {stage_dir}")
+                shutil.rmtree(stage_dir)
+                (log_dir / f"{stage}.done").unlink(missing_ok=True)
     return 0
 
 

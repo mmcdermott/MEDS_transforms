@@ -96,6 +96,34 @@ def test_example_pipeline_concurrent_launches():
     pipeline_tester(PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE, run_fn=_run_twice_concurrently)
 
 
+def test_example_pipeline_cleanup_intermediates():
+    """With `cleanup_intermediates=true`, only the pipeline's result and logs remain after the run."""
+    from MEDS_transforms.stages.discovery import get_all_registered_stages
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        root = Path(temp_dir)
+        input_dir, output_dir = root / "input", root / "output"
+        input_dir.mkdir()
+        get_all_registered_stages()["filter_subjects"].load().test_cases["."].write_for_test(input_dir)
+        pipeline_config_path = root / "pipeline_config.yaml"
+        pipeline_config_path.write_text(PIPELINE_YAML.format(input_dir=input_dir, output_dir=output_dir))
+
+        cmd = [
+            "MEDS_transform-pipeline",
+            str(pipeline_config_path),
+            "--overrides",
+            "cleanup_intermediates=true",
+        ]
+        out = subprocess.run(cmd, check=False, capture_output=True)
+
+        assert out.returncode == 0, f"Error running pipeline:\n{out.stdout.decode()}\n{out.stderr.decode()}"
+        assert {p.name for p in output_dir.iterdir()} == {".logs", "data", "metadata"}
+        # Every stage directory is removed with its marker; the published result outlives them.
+        done_files = {p.name for p in (output_dir / ".logs").glob("*.done")}
+        assert done_files == {"_all_stages.done"}
+        assert any((output_dir / "data").rglob("*.parquet"))
+
+
 @pytest.mark.parallelized
 def test_example_pipeline_parallel_stage_runner():
     log_out = pipeline_tester(PIPELINE_YAML, PARALLEL_STAGE_RUNNER_YAML, STAGE_SCENARIO_SEQUENCE)
