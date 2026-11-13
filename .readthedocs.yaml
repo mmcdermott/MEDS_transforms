@@ -4,18 +4,21 @@
 # Required
 version: 2
 
-# Set the version of Python and other tools you might need
+# Install docs dependencies from `uv.lock` so the docs build uses the same pinned environment as local
+# development and CI, rather than re-resolving with pip on every build.
 build:
-  os: ubuntu-22.04
+  os: ubuntu-24.04
   tools:
     python: "3.12"
-
-python:
-  install:
-    - method: pip
-      path: .
-      extra_requirements:
-        - docs
+  jobs:
+    pre_create_environment:
+      - asdf plugin add uv
+      - asdf install uv latest
+      - asdf global uv latest
+    create_environment:
+      - uv venv "${READTHEDOCS_VIRTUALENV_PATH}"
+    install:
+      - UV_PROJECT_ENVIRONMENT="${READTHEDOCS_VIRTUALENV_PATH}" uv sync --frozen --extra docs
 
 mkdocs:
   configuration: mkdocs.yml
