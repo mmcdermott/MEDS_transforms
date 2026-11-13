@@ -36,7 +36,7 @@ def stamp_run_id(argv: list[str], run_id: str) -> list[str]:
 
     Examples:
         >>> stamp_run_id(["some_stage", "worker=0"], "abc123")
-        ['some_stage', 'worker=0', '++run_id=abc123']
+        ['some_stage', 'worker=0', 'run_id=abc123']
 
         A caller that sets `run_id` itself — a wrapping tool coordinating several invocations, say —
         keeps their value, however it is spelled:
@@ -51,7 +51,7 @@ def stamp_run_id(argv: list[str], run_id: str) -> list[str]:
         Overrides that merely start with the same characters are not mistaken for it:
 
         >>> stamp_run_id(["some_stage", "run_id_prefix=x"], "abc123")
-        ['some_stage', 'run_id_prefix=x', '++run_id=abc123']
+        ['some_stage', 'run_id_prefix=x', 'run_id=abc123']
     """
 
     for arg in argv:
@@ -59,7 +59,7 @@ def stamp_run_id(argv: list[str], run_id: str) -> list[str]:
         if key == "run_id":
             return argv
 
-    return [*argv, f"++run_id={run_id}"]
+    return [*argv, f"run_id={run_id}"]
 
 
 def print_help_stage():

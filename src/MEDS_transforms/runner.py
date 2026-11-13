@@ -48,8 +48,9 @@ def stage_dir_overrides(stage_name: str, prior_stage_name: str | None) -> list[s
     ``${output_dir}/metadata`` (see `publish_final_outputs`).
 
     The paths are left as interpolations of ``output_dir``, so they follow any override of it, and each
-    override is quoted for the shell. ``++`` adds the key even to configs (such as custom stage scripts')
-    that don't define it.
+    override is quoted for the shell. These are plain overrides of keys every stage's config defines (see
+    ``configs/_main.yaml``), so a custom stage ``script`` whose config lacks them fails at launch rather than
+    ignoring them and writing somewhere the next stage won't look.
 
     Args:
         stage_name: The stage to run.
@@ -61,19 +62,19 @@ def stage_dir_overrides(stage_name: str, prior_stage_name: str | None) -> list[s
     Examples:
         >>> for o in stage_dir_overrides("count_codes", None):
         ...     print(o)
-        '++stage_output_dir="${output_dir}/count_codes"'
-        '++log_dir="${output_dir}/.logs/count_codes"'
+        'stage_output_dir=${output_dir}/count_codes'
+        'log_dir=${output_dir}/.logs/count_codes'
         >>> for o in stage_dir_overrides("filter_measurements", "count_codes"):
         ...     print(o)
-        '++stage_input_dir="${output_dir}/count_codes"'
-        '++stage_output_dir="${output_dir}/filter_measurements"'
-        '++log_dir="${output_dir}/.logs/filter_measurements"'
+        'stage_input_dir=${output_dir}/count_codes'
+        'stage_output_dir=${output_dir}/filter_measurements'
+        'log_dir=${output_dir}/.logs/filter_measurements'
     """
     overrides = []
     if prior_stage_name is not None:
-        overrides.append(f'++stage_input_dir="${{output_dir}}/{prior_stage_name}"')
-    overrides.append(f'++stage_output_dir="${{output_dir}}/{stage_name}"')
-    overrides.append(f'++log_dir="${{output_dir}}/.logs/{stage_name}"')
+        overrides.append(f"stage_input_dir=${{output_dir}}/{prior_stage_name}")
+    overrides.append(f"stage_output_dir=${{output_dir}}/{stage_name}")
+    overrides.append(f"log_dir=${{output_dir}}/.logs/{stage_name}")
     return [shlex.quote(o) for o in overrides]
 
 

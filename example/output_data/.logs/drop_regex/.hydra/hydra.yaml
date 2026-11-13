@@ -108,15 +108,15 @@ hydra:
     - hydra.mode=RUN
     task:
     - stage=drop_regex
-    - ++stage_output_dir="${output_dir}/drop_regex"
-    - ++log_dir="${output_dir}/.logs/drop_regex"
+    - stage_output_dir=${output_dir}/drop_regex
+    - log_dir=${output_dir}/.logs/drop_regex
     - input_dir=data
     - output_dir=output_data
-    - ++run_id=2d2f9d606bba40758969cf474c583160
+    - run_id=3341314cb8a84d6db951645e6665ee4c
   job:
     name: ${stage}_${worker}_${now:%Y-%m-%d_%H-%M-%S}
     chdir: null
-    override_dirname: ++log_dir="${output_dir}/.logs/drop_regex",++run_id=2d2f9d606bba40758969cf474c583160,++stage_output_dir="${output_dir}/drop_regex",input_dir=data,output_dir=output_data,stage=drop_regex
+    override_dirname: input_dir=data,log_dir=${output_dir}/.logs/drop_regex,output_dir=output_data,run_id=3341314cb8a84d6db951645e6665ee4c,stage=drop_regex,stage_output_dir=${output_dir}/drop_regex
     id: ???
     num: ???
     config_name: _main

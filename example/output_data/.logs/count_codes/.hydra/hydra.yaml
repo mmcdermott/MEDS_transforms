@@ -108,16 +108,16 @@ hydra:
     - hydra.mode=RUN
     task:
     - stage=count_codes
-    - ++stage_input_dir="${output_dir}/drop_regex"
-    - ++stage_output_dir="${output_dir}/count_codes"
-    - ++log_dir="${output_dir}/.logs/count_codes"
+    - stage_input_dir=${output_dir}/drop_regex
+    - stage_output_dir=${output_dir}/count_codes
+    - log_dir=${output_dir}/.logs/count_codes
     - input_dir=data
     - output_dir=output_data
-    - ++run_id=c04f24da6a87496f99c2f9fc6ab7ec24
+    - run_id=e59897fbbc10494f99f123b50b89c800
   job:
     name: ${stage}_${worker}_${now:%Y-%m-%d_%H-%M-%S}
     chdir: null
-    override_dirname: ++log_dir="${output_dir}/.logs/count_codes",++run_id=c04f24da6a87496f99c2f9fc6ab7ec24,++stage_input_dir="${output_dir}/drop_regex",++stage_output_dir="${output_dir}/count_codes",input_dir=data,output_dir=output_data,stage=count_codes
+    override_dirname: input_dir=data,log_dir=${output_dir}/.logs/count_codes,output_dir=output_data,run_id=e59897fbbc10494f99f123b50b89c800,stage=count_codes,stage_input_dir=${output_dir}/drop_regex,stage_output_dir=${output_dir}/count_codes
     id: ???
     num: ???
     config_name: _main

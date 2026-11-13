@@ -13,10 +13,11 @@ _default_description: 'This is a MEDS pipeline ETL. Please set a more detailed d
   configuration file.'
 log_dir: ${output_dir}/.logs/drop_regex
 do_overwrite: false
+cleanup_intermediates: false
 seed: 1
 worker: 0
 polling_time: 300
-run_id: 2d2f9d606bba40758969cf474c583160
+run_id: 3341314cb8a84d6db951645e6665ee4c
 stages:
 - drop_regex:
     regex: ^H.*
