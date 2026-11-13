@@ -132,3 +132,30 @@ def test_runner_module_is_runnable_via_dash_m():
 
     assert module_body == script_body
     assert module_body.startswith("MEDS-Transforms Pipeline Runner")
+
+
+@INVOCATIONS
+def test_stage_config_resolves_dataset_metadata(invocation, tmp_path):
+    """`--cfg job --resolve` resolves the whole stage config, including the dataset name and version.
+
+    Hydra flags go before the overrides here so this doesn't depend on where the dispatcher stamps `run_id`.
+    """
+
+    input_dir = tmp_path / "input"
+    (input_dir / "metadata").mkdir(parents=True)
+    (input_dir / "metadata" / "dataset.json").write_text(
+        '{"dataset_name": "my_dataset", "dataset_version": "1.2.3"}'
+    )
+    pipeline_fp = tmp_path / "pipeline.yaml"
+    pipeline_fp.write_text(
+        f"input_dir: {input_dir}\noutput_dir: {tmp_path / 'output'}\nstages:\n  - filter_subjects\n"
+    )
+
+    result = run_dispatcher(
+        invocation, str(pipeline_fp), "filter_subjects", "--cfg", "job", "--resolve", "stage=filter_subjects"
+    )
+
+    assert result.returncode == 0, result.stderr.decode()
+    out = result.stdout.decode()
+    assert "dataset_name: my_dataset" in out
+    assert "dataset_version: 1.2.3" in out
