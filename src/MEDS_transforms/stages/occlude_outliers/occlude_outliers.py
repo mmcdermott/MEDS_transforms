@@ -105,7 +105,7 @@ def occlude_outliers(
         filter_expr = (val - mean).abs() <= stddev_cutoff * stddev
 
         return (
-            df.join(code_metadata, on=join_cols, how="left", coalesce=True)
+            df.join(code_metadata, on=join_cols, how="left", coalesce=True, maintain_order="left")
             .with_columns(
                 filter_expr.alias("numeric_value/is_inlier"),
                 pl.when(filter_expr).then(pl.col("numeric_value")).alias("numeric_value"),
