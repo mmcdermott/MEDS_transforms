@@ -191,7 +191,7 @@ def reorder_measurements(
         """Reorders the measurements within each event (unique timepoint) by the specified code order."""
 
         return (
-            df.join(code_indices, on=join_cols, how="left", coalesce=True)
+            df.join(code_indices, on=join_cols, how="left", coalesce=True, maintain_order="left")
             .sort("subject_id", "time", "code_order_idx", maintain_order=True)
             .drop("code_order_idx")
         )

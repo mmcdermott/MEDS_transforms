@@ -99,6 +99,10 @@ MEDS_transform-pipeline "$PIPELINE_YAML"
 The runner creates a `.logs` folder inside the pipeline's `output_dir` and marks stages as complete by
 placing `<stage>.done` files in that folder. A `_all_stages.done` file is written when the entire pipeline
 finishes. Re-running the command will skip any stages that already have corresponding `.done` files.
+Set `cleanup_intermediates: true` in the pipeline YAML (or pass `--overrides cleanup_intermediates=true`)
+to delete the stage-specific directories, and their `.done` files, once every stage has succeeded; a failed
+run keeps them. Re-running the full pipeline still exits early, but cleaned-up stages can no longer be
+resumed: a partial re-run recomputes them.
 
 You can optionally supply a *stage runner* YAML as a second argument to control how each stage is launched
 (for example, providing parallelization options or custom stage scripts). Any additional arguments are
