@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import dataclasses
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,72 @@ logger = logging.getLogger(__name__)
 
 NULL_STR = "__null__"
 YAML_EXTENSIONS = {".yaml", ".yml"}
+
+
+#: Stage names become directory names under the pipeline's `output_dir`, the `stage=<name>` Hydra override,
+#: and an argument in the shell command the runner builds, so they are restricted to characters that are safe
+#: in all three. A leading `.` is disallowed so stage directories can't collide with hidden bookkeeping
+#: directories such as `.logs`.
+STAGE_NAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
+
+#: Directory names under `output_dir` that hold the pipeline's final outputs. A stage with one of these names
+#: (compared case-insensitively, as many filesystems are case-insensitive) would write into them.
+RESERVED_STAGE_NAMES = frozenset({"data", "metadata"})
+
+
+def validate_stage_name(name: str) -> None:
+    """Raise a `ValueError` if `name` can't be used as a stage name.
+
+    Args:
+        name: The stage name to check.
+
+    Raises:
+        ValueError: If the name contains characters other than letters, digits, `_`, `.` and `-`, starts with
+            `.` or `-`, or is reserved (see `RESERVED_STAGE_NAMES`).
+
+    Examples:
+        >>> validate_stage_name("count_codes")
+        >>> validate_stage_name("fit-normalization.v2")
+        >>> validate_stage_name("data")
+        Traceback (most recent call last):
+            ...
+        ValueError: Stage name 'data' is reserved: the pipeline writes its final outputs to the 'data' and
+            'metadata' directories of `output_dir`, so a stage with this name would overwrite or read them.
+            Please rename the stage (e.g., 'data_stage' with `_base_stage` set to the original stage).
+        >>> validate_stage_name("Metadata")
+        Traceback (most recent call last):
+            ...
+        ValueError: Stage name 'Metadata' is reserved: ...
+        >>> validate_stage_name(".logs")
+        Traceback (most recent call last):
+            ...
+        ValueError: Invalid stage name '.logs'. Stage names are used as directory names and command-line
+            arguments, so they must start with a letter, digit or '_' and contain only letters, digits,
+            '_', '.' and '-'.
+        >>> for bad in ["", "a/b", "../x", "my stage", "a;rm", "stage=1"]:
+        ...     try:
+        ...         validate_stage_name(bad)
+        ...     except ValueError as e:
+        ...         print(str(e).split(" Stage names")[0])
+        Invalid stage name ''.
+        Invalid stage name 'a/b'.
+        Invalid stage name '../x'.
+        Invalid stage name 'my stage'.
+        Invalid stage name 'a;rm'.
+        Invalid stage name 'stage=1'.
+    """
+    if not STAGE_NAME_RE.match(name):
+        raise ValueError(
+            f"Invalid stage name '{name}'. Stage names are used as directory names and command-line "
+            "arguments, so they must start with a letter, digit or '_' and contain only letters, digits, "
+            "'_', '.' and '-'."
+        )
+    if name.lower() in RESERVED_STAGE_NAMES:
+        raise ValueError(
+            f"Stage name '{name}' is reserved: the pipeline writes its final outputs to the 'data' and "
+            "'metadata' directories of `output_dir`, so a stage with this name would overwrite or read them. "
+            f"Please rename the stage (e.g., '{name}_stage' with `_base_stage` set to the original stage)."
+        )
 
 
 @dataclasses.dataclass
@@ -332,17 +399,46 @@ class PipelineConfig:
                 "Failed to parse pipeline configuration. Please check the pipeline YAML file 'stages' key."
             ) from e
 
-        duplicate_stages = set()
-        for s in self.parsed_stages:
-            if s.name in duplicate_stages:
-                raise ValueError(f"Duplicate stage name found: {s.name}")
-            duplicate_stages.add(s.name)
+        self._validate_stage_names()
 
         if not isinstance(self.additional_params, DictConfig | dict):
             raise TypeError(
                 f"Invalid type for additional_params: {type(self.additional_params)}. "
                 f"Expected dict or DictConfig."
             )
+
+    def _validate_stage_names(self) -> None:
+        """Check that every stage name is valid and that no two stages share an output directory.
+
+        Raises:
+            ValueError: If a name fails `validate_stage_name`, or if two stage names are equal, including when
+                compared case-insensitively (they would share a directory on case-insensitive filesystems).
+
+        Examples:
+            >>> PipelineConfig(stages=["filter_subjects", {"data": {"_base_stage": "filter_subjects"}}])
+            Traceback (most recent call last):
+                ...
+            ValueError: Stage name 'data' is reserved: ...
+            >>> PipelineConfig(stages=["count_codes", "Count_Codes"])
+            Traceback (most recent call last):
+                ...
+            ValueError: Stage names 'count_codes' and 'Count_Codes' differ only in case. They would write
+                to the same directory on case-insensitive filesystems (e.g., macOS and Windows defaults), so
+                please rename one of them.
+        """
+        seen = {}
+        for s in self.parsed_stages:
+            validate_stage_name(s.name)
+            if s.name in seen.values():
+                raise ValueError(f"Duplicate stage name found: {s.name}")
+            key = s.name.lower()
+            if key in seen:
+                raise ValueError(
+                    f"Stage names '{seen[key]}' and '{s.name}' differ only in case. They would write to the "
+                    "same directory on case-insensitive filesystems (e.g., macOS and Windows defaults), so "
+                    "please rename one of them."
+                )
+            seen[key] = s.name
 
     @property
     def structured_config(self) -> DictConfig:
@@ -490,6 +586,7 @@ class PipelineConfig:
         if not self.stages:
             logger.warning("No stages specified in the pipeline config. Adding the target stage alone.")
             self.stages = [stage_name]
+            self._validate_stage_names()
 
         registered_stages = get_all_registered_stages()
         loaded_stages = {}
