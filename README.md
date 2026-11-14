@@ -321,6 +321,36 @@ path on disk. For example:
 MEDS_transform-pipeline pkg://my_package.my_pipeline.yaml
 ```
 
+#### Stage blocks
+
+A run of consecutive map stages can be grouped into a *stage block*, which the pipeline runs as one stage:
+
+```yaml
+stages:
+  - preprocess:
+      _block:
+        - filter_subjects:
+            min_events_per_subject: 5
+        - add_time_derived_measurements:
+            age: {DOB_code: MEDS_BIRTH, age_code: AGE, age_unit: years}
+  - fit_normalization:
+      _base_stage: aggregate_code_metadata
+      aggregations: [code/n_occurrences, values/sum]
+  - normalization
+```
+
+Each worker of the block reads a shard once, applies every stage in the block to it in turn, and writes the
+result once. So the intermediate results never touch disk, and polars optimizes the whole block as one query.
+To the rest of the pipeline the block is a single stage named after it: it gets one output directory
+(`<output_dir>/preprocess`), one `.done` marker and one parallelization setting (`preprocess:` in a stage
+runner YAML), and its workers share its shards as they would a map stage's. The stages in a block keep their
+own options, as written above.
+
+For now, a block may contain only map stages (no `aggregate_code_metadata`-style metadata stages or stages
+with their own main function), only its first stage may use its own read function and only its last its own
+write function, and its stages must agree on `train_only`. The pipeline runner checks these before running
+anything.
+
 #### Meta-stage functionality
 
 Currently, the only supported meta-stage functionality is the "Match-Revise" protocol, which allows you to

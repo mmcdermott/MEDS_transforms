@@ -339,7 +339,7 @@ def stage_example(request: pytest.FixtureRequest, stage: str, stage_scenario: st
 def pipeline_tester(
     pipeline_yaml: str,
     stage_runner_yaml: str | None,
-    stage_scenario_sequence: list[str],
+    stage_scenario_sequence: list[str | list[str]],
     run_fn: Callable | None = subprocess.run,
 ) -> str:
     """Test the pipeline with the given YAML configuration and stage scenario sequence.
@@ -354,7 +354,9 @@ def pipeline_tester(
             relationships expected for the pipeline for each stage -- e.g., the input to the first listed
             scenario is the test input to the pipeline, its output is expected to be the output that the
             pipeline produces when it runs the first stage, which is then fed into the second stage, etc.
-            These are used to test the pipeline conforms to expectations across all stages.
+            These are used to test the pipeline conforms to expectations across all stages. A stage block's
+            entry is the list of its stages' scenarios: the block's input is the first one's input, and its
+            output is checked against the last one's output.
         run_fn: A callable to run the pipeline. Defaults to `subprocess.run`. This is useful for dependency
             injection during testing.
 
@@ -423,8 +425,7 @@ def pipeline_tester(
 
     registered_stages = get_all_registered_stages()
 
-    stage_examples = []
-    for stage_scenario in stage_scenario_sequence:
+    def load_example(stage_scenario: str):
         parts = stage_scenario.split("/")
         if len(parts) > 1:
             stage_name, scenario_name = parts[0], "/".join(parts[1:])
@@ -433,9 +434,16 @@ def pipeline_tester(
             scenario_name = "."
 
         try:
-            stage_examples.append(registered_stages[stage_name].load().test_cases[scenario_name])
+            return registered_stages[stage_name].load().test_cases[scenario_name]
         except Exception as e:
             raise ValueError(f"Error loading stage example for {stage_name}/{scenario_name}") from e
+
+    # A stage block's entry lists its stages' scenarios: its input is the first's, its output the last's.
+    first_examples, stage_examples = [], []
+    for stage_scenario in stage_scenario_sequence:
+        scenarios = [stage_scenario] if isinstance(stage_scenario, str) else list(stage_scenario)
+        first_examples.append(load_example(scenarios[0]))
+        stage_examples.append(load_example(scenarios[-1]))
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # 1. Set-up
@@ -444,7 +452,7 @@ def pipeline_tester(
         input_dir = test_root / "input"
         input_dir.mkdir(parents=True, exist_ok=True)
 
-        stage_examples[0].write_for_test(input_dir)
+        first_examples[0].write_for_test(input_dir)
 
         output_dir = test_root / "output"
 

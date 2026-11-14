@@ -444,6 +444,7 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     stages = [s.name for s in pipeline_config.parsed_stages]
     if not stages:
         raise ValueError("Pipeline configuration must specify at least one stage.")
+    pipeline_config.check_blocks()
 
     stage_runners_cfg = load_yaml_file(args.stage_runner_fp)
 

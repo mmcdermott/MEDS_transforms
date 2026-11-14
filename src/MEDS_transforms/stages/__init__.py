@@ -1,4 +1,5 @@
 from .base import Stage
+from .block import StageBlock
 from .discovery import get_all_registered_stages
 from .examples import StageExample
 

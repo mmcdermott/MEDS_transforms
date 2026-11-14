@@ -13,6 +13,7 @@ from hydra.core.config_store import ConfigStore
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from ..stages.base import Stage
+from ..stages.block import StageBlock
 from ..stages.discovery import StageNotFoundError, get_all_registered_stages
 from ..utils import PKG_PFX, resolve_pkg_path
 from .stage import UNPARSED_STAGE_T, StageConfig
@@ -441,6 +442,8 @@ class PipelineConfig:
         seen = {}
         for s in self.parsed_stages:
             validate_stage_name(s.name)
+            for c in s.block or []:
+                validate_stage_name(c.name)
             if s.name in seen.values():
                 raise ValueError(f"Duplicate stage name found: {s.name}")
             key = s.name.lower()
@@ -571,11 +574,8 @@ class PipelineConfig:
         stage_input_dir = Path("${stage_input_dir}")
         stage_output_dir = Path("${stage_output_dir}")
 
-        resolved_stage_configs = {}
-        for s in self.parsed_stages:
-            stage = all_stages[s.resolved_name]
-
-            config = {**stage.default_config} if stage.default_config else {}
+        def resolve(s: StageConfig, is_metadata: bool, default_config: dict | None) -> dict:
+            config = {**default_config} if default_config else {}
 
             config["data_input_dir"] = str(stage_input_dir / "data")
             config["metadata_input_dir"] = str(stage_input_dir / "metadata")
@@ -583,7 +583,7 @@ class PipelineConfig:
             config["metadata_output_dir"] = str(stage_output_dir / "metadata")
             config["scratch_dir"] = str(stage_output_dir / ".scratch")
 
-            if stage.is_metadata:
+            if is_metadata:
                 config["output_dir"] = config["scratch_dir"]
                 config["reducer_output_dir"] = config["metadata_output_dir"]
                 config["train_only"] = True
@@ -593,6 +593,30 @@ class PipelineConfig:
                 config["train_only"] = False
 
             config.update({k: v for k, v in s.config.items() if k != "_base_stage"})
+            return config
+
+        resolved_stage_configs = {}
+        for s in self.parsed_stages:
+            if not s.is_block:
+                stage = all_stages[s.resolved_name]
+                resolved_stage_configs[s.name] = OmegaConf.create(
+                    resolve(s, stage.is_metadata, stage.default_config)
+                )
+                continue
+
+            # A block's stages share its directories; each also gets its own defaults and options.
+            block_stage_configs = []
+            for c in s.block:
+                stage = all_stages[c.resolved_name]
+                block_stage_configs.append(resolve(c, stage.is_metadata, stage.default_config))
+            train_only = {c["train_only"] for c in block_stage_configs}
+            if len(train_only) > 1:
+                raise ValueError(
+                    f"The stages in block {s.name} must agree on train_only, as they run on the same shards."
+                )
+            config = resolve(s, is_metadata=False, default_config=None)
+            config["train_only"] = train_only.pop()
+            config["_block"] = block_stage_configs
             resolved_stage_configs[s.name] = OmegaConf.create(config)
 
         return resolved_stage_configs
@@ -646,24 +670,65 @@ class PipelineConfig:
         return resolved_stage_name
 
     @Stage.suppress_validation()
-    def register_for(self, stage_name: str) -> Stage:
+    def check_blocks(self) -> None:
+        """Check every stage block in the pipeline can run, so a bad one fails before any stage runs.
+
+        Raises:
+            ValueError: If a block contains a stage it can't run (see `StageBlock`), or its stages disagree
+                on ``train_only``.
+
+        Examples:
+            >>> block = {"prep": {"_block": ["filter_subjects", "occlude_outliers"]}}
+            >>> PipelineConfig(stages=[block, "aggregate_code_metadata"]).check_blocks()
+            >>> bad = {"prep": {"_block": ["filter_subjects", "aggregate_code_metadata"]}}
+            >>> PipelineConfig(stages=[bad]).check_blocks()
+            Traceback (most recent call last):
+                ...
+            ValueError: Stage block prep can only contain map stages for now, but aggregate_code_metadata is a
+            mapreduce stage.
+            >>> mixed = {"prep": {"_block": ["filter_subjects", {"occlude_outliers": {"train_only": True}}]}}
+            >>> PipelineConfig(stages=[mixed]).check_blocks()
+            Traceback (most recent call last):
+                ...
+            ValueError: The stages in block prep must agree on train_only, as they run on the same shards.
+        """
+        blocks = [s for s in self.parsed_stages if s.is_block]
+        if not blocks:
+            return
+        loaded = self._load_stages()
+        for s in blocks:
+            StageBlock(s.name, [(c.name, loaded[c.resolved_name]) for c in s.block])
+        self._resolve_stages(loaded)
+
+    def _load_stages(self) -> dict[str, Stage]:
+        """Load every registered stage the pipeline uses, including those in blocks, by registered name."""
+        registered_stages = get_all_registered_stages()
+        loaded_stages = {}
+        for s in self.parsed_stages:
+            for c in s.block if s.is_block else [s]:
+                if c.resolved_name not in registered_stages:
+                    raise ValueError(
+                        f"Stage '{c.resolved_name}' not registered! Registered stages: "
+                        f"{', '.join(sorted(registered_stages.keys()))}"
+                    )
+                if c.resolved_name not in loaded_stages:
+                    loaded_stages[c.resolved_name] = registered_stages[c.resolved_name].load()
+        return loaded_stages
+
+    @Stage.suppress_validation()
+    def register_for(self, stage_name: str) -> Stage | StageBlock:
         if not self.stages:
             logger.warning("No stages specified in the pipeline config. Adding the target stage alone.")
             self.stages = [stage_name]
             self._validate_stage_names()
 
-        registered_stages = get_all_registered_stages()
-        loaded_stages = {}
-        for s in self.parsed_stages:
-            if s.resolved_name not in registered_stages:
-                raise ValueError(
-                    f"Stage '{s.resolved_name}' not registered! Registered stages: "
-                    f"{', '.join(sorted(registered_stages.keys()))}"
-                )
-            if s.resolved_name not in loaded_stages:
-                loaded_stages[s.resolved_name] = registered_stages[s.resolved_name].load()
+        loaded_stages = self._load_stages()
 
-        resolved_stage_name = self._resolve_stage_name(stage_name)
+        target = self.parsed_stages_by_name.get(stage_name)
+        if target is not None and target.is_block:
+            stage = StageBlock(stage_name, [(c.name, loaded_stages[c.resolved_name]) for c in target.block])
+        else:
+            stage = loaded_stages[self._resolve_stage_name(stage_name)]
 
         pipeline_node = self.structured_config
         pipeline_node["stage_cfg"] = self._resolve_stages(loaded_stages)[stage_name]
@@ -671,4 +736,4 @@ class PipelineConfig:
         cs = ConfigStore.instance()
         cs.store(name="_pipeline", node=pipeline_node)
 
-        return loaded_stages[resolved_stage_name]
+        return stage
