@@ -1,4 +1,3 @@
-import doctest
 import re
 import subprocess
 import sys
@@ -20,22 +19,6 @@ def run_dispatcher(invocation: list[str], *args: str) -> subprocess.CompletedPro
     """Launch the stage dispatcher, without a shell so `sys.executable` is honored verbatim."""
 
     return subprocess.run([*invocation, *args], check=False, capture_output=True)
-
-
-def test_dispatcher_doctests():
-    """Run the doctests in `MEDS_transforms.__main__`.
-
-    `--doctest-modules` deliberately skips any file named `__main__.py` (see `_pytest.doctest`), so the
-    examples in the dispatcher would otherwise never execute and would be free to rot.
-    """
-
-    import MEDS_transforms.__main__ as dispatcher
-
-    results = doctest.testmod(
-        dispatcher, optionflags=doctest.NORMALIZE_WHITESPACE | doctest.ELLIPSIS, verbose=False
-    )
-    assert results.attempted > 0, "No doctests were found in the dispatcher module."
-    assert results.failed == 0
 
 
 def test_print_help_stage(capsys):

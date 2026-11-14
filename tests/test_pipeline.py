@@ -96,6 +96,57 @@ def test_example_pipeline_concurrent_launches():
     pipeline_tester(PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE, run_fn=_run_twice_concurrently)
 
 
+def _run_in_process(cmd, **kwargs) -> subprocess.CompletedProcess:
+    return subprocess.run([*cmd, "--in_process"], **kwargs)
+
+
+def test_example_pipeline_in_process():
+    """`--in_process` runs every stage in the runner's process and produces the same outputs."""
+    pipeline_tester(PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE, run_fn=_run_in_process)
+
+
+def _run_in_process_and_subprocess_concurrently(cmd, **kwargs) -> subprocess.CompletedProcess:
+    """Launch the pipeline in process and, at the same time, with a subprocess per stage."""
+    procs = [
+        subprocess.Popen(c, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        for c in (cmd, [*cmd, "--in_process"])
+    ]
+    outs = [proc.communicate() for proc in procs]
+    returncode = next((proc.returncode for proc in procs if proc.returncode != 0), 0)
+    return subprocess.CompletedProcess(
+        cmd, returncode, stdout=b"\n".join(o for o, _ in outs), stderr=b"\n".join(e for _, e in outs)
+    )
+
+
+def test_example_pipeline_in_process_shares_work_with_subprocess_launch():
+    """An in-process launch and a subprocess launch of the same pipeline can run at once."""
+    pipeline_tester(
+        PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE, run_fn=_run_in_process_and_subprocess_concurrently
+    )
+
+
+def test_in_process_rejects_stage_runner():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        root = Path(temp_dir)
+        pipeline_fp = root / "pipeline.yaml"
+        pipeline_fp.write_text(PIPELINE_YAML.format(input_dir=root / "in", output_dir=root / "out"))
+        runner_fp = root / "runner.yaml"
+        runner_fp.write_text("parallelize:\n  n_workers: 2\n")
+        out = subprocess.run(
+            [
+                "MEDS_transform-pipeline",
+                str(pipeline_fp),
+                "--in_process",
+                "--stage_runner_fp",
+                str(runner_fp),
+            ],
+            check=False,
+            capture_output=True,
+        )
+        assert out.returncode != 0
+        assert "--in_process does not support --stage_runner_fp" in out.stderr.decode()
+
+
 def test_example_pipeline_cleanup_intermediates():
     """With `cleanup_intermediates=true`, only the pipeline's result and logs remain after the run."""
     from MEDS_transforms.stages.discovery import get_all_registered_stages

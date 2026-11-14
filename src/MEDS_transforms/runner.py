@@ -21,6 +21,7 @@ from omegaconf import DictConfig, OmegaConf
 from . import __package_name__
 from .configs import PipelineConfig
 from .configs.utils import OmegaConfResolver
+from .stage_launch import run_stage_in_process
 from .stage_outputs import carry_forward
 from .utils import invocation_name
 
@@ -47,35 +48,89 @@ def stage_dir_overrides(stage_name: str, prior_stage_name: str | None) -> list[s
     finished, the runner publishes the last stage's dataset as ``${output_dir}/data`` and
     ``${output_dir}/metadata`` (see `publish_final_outputs`).
 
-    The paths are left as interpolations of ``output_dir``, so they follow any override of it, and each
-    override is quoted for the shell. These are plain overrides of keys every stage's config defines (see
-    ``configs/_main.yaml``), so a custom stage ``script`` whose config lacks them fails at launch rather than
-    ignoring them and writing somewhere the next stage won't look.
+    The paths are left as interpolations of ``output_dir``, so they follow any override of it. Quote each
+    override (e.g. with ``shlex.quote``) before putting it in a shell command. These are plain overrides of
+    keys every stage's config defines (see ``configs/_main.yaml``), so a custom stage ``script`` whose
+    config lacks them fails at launch rather than ignoring them and writing somewhere the next stage won't
+    look.
 
     Args:
         stage_name: The stage to run.
         prior_stage_name: The stage before it in the pipeline, or ``None`` if it is the first.
 
     Returns:
-        The overrides, ready to be joined into a shell command.
+        The overrides, unquoted.
 
     Examples:
         >>> for o in stage_dir_overrides("count_codes", None):
         ...     print(o)
-        'stage_output_dir=${output_dir}/count_codes'
-        'log_dir=${output_dir}/.logs/count_codes'
+        stage_output_dir=${output_dir}/count_codes
+        log_dir=${output_dir}/.logs/count_codes
         >>> for o in stage_dir_overrides("filter_measurements", "count_codes"):
         ...     print(o)
-        'stage_input_dir=${output_dir}/count_codes'
-        'stage_output_dir=${output_dir}/filter_measurements'
-        'log_dir=${output_dir}/.logs/filter_measurements'
+        stage_input_dir=${output_dir}/count_codes
+        stage_output_dir=${output_dir}/filter_measurements
+        log_dir=${output_dir}/.logs/filter_measurements
     """
     overrides = []
     if prior_stage_name is not None:
         overrides.append(f"stage_input_dir=${{output_dir}}/{prior_stage_name}")
     overrides.append(f"stage_output_dir=${{output_dir}}/{stage_name}")
     overrides.append(f"log_dir=${{output_dir}}/.logs/{stage_name}")
-    return [shlex.quote(o) for o in overrides]
+    return overrides
+
+
+def check_in_process_compatible(
+    pipeline_cfg: PipelineConfig, stage_runner_fp: str | None, do_profile: bool
+) -> None:
+    """Raise if the pipeline asks for something only stage subprocesses can do.
+
+    In-process execution runs each stage once, as a single worker, by calling it directly, so it can't
+    launch a custom stage ``script``, apply a Hydra launcher's parallelization, or attach Hydra's profiler
+    callback. Rather than silently ignore such settings, it refuses them.
+
+    Args:
+        pipeline_cfg: The pipeline to run.
+        stage_runner_fp: The ``--stage_runner_fp`` argument, if given.
+        do_profile: The ``--do_profile`` argument.
+
+    Raises:
+        ValueError: If any of those settings is present.
+
+    Examples:
+        >>> check_in_process_compatible(PipelineConfig(stages=["filter_subjects"]), None, False)
+        >>> check_in_process_compatible(PipelineConfig(stages=["filter_subjects"]), "runner.yaml", False)
+        Traceback (most recent call last):
+            ...
+        ValueError: --in_process does not support --stage_runner_fp: stage runners configure subprocesses.
+        >>> check_in_process_compatible(PipelineConfig(stages=["filter_subjects"]), None, True)
+        Traceback (most recent call last):
+            ...
+        ValueError: --in_process does not support --do_profile: profiling is a Hydra launch callback.
+        >>> parallel = PipelineConfig(stages=["filter_subjects"], additional_params={"parallelize": {}})
+        >>> check_in_process_compatible(parallel, None, False)
+        Traceback (most recent call last):
+            ...
+        ValueError: --in_process does not support the pipeline's `parallelize` setting: it runs one worker.
+        >>> scripted = PipelineConfig(stages=[{"filter_subjects": {"_script": "my_script"}}])
+        >>> check_in_process_compatible(scripted, None, False)
+        Traceback (most recent call last):
+            ...
+        ValueError: --in_process can't run stage filter_subjects, which sets a custom `_script`.
+    """
+    if stage_runner_fp is not None:
+        raise ValueError(
+            "--in_process does not support --stage_runner_fp: stage runners configure subprocesses."
+        )
+    if do_profile:
+        raise ValueError("--in_process does not support --do_profile: profiling is a Hydra launch callback.")
+    if "parallelize" in (pipeline_cfg.additional_params or {}):
+        raise ValueError(
+            "--in_process does not support the pipeline's `parallelize` setting: it runs one worker."
+        )
+    for stage in pipeline_cfg.parsed_stages:
+        if "_script" in stage.config:
+            raise ValueError(f"--in_process can't run stage {stage.name}, which sets a custom `_script`.")
 
 
 def publish_final_outputs(output_dir: Path, last_stage_name: str) -> None:
@@ -419,6 +474,16 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
         help="Enable Hydra profiling for the stages.",
     )
     parser.add_argument(
+        "--in_process",
+        default=False,
+        action=argparse.BooleanOptionalAction,
+        help=(
+            "Run every stage in this process, as a single worker, rather than launching a "
+            "`MEDS_transform-stage` subprocess per stage. Outputs are the same; stage runner configs, "
+            "parallelization and profiling are not supported."
+        ),
+    )
+    parser.add_argument(
         "--overrides", nargs="*", default=[], help="Additional overrides for the pipeline configuration."
     )
     args = parser.parse_args(argv)
@@ -445,6 +510,9 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     if not stages:
         raise ValueError("Pipeline configuration must specify at least one stage.")
 
+    if args.in_process:
+        check_in_process_compatible(pipeline_config, args.stage_runner_fp, args.do_profile)
+
     stage_runners_cfg = load_yaml_file(args.stage_runner_fp)
 
     if "parallelize" in stage_runners_cfg:
@@ -464,15 +532,21 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
             logger.info(f"Skipping stage {stage} as it is already complete.")
         else:
             logger.info(f"Running stage: {stage}")
-            run_stage(
-                args.pipeline_config_fp,
-                stage_runners_cfg,
-                pipeline_config,
-                stage,
-                cfg_overrides=[*stage_dir_overrides(stage, prior_stage), *args.overrides],
-                default_parallelization_cfg=default_parallelization_cfg,
-                do_profile=args.do_profile,
-            )
+            dir_overrides = stage_dir_overrides(stage, prior_stage)
+            if args.in_process:
+                run_stage_in_process(
+                    args.pipeline_config_fp, stage, [f"stage={stage}", *dir_overrides, *args.overrides]
+                )
+            else:
+                run_stage(
+                    args.pipeline_config_fp,
+                    stage_runners_cfg,
+                    pipeline_config,
+                    stage,
+                    cfg_overrides=[*(shlex.quote(o) for o in dir_overrides), *args.overrides],
+                    default_parallelization_cfg=default_parallelization_cfg,
+                    do_profile=args.do_profile,
+                )
             done_file.touch()
 
     publish_final_outputs(log_dir.parent, stages[-1])
