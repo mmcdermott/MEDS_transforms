@@ -88,3 +88,20 @@ def test_stage_removes_stale_shards_and_carries_metadata():
         assert _rel_files(output_dir / "metadata") == _rel_files(input_dir / "metadata")
         for rel in _rel_files(input_dir / "metadata"):
             assert (output_dir / "metadata" / rel).samefile(input_dir / "metadata" / rel)
+
+
+def test_stage_register_normalizes_carry_input_data():
+    import pytest
+
+    from MEDS_transforms.stages import Stage
+
+    def main(cfg):
+        pass
+
+    assert Stage(main_fn=main, is_metadata=False).carry_input_data is None
+    assert Stage(main_fn=main, is_metadata=False, carry_input_data=True).carry_input_data is True
+    assert Stage(main_fn=main, is_metadata=False, carry_input_data=["schemas"]).carry_input_data == (
+        "schemas",
+    )
+    with pytest.raises(TypeError, match="not a single string"):
+        Stage(main_fn=main, is_metadata=False, carry_input_data="schemas")

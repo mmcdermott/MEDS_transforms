@@ -299,6 +299,24 @@ ensure your stages will be appropriately recognized in downstream usage.
 
 Stages are registered via the `Stage.register` method, which can be used as a function or a decorator.
 
+##### Where a stage reads and writes
+
+Every stage reads one MEDS dataset and writes another. Its `stage_cfg` holds the directories:
+`data_input_dir` and `metadata_input_dir` (the previous stage's dataset), and `data_output_dir` and
+`metadata_output_dir` (its own, `<output_dir>/<stage>/{data,metadata}` in a pipeline), which are created
+before it runs. `stage_cfg.output_dir` is where a data stage writes its shards (its `data_output_dir`), and
+`reducer_output_dir` is where a metadata stage writes `codes.parquet` (its `metadata_output_dir`). Read
+only from the input directories, and write only to your own: a stage should not reach into another stage's
+directory or the pipeline's published `data/` and `metadata/`, which hold the last stage's dataset only once
+the pipeline finishes.
+
+Whatever a stage doesn't write is carried over from its input once it finishes, so its directory is always a
+complete dataset. A `MAIN` stage that writes no data has its input data carried over in full; one that writes
+any is assumed to have written all of it, and gets none. If your stage writes some data but must also keep
+part of its input data in its output, say so with `carry_input_data`, e.g.
+`Stage.register(is_metadata=False, carry_input_data=["schemas"])` to keep the input's `schemas/` directory
+alongside the files it writes (or `True` for every input file it does not overwrite).
+
 #### Defining your own pipelines
 
 In addition to writing your own scripts, you can also allow users to reference your pipeline configuration
