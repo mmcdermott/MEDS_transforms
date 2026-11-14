@@ -138,57 +138,57 @@ def run_stage_in_memory(
         store.remove_root(output_dir / prior_in_memory_stage / "data")
 
 
-def check_in_process_compatible(
-    pipeline_cfg: PipelineConfig, stage_runner_fp: str | None, do_profile: bool
-) -> None:
-    """Raise if the pipeline asks for something only stage subprocesses can do.
+def subprocess_reason(
+    pipeline_cfg: PipelineConfig,
+    stage_runners_cfg: dict | DictConfig,
+    stage_name: str,
+    default_parallelization_cfg: dict | DictConfig | None = None,
+    do_profile: bool = False,
+) -> str | None:
+    """Why a stage must be launched as a subprocess under ``--in_process``, or ``None`` if it needn't be.
 
-    In-process execution runs each stage once, as a single worker, by calling it directly, so it can't
-    launch a custom stage ``script``, apply a Hydra launcher's parallelization, or attach Hydra's profiler
-    callback. Rather than silently ignore such settings, it refuses them.
+    In-process execution calls a stage directly, as one worker. A stage that runs a custom script, is
+    parallelized (with its own ``parallelize`` setting or the pipeline's default), or is profiled needs a
+    ``MEDS_transform-stage`` subprocess and its Hydra launcher instead, so the runner launches just that
+    stage that way.
 
     Args:
-        pipeline_cfg: The pipeline to run.
-        stage_runner_fp: The ``--stage_runner_fp`` argument, if given.
+        pipeline_cfg: The pipeline.
+        stage_runners_cfg: The stage runner config (``--stage_runner_fp``), possibly empty.
+        stage_name: The stage.
+        default_parallelization_cfg: The pipeline-wide ``parallelize`` setting, if any.
         do_profile: The ``--do_profile`` argument.
 
-    Raises:
-        ValueError: If any of those settings is present.
+    Returns:
+        A short reason, for the log, or ``None`` if the stage can run in process.
 
     Examples:
-        >>> check_in_process_compatible(PipelineConfig(stages=["filter_subjects"]), None, False)
-        >>> check_in_process_compatible(PipelineConfig(stages=["filter_subjects"]), "runner.yaml", False)
-        Traceback (most recent call last):
-            ...
-        ValueError: --in_process does not support --stage_runner_fp: stage runners configure subprocesses.
-        >>> check_in_process_compatible(PipelineConfig(stages=["filter_subjects"]), None, True)
-        Traceback (most recent call last):
-            ...
-        ValueError: --in_process does not support --do_profile: profiling is a Hydra launch callback.
-        >>> parallel = PipelineConfig(stages=["filter_subjects"], additional_params={"parallelize": {}})
-        >>> check_in_process_compatible(parallel, None, False)
-        Traceback (most recent call last):
-            ...
-        ValueError: --in_process does not support the pipeline's `parallelize` setting: it runs one worker.
-        >>> scripted = PipelineConfig(stages=[{"filter_subjects": {"_script": "my_script"}}])
-        >>> check_in_process_compatible(scripted, None, False)
-        Traceback (most recent call last):
-            ...
-        ValueError: --in_process can't run stage filter_subjects, which sets a custom `_script`.
+        >>> stages = ["filter_subjects", {"reorder_measurements": {"_script": "x"}}]
+        >>> pipeline_cfg = PipelineConfig(stages=stages)
+        >>> print(subprocess_reason(pipeline_cfg, {}, "filter_subjects"))
+        None
+        >>> subprocess_reason(pipeline_cfg, {}, "reorder_measurements")
+        'it sets a custom `_script`'
+        >>> subprocess_reason(pipeline_cfg, {"filter_subjects": {"script": "y"}}, "filter_subjects")
+        'its stage runner sets a custom `script`'
+        >>> runners = {"filter_subjects": {"parallelize": {"n_workers": 2}}}
+        >>> subprocess_reason(pipeline_cfg, runners, "filter_subjects")
+        'it is parallelized'
+        >>> subprocess_reason(pipeline_cfg, {}, "filter_subjects", {"n_workers": 2})
+        'it is parallelized'
+        >>> subprocess_reason(pipeline_cfg, {}, "filter_subjects", do_profile=True)
+        'profiling is on'
     """
-    if stage_runner_fp is not None:
-        raise ValueError(
-            "--in_process does not support --stage_runner_fp: stage runners configure subprocesses."
-        )
+    stage_runner_cfg = stage_runners_cfg.get(stage_name, {})
+    if "script" in stage_runner_cfg:
+        return "its stage runner sets a custom `script`"
+    if "_script" in pipeline_cfg.parsed_stages_by_name[stage_name].config:
+        return "it sets a custom `_script`"
+    if get_parallelization_args(stage_runner_cfg.get("parallelize", {}), default_parallelization_cfg or {}):
+        return "it is parallelized"
     if do_profile:
-        raise ValueError("--in_process does not support --do_profile: profiling is a Hydra launch callback.")
-    if "parallelize" in (pipeline_cfg.additional_params or {}):
-        raise ValueError(
-            "--in_process does not support the pipeline's `parallelize` setting: it runs one worker."
-        )
-    for stage in pipeline_cfg.parsed_stages:
-        if "_script" in stage.config:
-            raise ValueError(f"--in_process can't run stage {stage.name}, which sets a custom `_script`.")
+        return "profiling is on"
+    return None
 
 
 def publish_final_outputs(output_dir: Path, last_stage_name: str) -> None:
@@ -536,9 +536,9 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
         default=False,
         action=argparse.BooleanOptionalAction,
         help=(
-            "Run every stage in this process, as a single worker, rather than launching a "
-            "`MEDS_transform-stage` subprocess per stage. Outputs are the same; stage runner configs, "
-            "parallelization and profiling are not supported."
+            "Run each stage in this process, as a single worker, rather than launching a "
+            "`MEDS_transform-stage` subprocess for it. Stages that are parallelized, run a custom script, or "
+            "are profiled are still launched as subprocesses. Outputs are the same either way."
         ),
     )
     parser.add_argument(
@@ -547,7 +547,8 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
         action=argparse.BooleanOptionalAction,
         help=(
             "Like --in_process, but keep each stage's data shards in memory rather than on disk. Only the "
-            "final dataset and the logs are written; a failed run restarts from the beginning."
+            "final dataset and the logs are written; a failed run restarts from the beginning. Every stage "
+            "must be able to run in process."
         ),
     )
     parser.add_argument(
@@ -579,9 +580,6 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     if not stages:
         raise ValueError("Pipeline configuration must specify at least one stage.")
 
-    if args.in_process:
-        check_in_process_compatible(pipeline_config, args.stage_runner_fp, args.do_profile)
-
     stage_runners_cfg = load_yaml_file(args.stage_runner_fp)
 
     if "parallelize" in stage_runners_cfg:
@@ -593,6 +591,21 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     else:
         logger.info("No parallelization configuration provided.")
         default_parallelization_cfg = None
+
+    reasons = {
+        stage: (
+            subprocess_reason(
+                pipeline_config, stage_runners_cfg, stage, default_parallelization_cfg, args.do_profile
+            )
+            if args.in_process
+            else "--in_process is off"
+        )
+        for stage in stages
+    }
+    if args.in_memory:
+        for stage, reason in reasons.items():
+            if reason is not None:
+                raise ValueError(f"--in_memory can't run stage {stage}, as {reason}.")
 
     output_dir = log_dir.parent
     in_memory_stages = []
@@ -606,23 +619,20 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
 
             logger.info(f"Running stage: {stage}")
             dir_overrides = stage_dir_overrides(stage, prior_stage)
+            overrides = [f"stage={stage}", *dir_overrides, *args.overrides]
             if store is not None:
+                prior_in_memory = prior_stage if prior_stage in in_memory_stages else None
                 run_stage_in_memory(
-                    store,
-                    args.pipeline_config_fp,
-                    stage,
-                    prior_stage if prior_stage in in_memory_stages else None,
-                    [f"stage={stage}", *dir_overrides, *args.overrides],
-                    output_dir,
+                    store, args.pipeline_config_fp, stage, prior_in_memory, overrides, output_dir
                 )
                 in_memory_stages.append(stage)
                 continue
 
-            if args.in_process:
-                run_stage_in_process(
-                    args.pipeline_config_fp, stage, [f"stage={stage}", *dir_overrides, *args.overrides]
-                )
+            if reasons[stage] is None:
+                run_stage_in_process(args.pipeline_config_fp, stage, overrides)
             else:
+                if args.in_process:
+                    logger.info(f"Running stage {stage} in a subprocess, as {reasons[stage]}.")
                 run_stage(
                     args.pipeline_config_fp,
                     stage_runners_cfg,

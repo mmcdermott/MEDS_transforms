@@ -35,7 +35,7 @@ from hydra.experimental.callback import Callback
 from .in_memory import owning_store, store_key
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
 
     from omegaconf import DictConfig
 
@@ -328,7 +328,45 @@ def prune_stale_outputs(output_dir: Path, keep: Iterable[Path], suffix: str = ".
     return removed
 
 
-def carry_forward_unchanged_outputs(cfg: DictConfig, stage_type: str, is_metadata: bool) -> None:
+def prepare_output_dirs(cfg: DictConfig) -> None:
+    """Create the stage's ``data/`` and ``metadata/`` output directories, if its config defines them.
+
+    Every stage writes a MEDS dataset, so both directories are created before it runs, and a stage (or a
+    downstream package's custom stage) can write into either without creating it first.
+
+    Args:
+        cfg: The full stage configuration, with a ``stage_cfg`` node.
+
+    Examples:
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     stage_dir = Path(tmpdir) / "stage"
+        ...     cfg = DictConfig({"stage_cfg": {
+        ...         "data_output_dir": str(stage_dir / "data"),
+        ...         "metadata_output_dir": str(stage_dir / "metadata"),
+        ...     }})
+        ...     prepare_output_dirs(cfg)
+        ...     print_directory(tmpdir)
+        └── stage
+            ├── data
+            └── metadata
+
+        Hand-built configs without these keys are left alone:
+
+        >>> prepare_output_dirs(DictConfig({"stage_cfg": {}}))
+    """
+    for key in ("data_output_dir", "metadata_output_dir"):
+        output_dir = cfg.stage_cfg.get(key, None)
+        # A directory held in memory (see `MEDS_transforms.in_memory`) is not created on disk.
+        if output_dir is not None and owning_store(output_dir) is None:
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+
+def carry_forward_unchanged_outputs(
+    cfg: DictConfig,
+    stage_type: str,
+    is_metadata: bool,
+    carry_input_data: bool | Sequence[str] | None = None,
+) -> None:
     """Fill in a stage's ``data/`` and ``metadata/`` output directories with whatever it did not produce.
 
     The stage launcher calls this once all of a stage's workers have finished. What gets carried depends on
@@ -344,6 +382,11 @@ def carry_forward_unchanged_outputs(cfg: DictConfig, stage_type: str, is_metadat
       added (an input shard that happens to share a name with none of the stage's would otherwise sneak in,
       duplicating subjects). Input metadata files are added where the stage wrote nothing at the same path.
 
+    A stage can override the data rule with ``carry_input_data`` (see `Stage`): ``True`` adds every input data
+    file at a path the stage did not write, a list of relative paths adds just the files under those, and
+    ``False`` adds none. This is for stages that write derived data next to input data their output must
+    keep, such as a stage turning one per-shard table into a new format while another must ship alongside.
+
     This is a no-op unless the stage config defines all four of ``data_input_dir``, ``metadata_input_dir``,
     ``data_output_dir`` and ``metadata_output_dir``. `PipelineConfig` always defines them; hand-built configs
     may not.
@@ -352,6 +395,7 @@ def carry_forward_unchanged_outputs(cfg: DictConfig, stage_type: str, is_metadat
         cfg: The full stage configuration, with a ``stage_cfg`` node.
         stage_type: The stage's `StageType` (``"main"``, ``"map"`` or ``"mapreduce"``).
         is_metadata: Whether the stage is a metadata stage.
+        carry_input_data: The stage's override of which input data to carry, if any.
 
     Examples:
         We'll use a helper that lays out input and output directories and builds the matching config. Text
@@ -442,6 +486,36 @@ def carry_forward_unchanged_outputs(cfg: DictConfig, stage_type: str, is_metadat
             ├── codes.txt
             └── dataset.txt
 
+        A stage that declares ``carry_input_data`` keeps just the input data it names, next to its own:
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     root = Path(tmpdir)
+        ...     cfg = make_cfg(root, {"data/train/": {"0.nrt": "tensors"}})
+        ...     _ = yaml_disk({"data/schemas/": {"0.txt": "schema"}}, root / "in")
+        ...     carry_forward_unchanged_outputs(cfg, "main", is_metadata=False, carry_input_data=["schemas"])
+        ...     print_directory(root / "out" / "data")
+        ├── schemas
+        │   └── 0.txt
+        └── train
+            └── 0.nrt
+
+        With ``True``, it keeps every input data file it did not write; with ``False``, none:
+
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     root = Path(tmpdir)
+        ...     cfg = make_cfg(root, {"data/train/": {"0.nrt": "tensors"}})
+        ...     carry_forward_unchanged_outputs(cfg, "main", is_metadata=False, carry_input_data=True)
+        ...     print_directory(root / "out" / "data")
+        └── train
+            ├── 0.nrt
+            └── 0.txt
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     root = Path(tmpdir)
+        ...     cfg = make_cfg(root, {"metadata/": {"codes.txt": "new"}})
+        ...     carry_forward_unchanged_outputs(cfg, "mapreduce", is_metadata=True, carry_input_data=False)
+        ...     print((root / "out" / "data").exists())
+        False
+
         Without the directory keys, nothing happens:
 
         >>> carry_forward_unchanged_outputs(DictConfig({"stage_cfg": {}}), "map", is_metadata=False)
@@ -461,12 +535,22 @@ def carry_forward_unchanged_outputs(cfg: DictConfig, stage_type: str, is_metadat
     else:
         data_mode, metadata_mode = None, "mirror"
 
-    for half, mode in (("data", data_mode), ("metadata", metadata_mode)):
-        src, dst = dirs[f"{half}_input_dir"], dirs[f"{half}_output_dir"]
-        if mode is None or _same_dir(src, dst):
-            continue
-        n = len(carry_forward(src, dst, mirror=(mode == "mirror")))
-        logger.info(f"Carried {n} {half} file(s) forward from {src} to {dst}")
+    # Each half carries a list of (path relative to the half's directory, mode) pairs.
+    carried = {"data": [("", data_mode)], "metadata": [("", metadata_mode)]}
+    if carry_input_data is True:
+        carried["data"] = [("", "fill")]
+    elif carry_input_data is False:
+        carried["data"] = []
+    elif carry_input_data is not None:
+        carried["data"] = [(rel, "fill") for rel in carry_input_data]
+
+    for half, entries in carried.items():
+        for rel, mode in entries:
+            src, dst = dirs[f"{half}_input_dir"] / rel, dirs[f"{half}_output_dir"] / rel
+            if mode is None or _same_dir(src, dst):
+                continue
+            n = len(carry_forward(src, dst, mirror=(mode == "mirror")))
+            logger.info(f"Carried {n} {half} file(s) forward from {src} to {dst}")
 
 
 class CaptureStageConfig(Callback):

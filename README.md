@@ -109,12 +109,14 @@ You can optionally supply a *stage runner* YAML as a second argument to control 
 forwarded to the stage invocations using Hydra override syntax, allowing you to tweak stage parameters on
 the command line.
 
-Pass `--in_process` to run every stage inside the runner's own process, as a single worker, rather than
-launching a `MEDS_transform-stage` subprocess per stage. That skips each stage's Python and Hydra
-start-up, which dominates the runtime of small pipelines, and produces the same outputs and logs. Since
-it runs one worker per stage, it refuses stage runner YAMLs, `parallelize` settings, custom stage
-`_script`s and `--do_profile`. You can still add workers by launching the same pipeline again, in process
-or not: concurrent launches share the work.
+Pass `--in_process` to run stages inside the runner's own process, as a single worker, rather than
+launching a `MEDS_transform-stage` subprocess for each. That skips each stage's Python and Hydra start-up,
+which dominates the runtime of small pipelines, and lets you debug the whole pipeline in one process. It
+produces the same outputs and logs. Stages that need a subprocess are still launched as one: those with a
+`parallelize` setting (their own in a stage runner YAML, or the pipeline's), a custom `script`/`_script`,
+or all stages under `--do_profile`. So you can keep parallelism where it pays off, for the heavy stages,
+and run the rest in process. You can also add workers by launching the same pipeline again, in process or
+not: concurrent launches share the work.
 
 Pass `--in_memory` to also keep every stage's data shards in memory rather than writing them to disk. It
 runs stages in process, like `--in_process`. Only the final dataset (`$PIPELINE_OUTPUT/data` and
@@ -307,6 +309,24 @@ ensure your stages will be appropriately recognized in downstream usage.
 ##### Stage registration configuration
 
 Stages are registered via the `Stage.register` method, which can be used as a function or a decorator.
+
+##### Where a stage reads and writes
+
+Every stage reads one MEDS dataset and writes another. Its `stage_cfg` holds the directories:
+`data_input_dir` and `metadata_input_dir` (the previous stage's dataset), and `data_output_dir` and
+`metadata_output_dir` (its own, `<output_dir>/<stage>/{data,metadata}` in a pipeline), which are created
+before it runs. `stage_cfg.output_dir` is where a data stage writes its shards (its `data_output_dir`), and
+`reducer_output_dir` is where a metadata stage writes `codes.parquet` (its `metadata_output_dir`). Read
+only from the input directories, and write only to your own: a stage should not reach into another stage's
+directory or the pipeline's published `data/` and `metadata/`, which hold the last stage's dataset only once
+the pipeline finishes.
+
+Whatever a stage doesn't write is carried over from its input once it finishes, so its directory is always a
+complete dataset. A `MAIN` stage that writes no data has its input data carried over in full; one that writes
+any is assumed to have written all of it, and gets none. If your stage writes some data but must also keep
+part of its input data in its output, say so with `carry_input_data`, e.g.
+`Stage.register(is_metadata=False, carry_input_data=["schemas"])` to keep the input's `schemas/` directory
+alongside the files it writes (or `True` for every input file it does not overwrite).
 
 #### Defining your own pipelines
 

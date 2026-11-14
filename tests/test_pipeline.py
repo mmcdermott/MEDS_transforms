@@ -125,6 +125,24 @@ def test_example_pipeline_in_process_shares_work_with_subprocess_launch():
     )
 
 
+MIXED_STAGE_RUNNER_YAML = """
+fit_outlier_detection:
+  parallelize:
+    n_workers: 2
+    launcher: "joblib"
+"""
+
+
+def test_example_pipeline_in_process_launches_parallel_stages_as_subprocesses():
+    """Under `--in_process`, a parallelized stage still gets its workers; the rest run in process."""
+    log = pipeline_tester(
+        PIPELINE_YAML, MIXED_STAGE_RUNNER_YAML, STAGE_SCENARIO_SEQUENCE, run_fn=_run_in_process
+    )
+    assert "Running stage fit_outlier_detection in a subprocess, as it is parallelized." in log
+    assert "Running stage filter_subjects in process" in log
+    assert "Running stage filter_subjects in a subprocess" not in log
+
+
 def _run_in_memory(cmd, **kwargs) -> subprocess.CompletedProcess:
     return subprocess.run([*cmd, "--in_memory"], **kwargs)
 
@@ -158,26 +176,22 @@ def test_in_memory_writes_only_the_final_dataset_and_logs():
         assert not list(output_dir.rglob("*.lock"))
 
 
-def test_in_process_rejects_stage_runner():
+def test_in_memory_rejects_stages_that_need_a_subprocess():
     with tempfile.TemporaryDirectory() as temp_dir:
         root = Path(temp_dir)
         pipeline_fp = root / "pipeline.yaml"
         pipeline_fp.write_text(PIPELINE_YAML.format(input_dir=root / "in", output_dir=root / "out"))
         runner_fp = root / "runner.yaml"
-        runner_fp.write_text("parallelize:\n  n_workers: 2\n")
+        runner_fp.write_text(MIXED_STAGE_RUNNER_YAML)
         out = subprocess.run(
-            [
-                "MEDS_transform-pipeline",
-                str(pipeline_fp),
-                "--in_process",
-                "--stage_runner_fp",
-                str(runner_fp),
-            ],
+            ["MEDS_transform-pipeline", str(pipeline_fp), "--in_memory", "--stage_runner_fp", str(runner_fp)],
             check=False,
             capture_output=True,
         )
         assert out.returncode != 0
-        assert "--in_process does not support --stage_runner_fp" in out.stderr.decode()
+        assert (
+            "--in_memory can't run stage fit_outlier_detection, as it is parallelized" in out.stderr.decode()
+        )
 
 
 def test_example_pipeline_cleanup_intermediates():
