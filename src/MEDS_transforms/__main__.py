@@ -142,7 +142,9 @@ def run_stage():  # pragma: no cover
     # this runs once per invocation of this command. It is idempotent, so concurrent invocations of the same
     # stage (which share its work between them) may each run it.
     if CaptureStageConfig.config is not None:
-        carry_forward_unchanged_outputs(CaptureStageConfig.config, stage.stage_type, stage.is_metadata)
+        carry_forward_unchanged_outputs(
+            CaptureStageConfig.config, stage.stage_type, stage.is_metadata, stage.carry_input_data
+        )
 
 
 if __name__ == "__main__":

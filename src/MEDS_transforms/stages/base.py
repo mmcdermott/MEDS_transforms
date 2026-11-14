@@ -9,7 +9,7 @@ import os
 import sys
 import textwrap
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from contextlib import contextmanager
 from enum import StrEnum
 from functools import partial, wraps
@@ -165,6 +165,12 @@ class Stage:
             a manner similar to the examples directory.
         is_metadata: A boolean indicating whether the stage is a metadata stage. This, in some cases, is set
             automatically based on the functions passed or can be manually overridden.
+        carry_input_data: Which of the stage's input data to carry into its data output, for a stage whose
+            output dataset should keep input data it does not rewrite (see
+            `MEDS_transforms.stage_outputs.carry_forward_unchanged_outputs`). ``True`` carries every input
+            data file the stage does not write itself; a list of paths relative to the data directory (e.g.
+            ``["schemas"]``) carries only those files or directories; ``False`` carries nothing. ``None``,
+            the default, uses the rule for the stage's type.
 
     Examples:
         >>> def compute(cfg: DictConfig):
@@ -483,6 +489,7 @@ class Stage:
         None
     )
     is_metadata: bool | None = None
+    carry_input_data: bool | tuple[str, ...] | None = None
 
     __mimic_fn: Callable | None = None
     __stage_docstring: str | None = None
@@ -549,6 +556,7 @@ class Stage:
         examples_dir: Path | None = None,
         default_config: dict[str, Any] | DictConfig | Path | str | None = None,
         is_metadata: bool | None = None,
+        carry_input_data: bool | Sequence[str] | None = None,
         example_class: type[StageExample] | None = None,
         _calling_file: Path | None = None,
     ) -> MAIN_FN_T:
@@ -588,6 +596,13 @@ class Stage:
             )
         else:
             self.is_metadata = is_metadata
+
+        if carry_input_data is None or isinstance(carry_input_data, bool):
+            self.carry_input_data = carry_input_data
+        elif isinstance(carry_input_data, str):
+            raise TypeError("carry_input_data must be a bool or a list of paths, not a single string.")
+        else:
+            self.carry_input_data = tuple(str(p) for p in carry_input_data)
 
         self.__infer_stage_dir(_calling_file)
         self._calling_file = _calling_file
@@ -933,22 +948,28 @@ class Stage:
 
     @property
     def main(self) -> MAIN_FN_T:
+        """The stage's entry point: creates its output directories, then runs it on a composed config."""
+        from ..stage_outputs import prepare_output_dirs
+
         match self.stage_type:
             case StageType.MAIN:
 
                 @wraps(self.main_fn)
                 def main_fn(cfg: DictConfig):
+                    prepare_output_dirs(cfg)
                     self.main_fn(cfg)
 
             case StageType.MAP:
 
                 @wraps(self.map_fn)
                 def main_fn(cfg: DictConfig):
+                    prepare_output_dirs(cfg)
                     map_stage(cfg, self.map_fn, read_fn=self.read_fn, write_fn=self.write_fn)
 
             case StageType.MAPREDUCE:
 
                 def main_fn(cfg: DictConfig):
+                    prepare_output_dirs(cfg)
                     mapreduce_stage(
                         cfg, self.map_fn, self.reduce_fn, read_fn=self.read_fn, write_fn=self.write_fn
                     )
