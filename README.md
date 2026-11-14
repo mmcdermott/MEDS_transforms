@@ -116,6 +116,15 @@ it runs one worker per stage, it refuses stage runner YAMLs, `parallelize` setti
 `_script`s and `--do_profile`. You can still add workers by launching the same pipeline again, in process
 or not: concurrent launches share the work.
 
+Pass `--in_memory` to also keep every stage's data shards in memory rather than writing them to disk. It
+runs stages in process, like `--in_process`. Only the final dataset (`$PIPELINE_OUTPUT/data` and
+`$PIPELINE_OUTPUT/metadata`) and the logs are written. Metadata, which is small and which some stages read
+directly, still goes through disk during the run, and each stage's directory is removed at the end. No
+per-stage `.done` files are written, since the stages' data does not outlive the run, so a failed run
+starts over from the beginning (stages already marked done by an earlier on-disk run are still skipped and
+read from disk). In-memory runs can't share work with other launches. Stages with their own write
+function may still write their shards to disk; later stages then read them from there.
+
 After running, `$PIPELINE_OUTPUT` holds a complete MEDS dataset (`data/` and `metadata/`) for each stage, in
 a directory named after it. Each stage reads the dataset written by the stage before it. Whichever half of
 the dataset a stage does not compute (the metadata, for a data stage; the data, for a metadata stage) is

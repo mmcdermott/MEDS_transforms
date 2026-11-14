@@ -11,6 +11,9 @@ helpers here finish the job:
   stage (or the user) can always read the output as a complete dataset. The stage launcher
   (``MEDS_transform-stage``) runs it once, after all of the stage's workers have finished.
 
+Under in-memory mode (see `MEDS_transforms.in_memory`), directories held in memory are listed, carried into
+and pruned in the in-memory store instead, and carrying a file out of memory onto disk writes it there.
+
 Carried files are hard links where the filesystem allows it, so they cost no disk space or copy time, and
 copies otherwise. Hard links (rather than symlinks) keep every stage directory valid on its own: deleting an
 earlier stage's directory does not break a later one. Every output in MEDS-Transforms is written to a
@@ -29,6 +32,8 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from hydra.experimental.callback import Callback
 
+from .in_memory import owning_store, store_key
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
@@ -42,7 +47,12 @@ def _is_hidden(rel: Path) -> bool:
 
 
 def _dataset_files(root: Path) -> dict[Path, Path]:
-    """The non-hidden files under ``root``, keyed by their path relative to it."""
+    """The non-hidden files under ``root``, keyed by their path relative to it.
+
+    For a directory held in memory, these are its in-memory entries.
+    """
+    if (store := owning_store(root)) is not None:
+        return store.files(root)
     if not root.is_dir():
         return {}
     files = {}
@@ -64,6 +74,46 @@ def _is_same_content(src: Path, dst: Path) -> bool:
         return True
     src_stat, dst_stat = src.stat(), dst.stat()
     return src_stat.st_size == dst_stat.st_size and src_stat.st_mtime_ns == dst_stat.st_mtime_ns
+
+
+def _exists(fp: Path) -> bool:
+    store = owning_store(fp)
+    return store.has(fp) if store is not None else fp.exists()
+
+
+def _is_current(src: Path, dst: Path) -> bool:
+    """Whether ``dst`` already holds ``src``'s contents, wherever each lives."""
+    src_store, dst_store = owning_store(src), owning_store(dst)
+    if dst_store is not None:
+        dst_entry = dst_store.get(dst)
+        return dst_entry is src_store.get(src) if src_store is not None else dst_entry == src
+    if src_store is not None:
+        return False
+    return _is_same_content(src, dst)
+
+
+def _remove(fp: Path) -> None:
+    if (store := owning_store(fp)) is not None:
+        store.delete(fp)
+    else:
+        fp.unlink()
+
+
+def _carry(src: Path, dst: Path) -> None:
+    """Make ``dst`` hold ``src``'s contents: in memory, by reference; on disk, as a link or copy."""
+    src_store, dst_store = owning_store(src), owning_store(dst)
+    if dst_store is not None:
+        dst_store.put(dst, src_store.get(src) if src_store is not None else src)
+    elif src_store is not None:
+        src_store.write_to_disk(src, dst)
+    else:
+        link_or_copy(src, dst)
+
+
+def _same_dir(a: Path, b: Path) -> bool:
+    if owning_store(a) is not None or owning_store(b) is not None:
+        return store_key(a) == store_key(b)
+    return a.exists() and b.exists() and a.samefile(b)
 
 
 def link_or_copy(src: Path, dst: Path) -> None:
@@ -212,15 +262,15 @@ def carry_forward(src_dir: Path, dst_dir: Path, mirror: bool = False) -> list[Pa
         for rel, dst_fp in _dataset_files(dst_dir).items():
             if rel not in src_files:
                 logger.info(f"Removing {dst_fp}, which is no longer in {src_dir}")
-                dst_fp.unlink()
+                _remove(dst_fp)
 
     created = []
     for rel, src_fp in src_files.items():
         dst_fp = dst_dir / rel
-        if dst_fp.exists() and (not mirror or _is_same_content(src_fp, dst_fp)):
+        if _exists(dst_fp) and (not mirror or _is_current(src_fp, dst_fp)):
             continue
 
-        link_or_copy(src_fp, dst_fp)
+        _carry(src_fp, dst_fp)
         created.append(dst_fp)
 
     return created
@@ -266,12 +316,14 @@ def prune_stale_outputs(output_dir: Path, keep: Iterable[Path], suffix: str = ".
             └── 0.txt
     """
     output_dir = Path(output_dir)
-    keep = {Path(fp).resolve() for fp in keep}
+    in_memory = owning_store(output_dir) is not None
+    normalize = store_key if in_memory else Path.resolve
+    keep = {normalize(Path(fp)) for fp in keep}
     removed = []
     for fp in _dataset_files(output_dir).values():
-        if fp.name.endswith(suffix) and fp.resolve() not in keep:
+        if fp.name.endswith(suffix) and normalize(fp) not in keep:
             logger.info(f"Removing stale output {fp}")
-            fp.unlink()
+            _remove(fp)
             removed.append(fp)
     return removed
 
@@ -411,7 +463,7 @@ def carry_forward_unchanged_outputs(cfg: DictConfig, stage_type: str, is_metadat
 
     for half, mode in (("data", data_mode), ("metadata", metadata_mode)):
         src, dst = dirs[f"{half}_input_dir"], dirs[f"{half}_output_dir"]
-        if mode is None or (src.exists() and dst.exists() and src.samefile(dst)):
+        if mode is None or _same_dir(src, dst):
             continue
         n = len(carry_forward(src, dst, mirror=(mode == "mirror")))
         logger.info(f"Carried {n} {half} file(s) forward from {src} to {dst}")

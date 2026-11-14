@@ -341,6 +341,7 @@ def pipeline_tester(
     stage_runner_yaml: str | None,
     stage_scenario_sequence: list[str],
     run_fn: Callable | None = subprocess.run,
+    check_intermediates: bool = True,
 ) -> str:
     """Test the pipeline with the given YAML configuration and stage scenario sequence.
 
@@ -357,6 +358,8 @@ def pipeline_tester(
             These are used to test the pipeline conforms to expectations across all stages.
         run_fn: A callable to run the pipeline. Defaults to `subprocess.run`. This is useful for dependency
             injection during testing.
+        check_intermediates: Whether to check each stage's own output directory, as well as the pipeline's
+            published output. Turn this off for runs that keep no stage directories (e.g. ``--in_memory``).
 
     Raises:
         ValueError: If the pipeline YAML and stage scenario sequence do not match in length.
@@ -493,6 +496,7 @@ def pipeline_tester(
         checks = [
             (name, stage, output_dir / name)
             for name, stage in zip(pipeline_stages, stage_examples, strict=True)
+            if check_intermediates
         ]
         checks.append((f"{pipeline_stages[-1]} (published)", stage_examples[-1], output_dir))
 

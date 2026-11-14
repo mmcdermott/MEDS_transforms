@@ -13,6 +13,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 
 import yaml
@@ -21,6 +22,7 @@ from omegaconf import DictConfig, OmegaConf
 from . import __package_name__
 from .configs import PipelineConfig
 from .configs.utils import OmegaConfResolver
+from .in_memory import FrameStore, in_memory_mode
 from .stage_launch import run_stage_in_process
 from .stage_outputs import carry_forward
 from .utils import invocation_name
@@ -78,6 +80,62 @@ def stage_dir_overrides(stage_name: str, prior_stage_name: str | None) -> list[s
     overrides.append(f"stage_output_dir=${{output_dir}}/{stage_name}")
     overrides.append(f"log_dir=${{output_dir}}/.logs/{stage_name}")
     return overrides
+
+
+def run_stage_in_memory(
+    store: FrameStore,
+    pipeline_config_fp: str,
+    stage_name: str,
+    prior_in_memory_stage: str | None,
+    overrides: list[str],
+    output_dir: Path,
+) -> None:
+    """Run a stage in process with its data output held in ``store``.
+
+    The stage's ``data/`` output directory becomes one of the store's roots before it runs. Afterwards, any
+    shards the stage wrote directly to disk there (through its own write function) are taken over by the
+    store, and the previous stage's in-memory data is dropped, as nothing reads it any more. No ``.done``
+    marker is written: the stage's data exists only in this process, so a later run could not resume
+    from it.
+
+    Args:
+        store: The active in-memory store.
+        pipeline_config_fp: The pipeline YAML.
+        stage_name: The stage to run.
+        prior_in_memory_stage: The previous stage, if it too ran in memory in this run.
+        overrides: The stage's Hydra overrides, unquoted.
+        output_dir: The pipeline's output directory.
+
+    Examples:
+        >>> from MEDS_transforms.stages.discovery import get_all_registered_stages
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     root = Path(tmpdir)
+        ...     input_dir, output_dir = root / "input", root / "output"
+        ...     input_dir.mkdir()
+        ...     stage = get_all_registered_stages()["filter_subjects"].load()
+        ...     stage.test_cases["."].write_for_test(input_dir)
+        ...     pipeline_fp = root / "pipeline.yaml"
+        ...     _ = pipeline_fp.write_text(
+        ...         f"input_dir: {input_dir}\\noutput_dir: {output_dir}\\n"
+        ...         "stages:\\n  - filter_subjects:\\n      min_events_per_subject: 5\\n"
+        ...     )
+        ...     overrides = ["stage=filter_subjects", *stage_dir_overrides("filter_subjects", None)]
+        ...     with in_memory_mode() as store:
+        ...         run_stage_in_memory(store, pipeline_fp, "filter_subjects", None, overrides, output_dir)
+        ...         data_dir = output_dir / "filter_subjects" / "data"
+        ...         print(sorted(p.as_posix() for p in store.files(data_dir)))
+        ...         print(data_dir.exists(), (output_dir / "filter_subjects" / "metadata").is_dir())
+        ['held_out/0.parquet', 'train/0.parquet', 'train/1.parquet', 'tuning/0.parquet']
+        False True
+    """
+    data_dir = output_dir / stage_name / "data"
+    store.add_root(data_dir)
+    before = store.disk_snapshot(data_dir)
+    run_stage_in_process(pipeline_config_fp, stage_name, overrides)
+    if adopted := store.adopt_disk_files(data_dir, before):
+        logger.info(f"Stage {stage_name} wrote {len(adopted)} shard(s) to disk; reading them from there.")
+    if prior_in_memory_stage is not None:
+        store.remove_root(output_dir / prior_in_memory_stage / "data")
 
 
 def check_in_process_compatible(
@@ -484,9 +542,20 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
         ),
     )
     parser.add_argument(
+        "--in_memory",
+        default=False,
+        action=argparse.BooleanOptionalAction,
+        help=(
+            "Like --in_process, but keep each stage's data shards in memory rather than on disk. Only the "
+            "final dataset and the logs are written; a failed run restarts from the beginning."
+        ),
+    )
+    parser.add_argument(
         "--overrides", nargs="*", default=[], help="Additional overrides for the pipeline configuration."
     )
     args = parser.parse_args(argv)
+    if args.in_memory:
+        args.in_process = True
 
     pipeline_config = PipelineConfig.from_arg(args.pipeline_config_fp, args.overrides)
     if pipeline_config.additional_params is None or "output_dir" not in pipeline_config.additional_params:
@@ -525,14 +594,30 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
         logger.info("No parallelization configuration provided.")
         default_parallelization_cfg = None
 
-    for prior_stage, stage in zip([None, *stages[:-1]], stages, strict=True):
-        done_file = log_dir / f"{stage}.done"
+    output_dir = log_dir.parent
+    in_memory_stages = []
+    with in_memory_mode() if args.in_memory else nullcontext() as store:
+        for prior_stage, stage in zip([None, *stages[:-1]], stages, strict=True):
+            done_file = log_dir / f"{stage}.done"
 
-        if done_file.exists():
-            logger.info(f"Skipping stage {stage} as it is already complete.")
-        else:
+            if done_file.exists():
+                logger.info(f"Skipping stage {stage} as it is already complete.")
+                continue
+
             logger.info(f"Running stage: {stage}")
             dir_overrides = stage_dir_overrides(stage, prior_stage)
+            if store is not None:
+                run_stage_in_memory(
+                    store,
+                    args.pipeline_config_fp,
+                    stage,
+                    prior_stage if prior_stage in in_memory_stages else None,
+                    [f"stage={stage}", *dir_overrides, *args.overrides],
+                    output_dir,
+                )
+                in_memory_stages.append(stage)
+                continue
+
             if args.in_process:
                 run_stage_in_process(
                     args.pipeline_config_fp, stage, [f"stage={stage}", *dir_overrides, *args.overrides]
@@ -549,7 +634,13 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
                 )
             done_file.touch()
 
-    publish_final_outputs(log_dir.parent, stages[-1])
+        # Inside the in-memory block, so the last stage's in-memory shards are written out to disk.
+        publish_final_outputs(output_dir, stages[-1])
+
+    for stage in in_memory_stages:
+        # These directories hold only the stage's metadata and scratch files; its data was never on disk,
+        # and the published result links to (or copies) the last stage's metadata.
+        shutil.rmtree(output_dir / stage, ignore_errors=True)
     global_done_file.touch()
 
     if pipeline_config.additional_params.get("cleanup_intermediates", False):

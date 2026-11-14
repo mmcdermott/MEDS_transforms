@@ -125,6 +125,39 @@ def test_example_pipeline_in_process_shares_work_with_subprocess_launch():
     )
 
 
+def _run_in_memory(cmd, **kwargs) -> subprocess.CompletedProcess:
+    return subprocess.run([*cmd, "--in_memory"], **kwargs)
+
+
+def test_example_pipeline_in_memory():
+    """`--in_memory` produces the same final dataset, keeping no stage's data on disk."""
+    pipeline_tester(
+        PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE, run_fn=_run_in_memory, check_intermediates=False
+    )
+
+
+def test_in_memory_writes_only_the_final_dataset_and_logs():
+    from MEDS_transforms.stages.discovery import get_all_registered_stages
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        root = Path(temp_dir)
+        input_dir, output_dir = root / "input", root / "output"
+        input_dir.mkdir()
+        get_all_registered_stages()["filter_subjects"].load().test_cases["."].write_for_test(input_dir)
+        pipeline_fp = root / "pipeline.yaml"
+        pipeline_fp.write_text(PIPELINE_YAML.format(input_dir=input_dir, output_dir=output_dir))
+
+        out = subprocess.run(
+            ["MEDS_transform-pipeline", str(pipeline_fp), "--in_memory"], check=False, capture_output=True
+        )
+
+        assert out.returncode == 0, f"{out.stdout.decode()}\n{out.stderr.decode()}"
+        assert {p.name for p in output_dir.iterdir()} == {".logs", "data", "metadata"}
+        assert {p.name for p in (output_dir / ".logs").glob("*.done")} == {"_all_stages.done"}
+        assert any((output_dir / "data").rglob("*.parquet"))
+        assert not list(output_dir.rglob("*.lock"))
+
+
 def test_in_process_rejects_stage_runner():
     with tempfile.TemporaryDirectory() as temp_dir:
         root = Path(temp_dir)

@@ -4,6 +4,7 @@ import hashlib
 import logging
 import time
 from collections.abc import Callable
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from omegaconf import DictConfig
 
 from ..compute_modes import COMPUTE_FN_T
 from ..dataframe import READ_FN_T, WRITE_FN_T
+from ..in_memory import owning_store
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +57,9 @@ def is_complete_parquet_file(fp: Path) -> bool:
 
 
 def default_file_checker(fp: Path) -> bool:
-    """Check if a file exists and is complete."""
+    """Check if a file exists and is complete (or, under in-memory mode, is held in memory)."""
+    if (store := owning_store(fp)) is not None:
+        return store.has(fp)
     if fp.suffix == ".parquet":
         return is_complete_parquet_file(fp)
     return fp.is_file()
@@ -407,13 +411,17 @@ def rwlock_wrap(
         logger.info(f"{out_fp} exists; returning.")
         return False
 
+    # An output held in memory is only ever written by this process, one worker at a time, so it needs no
+    # lock (and taking one would create a directory on disk for it).
+    store = owning_store(out_fp)
     lock_fp = out_fp.with_suffix(f"{out_fp.suffix}.lock")
-    lock = FileLock(str(lock_fp))
-    try:
-        lock.acquire(timeout=0)
-    except Timeout:
-        logger.info(f"Lock found at {lock_fp}. Returning.")
-        return False
+    lock = nullcontext() if store is not None else FileLock(str(lock_fp))
+    if store is None:
+        try:
+            lock.acquire(timeout=0)
+        except Timeout:
+            logger.info(f"Lock found at {lock_fp}. Returning.")
+            return False
 
     try:
         # Re-check under the lock: another worker may have finished this output between our check above
@@ -428,7 +436,10 @@ def rwlock_wrap(
             # while holding the lock — rather than before acquiring it, as this used to — keeps the
             # output from being absent during a window in which nothing guards it.
             logger.info(f"Deleting existing {out_fp} as do_overwrite={do_overwrite}.")
-            out_fp.unlink()
+            if store is not None:
+                store.delete(out_fp)
+            else:
+                out_fp.unlink()
 
         st_time = datetime.now(tz=UTC)
         logger.info(f"Reading input dataframe from {in_fp}")
@@ -445,5 +456,6 @@ def rwlock_wrap(
         logger.info(f"Succeeded in {datetime.now(tz=UTC) - st_time}")
         return True
     finally:
-        lock.release()
-        lock_fp.unlink(missing_ok=True)
+        if store is None:
+            lock.release()
+            lock_fp.unlink(missing_ok=True)

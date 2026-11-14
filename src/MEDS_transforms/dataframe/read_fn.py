@@ -14,8 +14,14 @@ READ_FN_T = Callable[[Path], DF_T]
 
 
 def read_df(in_fp: Path) -> DF_T:
-    """A generic helper to read a dataframe without accounting for globs."""
+    """A generic helper to read a dataframe without accounting for globs.
 
+    Under in-memory mode, a path held in memory is read from the store (see `MEDS_transforms.in_memory`).
+    """
+    from ..in_memory import owning_store
+
+    if (store := owning_store(in_fp)) is not None:
+        return store.read(in_fp)
     return pl.scan_parquet(in_fp, glob=False)
 
 
