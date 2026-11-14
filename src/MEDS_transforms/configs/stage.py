@@ -5,7 +5,7 @@ from __future__ import annotations
 import dataclasses
 from typing import ClassVar
 
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig
 
 UNPARSED_STAGE_T = str | dict | DictConfig
 
@@ -22,6 +22,8 @@ class StageConfig:
         name: The name of the stage.
         base_stage: The name of the underlying, registered, base stage (if any) for this stage.
         config: The configuration for the stage.
+        block: For a *stage block* (a ``_block:`` list in the pipeline YAML), the stages it runs, in order,
+            on each shard; ``None`` for an ordinary stage. See `MEDS_transforms.stages.StageBlock`.
 
     Raises:
         TypeError: If any non-None parameter is not of the appropriate type.
@@ -66,9 +68,11 @@ class StageConfig:
     name: str
     base_stage: str | None = None
     config: dict | DictConfig = dataclasses.field(default_factory=dict)
+    block: list[StageConfig] | None = dataclasses.field(default=None, repr=False)
 
     META_KEYS: ClassVar[set[str]] = {
         "_base_stage",
+        "_block",
     }
 
     @classmethod
@@ -264,6 +268,68 @@ class StageConfig:
 
         if not isinstance(self.config, dict | DictConfig):
             raise TypeError(f"Invalid config type {type(self.config)}. Expected dict or DictConfig.")
+
+        if self.block is not None:
+            self.block = self._parse_block(self.block)
+
+    def _parse_block(self, block: list | ListConfig | tuple) -> list[StageConfig]:
+        """Parse and check a stage block's list of stages.
+
+        Examples:
+            >>> stages = ["filter_subjects", {"occlude_outliers": {}}]
+            >>> block = StageConfig.from_arg({"prep": {"_block": stages}})
+            >>> block.is_block, [s.name for s in block.block]
+            (True, ['filter_subjects', 'occlude_outliers'])
+            >>> StageConfig(name="b", block=[])
+            Traceback (most recent call last):
+                ...
+            ValueError: Stage block b must list at least one stage.
+            >>> StageConfig(name="b", block="filter_subjects")
+            Traceback (most recent call last):
+                ...
+            TypeError: Stage block b's `_block` must be a list of stages, got str.
+            >>> StageConfig(name="b", base_stage="x", block=["filter_subjects"])
+            Traceback (most recent call last):
+                ...
+            ValueError: Stage block b can't set `_base_stage`; set it on the stages in its `_block`.
+            >>> StageConfig(name="b", block=["a", {"c": {"_block": ["d"]}}])
+            Traceback (most recent call last):
+                ...
+            ValueError: Stage block b contains another block, c; blocks can't be nested.
+            >>> StageConfig(name="b", block=["a", "a"])
+            Traceback (most recent call last):
+                ...
+            ValueError: Stage block b lists a twice; name each stage in a block uniquely.
+        """
+        if not isinstance(block, list | ListConfig | tuple):
+            raise TypeError(
+                f"Stage block {self.name}'s `_block` must be a list of stages, got {type(block).__name__}."
+            )
+        if not block:
+            raise ValueError(f"Stage block {self.name} must list at least one stage.")
+        if self.base_stage is not None:
+            raise ValueError(
+                f"Stage block {self.name} can't set `_base_stage`; set it on the stages in its `_block`."
+            )
+
+        stages = [s if isinstance(s, StageConfig) else StageConfig.from_arg(s) for s in block]
+        names = set()
+        for s in stages:
+            if s.is_block:
+                raise ValueError(
+                    f"Stage block {self.name} contains another block, {s.name}; blocks can't be nested."
+                )
+            if s.name in names:
+                raise ValueError(
+                    f"Stage block {self.name} lists {s.name} twice; name each stage in a block uniquely."
+                )
+            names.add(s.name)
+        return stages
+
+    @property
+    def is_block(self) -> bool:
+        """Whether this entry is a stage block rather than a single stage."""
+        return self.block is not None
 
     @property
     def resolved_name(self) -> str:

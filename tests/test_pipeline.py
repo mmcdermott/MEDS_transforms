@@ -96,6 +96,53 @@ def test_example_pipeline_concurrent_launches():
     pipeline_tester(PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE, run_fn=_run_twice_concurrently)
 
 
+BLOCK_PIPELINE_YAML = PIPELINE_YAML.replace(
+    """stages:
+  - filter_subjects:
+      min_events_per_subject: 5
+  - add_time_derived_measurements:
+      age:
+        DOB_code: "MEDS_BIRTH"
+        age_code: "AGE"
+        age_unit: "years"
+      time_of_day:
+        time_of_day_code: "TIME_OF_DAY"
+        endpoints: [6, 12, 18, 24]
+""",
+    """stages:
+  - preprocess:
+      _block:
+        - filter_subjects:
+            min_events_per_subject: 5
+        - add_time_derived_measurements:
+            age:
+              DOB_code: "MEDS_BIRTH"
+              age_code: "AGE"
+              age_unit: "years"
+            time_of_day:
+              time_of_day_code: "TIME_OF_DAY"
+              endpoints: [6, 12, 18, 24]
+""",
+)
+BLOCK_STAGE_SCENARIO_SEQUENCE = [STAGE_SCENARIO_SEQUENCE[:2], *STAGE_SCENARIO_SEQUENCE[2:]]
+
+
+def test_example_pipeline_with_a_stage_block():
+    """Running the first two map stages as one block gives the same outputs, from one stage directory."""
+    assert BLOCK_PIPELINE_YAML != PIPELINE_YAML
+    pipeline_tester(BLOCK_PIPELINE_YAML, None, BLOCK_STAGE_SCENARIO_SEQUENCE)
+
+
+def test_example_pipeline_with_a_parallel_stage_block():
+    """A block's parallelization setting applies to the whole block."""
+    log = pipeline_tester(
+        BLOCK_PIPELINE_YAML,
+        'preprocess:\n  parallelize:\n    n_workers: 2\n    launcher: "joblib"\n',
+        BLOCK_STAGE_SCENARIO_SEQUENCE,
+    )
+    assert "MEDS_transform-stage" in log and "preprocess --multirun" in log
+
+
 def test_example_pipeline_cleanup_intermediates():
     """With `cleanup_intermediates=true`, only the pipeline's result and logs remain after the run."""
     from MEDS_transforms.stages.discovery import get_all_registered_stages
