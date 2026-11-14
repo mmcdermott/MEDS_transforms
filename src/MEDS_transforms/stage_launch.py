@@ -145,6 +145,12 @@ def compose_stage_config(overrides: list[str]) -> DictConfig:
         filter_subjects out/filter_subjects/data
         >>> "hydra" in cfg
         False
+
+        It works even if Hydra is already initialized (for instance by an enclosing Hydra app):
+
+        >>> with initialize(version_base=None):
+        ...     print(compose_stage_config(["output_dir=out"]).stage)
+        filter_subjects
     """
     if GlobalHydra.instance().is_initialized():
         GlobalHydra.instance().clear()
