@@ -109,6 +109,15 @@ You can optionally supply a *stage runner* YAML as a second argument to control 
 forwarded to the stage invocations using Hydra override syntax, allowing you to tweak stage parameters on
 the command line.
 
+Pass `--in_process` to run stages inside the runner's own process, as a single worker, rather than
+launching a `MEDS_transform-stage` subprocess for each. That skips each stage's Python and Hydra start-up,
+which dominates the runtime of small pipelines, and lets you debug the whole pipeline in one process. It
+produces the same outputs and logs. Stages that need a subprocess are still launched as one: those with a
+`parallelize` setting (their own in a stage runner YAML, or the pipeline's), a custom `script`/`_script`,
+or all stages under `--do_profile`. So you can keep parallelism where it pays off, for the heavy stages,
+and run the rest in process. You can also add workers by launching the same pipeline again, in process or
+not: concurrent launches share the work.
+
 After running, you will see output files stored in `$PIPELINE_OUTPUT` with the results of each stage of the
 pipeline in stage-specific directories, and the global output in `$PIPELINE_OUTPUT/data` and
 `$PIPELINE_OUTPUT/metadata` (for data and metadata outputs, respectively). That's it!
