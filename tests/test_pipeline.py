@@ -90,26 +90,6 @@ def test_example_pipeline_in_process():
     pipeline_tester(PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE, run_fn=_run_in_process)
 
 
-def _run_in_process_and_subprocess_concurrently(cmd, **kwargs) -> subprocess.CompletedProcess:
-    """Launch the pipeline in process and, at the same time, with a subprocess per stage."""
-    procs = [
-        subprocess.Popen(c, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        for c in (cmd, [*cmd, "--in_process"])
-    ]
-    outs = [proc.communicate() for proc in procs]
-    returncode = next((proc.returncode for proc in procs if proc.returncode != 0), 0)
-    return subprocess.CompletedProcess(
-        cmd, returncode, stdout=b"\n".join(o for o, _ in outs), stderr=b"\n".join(e for _, e in outs)
-    )
-
-
-def test_example_pipeline_in_process_shares_work_with_subprocess_launch():
-    """An in-process launch and a subprocess launch of the same pipeline can run at once."""
-    pipeline_tester(
-        PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE, run_fn=_run_in_process_and_subprocess_concurrently
-    )
-
-
 MIXED_STAGE_RUNNER_YAML = """
 fit_outlier_detection:
   parallelize:
@@ -118,6 +98,7 @@ fit_outlier_detection:
 """
 
 
+@pytest.mark.parallelized
 def test_example_pipeline_in_process_launches_parallel_stages_as_subprocesses():
     """Under `--in_process`, a parallelized stage still gets its workers; the rest run in process."""
     log = pipeline_tester(

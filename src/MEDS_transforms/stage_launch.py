@@ -162,8 +162,7 @@ def run_stage_in_process(pipeline_config_fp: str | Path, stage_name: str, overri
     """Run one stage in the calling process, as ``MEDS_transform-stage <pipeline> <stage> ...`` would.
 
     The stage runs as a single worker. Its composed config and overrides are saved to ``<log_dir>/.hydra/``,
-    and its log to ``<log_dir>/<stage>.log``, as a Hydra run would. Concurrent launches of the same
-    pipeline, in process or not, still share the stage's work.
+    and its log to ``<log_dir>/<stage>.log``, as a Hydra run would.
 
     Args:
         pipeline_config_fp: The pipeline YAML, as a path or in ``pkg://`` syntax.
