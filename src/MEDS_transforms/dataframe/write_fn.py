@@ -19,7 +19,15 @@ def write_df(df: DF_T, out_fp: Path) -> None:
     ``out_fp`` and its staging path share a filesystem. The staging name is unique
     to each call, so concurrent writers of the same output (e.g. two launches of a
     stage both writing its reduced metadata) never rename each other's file away.
+
+    Under in-memory mode, a path held in memory is stored there instead, and nothing is written to disk
+    (see `MEDS_transforms.in_memory`).
     """
+    from ..in_memory import owning_store
+
+    if (store := owning_store(out_fp)) is not None:
+        store.put(out_fp, df)
+        return
     if isinstance(df, pl.LazyFrame):
         df = df.collect()
     out_fp.parent.mkdir(parents=True, exist_ok=True)

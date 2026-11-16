@@ -109,6 +109,24 @@ You can optionally supply a *stage runner* YAML as a second argument to control 
 forwarded to the stage invocations using Hydra override syntax, allowing you to tweak stage parameters on
 the command line.
 
+Pass `--in_process` to run stages inside the runner's own process, as a single worker, rather than
+launching a `MEDS_transform-stage` subprocess for each. That skips each stage's Python and Hydra start-up,
+which dominates the runtime of small pipelines, and lets you debug the whole pipeline in one process. It
+produces the same outputs and logs. Stages that need a subprocess are still launched as one: those with a
+`parallelize` setting (their own in a stage runner YAML, or the pipeline's), a custom `script`/`_script`,
+or all stages under `--do_profile`. So you can keep parallelism where it pays off, for the heavy stages,
+and run the rest in process. You can also add workers by launching the same pipeline again, in process or
+not: concurrent launches share the work.
+
+Pass `--in_memory` to also keep every stage's data shards in memory rather than writing them to disk. It
+runs stages in process, like `--in_process`. Only the final dataset (`$PIPELINE_OUTPUT/data` and
+`$PIPELINE_OUTPUT/metadata`) and the logs are written. Metadata, which is small and which some stages read
+directly, still goes through disk during the run, and each stage's directory is removed at the end. No
+per-stage `.done` files are written, since the stages' data does not outlive the run, so a failed run
+starts over from the beginning (stages already marked done by an earlier on-disk run are still skipped and
+read from disk). In-memory runs can't share work with other launches. Stages with their own write
+function may still write their shards to disk; later stages then read them from there.
+
 After running, `$PIPELINE_OUTPUT` holds a complete MEDS dataset (`data/` and `metadata/`) for each stage, in
 a directory named after it. Each stage reads the dataset written by the stage before it. Whichever half of
 the dataset a stage does not compute (the metadata, for a data stage; the data, for a metadata stage) is

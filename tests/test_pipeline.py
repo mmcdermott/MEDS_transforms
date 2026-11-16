@@ -96,6 +96,104 @@ def test_example_pipeline_concurrent_launches():
     pipeline_tester(PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE, run_fn=_run_twice_concurrently)
 
 
+def _run_in_process(cmd, **kwargs) -> subprocess.CompletedProcess:
+    return subprocess.run([*cmd, "--in_process"], **kwargs)
+
+
+def test_example_pipeline_in_process():
+    """`--in_process` runs every stage in the runner's process and produces the same outputs."""
+    pipeline_tester(PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE, run_fn=_run_in_process)
+
+
+def _run_in_process_and_subprocess_concurrently(cmd, **kwargs) -> subprocess.CompletedProcess:
+    """Launch the pipeline in process and, at the same time, with a subprocess per stage."""
+    procs = [
+        subprocess.Popen(c, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        for c in (cmd, [*cmd, "--in_process"])
+    ]
+    outs = [proc.communicate() for proc in procs]
+    returncode = next((proc.returncode for proc in procs if proc.returncode != 0), 0)
+    return subprocess.CompletedProcess(
+        cmd, returncode, stdout=b"\n".join(o for o, _ in outs), stderr=b"\n".join(e for _, e in outs)
+    )
+
+
+def test_example_pipeline_in_process_shares_work_with_subprocess_launch():
+    """An in-process launch and a subprocess launch of the same pipeline can run at once."""
+    pipeline_tester(
+        PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE, run_fn=_run_in_process_and_subprocess_concurrently
+    )
+
+
+MIXED_STAGE_RUNNER_YAML = """
+fit_outlier_detection:
+  parallelize:
+    n_workers: 2
+    launcher: "joblib"
+"""
+
+
+def test_example_pipeline_in_process_launches_parallel_stages_as_subprocesses():
+    """Under `--in_process`, a parallelized stage still gets its workers; the rest run in process."""
+    log = pipeline_tester(
+        PIPELINE_YAML, MIXED_STAGE_RUNNER_YAML, STAGE_SCENARIO_SEQUENCE, run_fn=_run_in_process
+    )
+    assert "Running stage fit_outlier_detection in a subprocess, as it is parallelized." in log
+    assert "Running stage filter_subjects in process" in log
+    assert "Running stage filter_subjects in a subprocess" not in log
+
+
+def _run_in_memory(cmd, **kwargs) -> subprocess.CompletedProcess:
+    return subprocess.run([*cmd, "--in_memory"], **kwargs)
+
+
+def test_example_pipeline_in_memory():
+    """`--in_memory` produces the same final dataset, keeping no stage's data on disk."""
+    pipeline_tester(
+        PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE, run_fn=_run_in_memory, check_intermediates=False
+    )
+
+
+def test_in_memory_writes_only_the_final_dataset_and_logs():
+    from MEDS_transforms.stages.discovery import get_all_registered_stages
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        root = Path(temp_dir)
+        input_dir, output_dir = root / "input", root / "output"
+        input_dir.mkdir()
+        get_all_registered_stages()["filter_subjects"].load().test_cases["."].write_for_test(input_dir)
+        pipeline_fp = root / "pipeline.yaml"
+        pipeline_fp.write_text(PIPELINE_YAML.format(input_dir=input_dir, output_dir=output_dir))
+
+        out = subprocess.run(
+            ["MEDS_transform-pipeline", str(pipeline_fp), "--in_memory"], check=False, capture_output=True
+        )
+
+        assert out.returncode == 0, f"{out.stdout.decode()}\n{out.stderr.decode()}"
+        assert {p.name for p in output_dir.iterdir()} == {".logs", "data", "metadata"}
+        assert {p.name for p in (output_dir / ".logs").glob("*.done")} == {"_all_stages.done"}
+        assert any((output_dir / "data").rglob("*.parquet"))
+        assert not list(output_dir.rglob("*.lock"))
+
+
+def test_in_memory_rejects_stages_that_need_a_subprocess():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        root = Path(temp_dir)
+        pipeline_fp = root / "pipeline.yaml"
+        pipeline_fp.write_text(PIPELINE_YAML.format(input_dir=root / "in", output_dir=root / "out"))
+        runner_fp = root / "runner.yaml"
+        runner_fp.write_text(MIXED_STAGE_RUNNER_YAML)
+        out = subprocess.run(
+            ["MEDS_transform-pipeline", str(pipeline_fp), "--in_memory", "--stage_runner_fp", str(runner_fp)],
+            check=False,
+            capture_output=True,
+        )
+        assert out.returncode != 0
+        assert (
+            "--in_memory can't run stage fit_outlier_detection, as it is parallelized" in out.stderr.decode()
+        )
+
+
 def test_example_pipeline_cleanup_intermediates():
     """With `cleanup_intermediates=true`, only the pipeline's result and logs remain after the run."""
     from MEDS_transforms.stages.discovery import get_all_registered_stages

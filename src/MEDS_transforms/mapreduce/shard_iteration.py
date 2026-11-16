@@ -9,6 +9,8 @@ from typing import NamedTuple
 
 from omegaconf import DictConfig
 
+from ..in_memory import owning_store
+
 logger = logging.getLogger(__name__)
 
 
@@ -275,12 +277,11 @@ def shard_iterator(
     if in_prefix:
         input_dir = input_dir / in_prefix
 
-    shards = []
-    for p in input_dir.glob(f"**/*{in_suffix}"):
-        relative_path = p.relative_to(input_dir)
-        shard_name = str(relative_path)
-        shard_name = shard_name[: -len(in_suffix)]
-        shards.append(shard_name)
+    if (store := owning_store(input_dir)) is not None:
+        shard_fps = list(store.files(input_dir, in_suffix))
+    else:
+        shard_fps = [p.relative_to(input_dir) for p in input_dir.glob(f"**/*{in_suffix}")]
+    shards = [str(rel)[: -len(in_suffix)] for rel in shard_fps]
 
     if not shards:
         raise FileNotFoundError(

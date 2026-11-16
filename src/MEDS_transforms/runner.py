@@ -13,6 +13,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 
 import yaml
@@ -21,6 +22,8 @@ from omegaconf import DictConfig, OmegaConf
 from . import __package_name__
 from .configs import PipelineConfig
 from .configs.utils import OmegaConfResolver
+from .in_memory import FrameStore, in_memory_mode
+from .stage_launch import run_stage_in_process
 from .stage_outputs import carry_forward
 from .utils import invocation_name
 
@@ -47,35 +50,145 @@ def stage_dir_overrides(stage_name: str, prior_stage_name: str | None) -> list[s
     finished, the runner publishes the last stage's dataset as ``${output_dir}/data`` and
     ``${output_dir}/metadata`` (see `publish_final_outputs`).
 
-    The paths are left as interpolations of ``output_dir``, so they follow any override of it, and each
-    override is quoted for the shell. These are plain overrides of keys every stage's config defines (see
-    ``configs/_main.yaml``), so a custom stage ``script`` whose config lacks them fails at launch rather than
-    ignoring them and writing somewhere the next stage won't look.
+    The paths are left as interpolations of ``output_dir``, so they follow any override of it. Quote each
+    override (e.g. with ``shlex.quote``) before putting it in a shell command. These are plain overrides of
+    keys every stage's config defines (see ``configs/_main.yaml``), so a custom stage ``script`` whose
+    config lacks them fails at launch rather than ignoring them and writing somewhere the next stage won't
+    look.
 
     Args:
         stage_name: The stage to run.
         prior_stage_name: The stage before it in the pipeline, or ``None`` if it is the first.
 
     Returns:
-        The overrides, ready to be joined into a shell command.
+        The overrides, unquoted.
 
     Examples:
         >>> for o in stage_dir_overrides("count_codes", None):
         ...     print(o)
-        'stage_output_dir=${output_dir}/count_codes'
-        'log_dir=${output_dir}/.logs/count_codes'
+        stage_output_dir=${output_dir}/count_codes
+        log_dir=${output_dir}/.logs/count_codes
         >>> for o in stage_dir_overrides("filter_measurements", "count_codes"):
         ...     print(o)
-        'stage_input_dir=${output_dir}/count_codes'
-        'stage_output_dir=${output_dir}/filter_measurements'
-        'log_dir=${output_dir}/.logs/filter_measurements'
+        stage_input_dir=${output_dir}/count_codes
+        stage_output_dir=${output_dir}/filter_measurements
+        log_dir=${output_dir}/.logs/filter_measurements
     """
     overrides = []
     if prior_stage_name is not None:
         overrides.append(f"stage_input_dir=${{output_dir}}/{prior_stage_name}")
     overrides.append(f"stage_output_dir=${{output_dir}}/{stage_name}")
     overrides.append(f"log_dir=${{output_dir}}/.logs/{stage_name}")
-    return [shlex.quote(o) for o in overrides]
+    return overrides
+
+
+def run_stage_in_memory(
+    store: FrameStore,
+    pipeline_config_fp: str,
+    stage_name: str,
+    prior_in_memory_stage: str | None,
+    overrides: list[str],
+    output_dir: Path,
+) -> None:
+    """Run a stage in process with its data output held in ``store``.
+
+    The stage's ``data/`` output directory becomes one of the store's roots before it runs. Afterwards, any
+    shards the stage wrote directly to disk there (through its own write function) are taken over by the
+    store, and the previous stage's in-memory data is dropped, as nothing reads it any more. No ``.done``
+    marker is written: the stage's data exists only in this process, so a later run could not resume
+    from it.
+
+    Args:
+        store: The active in-memory store.
+        pipeline_config_fp: The pipeline YAML.
+        stage_name: The stage to run.
+        prior_in_memory_stage: The previous stage, if it too ran in memory in this run.
+        overrides: The stage's Hydra overrides, unquoted.
+        output_dir: The pipeline's output directory.
+
+    Examples:
+        >>> from MEDS_transforms.stages.discovery import get_all_registered_stages
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     root = Path(tmpdir)
+        ...     input_dir, output_dir = root / "input", root / "output"
+        ...     input_dir.mkdir()
+        ...     stage = get_all_registered_stages()["filter_subjects"].load()
+        ...     stage.test_cases["."].write_for_test(input_dir)
+        ...     pipeline_fp = root / "pipeline.yaml"
+        ...     _ = pipeline_fp.write_text(
+        ...         f"input_dir: {input_dir}\\noutput_dir: {output_dir}\\n"
+        ...         "stages:\\n  - filter_subjects:\\n      min_events_per_subject: 5\\n"
+        ...     )
+        ...     overrides = ["stage=filter_subjects", *stage_dir_overrides("filter_subjects", None)]
+        ...     with in_memory_mode() as store:
+        ...         run_stage_in_memory(store, pipeline_fp, "filter_subjects", None, overrides, output_dir)
+        ...         data_dir = output_dir / "filter_subjects" / "data"
+        ...         print(sorted(p.as_posix() for p in store.files(data_dir)))
+        ...         print(data_dir.exists(), (output_dir / "filter_subjects" / "metadata").is_dir())
+        ['held_out/0.parquet', 'train/0.parquet', 'train/1.parquet', 'tuning/0.parquet']
+        False True
+    """
+    data_dir = output_dir / stage_name / "data"
+    store.add_root(data_dir)
+    before = store.disk_snapshot(data_dir)
+    run_stage_in_process(pipeline_config_fp, stage_name, overrides)
+    if adopted := store.adopt_disk_files(data_dir, before):
+        logger.info(f"Stage {stage_name} wrote {len(adopted)} shard(s) to disk; reading them from there.")
+    if prior_in_memory_stage is not None:
+        store.remove_root(output_dir / prior_in_memory_stage / "data")
+
+
+def subprocess_reason(
+    pipeline_cfg: PipelineConfig,
+    stage_runners_cfg: dict | DictConfig,
+    stage_name: str,
+    default_parallelization_cfg: dict | DictConfig | None = None,
+    do_profile: bool = False,
+) -> str | None:
+    """Why a stage must be launched as a subprocess under ``--in_process``, or ``None`` if it needn't be.
+
+    In-process execution calls a stage directly, as one worker. A stage that runs a custom script, is
+    parallelized (with its own ``parallelize`` setting or the pipeline's default), or is profiled needs a
+    ``MEDS_transform-stage`` subprocess and its Hydra launcher instead, so the runner launches just that
+    stage that way.
+
+    Args:
+        pipeline_cfg: The pipeline.
+        stage_runners_cfg: The stage runner config (``--stage_runner_fp``), possibly empty.
+        stage_name: The stage.
+        default_parallelization_cfg: The pipeline-wide ``parallelize`` setting, if any.
+        do_profile: The ``--do_profile`` argument.
+
+    Returns:
+        A short reason, for the log, or ``None`` if the stage can run in process.
+
+    Examples:
+        >>> stages = ["filter_subjects", {"reorder_measurements": {"_script": "x"}}]
+        >>> pipeline_cfg = PipelineConfig(stages=stages)
+        >>> print(subprocess_reason(pipeline_cfg, {}, "filter_subjects"))
+        None
+        >>> subprocess_reason(pipeline_cfg, {}, "reorder_measurements")
+        'it sets a custom `_script`'
+        >>> subprocess_reason(pipeline_cfg, {"filter_subjects": {"script": "y"}}, "filter_subjects")
+        'its stage runner sets a custom `script`'
+        >>> runners = {"filter_subjects": {"parallelize": {"n_workers": 2}}}
+        >>> subprocess_reason(pipeline_cfg, runners, "filter_subjects")
+        'it is parallelized'
+        >>> subprocess_reason(pipeline_cfg, {}, "filter_subjects", {"n_workers": 2})
+        'it is parallelized'
+        >>> subprocess_reason(pipeline_cfg, {}, "filter_subjects", do_profile=True)
+        'profiling is on'
+    """
+    stage_runner_cfg = stage_runners_cfg.get(stage_name, {})
+    if "script" in stage_runner_cfg:
+        return "its stage runner sets a custom `script`"
+    if "_script" in pipeline_cfg.parsed_stages_by_name[stage_name].config:
+        return "it sets a custom `_script`"
+    if get_parallelization_args(stage_runner_cfg.get("parallelize", {}), default_parallelization_cfg or {}):
+        return "it is parallelized"
+    if do_profile:
+        return "profiling is on"
+    return None
 
 
 def publish_final_outputs(output_dir: Path, last_stage_name: str) -> None:
@@ -419,9 +532,31 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
         help="Enable Hydra profiling for the stages.",
     )
     parser.add_argument(
+        "--in_process",
+        default=False,
+        action=argparse.BooleanOptionalAction,
+        help=(
+            "Run each stage in this process, as a single worker, rather than launching a "
+            "`MEDS_transform-stage` subprocess for it. Stages that are parallelized, run a custom script, or "
+            "are profiled are still launched as subprocesses. Outputs are the same either way."
+        ),
+    )
+    parser.add_argument(
+        "--in_memory",
+        default=False,
+        action=argparse.BooleanOptionalAction,
+        help=(
+            "Like --in_process, but keep each stage's data shards in memory rather than on disk. Only the "
+            "final dataset and the logs are written; a failed run restarts from the beginning. Every stage "
+            "must be able to run in process."
+        ),
+    )
+    parser.add_argument(
         "--overrides", nargs="*", default=[], help="Additional overrides for the pipeline configuration."
     )
     args = parser.parse_args(argv)
+    if args.in_memory:
+        args.in_process = True
 
     pipeline_config = PipelineConfig.from_arg(args.pipeline_config_fp, args.overrides)
     if pipeline_config.additional_params is None or "output_dir" not in pipeline_config.additional_params:
@@ -457,25 +592,65 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
         logger.info("No parallelization configuration provided.")
         default_parallelization_cfg = None
 
-    for prior_stage, stage in zip([None, *stages[:-1]], stages, strict=True):
-        done_file = log_dir / f"{stage}.done"
-
-        if done_file.exists():
-            logger.info(f"Skipping stage {stage} as it is already complete.")
-        else:
-            logger.info(f"Running stage: {stage}")
-            run_stage(
-                args.pipeline_config_fp,
-                stage_runners_cfg,
-                pipeline_config,
-                stage,
-                cfg_overrides=[*stage_dir_overrides(stage, prior_stage), *args.overrides],
-                default_parallelization_cfg=default_parallelization_cfg,
-                do_profile=args.do_profile,
+    reasons = {
+        stage: (
+            subprocess_reason(
+                pipeline_config, stage_runners_cfg, stage, default_parallelization_cfg, args.do_profile
             )
+            if args.in_process
+            else "--in_process is off"
+        )
+        for stage in stages
+    }
+    if args.in_memory:
+        for stage, reason in reasons.items():
+            if reason is not None:
+                raise ValueError(f"--in_memory can't run stage {stage}, as {reason}.")
+
+    output_dir = log_dir.parent
+    in_memory_stages = []
+    with in_memory_mode() if args.in_memory else nullcontext() as store:
+        for prior_stage, stage in zip([None, *stages[:-1]], stages, strict=True):
+            done_file = log_dir / f"{stage}.done"
+
+            if done_file.exists():
+                logger.info(f"Skipping stage {stage} as it is already complete.")
+                continue
+
+            logger.info(f"Running stage: {stage}")
+            dir_overrides = stage_dir_overrides(stage, prior_stage)
+            overrides = [f"stage={stage}", *dir_overrides, *args.overrides]
+            if store is not None:
+                prior_in_memory = prior_stage if prior_stage in in_memory_stages else None
+                run_stage_in_memory(
+                    store, args.pipeline_config_fp, stage, prior_in_memory, overrides, output_dir
+                )
+                in_memory_stages.append(stage)
+                continue
+
+            if reasons[stage] is None:
+                run_stage_in_process(args.pipeline_config_fp, stage, overrides)
+            else:
+                if args.in_process:
+                    logger.info(f"Running stage {stage} in a subprocess, as {reasons[stage]}.")
+                run_stage(
+                    args.pipeline_config_fp,
+                    stage_runners_cfg,
+                    pipeline_config,
+                    stage,
+                    cfg_overrides=[*(shlex.quote(o) for o in dir_overrides), *args.overrides],
+                    default_parallelization_cfg=default_parallelization_cfg,
+                    do_profile=args.do_profile,
+                )
             done_file.touch()
 
-    publish_final_outputs(log_dir.parent, stages[-1])
+        # Inside the in-memory block, so the last stage's in-memory shards are written out to disk.
+        publish_final_outputs(output_dir, stages[-1])
+
+    for stage in in_memory_stages:
+        # These directories hold only the stage's metadata and scratch files; its data was never on disk,
+        # and the published result links to (or copies) the last stage's metadata.
+        shutil.rmtree(output_dir / stage, ignore_errors=True)
     global_done_file.touch()
 
     if pipeline_config.additional_params.get("cleanup_intermediates", False):
