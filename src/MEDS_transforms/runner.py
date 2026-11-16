@@ -21,6 +21,7 @@ from omegaconf import DictConfig, OmegaConf
 from . import __package_name__
 from .configs import PipelineConfig
 from .configs.utils import OmegaConfResolver
+from .stage_launch import run_stage_in_process
 from .utils import invocation_name
 
 # Spelled out rather than taken from ``__name__``, which is ``"__main__"`` in exactly the case being
@@ -118,6 +119,59 @@ def get_parallelization_args(
         parallelization_args.append(f"hydra.launcher.{k}={v}")
 
     return parallelization_args
+
+
+def subprocess_reason(
+    pipeline_cfg: PipelineConfig,
+    stage_runners_cfg: dict | DictConfig,
+    stage_name: str,
+    default_parallelization_cfg: dict | DictConfig | None = None,
+    do_profile: bool = False,
+) -> str | None:
+    """Why a stage must be launched as a subprocess under ``--in_process``, or ``None`` if it needn't be.
+
+    In-process execution calls a stage directly, as one worker. A stage that runs a custom script, is
+    parallelized (with its own ``parallelize`` setting or the pipeline's default), or is profiled needs a
+    ``MEDS_transform-stage`` subprocess and its Hydra launcher instead, so the runner launches just that
+    stage that way.
+
+    Args:
+        pipeline_cfg: The pipeline.
+        stage_runners_cfg: The stage runner config (``--stage_runner_fp``), possibly empty.
+        stage_name: The stage.
+        default_parallelization_cfg: The pipeline-wide ``parallelize`` setting, if any.
+        do_profile: The ``--do_profile`` argument.
+
+    Returns:
+        A short reason, for the log, or ``None`` if the stage can run in process.
+
+    Examples:
+        >>> stages = ["filter_subjects", {"reorder_measurements": {"_script": "x"}}]
+        >>> pipeline_cfg = PipelineConfig(stages=stages)
+        >>> print(subprocess_reason(pipeline_cfg, {}, "filter_subjects"))
+        None
+        >>> subprocess_reason(pipeline_cfg, {}, "reorder_measurements")
+        'it sets a custom `_script`'
+        >>> subprocess_reason(pipeline_cfg, {"filter_subjects": {"script": "y"}}, "filter_subjects")
+        'its stage runner sets a custom `script`'
+        >>> runners = {"filter_subjects": {"parallelize": {"n_workers": 2}}}
+        >>> subprocess_reason(pipeline_cfg, runners, "filter_subjects")
+        'it is parallelized'
+        >>> subprocess_reason(pipeline_cfg, {}, "filter_subjects", {"n_workers": 2})
+        'it is parallelized'
+        >>> subprocess_reason(pipeline_cfg, {}, "filter_subjects", do_profile=True)
+        'profiling is on'
+    """
+    stage_runner_cfg = stage_runners_cfg.get(stage_name, {})
+    if "script" in stage_runner_cfg:
+        return "its stage runner sets a custom `script`"
+    if "_script" in pipeline_cfg.parsed_stages_by_name[stage_name].config:
+        return "it sets a custom `_script`"
+    if get_parallelization_args(stage_runner_cfg.get("parallelize", {}), default_parallelization_cfg or {}):
+        return "it is parallelized"
+    if do_profile:
+        return "profiling is on"
+    return None
 
 
 def run_stage(
@@ -328,6 +382,16 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
         help="Enable Hydra profiling for the stages.",
     )
     parser.add_argument(
+        "--in_process",
+        default=False,
+        action=argparse.BooleanOptionalAction,
+        help=(
+            "Run each stage in this process, as a single worker, rather than launching a "
+            "`MEDS_transform-stage` subprocess for it. Stages that are parallelized, run a custom script, or "
+            "are profiled are still launched as subprocesses. Outputs are the same either way."
+        ),
+    )
+    parser.add_argument(
         "--overrides", nargs="*", default=[], help="Additional overrides for the pipeline configuration."
     )
     args = parser.parse_args(argv)
@@ -373,15 +437,27 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
             logger.info(f"Skipping stage {stage} as it is already complete.")
         else:
             logger.info(f"Running stage: {stage}")
-            run_stage(
-                args.pipeline_config_fp,
-                stage_runners_cfg,
-                pipeline_config,
-                stage,
-                cfg_overrides=args.overrides,
-                default_parallelization_cfg=default_parallelization_cfg,
-                do_profile=args.do_profile,
+            reason = (
+                subprocess_reason(
+                    pipeline_config, stage_runners_cfg, stage, default_parallelization_cfg, args.do_profile
+                )
+                if args.in_process
+                else "--in_process is off"
             )
+            if reason is None:
+                run_stage_in_process(args.pipeline_config_fp, stage, [f"stage={stage}", *args.overrides])
+            else:
+                if args.in_process:
+                    logger.info(f"Running stage {stage} in a subprocess, as {reason}.")
+                run_stage(
+                    args.pipeline_config_fp,
+                    stage_runners_cfg,
+                    pipeline_config,
+                    stage,
+                    cfg_overrides=args.overrides,
+                    default_parallelization_cfg=default_parallelization_cfg,
+                    do_profile=args.do_profile,
+                )
             done_file.touch()
 
     global_done_file.touch()

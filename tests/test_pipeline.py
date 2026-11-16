@@ -81,6 +81,34 @@ def test_example_pipeline():
     pipeline_tester(PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE)
 
 
+def _run_in_process(cmd, **kwargs) -> subprocess.CompletedProcess:
+    return subprocess.run([*cmd, "--in_process"], **kwargs)
+
+
+def test_example_pipeline_in_process():
+    """`--in_process` runs every stage in the runner's process and produces the same outputs."""
+    pipeline_tester(PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE, run_fn=_run_in_process)
+
+
+MIXED_STAGE_RUNNER_YAML = """
+fit_outlier_detection:
+  parallelize:
+    n_workers: 2
+    launcher: "joblib"
+"""
+
+
+@pytest.mark.parallelized
+def test_example_pipeline_in_process_launches_parallel_stages_as_subprocesses():
+    """Under `--in_process`, a parallelized stage still gets its workers; the rest run in process."""
+    log = pipeline_tester(
+        PIPELINE_YAML, MIXED_STAGE_RUNNER_YAML, STAGE_SCENARIO_SEQUENCE, run_fn=_run_in_process
+    )
+    assert "Running stage fit_outlier_detection in a subprocess, as it is parallelized." in log
+    assert "Running stage filter_subjects in process" in log
+    assert "Running stage filter_subjects in a subprocess" not in log
+
+
 def test_example_pipeline_cleanup_intermediates():
     """With `cleanup_intermediates=true`, only the pipeline's result and logs remain after the run."""
     from MEDS_transforms.stages.discovery import get_all_registered_stages
