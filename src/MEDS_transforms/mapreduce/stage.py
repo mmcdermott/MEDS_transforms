@@ -872,15 +872,22 @@ def mapreduce_stage(
 
     reduce_fn = bind_compute_fn(cfg, cfg.stage_cfg, reduce_fn)
 
-    reduce_over(
-        in_fps=_out_fps,
-        out_fp=reduce_stage_out_fp,
-        read_fn=read_fn,
-        write_fn=write_fn,
-        reduce_fn=reduce_fn,
-        merge_fp=merge_fp,
-        merge_fn=merge_fn,
-        do_overwrite=cfg.do_overwrite,
-        polling_time=cfg.polling_time,
-    )
+    try:
+        reduce_over(
+            in_fps=_out_fps,
+            out_fp=reduce_stage_out_fp,
+            read_fn=read_fn,
+            write_fn=write_fn,
+            reduce_fn=reduce_fn,
+            merge_fp=merge_fp,
+            merge_fn=merge_fn,
+            do_overwrite=cfg.do_overwrite,
+            polling_time=cfg.polling_time,
+        )
+    except FileExistsError:
+        # Another launch of this stage (or an earlier, interrupted run of it) already reduced. Outputs are
+        # written atomically, so an existing one is complete; as with map outputs, it is reused unless
+        # `do_overwrite` is set.
+        logger.info(f"{reduce_stage_out_fp} already exists; not reducing again.")
+        return
     logger.info(f"Finished reduction in {datetime.now(tz=UTC) - start}")

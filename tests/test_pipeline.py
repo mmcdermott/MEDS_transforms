@@ -90,6 +90,68 @@ def test_example_pipeline_in_process():
     pipeline_tester(PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE, run_fn=_run_in_process)
 
 
+def _interrupt_after_first_reduce_and_relaunch(cmd, **kwargs) -> subprocess.CompletedProcess:
+    """Run the pipeline, then relaunch it as if it had been interrupted right after a reduce step wrote.
+
+    Deleting the `.done` markers from ``fit_outlier_detection`` on leaves that stage's reduced metadata in
+    place but unrecorded, which is what killing the runner between the reduce and its marker would do.
+    """
+    first = subprocess.run(cmd, **kwargs)
+    if first.returncode != 0:
+        return first
+    log_dir = Path(cmd[1]).parent / "output" / ".logs"
+    stages = ["fit_outlier_detection", "occlude_outliers", "fit_normalization", "fit_vocabulary_indices"]
+    for name in [*stages, "normalization", "_all_stages"]:
+        (log_dir / f"{name}.done").unlink()
+    return subprocess.run(cmd, **kwargs)
+
+
+def test_example_pipeline_relaunch_after_interrupted_reduce():
+    """A relaunch reuses a reduce output its interrupted predecessor wrote, rather than failing on it."""
+    pipeline_tester(
+        PIPELINE_YAML, None, STAGE_SCENARIO_SEQUENCE, run_fn=_interrupt_after_first_reduce_and_relaunch
+    )
+
+
+def _launch_twice_concurrently(cmd, *variants: list[str]) -> subprocess.CompletedProcess:
+    """Launch the same pipeline twice at once, the second time with ``variants`` appended to its command.
+
+    ``polling_time`` is shortened so a launch whose reduce step waits on the other launch's shards rechecks
+    after a second rather than the default five minutes.
+    """
+    cmds = [[*cmd, *extra, "--overrides", "polling_time=1"] for extra in ([], *variants)]
+    procs = [subprocess.Popen(c, stdout=subprocess.PIPE, stderr=subprocess.PIPE) for c in cmds]
+    outs = [proc.communicate() for proc in procs]
+    returncode = next((proc.returncode for proc in procs if proc.returncode != 0), 0)
+    return subprocess.CompletedProcess(
+        cmd, returncode, stdout=b"\n".join(o for o, _ in outs), stderr=b"\n".join(e for _, e in outs)
+    )
+
+
+def test_example_pipeline_concurrent_launches():
+    """Two launches of the same pipeline at once share its work, and both succeed.
+
+    Both launches' reduce steps used to race: whichever wrote the reduced metadata second failed with a
+    `FileExistsError`, or two simultaneous writes renamed each other's staging file away.
+    """
+    pipeline_tester(
+        PIPELINE_YAML,
+        None,
+        STAGE_SCENARIO_SEQUENCE,
+        run_fn=lambda cmd, **_: _launch_twice_concurrently(cmd, []),
+    )
+
+
+def test_example_pipeline_in_process_shares_work_with_subprocess_launch():
+    """An in-process launch and a subprocess launch of the same pipeline can run at once."""
+    pipeline_tester(
+        PIPELINE_YAML,
+        None,
+        STAGE_SCENARIO_SEQUENCE,
+        run_fn=lambda cmd, **_: _launch_twice_concurrently(cmd, ["--in_process"]),
+    )
+
+
 MIXED_STAGE_RUNNER_YAML = """
 fit_outlier_detection:
   parallelize:

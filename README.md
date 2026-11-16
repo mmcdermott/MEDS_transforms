@@ -98,7 +98,8 @@ MEDS_transform-pipeline "$PIPELINE_YAML"
 
 The runner creates a `.logs` folder inside the pipeline's `output_dir` and marks stages as complete by
 placing `<stage>.done` files in that folder. A `_all_stages.done` file is written when the entire pipeline
-finishes. Re-running the command will skip any stages that already have corresponding `.done` files.
+finishes. Re-running the command will skip any stages that already have corresponding `.done` files,
+and reuses whatever a stage that was interrupted part-way had already written.
 Set `cleanup_intermediates: true` in the pipeline YAML (or pass `--overrides cleanup_intermediates=true`)
 to delete the stage-specific directories, and their `.done` files, once every stage has succeeded; a failed
 run keeps them. Re-running the full pipeline still exits early, but cleaned-up stages can no longer be
@@ -116,6 +117,11 @@ produces the same outputs and logs. Stages that need a subprocess are still laun
 `parallelize` setting (their own in a stage runner YAML, or the pipeline's), a custom `script`/`_script`,
 or all stages under `--do_profile`. So you can keep parallelism where it pays off, for the heavy stages,
 and run the rest in process.
+
+You can also add workers to a running pipeline by launching it again, with or without `--in_process`:
+concurrent launches split each stage's shards between them. When a launch reaches a reduce step whose
+inputs another launch is still writing, it waits for them, rechecking every `polling_time` seconds (300 by
+default; lower it with `--overrides polling_time=10`, say, for small datasets).
 
 After running, you will see output files stored in `$PIPELINE_OUTPUT` with the results of each stage of the
 pipeline in stage-specific directories, and the global output in `$PIPELINE_OUTPUT/data` and
