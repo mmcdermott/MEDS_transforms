@@ -488,36 +488,22 @@ def pipeline_tester(
 
         pipeline_log_text = pipeline_log.read_text() if pipeline_log.exists() else ""
 
-        # 3. Check the output
-        last_data_stage = (None, None)
-        last_metadata_stage = (None, None)
+        # 3. Check the output. Every stage writes a full MEDS dataset into `output_dir/<stage name>`, and the
+        # last stage's is published as `output_dir` itself.
+        checks = [
+            (name, stage, output_dir / name)
+            for name, stage in zip(pipeline_stages, stage_examples, strict=True)
+        ]
+        checks.append((f"{pipeline_stages[-1]} (published)", stage_examples[-1], output_dir))
 
-        for name, stage in zip(pipeline_stages, stage_examples, strict=True):
-            if stage.want_data is not None:
-                last_data_stage = (name, stage)
-            if stage.want_metadata is not None:
-                last_metadata_stage = (name, stage)
-
-        for name, stage in zip(pipeline_stages, stage_examples, strict=True):
-            is_last_data_stage = last_data_stage[0] == name
-            is_last_metadata_stage = last_metadata_stage[0] == name
-
-            stage_output_dir = output_dir / name
-
+        for name, stage, stage_output_dir in checks:
             stage.df_check_kwargs = {"rel_tol": 5e-2, "abs_tol": 1e-2, "check_dtypes": False}
 
             try:
-                if stage.want_data is not None:
-                    if is_last_data_stage:
-                        stage.check_outputs(output_dir)
-                    else:
-                        stage.check_outputs(stage_output_dir, is_resolved_dir=True)
-
-                if stage.want_metadata is not None:
-                    if is_last_metadata_stage:
-                        stage.check_outputs(output_dir)
-                    else:
-                        stage.check_outputs(stage_output_dir, is_resolved_dir=True)
+                # Whichever half of the dataset the stage didn't compute must have been carried forward.
+                if not any((stage_output_dir / "data").glob("**/*.parquet")):
+                    raise AssertionError(f"No data shards in {stage_output_dir}/data")
+                stage.check_outputs(stage_output_dir)
             except AssertionError as e:
                 raise AssertionError(f"Pipeline failed to produce expected output for stage '{name}'") from e
 

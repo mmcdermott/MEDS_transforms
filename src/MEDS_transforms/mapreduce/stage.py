@@ -17,12 +17,42 @@ from ..compute_modes import (
     match_revise_fntr,
 )
 from ..dataframe import DF_T, READ_FN_T, WRITE_FN_T, read_and_filter_fntr, read_df, write_df
+from ..stage_outputs import prune_stale_outputs
 from .mapper import map_over
 from .reducer import REDUCE_FN_T, reduce_over
 from .rwlock import run_marker_dir
 from .shard_iteration import SHARD_ITR_FNTR_T, shard_iterator
 
 logger = logging.getLogger(__name__)
+
+
+def subject_splits_fp(cfg: DictConfig) -> Path:
+    """Where a stage finds its input dataset's subject splits.
+
+    Every stage's output carries its input's metadata forward, so the splits are read from the stage's own
+    ``metadata_input_dir``. Configs without that key (or whose input metadata has no splits file) fall back
+    to the pipeline's input dataset.
+
+    Examples:
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     root = Path(tmpdir)
+        ...     cfg = DictConfig({"input_dir": str(root / "raw"), "stage_cfg": {}})
+        ...     print(subject_splits_fp(cfg).relative_to(root))
+        ...     cfg.stage_cfg.metadata_input_dir = str(root / "prior" / "metadata")
+        ...     print(subject_splits_fp(cfg).relative_to(root))
+        ...     (root / "prior" / "metadata").mkdir(parents=True)
+        ...     (root / "prior" / "metadata" / "subject_splits.parquet").touch()
+        ...     print(subject_splits_fp(cfg).relative_to(root))
+        raw/metadata/subject_splits.parquet
+        raw/metadata/subject_splits.parquet
+        prior/metadata/subject_splits.parquet
+    """
+    metadata_input_dir = cfg.stage_cfg.get("metadata_input_dir", None)
+    if metadata_input_dir is not None:
+        split_fp = Path(metadata_input_dir) / Path(subject_splits_filepath).name
+        if split_fp.exists():
+            return split_fp
+    return Path(cfg.input_dir) / subject_splits_filepath
 
 
 def map_stage(
@@ -466,7 +496,7 @@ def map_stage(
     shards, includes_only_train = shard_iterator_fntr(cfg)
 
     if train_only:
-        split_fp = Path(cfg.input_dir) / subject_splits_filepath
+        split_fp = subject_splits_fp(cfg)
         if includes_only_train:
             logger.info(
                 f"Processing train split only via shard prefix. Not filtering with {split_fp.resolve()!s}."
@@ -502,6 +532,14 @@ def map_stage(
         do_overwrite=cfg.do_overwrite,
         marker_dir=run_marker_dir(cfg),
     )
+
+    # Every worker returns only once all shards exist, so whichever finishes first can prune the shards an
+    # earlier run left behind. Only a stage's own data output directory is pruned: a stage configured to
+    # write its map outputs anywhere else may share that directory with other files.
+    data_output_dir = cfg.stage_cfg.get("data_output_dir", None)
+    if data_output_dir is not None and Path(cfg.stage_cfg.output_dir) == Path(data_output_dir):
+        prune_stale_outputs(Path(data_output_dir), all_out_fps)
+
     logger.info(f"Finished mapping in {datetime.now(tz=UTC) - start}")
     return all_out_fps
 
@@ -872,15 +910,21 @@ def mapreduce_stage(
 
     reduce_fn = bind_compute_fn(cfg, cfg.stage_cfg, reduce_fn)
 
-    reduce_over(
-        in_fps=_out_fps,
-        out_fp=reduce_stage_out_fp,
-        read_fn=read_fn,
-        write_fn=write_fn,
-        reduce_fn=reduce_fn,
-        merge_fp=merge_fp,
-        merge_fn=merge_fn,
-        do_overwrite=cfg.do_overwrite,
-        polling_time=cfg.polling_time,
-    )
+    try:
+        reduce_over(
+            in_fps=_out_fps,
+            out_fp=reduce_stage_out_fp,
+            read_fn=read_fn,
+            write_fn=write_fn,
+            reduce_fn=reduce_fn,
+            merge_fp=merge_fp,
+            merge_fn=merge_fn,
+            do_overwrite=cfg.do_overwrite,
+            polling_time=cfg.polling_time,
+        )
+    except FileExistsError:
+        # Another launch of this stage (or an earlier, interrupted run of it) already reduced. As with map
+        # outputs, an existing output is reused unless `do_overwrite` is set.
+        logger.info(f"{reduce_stage_out_fp} already exists; not reducing again.")
+        return
     logger.info(f"Finished reduction in {datetime.now(tz=UTC) - start}")

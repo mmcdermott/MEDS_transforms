@@ -2,6 +2,7 @@
 
 import hashlib
 import logging
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -136,6 +137,117 @@ def _run_marker_fp(marker_dir: Path, out_fp: Path) -> Path:
 
     key = hashlib.sha256(str(Path(out_fp).resolve()).encode("utf-8")).hexdigest()
     return marker_dir / f"{key}.produced"
+
+
+def output_is_complete(
+    out_fp: Path,
+    do_overwrite: bool = False,
+    marker_dir: Path | None = None,
+    out_fp_checker: FILE_CHECKER_T = default_file_checker,
+) -> bool:
+    """Whether ``out_fp`` is finished, as far as the current run is concerned.
+
+    An output is finished if it exists and is complete. Under ``do_overwrite`` with a run marker directory,
+    it must also have been produced during this run (see `run_marker_dir`): an output left over from an
+    earlier run will be recomputed, so it is not finished yet. Without a marker directory there is no way to
+    tell the two apart, so any complete output counts.
+
+    Args:
+        out_fp: The output file to check.
+        do_overwrite: Whether the run overwrites existing outputs.
+        marker_dir: The run's marker directory, or ``None``.
+        out_fp_checker: How to check that the file exists and is complete.
+
+    Returns:
+        Whether nothing more needs to be done to produce ``out_fp`` in this run.
+
+    Examples:
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     root = Path(tmpdir)
+        ...     out_fp = root / "out.txt"
+        ...     marker_dir = root / "markers"
+        ...     print(output_is_complete(out_fp))
+        ...     _ = out_fp.write_text("done")
+        ...     print(output_is_complete(out_fp))
+        ...     print(output_is_complete(out_fp, do_overwrite=True))
+        ...     print(output_is_complete(out_fp, do_overwrite=True, marker_dir=marker_dir))
+        ...     marker_fp = _run_marker_fp(marker_dir, out_fp)
+        ...     marker_fp.parent.mkdir(parents=True)
+        ...     _ = marker_fp.write_text(str(out_fp))
+        ...     print(output_is_complete(out_fp, do_overwrite=True, marker_dir=marker_dir))
+        False
+        True
+        True
+        False
+        True
+    """
+    if not out_fp_checker(out_fp):
+        return False
+    if do_overwrite and marker_dir is not None:
+        return _run_marker_fp(marker_dir, out_fp).is_file()
+    return True
+
+
+def run_until_complete(
+    out_fps: list[Path],
+    attempt_fn: Callable[[Path], bool],
+    is_complete_fn: Callable[[Path], bool],
+    polling_time: float = 1.0,
+) -> None:
+    """Attempt to produce every output, then wait for (or take over) the ones other workers hold.
+
+    Workers divide work by locking the outputs they are computing (see `rwlock_wrap`), and skip any output
+    another worker has locked. On its own, that lets a worker finish while a peer, possibly launched by a
+    separate invocation of the same command, is still writing some outputs. Anything downstream of that
+    worker (the next stage, or the pipeline runner marking the stage done) would then see an incomplete
+    stage.
+
+    This function closes that gap. After one pass over ``out_fps``, it re-checks the outputs that are not
+    yet complete every ``polling_time`` seconds and calls ``attempt_fn`` on each again. ``attempt_fn`` is
+    expected to skip outputs that are still locked and to compute those that are not, so an output whose
+    worker died (releasing its lock without finishing) is picked up rather than waited on forever. It returns
+    once every output is complete, or was computed by this worker (so a write function that legitimately
+    writes nothing cannot make it wait forever).
+
+    Args:
+        out_fps: The outputs to produce.
+        attempt_fn: Called with an output path; computes it unless another worker holds its lock, and
+            returns whether it did (as `rwlock_wrap` does).
+        is_complete_fn: Whether an output is finished (see `output_is_complete`).
+        polling_time: Seconds to wait between passes.
+
+    Examples:
+        Here, ``b.txt`` is "locked" by another worker for the first two passes; this worker computes the
+        other outputs, then waits until ``b.txt`` can be computed:
+
+        >>> attempts = []
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     out_fps = [Path(tmpdir) / n for n in ("a.txt", "b.txt", "c.txt")]
+        ...     def attempt_fn(fp):
+        ...         attempts.append(fp.name)
+        ...         if fp.name == "b.txt" and attempts.count("b.txt") < 3:
+        ...             return False  # another worker holds the lock
+        ...         _ = fp.write_text("done")
+        ...         return True
+        ...     run_until_complete(out_fps, attempt_fn, Path.is_file, polling_time=0.001)
+        ...     print(sorted(fp.name for fp in Path(tmpdir).iterdir()))
+        ['a.txt', 'b.txt', 'c.txt']
+        >>> attempts
+        ['a.txt', 'b.txt', 'c.txt', 'b.txt', 'b.txt']
+    """
+    pending = list(out_fps)
+    n_passes = 0
+    while True:
+        pending = [out_fp for out_fp in pending if not attempt_fn(out_fp) and not is_complete_fn(out_fp)]
+        if not pending:
+            return
+
+        n_passes += 1
+        if n_passes == 1 or n_passes % 60 == 0:
+            logger.info(
+                f"Waiting on {len(pending)} output(s) still being written by other workers, e.g. {pending[0]}"
+            )
+        time.sleep(polling_time)
 
 
 def rwlock_wrap(

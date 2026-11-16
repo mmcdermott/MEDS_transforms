@@ -22,6 +22,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from . import __package_name__, __version__
 from .configs import PipelineConfig
+from .stage_outputs import carry_forward_unchanged_outputs
 
 if TYPE_CHECKING:
     from .stages import Stage
@@ -53,16 +54,16 @@ def stamp_run_id(argv: list[str], run_id: str) -> list[str]:
 
     Examples:
         >>> stamp_run_id(["some_stage", "worker=0"], "abc123")
-        ['some_stage', '++run_id=abc123', 'worker=0']
+        ['some_stage', 'run_id=abc123', 'worker=0']
 
         Flags before, between or after the overrides stay where they are:
 
         >>> stamp_run_id(["some_stage", "stage=x", 'worker="range(0,2)"', "--multirun"], "abc123")
-        ['some_stage', '++run_id=abc123', 'stage=x', 'worker="range(0,2)"', '--multirun']
+        ['some_stage', 'run_id=abc123', 'stage=x', 'worker="range(0,2)"', '--multirun']
         >>> stamp_run_id(["some_stage", "--multirun", "stage=x", "--cfg", "job"], "abc123")
-        ['some_stage', '--multirun', '++run_id=abc123', 'stage=x', '--cfg', 'job']
+        ['some_stage', '--multirun', 'run_id=abc123', 'stage=x', '--cfg', 'job']
         >>> stamp_run_id(["some_stage", "--cfg", "job"], "abc123")
-        ['some_stage', '++run_id=abc123', '--cfg', 'job']
+        ['some_stage', 'run_id=abc123', '--cfg', 'job']
 
         A caller that sets `run_id` itself — a wrapping tool coordinating several invocations, say —
         keeps their value, however it is spelled:
@@ -77,7 +78,7 @@ def stamp_run_id(argv: list[str], run_id: str) -> list[str]:
         Overrides that merely start with the same characters are not mistaken for it:
 
         >>> stamp_run_id(["some_stage", "run_id_prefix=x"], "abc123")
-        ['some_stage', '++run_id=abc123', 'run_id_prefix=x']
+        ['some_stage', 'run_id=abc123', 'run_id_prefix=x']
     """
 
     for arg in argv:
@@ -88,7 +89,7 @@ def stamp_run_id(argv: list[str], run_id: str) -> list[str]:
     first_override = next(
         (i for i, arg in enumerate(argv[1:], start=1) if "=" in arg and not arg.startswith("-")), 1
     )
-    return [*argv[:first_override], f"++run_id={run_id}", *argv[first_override:]]
+    return [*argv[:first_override], f"run_id={run_id}", *argv[first_override:]]
 
 
 def register_stage(pipeline_cfg: PipelineConfig, stage_name: str) -> Stage:
@@ -138,11 +139,10 @@ def compose_stage_config(overrides: list[str]) -> DictConfig:
         The composed config, without the ``hydra`` node.
 
     Examples:
-        >>> pipeline_cfg = PipelineConfig(stages=["filter_subjects", "occlude_outliers"])
-        >>> _ = register_stage(pipeline_cfg, "filter_subjects")
-        >>> cfg = compose_stage_config(["output_dir=out"])
-        >>> print(cfg.stage, cfg.stage_cfg.output_dir)
-        filter_subjects out/filter_subjects
+        >>> _ = register_stage(PipelineConfig(stages=["filter_subjects"]), "filter_subjects")
+        >>> cfg = compose_stage_config(["output_dir=out", "stage_output_dir=${output_dir}/filter_subjects"])
+        >>> print(cfg.stage, cfg.stage_cfg.data_output_dir)
+        filter_subjects out/filter_subjects/data
         >>> "hydra" in cfg
         False
 
@@ -161,8 +161,10 @@ def compose_stage_config(overrides: list[str]) -> DictConfig:
 def run_stage_in_process(pipeline_config_fp: str | Path, stage_name: str, overrides: list[str]) -> None:
     """Run one stage in the calling process, as ``MEDS_transform-stage <pipeline> <stage> ...`` would.
 
-    The stage runs as a single worker. Its composed config and overrides are saved to ``<log_dir>/.hydra/``,
-    and its log to ``<log_dir>/<stage>.log``, as a Hydra run would.
+    The stage runs as a single worker, then finishes its outputs (see `carry_forward_unchanged_outputs`)
+    just as the stage launcher does once its workers are done. Its composed config and overrides are saved
+    to ``<log_dir>/.hydra/``, and its log to ``<log_dir>/<stage>.log``, as a Hydra run would. Concurrent
+    launches of the same pipeline, in process or not, still share the stage's work.
 
     Args:
         pipeline_config_fp: The pipeline YAML, as a path or in ``pkg://`` syntax.
@@ -185,19 +187,23 @@ def run_stage_in_process(pipeline_config_fp: str | Path, stage_name: str, overri
         ...     )
         ...     run_stage_in_process(pipeline_fp, "filter_subjects", ["stage=filter_subjects"])
         ...     print_directory(output_dir, PrintConfig(ignore_regex=r"\\.lock$"))
-        └── data
-            ├── .logs
-            │   ├── .hydra
-            │   │   ├── config.yaml
-            │   │   └── overrides.yaml
-            │   └── filter_subjects.log
-            ├── held_out
-            │   └── 0.parquet
-            ├── train
-            │   ├── 0.parquet
-            │   └── 1.parquet
-            └── tuning
-                └── 0.parquet
+        ├── .logs
+        │   ├── .hydra
+        │   │   ├── config.yaml
+        │   │   └── overrides.yaml
+        │   └── filter_subjects.log
+        ├── data
+        │   ├── held_out
+        │   │   └── 0.parquet
+        │   ├── train
+        │   │   ├── 0.parquet
+        │   │   └── 1.parquet
+        │   └── tuning
+        │       └── 0.parquet
+        └── metadata
+            ├── codes.parquet
+            ├── dataset.json
+            └── subject_splits.parquet
     """
     overrides = stamp_run_id([stage_name, *overrides], uuid4().hex)[1:]
 
@@ -216,6 +222,7 @@ def run_stage_in_process(pipeline_config_fp: str | Path, stage_name: str, overri
     try:
         logger.info(f"Running stage {stage_name} in process")
         stage.main(cfg)
+        carry_forward_unchanged_outputs(cfg, stage.stage_type, stage.is_metadata)
     finally:
         root_logger.removeHandler(handler)
         handler.close()

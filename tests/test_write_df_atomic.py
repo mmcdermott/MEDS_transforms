@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import os
+from pathlib import Path
 from unittest.mock import patch
 
 import polars as pl
 import pytest
 
 from MEDS_transforms.dataframe import write_df
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 def test_write_df_publishes_final_file(tmp_path: Path) -> None:
@@ -20,7 +18,7 @@ def test_write_df_publishes_final_file(tmp_path: Path) -> None:
     write_df(pl.DataFrame({"a": [1, 2, 3]}), out_fp)
 
     assert out_fp.is_file()
-    assert not out_fp.with_suffix(".parquet.tmp").exists()
+    assert not list(tmp_path.glob("*.tmp"))
 
 
 def test_write_df_creates_parent_directory(tmp_path: Path) -> None:
@@ -46,7 +44,6 @@ def test_write_df_cleans_up_tmp_file_on_rename_failure(tmp_path: Path) -> None:
     The final ``out_fp`` should remain untouched.
     """
     out_fp = tmp_path / "out.parquet"
-    tmp_fp = out_fp.with_suffix(".parquet.tmp")
 
     with (
         patch("MEDS_transforms.dataframe.write_fn.os.replace", side_effect=OSError("boom")),
@@ -54,18 +51,17 @@ def test_write_df_cleans_up_tmp_file_on_rename_failure(tmp_path: Path) -> None:
     ):
         write_df(pl.DataFrame({"a": [1]}), out_fp)
 
-    assert not tmp_fp.exists(), "staging .tmp file should be cleaned up on failure"
+    assert not list(tmp_path.glob("*.tmp")), "staging .tmp file should be cleaned up on failure"
     assert not out_fp.exists(), "final output must not appear when rename failed"
 
 
 def test_write_df_cleans_up_tmp_file_on_write_failure(tmp_path: Path) -> None:
     """If ``df.write_parquet`` raises, any partial tmp file should be cleaned up too."""
     out_fp = tmp_path / "out.parquet"
-    tmp_fp = out_fp.with_suffix(".parquet.tmp")
 
-    def _explode(self, *args, **kwargs):
+    def _explode(self, fp, *args, **kwargs):
         # Simulate a mid-write failure: create the tmp file, then raise.
-        tmp_fp.write_bytes(b"partial")
+        Path(fp).write_bytes(b"partial")
         raise RuntimeError("write_parquet exploded")
 
     with (
@@ -74,5 +70,23 @@ def test_write_df_cleans_up_tmp_file_on_write_failure(tmp_path: Path) -> None:
     ):
         write_df(pl.DataFrame({"a": [1]}), out_fp)
 
-    assert not tmp_fp.exists(), "staging .tmp file should be cleaned up on failure"
+    assert not list(tmp_path.glob("*.tmp")), "staging .tmp file should be cleaned up on failure"
     assert not out_fp.exists()
+
+
+def test_write_df_concurrent_writers_do_not_collide(tmp_path: Path) -> None:
+    """Two writers of the same output stage to different files, so neither renames the other's away."""
+    out_fp = tmp_path / "out.parquet"
+    staged = []
+    real_replace = os.replace
+
+    def _record(src, dst):
+        staged.append(Path(src).name)
+        real_replace(src, dst)
+
+    with patch("MEDS_transforms.dataframe.write_fn.os.replace", side_effect=_record):
+        write_df(pl.DataFrame({"a": [1]}), out_fp)
+        write_df(pl.DataFrame({"a": [2]}), out_fp)
+
+    assert len(set(staged)) == 2
+    assert pl.read_parquet(out_fp)["a"].to_list() == [2]

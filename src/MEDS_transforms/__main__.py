@@ -6,6 +6,7 @@ import hydra
 
 from .configs import PipelineConfig
 from .stage_launch import register_stage, stamp_run_id
+from .stage_outputs import CaptureStageConfig, carry_forward_unchanged_outputs
 from .stages.discovery import get_all_registered_stages
 from .utils import invocation_name
 
@@ -60,7 +61,16 @@ def run_stage():  # pragma: no cover
     stage = register_stage(pipeline_cfg, stage_name)
     hydra_wrapper = hydra.main(version_base=None, config_name="_main")
 
+    CaptureStageConfig.config = None
     hydra_wrapper(stage.main)()
+
+    # Hydra only returns once every worker it launched has finished, and only if all of them succeeded, so
+    # this runs once per invocation of this command. It is idempotent, so concurrent invocations of the same
+    # stage (which share its work between them) may each run it.
+    if CaptureStageConfig.config is not None:
+        carry_forward_unchanged_outputs(
+            CaptureStageConfig.config, stage.stage_type, stage.is_metadata, stage.carry_input_data
+        )
 
 
 if __name__ == "__main__":

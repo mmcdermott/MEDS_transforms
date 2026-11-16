@@ -115,11 +115,31 @@ which dominates the runtime of small pipelines, and lets you debug the whole pip
 produces the same outputs and logs. Stages that need a subprocess are still launched as one: those with a
 `parallelize` setting (their own in a stage runner YAML, or the pipeline's), a custom `script`/`_script`,
 or all stages under `--do_profile`. So you can keep parallelism where it pays off, for the heavy stages,
-and run the rest in process.
+and run the rest in process. You can also add workers by launching the same pipeline again, in process or
+not: concurrent launches share the work.
 
-After running, you will see output files stored in `$PIPELINE_OUTPUT` with the results of each stage of the
-pipeline in stage-specific directories, and the global output in `$PIPELINE_OUTPUT/data` and
-`$PIPELINE_OUTPUT/metadata` (for data and metadata outputs, respectively). That's it!
+After running, `$PIPELINE_OUTPUT` holds a complete MEDS dataset (`data/` and `metadata/`) for each stage, in
+a directory named after it. Each stage reads the dataset written by the stage before it. Whichever half of
+the dataset a stage does not compute (the metadata, for a data stage; the data, for a metadata stage) is
+hard-linked in from its input, so it costs no extra disk space. The last stage's dataset is published as
+`$PIPELINE_OUTPUT/data` and `$PIPELINE_OUTPUT/metadata`, again via hard links. That's it!
+
+```
+$PIPELINE_OUTPUT/
+├── .logs/                  # the runner's `.done` markers and log, and each stage's logs
+├── <stage 1>/{data,metadata}/
+├── <stage 2>/{data,metadata}/
+├── ...
+├── data/                   # the last stage's data
+└── metadata/               # the last stage's metadata
+```
+
+Running a single stage on its own (`MEDS_transform-stage <pipeline.yaml> <stage>`) reads `input_dir` and
+writes its dataset directly to `output_dir/data` and `output_dir/metadata`.
+
+You can launch the same pipeline command more than once at the same time (for example, on several machines
+sharing a filesystem) to add workers. The launches split each stage's shards between them, and each launch
+waits for the others' shards before moving on, so neither finishes before the whole pipeline is done.
 
 ### 4. Do even more!
 
@@ -280,6 +300,24 @@ ensure your stages will be appropriately recognized in downstream usage.
 ##### Stage registration configuration
 
 Stages are registered via the `Stage.register` method, which can be used as a function or a decorator.
+
+##### Where a stage reads and writes
+
+Every stage reads one MEDS dataset and writes another. Its `stage_cfg` holds the directories:
+`data_input_dir` and `metadata_input_dir` (the previous stage's dataset), and `data_output_dir` and
+`metadata_output_dir` (its own, `<output_dir>/<stage>/{data,metadata}` in a pipeline), which are created
+before it runs. `stage_cfg.output_dir` is where a data stage writes its shards (its `data_output_dir`), and
+`reducer_output_dir` is where a metadata stage writes `codes.parquet` (its `metadata_output_dir`). Read
+only from the input directories, and write only to your own: a stage should not reach into another stage's
+directory or the pipeline's published `data/` and `metadata/`, which hold the last stage's dataset only once
+the pipeline finishes.
+
+Whatever a stage doesn't write is carried over from its input once it finishes, so its directory is always a
+complete dataset. A `MAIN` stage that writes no data has its input data carried over in full; one that writes
+any is assumed to have written all of it, and gets none. If your stage writes some data but must also keep
+part of its input data in its output, say so with `carry_input_data`, e.g.
+`Stage.register(is_metadata=False, carry_input_data=["schemas"])` to keep the input's `schemas/` directory
+alongside the files it writes (or `True` for every input file it does not overwrite).
 
 #### Defining your own pipelines
 
