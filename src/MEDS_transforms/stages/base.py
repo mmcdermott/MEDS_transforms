@@ -16,6 +16,7 @@ from functools import partial, wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from meds import CodeMetadataSchema, DataSchema
 from omegaconf import DictConfig, OmegaConf
 
 from ..mapreduce import map_stage, mapreduce_stage
@@ -24,9 +25,12 @@ from .examples import StageExample, StageExampleDict
 
 if TYPE_CHECKING:
     import polars as pl
+    from flexible_schema import Schema
 
     from ..compute_modes import ANY_COMPUTE_FN_T
     from ..dataframe import READ_FN_T, WRITE_FN_T
+
+    SchemaLike = type[Schema] | Schema
 
 logger = logging.getLogger(__name__)
 
@@ -482,6 +486,16 @@ class Stage:
     output_schema_updates: dict[str, pl.DataType] | Callable[[dict | None], dict[str, pl.DataType]] | None = (
         None
     )
+    # Default schema declarations track the MEDS schemas — most stages don't override these. A
+    # stage that doesn't read/write a particular role sets it to ``None`` explicitly (e.g. a
+    # MAPREDUCE that aggregates data into metadata sets ``output_schema=None`` because it
+    # doesn't write data shards). ``output_schema`` is the BASE schema this stage's output
+    # conforms to; ``output_schema_updates`` (above) layers column-level additions/overrides on
+    # top of that base — the two compose rather than conflict.
+    input_schema: SchemaLike | None = DataSchema
+    output_schema: SchemaLike | None = DataSchema
+    metadata_input_schema: SchemaLike | None = CodeMetadataSchema
+    metadata_output_schema: SchemaLike | None = CodeMetadataSchema
     is_metadata: bool | None = None
 
     __mimic_fn: Callable | None = None
@@ -546,6 +560,10 @@ class Stage:
         output_schema_updates: (
             dict[str, pl.DataType] | Callable[[dict | None], dict[str, pl.DataType]] | None
         ) = None,
+        input_schema: SchemaLike | None = DataSchema,
+        output_schema: SchemaLike | None = DataSchema,
+        metadata_input_schema: SchemaLike | None = CodeMetadataSchema,
+        metadata_output_schema: SchemaLike | None = CodeMetadataSchema,
         examples_dir: Path | None = None,
         default_config: dict[str, Any] | DictConfig | Path | str | None = None,
         is_metadata: bool | None = None,
@@ -615,6 +633,11 @@ class Stage:
             self.output_schema_updates = output_schema_updates
         else:
             self.output_schema_updates = copy.deepcopy(output_schema_updates)
+
+        self.input_schema = input_schema
+        self.output_schema = output_schema
+        self.metadata_input_schema = metadata_input_schema
+        self.metadata_output_schema = metadata_output_schema
 
         self.example_class = example_class if example_class is not None else StageExample
 
@@ -814,6 +837,67 @@ class Stage:
             resolved_cfg = override_cfg if override_cfg is not None else default_cfg
 
         return dict(self.output_schema_updates(resolved_cfg))
+
+    @property
+    def declared_schemas(self) -> dict[str, SchemaLike | None]:
+        """Return all declared ``flexible_schema`` schemas on this stage, keyed by role.
+
+        The four roles are ``input``, ``output``, ``metadata_input``, ``metadata_output``.
+        Defaults track the MEDS schemas — ``DataSchema`` for ``input``/``output`` and
+        ``CodeMetadataSchema`` for ``metadata_input``/``metadata_output`` — so a typical MAP
+        stage doesn't need to declare anything. A stage that doesn't read/write a particular
+        role sets it explicitly to ``None``; pipeline validation should treat ``None`` as
+        "this stage doesn't touch that role" rather than "not yet annotated."
+
+        Examples by stage type:
+
+        - **MAP** stage (data → data): keep all four defaults; the ``metadata_*`` roles are
+          ``CodeMetadataSchema`` because the stage reads ``codes.parquet`` (often via the
+          auto-inferred ``code_metadata`` parameter) — they're not ``None``.
+        - **MAPREDUCE that reduces data into metadata** (e.g. ``aggregate_code_metadata``):
+          override ``output_schema=None`` (the stage doesn't write data shards);
+          ``metadata_output_schema`` stays ``CodeMetadataSchema`` (the default).
+        - **Custom-output stage** (e.g. CSV/JSON export): override ``output_schema=None`` and
+          either set ``output_schema_updates`` to a callable or leave it as the empty default.
+
+        ``output_schema`` is the BASE schema declaration; ``output_schema_updates`` layers
+        column-level additions/overrides on top of that base. The two compose: a stage with
+        ``output_schema=DataSchema`` and ``output_schema_updates={"foo": pl.Int64}`` outputs
+        ``DataSchema`` plus the ``foo`` column.
+
+        Examples:
+            Default construction picks up the MEDS-schema defaults — most stages don't need
+            to declare anything:
+
+            >>> def compute(cfg):
+            ...     '''docstring'''
+            ...     return 0
+            >>> from meds import DataSchema, CodeMetadataSchema
+            >>> stage = Stage(map_fn=compute)
+            >>> sorted(stage.declared_schemas.keys())
+            ['input', 'metadata_input', 'metadata_output', 'output']
+            >>> stage.declared_schemas["input"] is DataSchema
+            True
+            >>> stage.declared_schemas["metadata_output"] is CodeMetadataSchema
+            True
+
+            Opt out of a role by passing ``None`` explicitly. A MAPREDUCE stage that aggregates
+            data into metadata declares no data output:
+
+            >>> stage = Stage(map_fn=compute, output_schema=None, metadata_input_schema=None)
+            >>> stage.declared_schemas["output"] is None
+            True
+            >>> stage.declared_schemas["metadata_input"] is None
+            True
+            >>> stage.declared_schemas["input"] is DataSchema  # default preserved
+            True
+        """
+        return {
+            "input": self.input_schema,
+            "output": self.output_schema,
+            "metadata_input": self.metadata_input_schema,
+            "metadata_output": self.metadata_output_schema,
+        }
 
     @property
     def test_cases(self) -> dict[str, StageExample]:
@@ -1104,7 +1188,11 @@ class Stage:
                 keyword arguments should be set.
             **kwargs: Keyword arguments. These can include all keyword arguments to the `Stage` constructor
                 save for `_calling_file`; namely, `main_fn`, `map_fn`, `reduce_fn`, `stage_name`,
-                `stage_docstring`, `examples_dir`, `output_schema_updates`, and `default_config`.
+                `stage_docstring`, `examples_dir`, `output_schema_updates`, `default_config`,
+                `is_metadata`, `example_class`, and the four flexible-schema declarations
+                `input_schema` / `output_schema` / `metadata_input_schema` / `metadata_output_schema`
+                (see :attr:`Stage.declared_schemas` for what these are used for and which
+                combinations make sense for MAP vs MAPREDUCE stages).
                 Not all keyword arguments are required for all usages of the decorator.
 
         ## Inference of static data examples and the default configuration filepath.
