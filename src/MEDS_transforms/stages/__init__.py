@@ -8,6 +8,7 @@ from .examples import StageExample
 from .add_time_derived_measurements import stage as add_time_derived_measurements
 from .aggregate_code_metadata import stage as aggregate_code_metadata
 from .bin_numeric_values import stage as bin_numeric_values
+from .deduplicate_events import stage as deduplicate_events
 from .docgen import StageDoc, generate_stage_docs
 from .extract_values import stage as extract_values
 from .filter_measurements import stage as filter_measurements
