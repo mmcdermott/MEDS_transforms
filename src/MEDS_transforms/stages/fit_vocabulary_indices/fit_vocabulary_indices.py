@@ -8,6 +8,7 @@ from pathlib import Path
 import polars as pl
 from omegaconf import DictConfig, OmegaConf
 
+from ...utils import coerce_strenum
 from .. import Stage
 
 logger = logging.getLogger(__name__)
@@ -279,7 +280,7 @@ def main(cfg: DictConfig):
         >>> main(cfg)
         Traceback (most recent call last):
             ...
-        ValueError: Invalid ordering method: other. Expected one of lexicographic
+        ValueError: ordering_method: unknown value 'other'. Supported: lexicographic.
 
         Note that if the code and code modifiers in the metadata file are not unique, an error will be thrown
         as well -- this is because without unique assignments between codes/modifiers and indices, you would
@@ -309,13 +310,11 @@ def main(cfg: DictConfig):
         f"Stage config:\n{OmegaConf.to_yaml(cfg.stage_cfg)}"
     )
 
-    ordering_method = cfg.stage_cfg.get("ordering_method", VocabularyOrdering.LEXICOGRAPHIC)
-
-    if ordering_method not in VocabularyOrdering_METHODS:
-        raise ValueError(
-            f"Invalid ordering method: {ordering_method}. "
-            f"Expected one of {', '.join(VocabularyOrdering_METHODS.keys())}"
-        )
+    ordering_method = coerce_strenum(
+        cfg.stage_cfg.get("ordering_method", VocabularyOrdering.LEXICOGRAPHIC),
+        VocabularyOrdering,
+        field_name="ordering_method",
+    )
 
     metadata_input_dir = Path(cfg.stage_cfg.metadata_input_dir)
     output_dir = Path(cfg.stage_cfg.reducer_output_dir)
