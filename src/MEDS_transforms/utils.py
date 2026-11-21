@@ -2,12 +2,16 @@
 
 import os
 import sys
+from enum import StrEnum
 from importlib.resources import files
 from pathlib import Path
+from typing import TypeVar
 
 from . import __package_name__
 
 PKG_PFX = "pkg://"
+
+StrEnumT = TypeVar("StrEnumT", bound=StrEnum)
 
 
 def invocation_name(module: str = __package_name__, argv_0: str | None = None) -> str:
@@ -78,3 +82,44 @@ def resolve_pkg_path(pkg_path: str) -> Path:
         return files(pkg_name) / relative_path
     except ModuleNotFoundError as e:
         raise ValueError(f"Package '{pkg_name}' not found. Please check the package name.") from e
+
+
+def coerce_strenum(raw: str, enum_cls: type[StrEnumT], *, field_name: str | None = None) -> StrEnumT:
+    """Coerce a raw config value into a member of ``enum_cls``, with a uniform error on bad input.
+
+    Args:
+        raw: The value to coerce, usually read from a stage config. An existing member of ``enum_cls`` is
+            returned unchanged.
+        enum_cls: The ``StrEnum`` whose values are the supported options.
+        field_name: The config key the value came from. If given, it prefixes the error message, so the user
+            knows which setting to fix.
+
+    Returns:
+        The member of ``enum_cls`` whose value is ``raw``.
+
+    Raises:
+        ValueError: If ``raw`` is not a value of ``enum_cls``. The message lists the supported values.
+
+    Examples:
+        >>> class Color(StrEnum):
+        ...     RED = "red"
+        ...     BLUE = "blue"
+        >>> coerce_strenum("red", Color)
+        <Color.RED: 'red'>
+        >>> coerce_strenum(Color.BLUE, Color, field_name="color")
+        <Color.BLUE: 'blue'>
+        >>> coerce_strenum("green", Color, field_name="color")
+        Traceback (most recent call last):
+            ...
+        ValueError: color: unknown value 'green'. Supported: red, blue.
+        >>> coerce_strenum("green", Color)
+        Traceback (most recent call last):
+            ...
+        ValueError: unknown value 'green'. Supported: red, blue.
+    """
+    try:
+        return enum_cls(raw)
+    except ValueError as e:
+        supported = ", ".join(member.value for member in enum_cls)
+        prefix = f"{field_name}: " if field_name else ""
+        raise ValueError(f"{prefix}unknown value {raw!r}. Supported: {supported}.") from e

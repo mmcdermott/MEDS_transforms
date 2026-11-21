@@ -16,6 +16,7 @@ from omegaconf import DictConfig, ListConfig
 
 from ..dataframe import DF_T
 from ..parser import is_matcher, matcher_to_expr
+from ..utils import coerce_strenum
 from .compute_fn import ANY_COMPUTE_FN_T, COMPUTE_FN_T, bind_compute_fn
 
 logger = logging.getLogger(__name__)
@@ -264,7 +265,8 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
         >>> match_revise_fn = match_revise_fntr(cfg, stage_cfg, compute_fn)
         Traceback (most recent call last):
             ...
-        ValueError: Invalid match and revise mode: foobar
+        ValueError: _match_revise_mode: unknown value 'foobar'. Supported: match_and_revise,
+            multi_match_and_revise.
     """
     try:
         validate_match_revise(stage_cfg)
@@ -273,9 +275,11 @@ def match_revise_fntr(cfg: DictConfig, stage_cfg: DictConfig, compute_fn: ANY_CO
 
     stage_cfg = hydra.utils.instantiate(stage_cfg)
 
-    match_revise_mode = stage_cfg.pop(MATCH_REVISE_MODE_KEY, "match_and_revise")
-    if match_revise_mode not in {x.value for x in MatchReviseMode}:
-        raise ValueError(f"Invalid match and revise mode: {match_revise_mode}")
+    match_revise_mode = coerce_strenum(
+        stage_cfg.pop(MATCH_REVISE_MODE_KEY, "match_and_revise"),
+        MatchReviseMode,
+        field_name=MATCH_REVISE_MODE_KEY,
+    )
 
     matchers_and_fns = []
     for match_revise_cfg in stage_cfg.pop(MATCH_REVISE_KEY):
